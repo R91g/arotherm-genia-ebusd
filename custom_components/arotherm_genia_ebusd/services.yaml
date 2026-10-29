@@ -1,0 +1,95 @@
+set_weekly_timer:
+  name: Configurar programación horaria semanal (b5 55)
+  description: >
+    Modifica una franja horaria semanal en el regulador MiPro Sense (15.bass3)
+    para Calefacción Zona 1, Agua Caliente Sanitaria (ACS), Refrigeración o Recirculación.
+  fields:
+    circuit_type:
+      name: Circuito
+      description: Circuito de programación horaria a modificar.
+      required: true
+      example: "dhw"
+      selector:
+        select:
+          options:
+            - label: "Calefacción Zona 1 (Z1Timer)"
+              value: "heating"
+            - label: "Agua Caliente Sanitaria - ACS (HwcTimer)"
+              value: "dhw"
+            - label: "Refrigeración (CoolingTimer)"
+              value: "cooling"
+            - label: "Recirculación (CirculationTimer)"
+              value: "circulation"
+    day:
+      name: Día de la semana
+      description: Día específico, Lunes a Viernes (Weekdays) o toda la semana (All).
+      required: true
+      example: "All"
+      selector:
+        select:
+          options:
+            - label: "Lunes (Monday)"
+              value: "Monday"
+            - label: "Martes (Tuesday)"
+              value: "Tuesday"
+            - label: "Miércoles (Wednesday)"
+              value: "Wednesday"
+            - label: "Jueves (Thursday)"
+              value: "Thursday"
+            - label: "Viernes (Friday)"
+              value: "Friday"
+            - label: "Sábado (Saturday)"
+              value: "Saturday"
+            - label: "Domingo (Sunday)"
+              value: "Sunday"
+            - label: "Lunes a Viernes (Weekdays)"
+              value: "Weekdays"
+            - label: "Todos los días L-D (All)"
+              value: "All"
+    slot:
+      name: Ranura horaria (Slot)
+      description: Número de ranura diaria (1, 2 o 3). Por defecto 1.
+      required: false
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 3
+          step: 1
+          mode: box
+    start_time:
+      name: Hora de inicio
+      description: Hora de inicio de la franja en formato HH:MM (ej. 13:10).
+      required: true
+      example: "13:10"
+      selector:
+        text:
+    end_time:
+      name: Hora de fin
+      description: Hora de finalización de la franja en formato HH:MM (ej. 14:50).
+      required: true
+      example: "14:50"
+      selector:
+        text:
+
+force_dhw_boost:
+  name: Activar ACS Puntual Forzado Inteligente (Boost)
+  description: >
+    Inicia una carga puntual del depósito de ACS (HwcSFMode = load) superando
+    automáticamente la histéresis mediante elevación dinámica temporal de consigna
+    (T_actual + histéresis + 1.5 °C) y restauración automática al finalizar.
+  fields:
+    boost_temp:
+      name: Temperatura temporal de Boost (Opcional - Excedentes)
+      description: >
+        Consigna temporal opcional en °C para este ciclo concreto (ej. 60 °C para excedentes solares).
+        Si se omite, calcula automáticamente T_actual + histéresis + 1.5 °C.
+      required: false
+      example: 60.0
+      selector:
+        number:
+          min: 40.0
+          max: 68.0
+          step: 0.5
+          unit_of_measurement: "°C"
+          mode: box

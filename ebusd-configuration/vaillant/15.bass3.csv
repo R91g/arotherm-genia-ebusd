@@ -1,0 +1,263 @@
+type,circuit,level,name,comment,qq,zz,pbsb,id,*name,part,type,divisor/values,unit,comment
+*r,
+*w,
+*u,
+*uw,
+
+# ==============================================================================
+# 1. GENERAL PARAMETERS, HYDRAULICS, AND ENERGY TELEMETRY (BASS3)
+# ==============================================================================
+u,,,WaterPressure,water pressure,,,b524,020000003900,ign,,IGN:4,,,,press,,EXP,,bar,water pressure
+u,,,SystemFlowUninstalled,system flow temp (uninstalled probe),,,b524,020000004b00,data,,HEX:4,,,system flow temperature
+u,,,ContinuosHeating,continuos heating,,,b524,020000000200,ign,,IGN:4,,,,value,,EXP,,°C,"-26=off, when the outside temperature falls below this threshold temperature the continuous heating function is started (off <=> function is disabled)"
+w,,,ContinuosHeating,continuos heating,,,b524,020100000200,value,,EXP,,°C,"-26=off, when the outside temperature falls below this threshold temperature the continuous heating function is started (off <=> function is disabled)"
+u,,,FrostOverRideTime,frost delay time,,,b524,020000000300,ign,,IGN:4,,,,value,,UIN,,h,delay before frost protection is activated
+w,,,FrostOverRideTime,frost delay time,,,b524,020100000300,value,,UIN,,h,delay before frost protection is activated
+r9,,,GlobalSystemOff,Global System OFF,,,b524,020000000700,ign,,IGN:4,,,,value,,UCH,0=no;1=yes,,For switching system off
+w,,install,GlobalSystemOff,Global System OFF,,,b524,020100000700,value,,UCH,0=no;1=yes,,For switching system off
+r9,,,MaxRoomHumidity,max room humidity,,,b524,020000000e00,ign,,IGN:4,,,,value,,UIN,,,maximum room humidity
+w,,,MaxRoomHumidity,max room humidity,,,b524,020100000e00,value,,UIN,,,maximum room humidity
+r9,,,AdaptHeatCurve,adaptive heat curve,,,b524,020000001400,ign,,IGN:4,,,,value,,UCH,0=no;1=yes,,automatic correction of configured heat curve
+w,,,AdaptHeatCurve,adaptive heat curve,,,b524,020100001400,value,,UCH,0=no;1=yes,,automatic correction of configured heat curve
+u,,,Date,date,,,b524,020000003400,ign,,IGN:4,,,,value,,HDA:3,,,current date
+w,,,Date,date,,,b524,020100003400,value,,HDA:3,,,current date
+u,,,Time,time,,,b524,020000003500,ign,,IGN:4,,,,value,,HTI,,,current time
+w,,,Time,time,,,b524,020100003500,value,,HTI,,,current time
+u,,,HydraulicScheme,system diagram,,,b524,020000003600,ign,,IGN:4,,,,value,,UIN,,,system diagram
+w,,,HydraulicScheme,system diagram,,,b524,020100003600,value,,UIN,,,system diagram
+u,,,MultiRelaySetting,multifunction relay setting,,,b524,020000004d00,ign,,IGN:4,,,,value,,UIN,0=circulation;1=dryer;2=zone;3=legiopump,,
+w,,,MultiRelaySetting,multifunction relay setting,,,b524,020100004d00,value,,UIN,0=circulation;1=dryer;2=zone;3=legiopump,,
+u,,,DisplayedOutsideTemp,outside temperature,,,b524,020000007300,ign,,IGN:4,,,,value,,EXP,,°C,outside temperature
+u,,,OutsideTempAvg,average outside temperature,,,b524,020000009500,ign,,IGN:4,,,,value,,EXP,,°C,rounded average outside temperature (updated every 3h)
+w,,,OutsideTempAvg,average outside temperature,,,b524,020100009500,value,,EXP,,°C,rounded average outside temperature (updated every 3h)
+# Disabled active polling of non-existent solar registers to prevent bus saturation and read timeouts
+u,,,YieldTotal,total environmental yield,,,b524,020000003e00,ign,,IGN:4,,,,value,,ULG,,kWh,total environmental yield
+w,,,YieldTotal,total environmental yield,,,b524,020100003e00,value,,ULG,,kWh,total environmental yield
+u,,,SolarYieldTotal,total solar yield,,,b524,020000003d00,ign,,IGN:4,,,,value,,ULG,,kWh,total solar yield
+w,,,SolarYieldTotal,total solar yield,,,b524,020100003d00,value,,ULG,,kWh,total solar yield
+r9,,,PrEnergySumHc,total energy consumption heating,,,b524,020000005700,ign,,IGN:4,,,,value,,ULG,,kWh,total heating electricity consumption
+w,,,PrEnergySumHc,total energy consumption heating,,,b524,020100005700,value,,ULG,,kWh,total heating electricity consumption
+r9,,,PrEnergySumHcThisMonth,this months energy consumption heating,,,b524,020000004f00,ign,,IGN:4,,,,value,,ULG,,kWh,current month heating electricity consumption
+w,,,PrEnergySumHcThisMonth,this months energy consumption heating,,,b524,020100004f00,value,,ULG,,kWh,current month heating electricity consumption
+r9,,,PrEnergySumHcLastMonth,last months energy consumption heating,,,b524,020000005300,ign,,IGN:4,,,,value,,ULG,,kWh,last month heating electricity consumption
+w,,,PrEnergySumHcLastMonth,last months energy consumption heating,,,b524,020100005300,value,,ULG,,kWh,last month heating electricity consumption
+r9,,,PrEnergySumHwc,total energy consumption hot water,,,b524,020000005800,ign,,IGN:4,,,,value,,ULG,,kWh,total hot water electricity consumption
+w,,,PrEnergySumHwc,total energy consumption hot water,,,b524,020100005800,value,,ULG,,kWh,total hot water electricity consumption
+r9,,,PrEnergySumHwcThisMonth,this months energy consumption hot water,,,b524,020000005000,ign,,IGN:4,,,,value,,ULG,,kWh,current month hot water electricity consumption
+w,,,PrEnergySumHwcThisMonth,this months energy consumption hot water,,,b524,020100005000,value,,ULG,,kWh,current month hot water electricity consumption
+r9,,,PrEnergySumHwcLastMonth,last months energy consumption hot water,,,b524,020000005400,ign,,IGN:4,,,,value,,ULG,,kWh,last month hot water electricity consumption
+w,,,PrEnergySumHwcLastMonth,last months energy consumption hot water,,,b524,020100005400,value,,ULG,,kWh,last month hot water electricity consumption
+u,,,KeyCodeforConfigMenu,code for installer menu,,,b524,020000007600,ign,,IGN:4,,,,value,,UIN,,,000-999; code for the installer's menues
+w,,,KeyCodeforConfigMenu,code for installer menu,,,b524,020100007600,value,,UIN,,,000-999; code for the installer's menues
+u,,,MaintenanceDate,next maintenance,,,b524,020000002c00,ign,,IGN:4,,,,value,,HDA:3,,,next maintenance date
+w,,,MaintenanceDate,next maintenance,,,b524,020100002c00,value,,HDA:3,,,next maintenance date
+u,,,MaintenanceDue,maintenance due,,,b524,020000009600,ign,,IGN:4,,,,value,,UCH,0=no;1=yes,,indicates whether maintenance is due
+u,,,SystemOperatingState,system operating state,,,b524,020000004800,ign,,IGN:4,,,,value,,UIN,0=standby;1=heating;2=cooling;3=dhw,,current active system operating state
+r9,,,BivalencePointHc,bivalence point heating,,,b524,020000002300,ign,,IGN:4,,,,value,,EXP,,°C,bivalence point for heat pump heating
+w,,,BivalencePointHc,bivalence point heating,,,b524,020100002300,value,,EXP,,°C,bivalence point for heat pump heating
+r9,,,BivalencePointHwc,bivalence point hot water,,,b524,020000000100,ign,,IGN:4,,,,value,,EXP,,°C,bivalence point for hot water
+w,,,BivalencePointHwc,bivalence point hot water,,,b524,020100000100,value,,EXP,,°C,bivalence point for hot water
+r9,,,AlternativePoint,alternative point heating,,,b524,020000002200,ign,,IGN:4,,,,value,,EXP,,°C,alternative point threshold temperature
+w,,,AlternativePoint,alternative point heating,,,b524,020100002200,value,,EXP,,°C,alternative point threshold temperature
+u,,,Unknown04,unknown register 04 (uninstalled),,,b524,020000000400,data,,HEX:4,,,
+u,,,SolarStorageBottom,solar storage temperature bottom (uninstalled),,,b524,020000006700,data,,HEX:4,,,"solar temperature sensor, bottom"
+u,,,SolarStorageTop,solar storage temperature top (uninstalled),,,b524,020000006800,data,,HEX:4,,,"solar temperature sensor, top"
+u,,,UnknownSettingB6,unknown setting b6 (uninstalled),,,b524,02000000b600,data,,HEX:4,,,
+u,,,PrHeader,energy header query,,,b516,1000ffff01000000,ign,,IGN:7,,,,value,,EXP,,,
+
+# ==============================================================================
+# 2. DOMESTIC HOT WATER (DHW)
+# ==============================================================================
+u,,,HwcStorageTemp,hwc storage temperature,,,b524,020001000500,ign,,IGN:4,,,,value,,EXP,,°C,actual storage temperature
+u,,,HwcTempDesired,hwc temperature desired,,,b524,020001000400,ign,,IGN:4,,,,value,,EXP,,°C,setpoint of domestic hot water circuit
+w,,,HwcTempDesired,hwc temperature desired,,,b524,020101000400,value,,EXP,,°C,setpoint of domestic hot water circuit
+u,,,HwcOpMode,hwc operation mode,,,b524,020001000300,ign,,IGN:4,,,,value,,UIN,0=off;1=auto;2=day;3=night,,operation mode of Hwc
+w,,,HwcOpMode,hwc operation mode,,,b524,020101000300,value,,UIN,0=off;1=auto;2=day;3=night,,operation mode of Hwc
+r9,,,HwcSFMode,hwc SF mode,,,b524,020001000d00,ign,,IGN:4,,,,value,,UCH,0=auto;1=ventilation;2=party;3=veto;4=onedayaway;5=onedayathome;6=load,,
+w,,,HwcSFMode,hwc SF mode,,,b524,020101000d00,value,,UCH,0=auto;1=ventilation;2=party;3=veto;4=onedayaway;5=onedayathome;6=load,,
+r9,,,HwcFlowTemp,hwc flow temperature,,,b524,020001000800,ign,,IGN:4,,,,value,,EXP,,°C,desired flow temp for Hwc
+r9,,,HwcMaxFlowTempDesired,hwc max flow temp desired,,,b524,020000004600,ign,,IGN:4,,,,value,,EXP,,°C,maximum flow temperature setpoint of Hwc
+w,,,HwcMaxFlowTempDesired,hwc max flow temp desired,,,b524,020100004600,value,,EXP,,°C,maximum flow temperature setpoint of Hwc
+r9,,,HwcParallelLoading,hwc parallel loading,,,b524,020000000a00,ign,,IGN:4,,,,value,,UCH,0=off;1=on,,heating and hot water parallel
+w,,,HwcParallelLoading,hwc parallel loading,,,b524,020100000a00,value,,UCH,0=off;1=on,,heating and hot water parallel
+r9,,,HwcLockTime,hwc lock time,,,b524,020000001800,ign,,IGN:4,,,,value,,UIN,,min,DHW lock time
+w,,,HwcLockTime,hwc lock time,,,b524,020100001800,value,,UIN,,min,DHW lock time
+r9,,,MaxCylinderChargeTime,maximale Speicherladezeit,,,b524,020000001700,ign,,IGN:4,,,,value,,UIN,,min,maximum cylinder charging time
+w,,,MaxCylinderChargeTime,maximale Speicherladezeit,,,b524,020100001700,value,,UIN,,min,maximum cylinder charging time
+r9,,,PumpAdditionalTime,pump additional time,,,b524,020000001b00,ign,,IGN:4,,,,value,,UIN,,min,charging pump overrun time
+w,,,PumpAdditionalTime,pump additional time,,,b524,020100001b00,value,,UIN,,min,charging pump overrun time
+r9,,,CylinderChargeHyst,hysteresis cylinder charge,,,b524,020000002700,ign,,IGN:4,,,,value,,EXP,,K,cylinder charging hysteresis
+w,,,CylinderChargeHyst,hysteresis cylinder charge,,,b524,020100002700,value,,EXP,,K,cylinder charging hysteresis
+r9,,,CylinderChargeOffset,offset cylinder charge,,,b524,020000002900,ign,,IGN:4,,,,value,,EXP,,K,cylinder charging offset
+w,,,CylinderChargeOffset,offset cylinder charge,,,b524,020100002900,value,,EXP,,K,cylinder charging offset
+u,,,HwcStorageTop,hwc storage temperature top (uninstalled),,,b524,020000009d00,data,,HEX:4,,,"DHW temperature sensor, top"
+u,,,HwcStorageBottom,storage temperature bottom (uninstalled),,,b524,020000009e00,data,,HEX:4,,,"DHW temperature sensor, bottom"
+
+u,,,HwcStatus,hwc status,,,b524,020001000f00,ign,,IGN:4,,,,value,,UIN,0=auto;7=holidayaway;9=load;10=off,,
+r9,,,BufferChargeOffset,offset buffer charge,,,b524,02000000a200,ign,,IGN:4,,,,value,,EXP,,K,
+w,,,BufferChargeOffset,offset buffer charge,,,b524,02010000a200,value,,EXP,,K,
+
+# ==============================================================================
+# 3. CLIMATE CONTROL / HEATING (CIRCUIT 1 - SINGLE ZONE)
+# ==============================================================================
+u,,,Z1RoomTemp,room temperature zone 1,,,b524,020003000f00,ign,,IGN:4,,,,value,,EXP,,°C,current room temperature in zone 1
+u,,,Z1ActualRoomTempDesired,room temperature desired zone 1,,,b524,020003001400,ign,,IGN:4,,,,value,,EXP,,°C,current room setpoint considering all basic conditions passed to the control algorithms
+w,,,Z1ActualRoomTempDesired,room temperature desired zone 1,,,b524,020103001400,value,,EXP,,°C,current room setpoint considering all basic conditions passed to the control algorithms
+u,,,Z1OpMode,operation mode zone 1,,,b524,020003000600,ign,,IGN:4,,,,value,,UIN,0=off;1=auto;2=day;3=night,,operation mode of zone 1
+w,,,Z1OpMode,operation mode zone 1,,,b524,020103000600,value,,UIN,0=off;1=auto;2=day;3=night,,operation mode of zone 1
+r9,,,Z1SFMode,SF mode zone 1,,,b524,020003000e00,ign,,IGN:4,,,,value,,UCH,0=auto;1=ventilation;2=party;3=veto;4=onedayaway;5=onedayathome;6=load,,
+w,,,Z1SFMode,SF mode zone 1,,,b524,020103000e00,value,,UCH,0=auto;1=ventilation;2=party;3=veto;4=onedayaway;5=onedayathome;6=load,,
+r9,,,Z1QuickVetoTemp,quick veto temperature zone 1,,,b524,020003000800,ign,,IGN:4,,,,value,,EXP,,°C,manual override setpoint for zone 1
+w,,,Z1QuickVetoTemp,quick veto temperature zone 1,,,b524,020103000800,value,,EXP,,°C,manual override setpoint for zone 1
+r9,,,Z1NightTemp,night temperature zone 1,,,b524,020003000900,ign,,IGN:4,,,,value,,EXP,,°C,night setpoint for zone 1
+w,,,Z1NightTemp,night temperature zone 1,,,b524,020103000900,value,,EXP,,°C,night setpoint for zone 1
+r9,,,Z1HolidayTemp,room setpoint holiday period zone 1,,,b524,020003000500,ign,,IGN:4,,,,value,,EXP,,°C,holiday setpoint for zone 1
+w,,,Z1HolidayTemp,room setpoint holiday period zone 1,,,b524,020103000500,value,,EXP,,°C,holiday setpoint for zone 1
+u,,,Hc1FlowTemp,FlowTemp heating circuit 1,,,b524,020002000800,ign,,IGN:4,,,,value,,EXP,,°C,current flow temperature of Hc1
+u,,,Hc1ActualFlowTempDesired,ActualFlowTempDesired heating circuit 1,,,b524,020002000700,ign,,IGN:4,,,,value,,EXP,,°C,current flow temperature setpoint of Hc1
+r9,,,Hc1HeatCurve,HeatCurve heating circuit 1,,,b524,020002000f00,ign,,IGN:4,,,,value,,EXP,,,heating curve of Hc1
+w,,,Hc1HeatCurve,HeatCurve heating circuit 1,,,b524,020102000f00,value,,EXP,,,heating curve of Hc1
+r9,,,Hc1SummerTempLimit,summer outside switchoff temperature heating circuit 1,,,b524,020002001400,ign,,IGN:4,,,,value,,EXP,,°C,if outside temperature > summer limit => heating is OFF;applies to comfort and night setback setpoint
+w,,,Hc1SummerTempLimit,summer outside switchoff temperature heating circuit 1,,,b524,020102001400,value,,EXP,,°C,if outside temperature > summer limit => heating is OFF;applies to comfort and night setback setpoint
+r9,,,Hc1MaxFlowTempDesired,MaxFlowTempDesired heating circuit 1,,,b524,020002001000,ign,,IGN:4,,,,value,,EXP,,°C,maximum flow temperature setpoint (end emphasis) of Hc1
+w,,,Hc1MaxFlowTempDesired,MaxFlowTempDesired heating circuit 1,,,b524,020102001000,value,,EXP,,°C,maximum flow temperature setpoint (end emphasis) of Hc1
+r9,,,Hc1MinFlowTempDesired,MinFlowTempDesired heating circuit 1,,,b524,020002001200,ign,,IGN:4,,,,value,,EXP,,°C,minimum flow temperature setpoint (end emphasis) of Hc1
+w,,,Hc1MinFlowTempDesired,MinFlowTempDesired heating circuit 1,,,b524,020102001200,value,,EXP,,°C,minimum flow temperature setpoint (end emphasis) of Hc1
+r9,,,Hc1RoomTempSwitchOn,RoomTempSwitchOn heating circuit 1,,,b524,020002001500,ign,,IGN:4,,,,value,,UIN,0=off;1=modulating;2=thermostat,,room temperature modulation of Hc1
+w,,,Hc1RoomTempSwitchOn,RoomTempSwitchOn heating circuit 1,,,b524,020102001500,value,,UIN,0=off;1=modulating;2=thermostat,,room temperature modulation of Hc1
+r9,,,Hc1Status,Status heating circuit 1,,,b524,020002001b00,ign,,IGN:4,,,,value,,UCH,,,status of zone 1
+w,,,Hc1Status,Status heating circuit 1,,,b524,020102001b00,value,,UCH,,,status of zone 1
+u,,,Hc1PumpStatus,PumpStatus heating circuit 1,,,b524,020002001e00,ign,,IGN:4,,,,value,,UIN,,,pump status of zone 1
+w,,,Hc1PumpStatus,PumpStatus heating circuit 1,,,b524,020102001e00,value,,UIN,,,pump status of zone 1
+r9,,,Hc1AutoOffMode,AutoOffMode heating circuit 1,,,b524,020002000e00,ign,,IGN:4,,,,value,,UIN,0=eco;1=night,,operation of Hc1 during the lowering time; no influence if room temperature modulation is set to thermostat
+w,,,Hc1AutoOffMode,AutoOffMode heating circuit 1,,,b524,020102000e00,value,,UIN,0=eco;1=night,,operation of Hc1 during the lowering time; no influence if room temperature modulation is set to thermostat
+u,,,Hc1CircuitType,CircuitType heating circuit 1,,,b524,020002000200,ign,,IGN:4,,,,mctype,,UCH,0=inactive;1=mixer;2=fixed;3=hwc;4=returnincr;5=pool,,mixer type,ign,,IGN:1,,,
+# Disabled active polling of non-existent mixer circuit and adaptive curve (prevents collisions and timeouts)
+r9,,,Hc1ExcessTemp,ExcessTemp heating circuit 1,,,b524,020002000b00,ign,,IGN:4,,,,value,,EXP,,K,excess temperature of Hc1
+w,,,Hc1ExcessTemp,ExcessTemp heating circuit 1,,,b524,020102000b00,value,,EXP,,K,excess temperature of Hc1
+u,,,Hc1MixerMovement,MixerMovement heating circuit 1,,,b524,020002001a00,ign,,IGN:4,,,,value,,EXP,,,"status of mixer (<0 closing, >0 opening)"
+u,,,Hc1HeatCurveAdaption,HeatCurveAdaption heating circuit 1,,,b524,020002001c00,ign,,IGN:4,,,,value,,EXP,,,adaption applied to heating curve of Hc1
+u,,,HcStorageTop,hc storage temperature top (uninstalled),,,b524,020000009f00,data,,HEX:4,,,"heating storage temperature sensor, top"
+u,,,HcStorageBottom,hc storage temperature bottom (uninstalled),,,b524,02000000a000,data,,HEX:4,,,"heating storage temperature sensor, bottom"
+r9,,,Z1ValveStatus,valve status zone 1,,,b524,020003001200,ign,,IGN:4,,,,value,,UCH,,,valve status of zone 1
+w,,,Z1ValveStatus,valve status zone 1,,,b524,020103001200,value,,UCH,,,valve status of zone 1
+u,,,Z1RoomZoneMapping,room zone mapping zone 1,,,b524,020003001300,ign,,IGN:4,,,,value,,UIN,0=none;1=VRC700;2=VR91_1;3=VR91_2;4=VR91_3,,configures which room temperature is assigned to zone 1
+w,,,Z1RoomZoneMapping,room zone mapping zone 1,,,b524,020103001300,value,,UIN,0=none;1=VRC700;2=VR91_1;3=VR91_2;4=VR91_3,,configures which room temperature is assigned to zone 1
+u,,,Z1Shortname,short name zone 1,,,b524,020003001600,ign,,IGN:4,,,,value,,STR:6,,,short name of zone 1
+w,,,Z1Shortname,short name zone 1,,,b524,020103001600,value,,STR:6,,,short name of zone 1
+u,,,Z1Name1,zone 1 label (first part),,,b524,020003001700,ign,,IGN:4,,,,value,,STR:5,,,name of zone 1
+w,,,Z1Name1,zone 1 label (first part),,,b524,020103001700,value,,STR:5,,,name of zone 1
+u,,,Z1Status,zone 1 status,,,b524,020003001b00,ign,,IGN:4,,,,value,,UIN,0=auto;1=ventilation;4=veto;7=holidayaway;9=load;10=off,,
+u,,,Z1HeatingState,zone 1 heating demand state,,,b524,020003002c00,ign,,IGN:4,,,,value,,UCH,0=off;1=on,,heating demand status
+u,,,Z1ManualTemp,manual heating setpoint zone 1,,,b524,020003002200,ign,,IGN:4,,,,value,,EXP,,°C,temperature
+w,,,Z1ManualTemp,manual heating setpoint zone 1,,,b524,020103002200,value,,EXP,,°C,temperature
+u,,,Z1DayTemp,desired day temperature zone 1,,,b524,020003002300,ign,,IGN:4,,,,value,,EXP,,°C,day comfort setpoint for zone 1
+w,,,Z1DayTemp,desired day temperature zone 1,,,b524,020103002300,value,,EXP,,°C,day comfort setpoint for zone 1
+u,,,Z1MaxFlowTempDesired,max flow temp zone 1,,,b524,020003002800,ign,,IGN:4,,,,value,,EXP,,°C,max flow temperature zone 1
+w,,,Z1MaxFlowTempDesired,max flow temp zone 1,,,b524,020103002800,value,,EXP,,°C,max flow temperature zone 1
+
+# ==============================================================================
+# 4. COOLING LOGIC (SEASON WINDOW AND SETPOINTS)
+# ==============================================================================
+u,,,Z1OpModeCooling,cooling operation mode zone 1,,,b524,020003000100,ign,,IGN:4,,,,value,,UIN,0=off;1=auto;2=day;3=night,,operation mode for cooling of zone 1
+w,,,Z1OpModeCooling,cooling operation mode zone 1,,,b524,020103000100,value,,UIN,0=off;1=auto;2=day;3=night,,operation mode for cooling of zone 1
+u,,,Z1CoolingTemp,cooling setpoint zone 1,,,b524,020003000200,ign,,IGN:4,,,,value,,EXP,,°C,desired cooling setpoint for zone 1
+w,,,Z1CoolingTemp,cooling setpoint zone 1,,,b524,020103000200,value,,EXP,,°C,desired cooling setpoint for zone 1
+u,,,CoolingStartDate,cooling start date,,,b524,02000000da00,ign,,IGN:4,,,,day,,UCH,,,,month,,UCH,,,,year,,UCH,,,"Start date for active cooling (day, month, year)"
+w,,,CoolingStartDate,cooling start date,,,b524,02010000da00,day,,UCH,,,,month,,UCH,,,,year,,UCH,,,"Start date for active cooling (day, month, year)"
+u,,,CoolingEndDate,cooling end date,,,b524,02000000db00,ign,,IGN:4,,,,day,,UCH,,,,month,,UCH,,,,year,,UCH,,,"End date for active cooling (day, month, year)"
+w,,,CoolingEndDate,cooling end date,,,b524,02010000db00,day,,UCH,,,,month,,UCH,,,,year,,UCH,,,"End date for active cooling (day, month, year)"
+u,,,Z1CoolingTempDesired,cooling room temperature desired zone 1,,,b524,020003001500,ign,,IGN:4,,,,value,,EXP,,°C,temperature
+w,,,Z1CoolingTempDesired,cooling room temperature desired zone 1,,,b524,020103001500,value,,EXP,,°C,temperature
+r9,,,CoolingReleaseStatus,cooling release status,,,b524,020000000900,ign,,IGN:4,,,,value,,UCH,0=off;1=on,,cooling release status
+r9,,,CoolingFlowTempDesiredMin,cooling min flow temp desired,,,b524,020002001100,ign,,IGN:4,,,,value,,EXP,,°C,min flow temperature setpoint for cooling (Circuit 1: 10.0 °C on MiPro Sense)
+w,,,CoolingFlowTempDesiredMin,cooling min flow temp desired,,,b524,020102001100,value,,EXP,,°C,min flow temperature setpoint for cooling (Circuit 1: 10.0 °C on MiPro Sense)
+r9,,,CoolingFlowTempDesiredMax,cooling max flow temp desired,,,b524,020000002600,ign,,IGN:4,,,,value,,EXP,,°C,max flow temperature setpoint for cooling
+w,,,CoolingFlowTempDesiredMax,cooling max flow temp desired,,,b524,020100002600,value,,EXP,,°C,max flow temperature setpoint for cooling
+
+
+# ==============================================================================
+# 5. DIAGNOSTICS AND ERROR LOGGING
+# ==============================================================================
+u,,,Currenterror,Current errors,,,b503,0001,error,,UIN,,,error number,error_1,,UIN,,,error number,error_2,,UIN,,,error number,error_3,,UIN,,,error number,error_4,,UIN,,,error number
+u,,,Errorhistory,Error_History,,,b503,0101,index,m,UCH,,,,status,,UCH,,,Status,time,,VTM,,,time,date,,HDA:3,,,date,error,,UIN,,,error number
+u,,,ErrorMemorySlot,error memory slot,,,b503,00,slot,m,UCH,,,,error,,UIN,,,error number,data,,HEX:8,,,
+w,,install,Clearerrorhistory,Clear error history,,,b503,0201,cleared,s,UCH,0=no;1=yes,,
+u,,,AppSessionStatus,app session status,,,b531,0301,status,,UCH,1=connected;0=disconnected,,app session status
+
+# ==============================================================================
+# 6. WEEKLY TIME SCHEDULE (b5 55: READ r / WRITE w)
+# ==============================================================================
+# Read command structure (a5): a5 00 [circuit] [day 00-06] [slot 00-02]
+# Write command structure (a6): a6 ff [circuit] [day 00-06] [slot 00-02] [total_slots 01-03]
+# 6.1 Heating Zone 1 (Circuit 03)
+u,,,Z1Timer_Monday,Timer Zone 1 Monday,,,b555,a500030000,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_2,,IGN:2,,,"Heating schedule Monday (HH;MM;HH;MM)"
+w,,,Z1Timer_Monday,Timer Zone 1 Monday,,,b555,a6ff03000001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"Heating schedule Monday (HH;MM;HH;MM)"
+u,,,Z1Timer_Tuesday,Timer Zone 1 Tuesday,,,b555,a500030100,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_2,,IGN:2,,,"Heating schedule Tuesday (HH;MM;HH;MM)"
+w,,,Z1Timer_Tuesday,Timer Zone 1 Tuesday,,,b555,a6ff03010001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"Heating schedule Tuesday (HH;MM;HH;MM)"
+u,,,Z1Timer_Wednesday,Timer Zone 1 Wednesday,,,b555,a500030200,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_2,,IGN:2,,,"Heating schedule Wednesday (HH;MM;HH;MM)"
+w,,,Z1Timer_Wednesday,Timer Zone 1 Wednesday,,,b555,a6ff03020001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"Heating schedule Wednesday (HH;MM;HH;MM)"
+u,,,Z1Timer_Thursday,Timer Zone 1 Thursday,,,b555,a500030300,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_2,,IGN:2,,,"Heating schedule Thursday (HH;MM;HH;MM)"
+w,,,Z1Timer_Thursday,Timer Zone 1 Thursday,,,b555,a6ff03030001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"Heating schedule Thursday (HH;MM;HH;MM)"
+u,,,Z1Timer_Friday,Timer Zone 1 Friday,,,b555,a500030400,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_2,,IGN:2,,,"Heating schedule Friday (HH;MM;HH;MM)"
+w,,,Z1Timer_Friday,Timer Zone 1 Friday,,,b555,a6ff03040001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"Heating schedule Friday (HH;MM;HH;MM)"
+u,,,Z1Timer_Saturday,Timer Zone 1 Saturday,,,b555,a500030500,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_2,,IGN:2,,,"Heating schedule Saturday (HH;MM;HH;MM)"
+w,,,Z1Timer_Saturday,Timer Zone 1 Saturday,,,b555,a6ff03050001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"Heating schedule Saturday (HH;MM;HH;MM)"
+u,,,Z1Timer_Sunday,Timer Zone 1 Sunday,,,b555,a500030600,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_2,,IGN:2,,,"Heating schedule Sunday (HH;MM;HH;MM)"
+w,,,Z1Timer_Sunday,Timer Zone 1 Sunday,,,b555,a6ff03060001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"Heating schedule Sunday (HH;MM;HH;MM)"
+
+# 6.2 Domestic Hot Water - DHW (Circuit 02)
+u,,,HwcTimer_Monday,Timer DHW Monday,,,b555,a500020000,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_2,,IGN:2,,,"DHW schedule Monday (HH;MM;HH;MM)"
+w,,,HwcTimer_Monday,Timer DHW Monday,,,b555,a6ff02000001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"DHW schedule Monday (HH;MM;HH;MM)"
+u,,,HwcTimer_Tuesday,Timer DHW Tuesday,,,b555,a500020100,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_2,,IGN:2,,,"DHW schedule Tuesday (HH;MM;HH;MM)"
+w,,,HwcTimer_Tuesday,Timer DHW Tuesday,,,b555,a6ff02010001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"DHW schedule Tuesday (HH;MM;HH;MM)"
+u,,,HwcTimer_Wednesday,Timer DHW Wednesday,,,b555,a500020200,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_2,,IGN:2,,,"DHW schedule Wednesday (HH;MM;HH;MM)"
+w,,,HwcTimer_Wednesday,Timer DHW Wednesday,,,b555,a6ff02020001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"DHW schedule Wednesday (HH;MM;HH;MM)"
+u,,,HwcTimer_Thursday,Timer DHW Thursday,,,b555,a500020300,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_2,,IGN:2,,,"DHW schedule Thursday (HH;MM;HH;MM)"
+w,,,HwcTimer_Thursday,Timer DHW Thursday,,,b555,a6ff02030001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"DHW schedule Thursday (HH;MM;HH;MM)"
+u,,,HwcTimer_Friday,Timer DHW Friday,,,b555,a500020400,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_2,,IGN:2,,,"DHW schedule Friday (HH;MM;HH;MM)"
+w,,,HwcTimer_Friday,Timer DHW Friday,,,b555,a6ff02040001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"DHW schedule Friday (HH;MM;HH;MM)"
+u,,,HwcTimer_Saturday,Timer DHW Saturday,,,b555,a500020500,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_2,,IGN:2,,,"DHW schedule Saturday (HH;MM;HH;MM)"
+w,,,HwcTimer_Saturday,Timer DHW Saturday,,,b555,a6ff02050001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"DHW schedule Saturday (HH;MM;HH;MM)"
+u,,,HwcTimer_Sunday,Timer DHW Sunday,,,b555,a500020600,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_2,,IGN:2,,,"DHW schedule Sunday (HH;MM;HH;MM)"
+w,,,HwcTimer_Sunday,Timer DHW Sunday,,,b555,a6ff02060001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"DHW schedule Sunday (HH;MM;HH;MM)"
+
+# 6.3 Cooling (Circuit 01)
+u,,,CoolingTimer_Monday,Timer Cooling Monday,,,b555,a500010000,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,D1C,,°C,"Cooling schedule Monday (HH;MM;HH;MM)"
+w,,,CoolingTimer_Monday,Timer Cooling Monday,,,b555,a6ff01000001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"Cooling schedule Monday (HH;MM;HH;MM)"
+u,,,CoolingTimer_Tuesday,Timer Cooling Tuesday,,,b555,a500010100,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,D1C,,°C,"Cooling schedule Tuesday (HH;MM;HH;MM)"
+w,,,CoolingTimer_Tuesday,Timer Cooling Tuesday,,,b555,a6ff01010001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"Cooling schedule Tuesday (HH;MM;HH;MM)"
+u,,,CoolingTimer_Wednesday,Timer Cooling Wednesday,,,b555,a500010200,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,D1C,,°C,"Cooling schedule Wednesday (HH;MM;HH;MM)"
+w,,,CoolingTimer_Wednesday,Timer Cooling Wednesday,,,b555,a6ff01020001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"Cooling schedule Wednesday (HH;MM;HH;MM)"
+u,,,CoolingTimer_Thursday,Timer Cooling Thursday,,,b555,a500010300,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,D1C,,°C,"Cooling schedule Thursday (HH;MM;HH;MM)"
+w,,,CoolingTimer_Thursday,Timer Cooling Thursday,,,b555,a6ff01030001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"Cooling schedule Thursday (HH;MM;HH;MM)"
+u,,,CoolingTimer_Friday,Timer Cooling Friday,,,b555,a500010400,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,D1C,,°C,"Cooling schedule Friday (HH;MM;HH;MM)"
+w,,,CoolingTimer_Friday,Timer Cooling Friday,,,b555,a6ff01040001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"Cooling schedule Friday (HH;MM;HH;MM)"
+u,,,CoolingTimer_Saturday,Timer Cooling Saturday,,,b555,a500010500,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,D1C,,°C,"Cooling schedule Saturday (HH;MM;HH;MM)"
+w,,,CoolingTimer_Saturday,Timer Cooling Saturday,,,b555,a6ff01050001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"Cooling schedule Saturday (HH;MM;HH;MM)"
+u,,,CoolingTimer_Sunday,Timer Cooling Sunday,,,b555,a500010600,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,D1C,,°C,"Cooling schedule Sunday (HH;MM;HH;MM)"
+w,,,CoolingTimer_Sunday,Timer Cooling Sunday,,,b555,a6ff01060001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"Cooling schedule Sunday (HH;MM;HH;MM)"
+
+# 6.4 Circulation Pump (Circuit 00)
+u,,,CirculationTimer_Monday,Timer Circulation Monday,,,b555,a500000000,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_2,,IGN:2,,,"Circulation schedule Monday (HH;MM;HH;MM)"
+w,,,CirculationTimer_Monday,Timer Circulation Monday,,,b555,a6ff00000001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"Circulation schedule Monday (HH;MM;HH;MM)"
+u,,,CirculationTimer_Tuesday,Timer Circulation Tuesday,,,b555,a500000100,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_2,,IGN:2,,,"Circulation schedule Tuesday (HH;MM;HH;MM)"
+w,,,CirculationTimer_Tuesday,Timer Circulation Tuesday,,,b555,a6ff00010001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"Circulation schedule Tuesday (HH;MM;HH;MM)"
+u,,,CirculationTimer_Wednesday,Timer Circulation Wednesday,,,b555,a500000200,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_2,,IGN:2,,,"Circulation schedule Wednesday (HH;MM;HH;MM)"
+w,,,CirculationTimer_Wednesday,Timer Circulation Wednesday,,,b555,a6ff00020001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"Circulation schedule Wednesday (HH;MM;HH;MM)"
+u,,,CirculationTimer_Thursday,Timer Circulation Thursday,,,b555,a500000300,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_2,,IGN:2,,,"Circulation schedule Thursday (HH;MM;HH;MM)"
+w,,,CirculationTimer_Thursday,Timer Circulation Thursday,,,b555,a6ff00030001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"Circulation schedule Thursday (HH;MM;HH;MM)"
+u,,,CirculationTimer_Friday,Timer Circulation Friday,,,b555,a500000400,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_2,,IGN:2,,,"Circulation schedule Friday (HH;MM;HH;MM)"
+w,,,CirculationTimer_Friday,Timer Circulation Friday,,,b555,a6ff00040001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"Circulation schedule Friday (HH;MM;HH;MM)"
+u,,,CirculationTimer_Saturday,Timer Circulation Saturday,,,b555,a500000500,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_2,,IGN:2,,,"Circulation schedule Saturday (HH;MM;HH;MM)"
+w,,,CirculationTimer_Saturday,Timer Circulation Saturday,,,b555,a6ff00050001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"Circulation schedule Saturday (HH;MM;HH;MM)"
+u,,,CirculationTimer_Sunday,Timer Circulation Sunday,,,b555,a500000600,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_2,,IGN:2,,,"Circulation schedule Sunday (HH;MM;HH;MM)"
+w,,,CirculationTimer_Sunday,Timer Circulation Sunday,,,b555,a6ff00060001,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ignore,,HEX:2,=FFFF,,"Circulation schedule Sunday (HH;MM;HH;MM)"
+
+# ============================================================================== # 6.5 NUMBER OF ACTIVE TIME SLOTS PER DAY (MONDAY TO SUNDAY)
+# ============================================================================== 
+u,,,CirculationTimer_Slots,Active slots Circulation,,,b555,a40000,ign,,IGN:1,,,,mon,,UCH,,,,tue,,UCH,,,,wed,,UCH,,,,thu,,UCH,,,,fri,,UCH,,,,sat,,UCH,,,,sun,,UCH,,,,ign_2,,IGN:1,,,
+u,,,CoolingTimer_Slots,Active slots Cooling,,,b555,a40001,ign,,IGN:1,,,,mon,,UCH,,,,tue,,UCH,,,,wed,,UCH,,,,thu,,UCH,,,,fri,,UCH,,,,sat,,UCH,,,,sun,,UCH,,,,ign_2,,IGN:1,,,
+u,,,HwcTimer_Slots,Active slots DHW,,,b555,a40002,ign,,IGN:1,,,,mon,,UCH,,,,tue,,UCH,,,,wed,,UCH,,,,thu,,UCH,,,,fri,,UCH,,,,sat,,UCH,,,,sun,,UCH,,,,ign_2,,IGN:1,,,
+u,,,Z1Timer_Slots,Active slots Zone 1,,,b555,a40003,ign,,IGN:1,,,,mon,,UCH,,,,tue,,UCH,,,,wed,,UCH,,,,thu,,UCH,,,,fri,,UCH,,,,sat,,UCH,,,,sun,,UCH,,,,ign_2,,IGN:1,,,
+

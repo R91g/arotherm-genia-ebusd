@@ -1,0 +1,627 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configurar Bomba de Calor (eBUSd)",
+        "description": "Configura la conexión MQTT local con el demonio eBUSd (`--mqttjson` activado) y selecciona el fabricante de tu instalación.",
+        "data": {
+          "mqtt_prefix": "Prefijo del tópico MQTT en eBUSd",
+          "manufacturer": "Fabricante del equipo"
+        }
+      },
+      "models": {
+        "title": "Modelos de Hardware Instalado",
+        "description": "Selecciona la unidad exterior de aerotermia, el módulo o torre hidráulica interior y los accesorios instalados.",
+        "data": {
+          "outdoor_model": "Modelo de unidad exterior (Bomba de Calor)",
+          "indoor_model": "Modelo de interfaz / módulo hidráulico interior",
+          "has_wireless_room_unit": "Termostato de ambiente inalámbrico (receptor radio 04.netx3)",
+          "has_migo_link": "Pasarela oficial en nube (MiGo Link / myVAILLANT connect en eBUS f1)"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigurar Fabricante",
+        "description": "Cambia el fabricante del equipo instalado.",
+        "data": {
+          "manufacturer": "Fabricante del equipo"
+        }
+      },
+      "reconfigure_models": {
+        "title": "Reconfigurar Modelos de Hardware",
+        "description": "Actualiza los modelos instalados para el fabricante seleccionado.",
+        "data": {
+          "outdoor_model": "Modelo de unidad exterior (Bomba de Calor)",
+          "indoor_model": "Modelo de interfaz / módulo hidráulico interior",
+          "has_wireless_room_unit": "Termostato de ambiente inalámbrico (receptor radio 04.netx3)",
+          "has_migo_link": "Pasarela oficial en nube (MiGo Link / myVAILLANT connect en eBUS f1)"
+        }
+      }
+    },
+    "error": {
+      "invalid_mqtt_prefix": "El prefijo MQTT no puede estar vacío.",
+      "mqtt_not_configured": "La integración MQTT de Home Assistant no está configurada o activa."
+    },
+    "abort": {
+      "already_configured": "Esta instancia de eBUSd ya está configurada en Home Assistant."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opciones de operación en caliente (aroTHERM & GeniaAir)",
+        "description": "Ajusta los algoritmos inteligentes de ACS Puntual (Boost Forzado), el Doble Cerrojo de refrigeración y el sondeo de respaldo.",
+        "data": {
+          "force_dhw_boost": "Activar ACS Boost Forzado Inteligente (aplica T_actual + histéresis + 1.5 °C si ΔT < histéresis)",
+          "auto_cooling_lock_bypass": "Abrir automáticamente el Cerrojo 1 de refrigeración (01;01;99) al activar modo Frío",
+          "fallback_poll_interval": "Intervalo de sondeo /get de respaldo si no hay pasarela oficial (segundos)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "climate": {
+      "zone_1_climate": {
+        "name": "Climatización Zona 1",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "comfort": "Programado (Confort)",
+              "manual": "Manual continuo",
+              "eco": "Eco (Reducción nocturna)",
+              "boost": "Anulación rápida (Quick Veto)"
+            }
+          }
+        }
+      }
+    },
+    "water_heater": {
+      "dhw_water_heater": {
+        "name": "Agua Caliente Sanitaria (ACS)",
+        "state": {
+          "off": "Apagado",
+          "eco": "Programación horaria",
+          "performance": "Continuo (24h)",
+          "boost": "Boost"
+        },
+        "state_attributes": {
+          "operation_mode": {
+            "state": {
+              "off": "Apagado",
+              "eco": "Programación horaria",
+              "performance": "Continuo (24h)",
+              "boost": "Boost"
+            }
+          }
+        }
+      }
+    },
+    "number": {
+      "hc1_heat_curve": {
+        "name": "Curva de calefacción Circuito 1"
+      },
+      "hc1_excess_temp": {
+        "name": "Sobretemperatura de impulsión Circuito 1 (ExcessTemp)"
+      },
+      "hc1_min_flow_temp_desired": {
+        "name": "Temperatura mínima de impulsión calefacción"
+      },
+      "hc1_max_flow_temp_desired": {
+        "name": "Temperatura máxima de impulsión calefacción"
+      },
+      "hc1_summer_temp_limit": {
+        "name": "Límite de desconexión verano (Temp. exterior)"
+      },
+      "cooling_flow_temp_desired_min": {
+        "name": "Temperatura mínima de impulsión refrigeración"
+      },
+      "cooling_flow_temp_desired_max": {
+        "name": "Temperatura máxima de impulsión refrigeración"
+      },
+      "z1_day_temp": {
+        "name": "Consigna confort calefacción Zona 1 (Día)"
+      },
+      "z1_night_temp": {
+        "name": "Consigna reducción nocturna Zona 1 (Noche)"
+      },
+      "z1_manual_temp": {
+        "name": "Consigna manual calefacción Zona 1"
+      },
+      "z1_quick_veto_temp": {
+        "name": "Consigna temporal Quick Veto Zona 1"
+      },
+      "z1_cooling_temp_time_controlled": {
+        "name": "Consigna refrigeración tiempo-controlada (Reducción)"
+      },
+      "z1_cooling_temp_manual": {
+        "name": "Consigna refrigeración manual Zona 1"
+      },
+      "hwc_temp_desired": {
+        "name": "Consigna de temperatura ACS"
+      },
+      "hwc_max_flow_temp_desired": {
+        "name": "Temperatura máxima de impulsión ACS"
+      },
+      "bivalence_point_hc": {
+        "name": "Punto de bivalencia calefacción"
+      },
+      "bivalence_point_hwc": {
+        "name": "Punto de bivalencia ACS"
+      },
+      "alternative_point": {
+        "name": "Punto alternativo de temperatura exterior"
+      },
+      "cylinder_charge_hyst": {
+        "name": "Histéresis de carga del acumulador ACS"
+      },
+      "cylinder_charge_offset": {
+        "name": "Offset de carga del acumulador ACS"
+      },
+      "max_cylinder_charge_time": {
+        "name": "Tiempo máximo de carga de ACS"
+      },
+      "hwc_lock_time": {
+        "name": "Tiempo de bloqueo de ACS"
+      },
+      "buffer_charge_offset": {
+        "name": "Offset del depósito de inercia"
+      },
+      "max_room_humidity": {
+        "name": "Humedad ambiente máxima permitida"
+      }
+    },
+    "select": {
+      "z1_op_mode": {
+        "name": "Modo de operación Calefacción Zona 1",
+        "state": {
+          "off": "Apagado",
+          "auto": "Programación horaria (Auto)",
+          "day": "Manual continuo (Día)",
+          "night": "Reducción nocturna (Noche)"
+        }
+      },
+      "z1_op_mode_cooling": {
+        "name": "Modo de operación Refrigeración Zona 1",
+        "state": {
+          "off": "Apagado",
+          "auto": "Programación horaria (Auto)",
+          "day": "Manual continuo (Día)"
+        }
+      },
+      "hwc_op_mode": {
+        "name": "Modo de operación ACS",
+        "state": {
+          "off": "Apagado",
+          "auto": "Programación horaria (Auto)",
+          "day": "Continuo (24h)",
+          "night": "Reducción nocturna (Noche)"
+        }
+      },
+      "hc1_auto_off_mode": {
+        "name": "Modo de reducción nocturna Circuito 1",
+        "state": {
+          "eco": "Eco (Desconexión)",
+          "night": "Normal (Reducción nocturna)",
+          "off": "Apagado"
+        }
+      },
+      "hc1_room_temp_switch_on": {
+        "name": "Control por temperatura ambiente Circuito 1",
+        "state": {
+          "off": "Inactivo (Solo curva climática)",
+          "modulating": "Activo (Modulación)",
+          "thermostat": "Ampliado (Termostato con corte)"
+        }
+      }
+    },
+    "switch": {
+      "dhw_boost_switch": {
+        "name": "ACS Puntual (Boost)"
+      },
+      "cooling_season_authorization": {
+        "name": "Autorización temporada de frío (Cerrojo 1)"
+      },
+      "adapt_heat_curve": {
+        "name": "Curva de calefacción adaptativa"
+      },
+      "hwc_parallel_loading": {
+        "name": "Carga paralela de ACS y calefacción"
+      },
+      "global_system_off": {
+        "name": "Apagado global del sistema (Instalador)"
+      }
+    },
+    "binary_sensor": {
+      "compressor_active": {
+        "name": "Compresor en marcha"
+      },
+      "primary_circulation_pump": {
+        "name": "Bomba de circulación primaria"
+      },
+      "defrost_active": {
+        "name": "Desescarche activo (Defrost)"
+      },
+      "energy_integration_active": {
+        "name": "Integración de energía activa"
+      },
+      "z1_heating_demand": {
+        "name": "Demanda de calor Zona 1"
+      },
+      "cooling_release_status": {
+        "name": "Autorización de refrigeración (Hardware / Cerrojo 1)"
+      },
+      "broadcast_cooling_active": {
+        "name": "Ciclo de refrigeración activo (Broadcast)"
+      },
+      "ebusd_signal": {
+        "name": "Señal del bus eBUS"
+      }
+    },
+    "sensor": {
+      "hmu_status_code": {
+        "name": "Estado operativo unidad exterior (Live Monitor)",
+        "state": {
+          "frost_protect": "Protección antihielo activa (S.34)",
+          "standby": "En reposo (Standby S.100)",
+          "heat_compressor_shutdown": "Calefacción: Compresor apagándose (S.101)",
+          "heat_compressor_blocked": "Calefacción: Compresor bloqueado (S.102)",
+          "heat_prerun": "Calefacción: Pre-circulación (S.103)",
+          "heat_compressor_active": "Calefacción: Compresor activo (S.104)",
+          "heat_overrun": "Calefacción: Post-circulación (S.107)",
+          "cool_compressor_shutdown": "Refrigeración: Compresor apagándose (S.111)",
+          "cool_compressor_blocked": "Refrigeración: Compresor bloqueado (S.112)",
+          "cool_prerun": "Refrigeración: Pre-circulación (S.113)",
+          "cool_compressor_active": "Refrigeración: Compresor activo (S.114)",
+          "cool_overrun": "Refrigeración: Post-circulación (S.117)",
+          "heat_immersion_heater_active": "Calefacción: Apoyo eléctrico activo (S.125)",
+          "heat_immersion_active": "Calefacción: Apoyo eléctrico activo (S.125)",
+          "hwc_compressor_blocked": "ACS: Compresor bloqueado (S.132)",
+          "hwc_prerun": "ACS: Pre-circulación (S.133)",
+          "hwc_compressor_active": "ACS: Compresor activo (S.134)",
+          "hwc_immersion_heater_active": "ACS: Apoyo eléctrico activo (S.135)",
+          "hwc_immersion_active": "ACS: Apoyo eléctrico activo (S.135)",
+          "hwc_overrun": "ACS: Post-circulación (S.137)",
+          "heat_immersion_heater_shutdown": "Calefacción: Apoyo eléctrico apagándose (S.141)",
+          "heat_immersion_heater_blocked": "Calefacción: Apoyo eléctrico bloqueado (S.142)",
+          "hwc_immersion_heater_shutdown": "ACS: Apoyo eléctrico apagándose (S.151)",
+          "hwc_immersion_heater_blocked": "ACS: Apoyo eléctrico bloqueado (S.152)",
+          "air_purging_program_active": "Programa de purgado de aire activo (S.202)",
+          "compressor_oil_heating_active": "Calentamiento de cárter del compresor (S.240)",
+          "fan1_blocked": "Ventilador 1 bloqueado (S.252)",
+          "fan1_airinlet_too_high": "Temperatura entrada aire excesiva (S.255)",
+          "fan1_airinlet_too_low": "Temperatura entrada aire demasiado baja (S.256)",
+          "fan2_blocked": "Ventilador 2 bloqueado (S.260)",
+          "building_circuit_flow_too_low": "Caudal primario demasiado bajo (S.275)",
+          "building_circuit_pump_fault": "Fallo en bomba circuito edificio (S.277)",
+          "frequency_converter_fault_compressor": "Fallo variador de frecuencia compresor (S.280)",
+          "frequency_converter_fault_mains_voltage": "Fallo tensión de red en variador (S.281)",
+          "frequency_converter_fault_overheating": "Sobrecalentamiento variador de frecuencia (S.282)",
+          "deicing_time_too_long": "Tiempo de desescarche excedido (S.283)",
+          "deicing_flow_temp_too_low": "Temp. impulsión baja en desescarche (S.284)",
+          "compressor_outlet_temp_too_high": "Temp. descarga compresor demasiado alta (S.285)",
+          "hot_gas_temp_switch_open": "Presostato/termostato gas caliente abierto (S.286)",
+          "fan1_wind": "Viento fuerte en ventilador 1 (S.287)",
+          "fan2_wind": "Viento fuerte en ventilador 2 (S.288)",
+          "current_limt_active": "Limitación de corriente activa (S.289)",
+          "high_pressure_switch_open": "Presostato de alta presión abierto (S.302)",
+          "compressor_outlet_temp_too_high_1": "Límite temp. descarga compresor (S.303)",
+          "evaporation_temp_too_low": "Temperatura de evaporación demasiado baja (S.304)",
+          "condensation_temp_too_low": "Temperatura de condensación demasiado baja (S.305)",
+          "evaporation_temp_too_high": "Temperatura de evaporación demasiado alta (S.306)",
+          "condensation_temp_too_high": "Temperatura de condensación demasiado alta (S.308)",
+          "building_circuit_return_temp_too_low": "Temperatura de retorno demasiado baja (S.312)",
+          "building_circuit_return_temp_too_high": "Temperatura de retorno demasiado alta (S.314)",
+          "immersion_heater_flow_temp_too_high": "Temp. impulsión apoyo eléctrico excesiva (S.351)",
+          "deicing_active": "Desescarche activo (S.516)",
+          "deicing": "Desescarche activo (S.516)",
+          "frequency_converter_fault": "Avería en variador de frecuencia (S.575)",
+          "connection_fault_frequency_converter": "Error comunicación con variador (S.581)",
+          "four_port_valve_position_fault": "Advertencia posición válvula de 4 vías (S.590)"
+        }
+      },
+      "electric_power_consumption": {
+        "name": "Potencia eléctrica instantánea"
+      },
+      "calculated_thermal_power": {
+        "name": "Potencia térmica instantánea (Calculada)"
+      },
+      "calculated_delta_t": {
+        "name": "Salto térmico primario (ΔT)"
+      },
+      "calculated_live_cop": {
+        "name": "COP / EER instantáneo en vivo"
+      },
+      "calculated_daily_cop": {
+        "name": "COP diario real"
+      },
+      "calculated_monthly_cop": {
+        "name": "COP mensual real"
+      },
+      "calculated_total_cop": {
+        "name": "SCOP histórico global"
+      },
+      "calculated_total_energy": {
+        "name": "Consumo eléctrico total combinado aerotermia"
+      },
+      "primary_flow_rate": {
+        "name": "Caudal volumétrico circuito primario"
+      },
+      "refrigerant_high_pressure": {
+        "name": "Alta presión circuito frigorífico R290"
+      },
+      "flow_temp_precision": {
+        "name": "Temperatura de impulsión primaria (Alta precisión)"
+      },
+      "return_temp_precision": {
+        "name": "Temperatura de retorno primario (Alta precisión)"
+      },
+      "air_inlet_temp": {
+        "name": "Temperatura de entrada de aire exterior"
+      },
+      "compressor_inlet_temp": {
+        "name": "Temperatura de aspiración del compresor"
+      },
+      "compressor_outlet_temp": {
+        "name": "Temperatura de descarga del compresor (Gas caliente)"
+      },
+      "eev_outlet_temp": {
+        "name": "Temperatura salida válvula de expansión (EEV)"
+      },
+      "condenser_out_temp": {
+        "name": "Temperatura salida del condensador"
+      },
+      "building_cpump_power": {
+        "name": "Potencia de la bomba del circuito"
+      },
+      "compressor_speed_rpm": {
+        "name": "Velocidad del compresor (RPM)"
+      },
+      "compressor_speed_rps": {
+        "name": "Frecuencia de giro del compresor (RPS)"
+      },
+      "compressor_modulation": {
+        "name": "Modulación del compresor"
+      },
+      "fan1_speed": {
+        "name": "Velocidad ventilador 1"
+      },
+      "fan2_speed": {
+        "name": "Velocidad ventilador 2"
+      },
+      "eev_position_abs": {
+        "name": "Posición absoluta válvula de expansión (EEV)"
+      },
+      "setmode_flow_temp_desired": {
+        "name": "Consigna de impulsión solicitada a bomba (SetMode)"
+      },
+      "setmode_hc_mode": {
+        "name": "Modo solicitado por regulador a bomba (SetMode)",
+        "state": {
+          "auto": "Automático",
+          "off": "En espera (Apagado)",
+          "heat": "Calefacción",
+          "water": "Agua Caliente Sanitaria (ACS)"
+        }
+      },
+      "energy_electric_today": {
+        "name": "Energía eléctrica consumida hoy"
+      },
+      "energy_electric_month": {
+        "name": "Energía eléctrica consumida este mes"
+      },
+      "energy_electric_total": {
+        "name": "Energía eléctrica consumida total histórica"
+      },
+      "energy_cooling_electric_today": {
+        "name": "Energía eléctrica refrigeración hoy"
+      },
+      "energy_cooling_electric_month": {
+        "name": "Energía eléctrica refrigeración este mes"
+      },
+      "energy_cooling_electric_total": {
+        "name": "Energía eléctrica refrigeración total histórica"
+      },
+      "energy_thermal_today": {
+        "name": "Energía térmica entregada hoy"
+      },
+      "energy_thermal_month": {
+        "name": "Energía térmica entregada este mes"
+      },
+      "energy_thermal_total": {
+        "name": "Energía térmica entregada total histórica"
+      },
+      "energy_heating_today": {
+        "name": "Energía térmica calefacción hoy"
+      },
+      "energy_heating_month": {
+        "name": "Energía térmica calefacción este mes"
+      },
+      "energy_heating_total": {
+        "name": "Energía térmica calefacción total histórica"
+      },
+      "stats_hmu_hours": {
+        "name": "Horas de funcionamiento unidad exterior"
+      },
+      "stats_compressor_hours": {
+        "name": "Horas de funcionamiento del compresor"
+      },
+      "stats_compressor_starts": {
+        "name": "Arranques acumulados del compresor"
+      },
+      "stats_hc_hours": {
+        "name": "Horas de funcionamiento en calefacción"
+      },
+      "stats_hc_starts": {
+        "name": "Arranques acumulados en calefacción"
+      },
+      "stats_hwc_hours": {
+        "name": "Horas de funcionamiento en ACS"
+      },
+      "stats_hwc_starts": {
+        "name": "Arranques acumulados en ACS"
+      },
+      "stats_building_cpump_hours": {
+        "name": "Horas de funcionamiento bomba primaria"
+      },
+      "stats_building_cpump_starts": {
+        "name": "Arranques acumulados bomba primaria"
+      },
+      "stats_4port_valve_hours": {
+        "name": "Horas de funcionamiento válvula 4 vías (Refrigeración)"
+      },
+      "stats_4port_valve_switches": {
+        "name": "Conmutaciones acumuladas válvula 4 vías"
+      },
+      "stats_fan1_hours": {
+        "name": "Horas de funcionamiento ventilador 1"
+      },
+      "stats_fan2_hours": {
+        "name": "Horas de funcionamiento ventilador 2"
+      },
+      "stats_deice_hours": {
+        "name": "Horas acumuladas en desescarche"
+      },
+      "stats_immersion_heater_hours": {
+        "name": "Horas de funcionamiento resistencia de apoyo"
+      },
+      "stats_immersion_heater_starts": {
+        "name": "Arranques acumulados resistencia de apoyo"
+      },
+      "system_operating_state": {
+        "name": "Estado operativo del sistema",
+        "state": {
+          "standby": "En reposo",
+          "heating": "Calefacción",
+          "cooling": "Refrigeración",
+          "dhw": "Agua Caliente Sanitaria (ACS)"
+        }
+      },
+      "water_pressure": {
+        "name": "Presión de agua del circuito"
+      },
+      "displayed_outside_temp": {
+        "name": "Temperatura exterior mostrada"
+      },
+      "outside_temp_avg": {
+        "name": "Temperatura exterior media (3h)"
+      },
+      "z1_room_temp": {
+        "name": "Temperatura ambiente Zona 1"
+      },
+      "z1_actual_room_temp_desired": {
+        "name": "Consigna efectiva actual Zona 1"
+      },
+      "hc1_flow_temp": {
+        "name": "Temperatura de impulsión Circuito 1"
+      },
+      "hc1_actual_flow_temp_desired": {
+        "name": "Consigna de impulsión calculada Circuito 1"
+      },
+      "hwc_storage_temp": {
+        "name": "Temperatura depósito ACS (Sonda SP1)"
+      },
+      "hwc_flow_temp": {
+        "name": "Temperatura de impulsión ACS"
+      },
+      "z1_status": {
+        "name": "Estado del circuito Zona 1",
+        "state": {
+          "auto": "Automático (Programado)",
+          "ventilation": "Ventilación",
+          "veto": "Anulación manual (Quick Veto)",
+          "holidayaway": "Vacaciones",
+          "load": "En carga",
+          "off": "Apagado"
+        }
+      },
+      "hwc_status": {
+        "name": "Estado del circuito de ACS",
+        "state": {
+          "auto": "En espera (Programado)",
+          "holidayaway": "Vacaciones",
+          "load": "Cargando depósito ACS",
+          "off": "Apagado"
+        }
+      },
+      "hc1_pump_status": {
+        "name": "Estado bomba Circuito 1"
+      },
+      "hydraulic_scheme": {
+        "name": "Código de esquema hidráulico"
+      },
+      "cooling_start_date": {
+        "name": "Fecha de inicio temporada de frío"
+      },
+      "cooling_end_date": {
+        "name": "Fecha de fin temporada de frío"
+      },
+      "bass3_energy_hc_this_month": {
+        "name": "Consumo calefacción este mes (BASS3)"
+      },
+      "bass3_energy_hc_last_month": {
+        "name": "Consumo calefacción mes pasado (BASS3)"
+      },
+      "bass3_energy_hc_total": {
+        "name": "Consumo calefacción total (BASS3)"
+      },
+      "bass3_energy_hwc_this_month": {
+        "name": "Consumo ACS este mes (BASS3)"
+      },
+      "bass3_energy_hwc_last_month": {
+        "name": "Consumo ACS mes pasado (BASS3)"
+      },
+      "bass3_energy_hwc_total": {
+        "name": "Consumo ACS total (BASS3)"
+      },
+      "yield_total": {
+        "name": "Rendimiento ambiental acumulado (YieldTotal)"
+      },
+      "solar_yield_total": {
+        "name": "Rendimiento solar térmico acumulado"
+      },
+      "vwzio_secondary_circuit_status": {
+        "name": "Estado circuito secundario",
+        "state": {
+          "standby": "En reposo",
+          "heating": "Calefacción activa",
+          "cooling": "Refrigeración activa",
+          "dhw": "Agua Caliente Sanitaria (ACS)",
+          "overrun": "Postcirculación"
+        }
+      },
+      "vwzio_secondary_circuit_hwc": {
+        "name": "Estado circuito secundario en ACS",
+        "state": {
+          "standby": "En reposo",
+          "dhw": "Carga de ACS activa"
+        }
+      },
+      "vwzio_current_error": {
+        "name": "Diagnóstico de errores activos"
+      },
+      "wireless_room_temp_dial": {
+        "name": "Consigna en selector (Dial) del termostato inalámbrico"
+      },
+      "wireless_room_target_temp": {
+        "name": "Consigna en termostato inalámbrico"
+      },
+      "broadcast_outside_temp": {
+        "name": "Temperatura exterior difundida (Broadcast)"
+      },
+      "broadcast_datetime": {
+        "name": "Fecha y hora del sistema eBUS (Broadcast)"
+      },
+      "z1_weekly_schedule_summary": {
+        "name": "Programación semanal Calefacción Zona 1"
+      },
+      "hwc_weekly_schedule_summary": {
+        "name": "Programación semanal ACS"
+      },
+      "cooling_weekly_schedule_summary": {
+        "name": "Programación semanal Refrigeración"
+      },
+      "circulation_weekly_schedule_summary": {
+        "name": "Programación semanal Recirculación"
+      }
+    }
+  }
+}

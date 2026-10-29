@@ -1,0 +1,8 @@
+{
+  "include": [
+    "custom_components/arotherm_genia_ebusd",
+    "tests"
+  ],
+  "reportMissingImports": "none"
+}
+

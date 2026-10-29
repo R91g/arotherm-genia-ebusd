@@ -1,0 +1,627 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configure Heat Pump (eBUSd)",
+        "description": "Configure the local MQTT connection to the eBUSd daemon (`--mqttjson` enabled) and select your equipment manufacturer.",
+        "data": {
+          "mqtt_prefix": "eBUSd MQTT topic prefix",
+          "manufacturer": "Equipment manufacturer"
+        }
+      },
+      "models": {
+        "title": "Equipment Hardware Models",
+        "description": "Select the installed heat pump outdoor unit, indoor hydraulic module, and optional accessories.",
+        "data": {
+          "outdoor_model": "Outdoor unit model (Heat Pump)",
+          "indoor_model": "Indoor hydraulic interface / module model",
+          "has_wireless_room_unit": "Wireless room thermostat (04.netx3 radio receiver)",
+          "has_migo_link": "Official cloud gateway (MiGo Link / myVAILLANT connect on eBUS f1)"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Equipment Manufacturer",
+        "description": "Change the equipment manufacturer.",
+        "data": {
+          "manufacturer": "Equipment manufacturer"
+        }
+      },
+      "reconfigure_models": {
+        "title": "Reconfigure Hardware Models",
+        "description": "Update the installed hardware models for the selected manufacturer.",
+        "data": {
+          "outdoor_model": "Outdoor unit model (Heat Pump)",
+          "indoor_model": "Indoor hydraulic interface / module model",
+          "has_wireless_room_unit": "Wireless room thermostat (04.netx3 radio receiver)",
+          "has_migo_link": "Official cloud gateway (MiGo Link / myVAILLANT connect on eBUS f1)"
+        }
+      }
+    },
+    "error": {
+      "invalid_mqtt_prefix": "The MQTT prefix cannot be empty.",
+      "mqtt_not_configured": "Home Assistant's MQTT integration is not configured or active."
+    },
+    "abort": {
+      "already_configured": "This eBUSd instance is already configured in Home Assistant."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Runtime Options (aroTHERM & GeniaAir)",
+        "description": "Tune the Smart Forced DHW Boost algorithm, Double-Lock cooling automation, and fallback polling interval.",
+        "data": {
+          "force_dhw_boost": "Enable Smart Forced DHW Boost (applies T_current + hysteresis + 1.5 °C when ΔT < hysteresis)",
+          "auto_cooling_lock_bypass": "Automatically open Cooling Lock 1 (01;01;99) when selecting Cool mode",
+          "fallback_poll_interval": "Fallback /get polling interval when cloud gateway is absent (seconds)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "climate": {
+      "zone_1_climate": {
+        "name": "Zone 1 Climate",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "comfort": "Scheduled (Comfort)",
+              "manual": "Continuous Manual",
+              "eco": "Eco (Night setback)",
+              "boost": "Quick Veto Override"
+            }
+          }
+        }
+      }
+    },
+    "water_heater": {
+      "dhw_water_heater": {
+        "name": "Domestic Hot Water (DHW)",
+        "state": {
+          "off": "Off",
+          "eco": "Time-controlled (Schedule)",
+          "performance": "Continuous (24h)",
+          "boost": "Boost"
+        },
+        "state_attributes": {
+          "operation_mode": {
+            "state": {
+              "off": "Off",
+              "eco": "Time-controlled (Schedule)",
+              "performance": "Continuous (24h)",
+              "boost": "Boost"
+            }
+          }
+        }
+      }
+    },
+    "number": {
+      "hc1_heat_curve": {
+        "name": "Circuit 1 Heating Curve"
+      },
+      "hc1_excess_temp": {
+        "name": "Circuit 1 Flow Excess Temperature (ExcessTemp)"
+      },
+      "hc1_min_flow_temp_desired": {
+        "name": "Minimum Heating Flow Setpoint"
+      },
+      "hc1_max_flow_temp_desired": {
+        "name": "Maximum Heating Flow Setpoint"
+      },
+      "hc1_summer_temp_limit": {
+        "name": "Summer Switch-Off Outside Temperature Limit"
+      },
+      "cooling_flow_temp_desired_min": {
+        "name": "Minimum Cooling Flow Setpoint"
+      },
+      "cooling_flow_temp_desired_max": {
+        "name": "Maximum Cooling Flow Setpoint"
+      },
+      "z1_day_temp": {
+        "name": "Zone 1 Comfort Heating Setpoint (Day)"
+      },
+      "z1_night_temp": {
+        "name": "Zone 1 Night Setback Temperature (Night)"
+      },
+      "z1_manual_temp": {
+        "name": "Zone 1 Manual Heating Setpoint"
+      },
+      "z1_quick_veto_temp": {
+        "name": "Zone 1 Quick Veto Setpoint"
+      },
+      "z1_cooling_temp_time_controlled": {
+        "name": "Zone 1 Time-Controlled Cooling Setpoint (Setback)"
+      },
+      "z1_cooling_temp_manual": {
+        "name": "Zone 1 Manual Cooling Setpoint"
+      },
+      "hwc_temp_desired": {
+        "name": "DHW Target Temperature"
+      },
+      "hwc_max_flow_temp_desired": {
+        "name": "Maximum DHW Flow Setpoint"
+      },
+      "bivalence_point_hc": {
+        "name": "Heating Bivalence Point"
+      },
+      "bivalence_point_hwc": {
+        "name": "DHW Bivalence Point"
+      },
+      "alternative_point": {
+        "name": "Alternative Outside Temperature Point"
+      },
+      "cylinder_charge_hyst": {
+        "name": "DHW Cylinder Charging Hysteresis"
+      },
+      "cylinder_charge_offset": {
+        "name": "DHW Cylinder Charging Offset"
+      },
+      "max_cylinder_charge_time": {
+        "name": "Maximum DHW Cylinder Charging Time"
+      },
+      "hwc_lock_time": {
+        "name": "DHW Lock Time"
+      },
+      "buffer_charge_offset": {
+        "name": "Buffer Tank Charging Offset"
+      },
+      "max_room_humidity": {
+        "name": "Maximum Permitted Room Humidity"
+      }
+    },
+    "select": {
+      "z1_op_mode": {
+        "name": "Zone 1 Heating Operation Mode",
+        "state": {
+          "off": "Off",
+          "auto": "Time-Controlled (Auto)",
+          "day": "Continuous Manual (Day)",
+          "night": "Night Setback (Night)"
+        }
+      },
+      "z1_op_mode_cooling": {
+        "name": "Zone 1 Cooling Operation Mode",
+        "state": {
+          "off": "Off",
+          "auto": "Time-Controlled (Auto)",
+          "day": "Continuous Manual (Day)"
+        }
+      },
+      "hwc_op_mode": {
+        "name": "DHW Operation Mode",
+        "state": {
+          "off": "Off",
+          "auto": "Time-controlled (Auto)",
+          "day": "Continuous (24h)",
+          "night": "Night Setback"
+        }
+      },
+      "hc1_auto_off_mode": {
+        "name": "Circuit 1 Night Lowering Mode",
+        "state": {
+          "eco": "Eco (Switch-off)",
+          "night": "Normal (Night setback)",
+          "off": "Off"
+        }
+      },
+      "hc1_room_temp_switch_on": {
+        "name": "Circuit 1 Room Temperature Modulation",
+        "state": {
+          "off": "Inactive (Weather curve only)",
+          "modulating": "Active (Modulating)",
+          "thermostat": "Expanded (Thermostat cut-off)"
+        }
+      }
+    },
+    "switch": {
+      "dhw_boost_switch": {
+        "name": "One-Time DHW Charge (Boost)"
+      },
+      "cooling_season_authorization": {
+        "name": "Cooling Season Authorization (Lock 1)"
+      },
+      "adapt_heat_curve": {
+        "name": "Adaptive Heating Curve"
+      },
+      "hwc_parallel_loading": {
+        "name": "DHW and Heating Parallel Loading"
+      },
+      "global_system_off": {
+        "name": "Global System Off (Installer)"
+      }
+    },
+    "binary_sensor": {
+      "compressor_active": {
+        "name": "Compressor Running"
+      },
+      "primary_circulation_pump": {
+        "name": "Primary Circulation Pump"
+      },
+      "defrost_active": {
+        "name": "Defrost Active"
+      },
+      "energy_integration_active": {
+        "name": "Energy Integration Active"
+      },
+      "z1_heating_demand": {
+        "name": "Zone 1 Heating Demand"
+      },
+      "cooling_release_status": {
+        "name": "Cooling Release Status (Hardware Lock 1)"
+      },
+      "broadcast_cooling_active": {
+        "name": "Active Cooling Cycle (Broadcast)"
+      },
+      "ebusd_signal": {
+        "name": "eBUS Signal"
+      }
+    },
+    "sensor": {
+      "hmu_status_code": {
+        "name": "Outdoor Unit Operating Status (Live Monitor)",
+        "state": {
+          "frost_protect": "Frost protection active (S.34)",
+          "standby": "Standby (S.100)",
+          "heat_compressor_shutdown": "Heating: Compressor shutting down (S.101)",
+          "heat_compressor_blocked": "Heating: Compressor blocked (S.102)",
+          "heat_prerun": "Heating: Pre-run circulation (S.103)",
+          "heat_compressor_active": "Heating: Compressor active (S.104)",
+          "heat_overrun": "Heating: Pump overrun (S.107)",
+          "cool_compressor_shutdown": "Cooling: Compressor shutting down (S.111)",
+          "cool_compressor_blocked": "Cooling: Compressor blocked (S.112)",
+          "cool_prerun": "Cooling: Pre-run circulation (S.113)",
+          "cool_compressor_active": "Cooling: Compressor active (S.114)",
+          "cool_overrun": "Cooling: Pump overrun (S.117)",
+          "heat_immersion_heater_active": "Heating: Backup heater active (S.125)",
+          "heat_immersion_active": "Heating: Backup heater active (S.125)",
+          "hwc_compressor_blocked": "DHW: Compressor blocked (S.132)",
+          "hwc_prerun": "DHW: Pre-run circulation (S.133)",
+          "hwc_compressor_active": "DHW: Compressor active (S.134)",
+          "hwc_immersion_heater_active": "DHW: Backup heater active (S.135)",
+          "hwc_immersion_active": "DHW: Backup heater active (S.135)",
+          "hwc_overrun": "DHW: Pump overrun (S.137)",
+          "heat_immersion_heater_shutdown": "Heating: Backup heater shutting down (S.141)",
+          "heat_immersion_heater_blocked": "Heating: Backup heater blocked (S.142)",
+          "hwc_immersion_heater_shutdown": "DHW: Backup heater shutting down (S.151)",
+          "hwc_immersion_heater_blocked": "DHW: Backup heater blocked (S.152)",
+          "air_purging_program_active": "Air purging program active (S.202)",
+          "compressor_oil_heating_active": "Compressor crankcase heater active (S.240)",
+          "fan1_blocked": "Fan 1 blocked (S.252)",
+          "fan1_airinlet_too_high": "Air inlet temperature too high (S.255)",
+          "fan1_airinlet_too_low": "Air inlet temperature too low (S.256)",
+          "fan2_blocked": "Fan 2 blocked (S.260)",
+          "building_circuit_flow_too_low": "Building circuit flow rate too low (S.275)",
+          "building_circuit_pump_fault": "Building circuit pump fault (S.277)",
+          "frequency_converter_fault_compressor": "Inverter compressor fault (S.280)",
+          "frequency_converter_fault_mains_voltage": "Inverter mains voltage fault (S.281)",
+          "frequency_converter_fault_overheating": "Inverter overheating fault (S.282)",
+          "deicing_time_too_long": "Defrosting time exceeded (S.283)",
+          "deicing_flow_temp_too_low": "Flow temperature too low during defrost (S.284)",
+          "compressor_outlet_temp_too_high": "Compressor discharge temperature too high (S.285)",
+          "hot_gas_temp_switch_open": "Hot gas thermal switch open (S.286)",
+          "fan1_wind": "High wind load on Fan 1 (S.287)",
+          "fan2_wind": "High wind load on Fan 2 (S.288)",
+          "current_limt_active": "Current limitation active (S.289)",
+          "high_pressure_switch_open": "High pressure switch open (S.302)",
+          "compressor_outlet_temp_too_high_1": "Compressor discharge temp limit (S.303)",
+          "evaporation_temp_too_low": "Evaporation temperature too low (S.304)",
+          "condensation_temp_too_low": "Condensation temperature too low (S.305)",
+          "evaporation_temp_too_high": "Evaporation temperature too high (S.306)",
+          "condensation_temp_too_high": "Condensation temperature too high (S.308)",
+          "building_circuit_return_temp_too_low": "Building return temperature too low (S.312)",
+          "building_circuit_return_temp_too_high": "Building return temperature too high (S.314)",
+          "immersion_heater_flow_temp_too_high": "Backup heater flow temp too high (S.351)",
+          "deicing_active": "Defrosting active (S.516)",
+          "deicing": "Defrosting active (S.516)",
+          "frequency_converter_fault": "Frequency converter fault (S.575)",
+          "connection_fault_frequency_converter": "Frequency converter communication fault (S.581)",
+          "four_port_valve_position_fault": "4-port reversing valve position fault (S.590)"
+        }
+      },
+      "electric_power_consumption": {
+        "name": "Instantaneous Electric Power Consumption"
+      },
+      "calculated_thermal_power": {
+        "name": "Instantaneous Thermal Power (Calculated)"
+      },
+      "calculated_delta_t": {
+        "name": "Primary Temperature Delta (ΔT)"
+      },
+      "calculated_live_cop": {
+        "name": "Live Instantaneous COP / EER"
+      },
+      "calculated_daily_cop": {
+        "name": "Daily Real COP"
+      },
+      "calculated_monthly_cop": {
+        "name": "Monthly Real COP"
+      },
+      "calculated_total_cop": {
+        "name": "Historical Total SCOP"
+      },
+      "calculated_total_energy": {
+        "name": "Combined Historical Electrical Energy"
+      },
+      "primary_flow_rate": {
+        "name": "Primary Circuit Water Flow Rate"
+      },
+      "refrigerant_high_pressure": {
+        "name": "R290 Refrigerant High Pressure"
+      },
+      "flow_temp_precision": {
+        "name": "Primary Flow Temperature (High Precision)"
+      },
+      "return_temp_precision": {
+        "name": "Primary Return Temperature (High Precision)"
+      },
+      "air_inlet_temp": {
+        "name": "Outdoor Air Inlet Temperature"
+      },
+      "compressor_inlet_temp": {
+        "name": "Compressor Suction Temperature"
+      },
+      "compressor_outlet_temp": {
+        "name": "Compressor Discharge Temperature (Hot Gas)"
+      },
+      "eev_outlet_temp": {
+        "name": "EEV Outlet Temperature"
+      },
+      "condenser_out_temp": {
+        "name": "Condenser Outlet Temperature"
+      },
+      "building_cpump_power": {
+        "name": "Building Circuit Pump Power"
+      },
+      "compressor_speed_rpm": {
+        "name": "Compressor Speed (RPM)"
+      },
+      "compressor_speed_rps": {
+        "name": "Compressor Frequency (RPS)"
+      },
+      "compressor_modulation": {
+        "name": "Compressor Modulation"
+      },
+      "fan1_speed": {
+        "name": "Fan 1 Speed"
+      },
+      "fan2_speed": {
+        "name": "Fan 2 Speed"
+      },
+      "eev_position_abs": {
+        "name": "EEV Absolute Step Position"
+      },
+      "setmode_flow_temp_desired": {
+        "name": "Requested Heat Pump Flow Setpoint (SetMode)"
+      },
+      "setmode_hc_mode": {
+        "name": "Requested Heat Pump Mode (SetMode)",
+        "state": {
+          "auto": "Auto",
+          "off": "Standby (Off)",
+          "heat": "Heating",
+          "water": "Domestic Hot Water (DHW)"
+        }
+      },
+      "energy_electric_today": {
+        "name": "Electrical Energy Consumed Today"
+      },
+      "energy_electric_month": {
+        "name": "Electrical Energy Consumed This Month"
+      },
+      "energy_electric_total": {
+        "name": "Total Historical Electrical Energy Consumed"
+      },
+      "energy_cooling_electric_today": {
+        "name": "Cooling Electrical Energy Today"
+      },
+      "energy_cooling_electric_month": {
+        "name": "Cooling Electrical Energy This Month"
+      },
+      "energy_cooling_electric_total": {
+        "name": "Total Historical Cooling Electrical Energy"
+      },
+      "energy_thermal_today": {
+        "name": "Thermal Energy Delivered Today"
+      },
+      "energy_thermal_month": {
+        "name": "Thermal Energy Delivered This Month"
+      },
+      "energy_thermal_total": {
+        "name": "Total Historical Thermal Energy Delivered"
+      },
+      "energy_heating_today": {
+        "name": "Heating Thermal Energy Today"
+      },
+      "energy_heating_month": {
+        "name": "Heating Thermal Energy This Month"
+      },
+      "energy_heating_total": {
+        "name": "Total Historical Heating Thermal Energy"
+      },
+      "stats_hmu_hours": {
+        "name": "Outdoor Unit Operating Hours"
+      },
+      "stats_compressor_hours": {
+        "name": "Compressor Operating Hours"
+      },
+      "stats_compressor_starts": {
+        "name": "Compressor Total Starts"
+      },
+      "stats_hc_hours": {
+        "name": "Heating Mode Operating Hours"
+      },
+      "stats_hc_starts": {
+        "name": "Heating Mode Total Starts"
+      },
+      "stats_hwc_hours": {
+        "name": "DHW Mode Operating Hours"
+      },
+      "stats_hwc_starts": {
+        "name": "DHW Mode Total Starts"
+      },
+      "stats_building_cpump_hours": {
+        "name": "Primary Pump Operating Hours"
+      },
+      "stats_building_cpump_starts": {
+        "name": "Primary Pump Total Starts"
+      },
+      "stats_4port_valve_hours": {
+        "name": "4-Port Reversing Valve Operating Hours (Cooling)"
+      },
+      "stats_4port_valve_switches": {
+        "name": "4-Port Reversing Valve Total Switches"
+      },
+      "stats_fan1_hours": {
+        "name": "Fan 1 Operating Hours"
+      },
+      "stats_fan2_hours": {
+        "name": "Fan 2 Operating Hours"
+      },
+      "stats_deice_hours": {
+        "name": "Defrost Total Operating Hours"
+      },
+      "stats_immersion_heater_hours": {
+        "name": "Backup Immersion Heater Operating Hours"
+      },
+      "stats_immersion_heater_starts": {
+        "name": "Backup Immersion Heater Total Starts"
+      },
+      "system_operating_state": {
+        "name": "System Operating State",
+        "state": {
+          "standby": "Standby",
+          "heating": "Heating",
+          "cooling": "Cooling",
+          "dhw": "Domestic Hot Water (DHW)"
+        }
+      },
+      "water_pressure": {
+        "name": "System Water Pressure"
+      },
+      "displayed_outside_temp": {
+        "name": "Displayed Outside Temperature"
+      },
+      "outside_temp_avg": {
+        "name": "Average Outside Temperature (3h)"
+      },
+      "z1_room_temp": {
+        "name": "Zone 1 Room Temperature"
+      },
+      "z1_actual_room_temp_desired": {
+        "name": "Zone 1 Effective Room Setpoint"
+      },
+      "hc1_flow_temp": {
+        "name": "Circuit 1 Flow Temperature"
+      },
+      "hc1_actual_flow_temp_desired": {
+        "name": "Circuit 1 Calculated Flow Setpoint"
+      },
+      "hwc_storage_temp": {
+        "name": "DHW Tank Temperature (SP1 Probe)"
+      },
+      "hwc_flow_temp": {
+        "name": "DHW Flow Temperature"
+      },
+      "z1_status": {
+        "name": "Zone 1 Circuit Status",
+        "state": {
+          "auto": "Automatic (Scheduled)",
+          "ventilation": "Ventilation",
+          "veto": "Manual Override (Quick Veto)",
+          "holidayaway": "Holiday Away",
+          "load": "Loading",
+          "off": "Off"
+        }
+      },
+      "hwc_status": {
+        "name": "DHW Circuit Status",
+        "state": {
+          "auto": "Standby (Scheduled)",
+          "holidayaway": "Holiday Away",
+          "load": "Charging DHW Cylinder",
+          "off": "Off"
+        }
+      },
+      "hc1_pump_status": {
+        "name": "Circuit 1 Pump Status"
+      },
+      "hydraulic_scheme": {
+        "name": "System Hydraulic Scheme Code"
+      },
+      "cooling_start_date": {
+        "name": "Cooling Season Start Date"
+      },
+      "cooling_end_date": {
+        "name": "Cooling Season End Date"
+      },
+      "bass3_energy_hc_this_month": {
+        "name": "Heating Energy Consumed This Month (BASS3)"
+      },
+      "bass3_energy_hc_last_month": {
+        "name": "Heating Energy Consumed Last Month (BASS3)"
+      },
+      "bass3_energy_hc_total": {
+        "name": "Total Heating Energy Consumed (BASS3)"
+      },
+      "bass3_energy_hwc_this_month": {
+        "name": "DHW Energy Consumed This Month (BASS3)"
+      },
+      "bass3_energy_hwc_last_month": {
+        "name": "DHW Energy Consumed Last Month (BASS3)"
+      },
+      "bass3_energy_hwc_total": {
+        "name": "Total DHW Energy Consumed (BASS3)"
+      },
+      "yield_total": {
+        "name": "Total Environmental Yield (YieldTotal)"
+      },
+      "solar_yield_total": {
+        "name": "Total Solar Thermal Yield"
+      },
+      "vwzio_secondary_circuit_status": {
+        "name": "Secondary Circuit Status",
+        "state": {
+          "standby": "Standby",
+          "heating": "Heating Active",
+          "cooling": "Cooling Active",
+          "dhw": "Domestic Hot Water (DHW)",
+          "overrun": "Overrun"
+        }
+      },
+      "vwzio_secondary_circuit_hwc": {
+        "name": "Secondary Circuit DHW Status",
+        "state": {
+          "standby": "Standby",
+          "dhw": "DHW Charging Active"
+        }
+      },
+      "vwzio_current_error": {
+        "name": "Active Error Diagnostics"
+      },
+      "wireless_room_temp_dial": {
+        "name": "Wireless Thermostat Dial Setting"
+      },
+      "wireless_room_target_temp": {
+        "name": "Wireless Thermostat Target Setpoint"
+      },
+      "broadcast_outside_temp": {
+        "name": "Broadcast Outside Temperature"
+      },
+      "broadcast_datetime": {
+        "name": "Broadcast eBUS System Date & Time"
+      },
+      "z1_weekly_schedule_summary": {
+        "name": "Zone 1 Heating Weekly Schedule"
+      },
+      "hwc_weekly_schedule_summary": {
+        "name": "DHW Weekly Schedule"
+      },
+      "cooling_weekly_schedule_summary": {
+        "name": "Cooling Weekly Schedule"
+      },
+      "circulation_weekly_schedule_summary": {
+        "name": "Circulation Pump Weekly Schedule"
+      }
+    }
+  }
+}

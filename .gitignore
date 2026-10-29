@@ -1,0 +1,23 @@
+# Local archive (personal media, research, logs, manuals)
+_archive/
+scratch/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.ruff_cache/
+
+# Home Assistant local testing
+.storage/
+.HA_RESTORE
+*.log
+
+# Environments & editor
+.vscode/*
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

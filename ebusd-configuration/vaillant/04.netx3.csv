@@ -1,0 +1,9 @@
+type,circuit,level,name,comment,qq,zz,pbsb,id,*name,part,type,divisor/values,unit,comment
+*u,
+*r,
+
+# ==============================================================================
+# 1. WIRELESS ROOM THERMOSTAT (03 -> 04)
+# ==============================================================================
+u,04,,RoomTempDial,room thermostat measured temperature,,,b511,0e,temp,,UCH,,°C,"room temperature measured by the wall thermostat"
+u,04,,Currenterror,current errors,,,b503,0001,error,,UIN,,,error number
