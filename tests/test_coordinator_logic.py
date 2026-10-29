@@ -9,17 +9,19 @@ from unittest.mock import AsyncMock, MagicMock, patch
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 import setup_mocks  # noqa: F401
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "hacs")))
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "hacs"))
+)
 
 import unittest
 
 from custom_components.arotherm_genia_ebusd.coordinator import (
-    SaunierGeniaCoordinator,
-    parse_ebusd_payload,
-    _coerce_scalar,
-    _multi_field_layout,
     DATE_WRITE_FIELDS,
     TIMER_WRITE_FIELDS,
+    SaunierGeniaCoordinator,
+    _coerce_scalar,
+    _multi_field_layout,
+    parse_ebusd_payload,
 )
 
 
@@ -34,7 +36,9 @@ class TestCoordinatorLogic(unittest.TestCase):
         self.assertEqual(parsed, {"temp": 21.5})
 
         # Multi-field dict
-        payload_multi = '{"day": {"value": 15}, "month": {"value": 6}, "year": {"value": 24}}'
+        payload_multi = (
+            '{"day": {"value": 15}, "month": {"value": 6}, "year": {"value": 24}}'
+        )
         parsed_multi = parse_ebusd_payload(payload_multi)
         self.assertEqual(parsed_multi, {"day": 15, "month": 6, "year": 24})
 
@@ -59,8 +63,12 @@ class TestCoordinatorLogic(unittest.TestCase):
 
         # Timers
         self.assertEqual(_multi_field_layout("Z1Timer_Monday", {}), TIMER_WRITE_FIELDS)
-        self.assertEqual(_multi_field_layout("HwcTimer_Sunday_Slot2", {}), TIMER_WRITE_FIELDS)
-        self.assertEqual(_multi_field_layout("CoolingTimer_Friday_Slot3", {}), TIMER_WRITE_FIELDS)
+        self.assertEqual(
+            _multi_field_layout("HwcTimer_Sunday_Slot2", {}), TIMER_WRITE_FIELDS
+        )
+        self.assertEqual(
+            _multi_field_layout("CoolingTimer_Friday_Slot3", {}), TIMER_WRITE_FIELDS
+        )
 
         # Generic fallback using existing keys
         self.assertEqual(_multi_field_layout("CustomMsg", {"a": 1, "b": 2}), ("a", "b"))
@@ -71,10 +79,12 @@ class TestCoordinatorLogic(unittest.TestCase):
 
     def test_apply_optimistic_update(self) -> None:
         """Test full coordinator optimistic state updates."""
+
         class MockCoordinator:
             def __init__(self) -> None:
                 self._state: dict = {}
                 self._canonical_names: dict = {}
+
             _apply_optimistic_update = SaunierGeniaCoordinator._apply_optimistic_update
 
         coord = MockCoordinator()
@@ -82,20 +92,30 @@ class TestCoordinatorLogic(unittest.TestCase):
         # 1. Date with previous ebusd state
         coord._state[("bass3", "CoolingEndDate")] = {"day": 1, "month": 1, "year": 19}
         coord._apply_optimistic_update("bass3", "CoolingEndDate", "01;01;99")
-        self.assertEqual(coord._state[("bass3", "CoolingEndDate")], {"day": 1, "month": 1, "year": 99})
+        self.assertEqual(
+            coord._state[("bass3", "CoolingEndDate")],
+            {"day": 1, "month": 1, "year": 99},
+        )
 
         # 2. Date without previous state
         coord._apply_optimistic_update("bass3", "CoolingStartDate", "15;06;24")
-        self.assertEqual(coord._state[("bass3", "CoolingStartDate")], {"day": 15, "month": 6, "year": 24})
+        self.assertEqual(
+            coord._state[("bass3", "CoolingStartDate")],
+            {"day": 15, "month": 6, "year": 24},
+        )
 
         # 3. Weekly timer preserving read-only fields (e.g. cooling_temp)
         coord._state[("bass3", "Z1Timer_Monday")] = {
-            "from_hour": 6, "from_min": 0, "to_hour": 22, "to_min": 0, "temp": 21.0
+            "from_hour": 6,
+            "from_min": 0,
+            "to_hour": 22,
+            "to_min": 0,
+            "temp": 21.0,
         }
         coord._apply_optimistic_update("bass3", "Z1Timer_Monday", "08;30;20;15")
         self.assertEqual(
             coord._state[("bass3", "Z1Timer_Monday")],
-            {"from_hour": 8, "from_min": 30, "to_hour": 20, "to_min": 15, "temp": 21.0}
+            {"from_hour": 8, "from_min": 30, "to_hour": 20, "to_min": 15, "temp": 21.0},
         )
 
         # 4. Standard scalar (temperature)

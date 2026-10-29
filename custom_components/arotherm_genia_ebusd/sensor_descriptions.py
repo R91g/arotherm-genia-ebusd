@@ -65,9 +65,7 @@ from .const import (
 )
 from .coordinator import SaunierGeniaCoordinator
 
-TEMP_DELTA_DEVICE_CLASS = getattr(
-    SensorDeviceClass, "TEMPERATURE_DELTA", None
-)
+TEMP_DELTA_DEVICE_CLASS = getattr(SensorDeviceClass, "TEMPERATURE_DELTA", None)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -87,9 +85,7 @@ class SaunierGeniaSensorEntityDescription(SensorEntityDescription):
     requires_wireless_unit: bool = False
 
 
-def _format_bass3_date(
-    coord: SaunierGeniaCoordinator, message: str
-) -> str | None:
+def _format_bass3_date(coord: SaunierGeniaCoordinator, message: str) -> str | None:
     """Format CoolingStartDate / CoolingEndDate (day;month;year) into a readable string."""
     msg = coord.get_message(CIRCUIT_BASS3, message)
     if not msg:
@@ -146,7 +142,9 @@ def _get_vwzio_secondary_status(coord: SaunierGeniaCoordinator) -> str | None:
             try:
                 b0 = int(parts[0], 16)
                 if b0 >= 0x20:
-                    cooling_rel = coord.get_str(CIRCUIT_BASS3, "CoolingReleaseStatus", "value")
+                    cooling_rel = coord.get_str(
+                        CIRCUIT_BASS3, "CoolingReleaseStatus", "value"
+                    )
                     if cooling_rel and cooling_rel.lower().strip() == "on":
                         return "cooling"
                     return "heating"
@@ -247,9 +245,7 @@ def _get_z1_actual_desired_filtered(
     if val is None:
         return None
     if val <= SENTINEL_HEATING_THRESHOLD:
-        op_mode = (
-            coord.get_str(CIRCUIT_BASS3, "Z1OpMode", "value") or ""
-        ).lower()
+        op_mode = (coord.get_str(CIRCUIT_BASS3, "Z1OpMode", "value") or "").lower()
         if op_mode == "off":
             day_temp = coord.get_float(CIRCUIT_BASS3, "Z1DayTemp", "value")
             return day_temp if day_temp is not None else DEFAULT_COMFORT_TEMP
@@ -1290,5 +1286,3 @@ WEEKLY_SCHEDULE_SENSORS: tuple[tuple[str, str], ...] = (
     ("cooling_weekly_schedule_summary", "CoolingTimer"),
     ("circulation_weekly_schedule_summary", "CirculationTimer"),
 )
-
-

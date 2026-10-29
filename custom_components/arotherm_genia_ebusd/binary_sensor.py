@@ -103,9 +103,7 @@ def _check_ebusd_signal(coord: SaunierGeniaCoordinator) -> bool | None:
     return val.lower() in ("true", "1", "on", "yes")
 
 
-BINARY_SENSOR_DESCRIPTIONS: tuple[
-    SaunierGeniaBinarySensorEntityDescription, ...
-] = (
+BINARY_SENSOR_DESCRIPTIONS: tuple[SaunierGeniaBinarySensorEntityDescription, ...] = (
     SaunierGeniaBinarySensorEntityDescription(
         key="compressor_active",
         translation_key="compressor_active",

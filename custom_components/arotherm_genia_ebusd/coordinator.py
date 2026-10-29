@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
-from datetime import datetime, timedelta
 import json
 import logging
 import time
+from collections.abc import Callable
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.components import mqtt
@@ -162,34 +162,36 @@ def _multi_field_layout(
 # ONLY these parameters query physical bus hardware on confirmation /get.
 # For all other writable parameters (passive 'u'), confirmation /get is NEVER sent,
 # preventing eBUSd from echoing stale RAM cache over user input.
-ACTIVE_READ_CONFIRMATION_MESSAGES: frozenset[tuple[str, str]] = frozenset({
-    (CIRCUIT_BASS3.lower(), "AdaptHeatCurve"),
-    (CIRCUIT_BASS3.lower(), "AlternativePoint"),
-    (CIRCUIT_BASS3.lower(), "BivalencePointHc"),
-    (CIRCUIT_BASS3.lower(), "BivalencePointHwc"),
-    (CIRCUIT_BASS3.lower(), "BufferChargeOffset"),
-    (CIRCUIT_BASS3.lower(), "CoolingFlowTempDesiredMax"),
-    (CIRCUIT_BASS3.lower(), "CoolingFlowTempDesiredMin"),
-    (CIRCUIT_BASS3.lower(), "CylinderChargeHyst"),
-    (CIRCUIT_BASS3.lower(), "CylinderChargeOffset"),
-    (CIRCUIT_BASS3.lower(), "GlobalSystemOff"),
-    (CIRCUIT_BASS3.lower(), "Hc1AutoOffMode"),
-    (CIRCUIT_BASS3.lower(), "Hc1ExcessTemp"),
-    (CIRCUIT_BASS3.lower(), "Hc1HeatCurve"),
-    (CIRCUIT_BASS3.lower(), "Hc1MaxFlowTempDesired"),
-    (CIRCUIT_BASS3.lower(), "Hc1MinFlowTempDesired"),
-    (CIRCUIT_BASS3.lower(), "Hc1RoomTempSwitchOn"),
-    (CIRCUIT_BASS3.lower(), "Hc1Status"),
-    (CIRCUIT_BASS3.lower(), "Hc1SummerTempLimit"),
-    (CIRCUIT_BASS3.lower(), "HwcLockTime"),
-    (CIRCUIT_BASS3.lower(), "HwcMaxFlowTempDesired"),
-    (CIRCUIT_BASS3.lower(), "HwcParallelLoading"),
-    (CIRCUIT_BASS3.lower(), "MaxCylinderChargeTime"),
-    (CIRCUIT_BASS3.lower(), "MaxRoomHumidity"),
-    (CIRCUIT_BASS3.lower(), "PumpAdditionalTime"),
-    (CIRCUIT_BASS3.lower(), "Z1HolidayTemp"),
-    (CIRCUIT_BASS3.lower(), "Z1ValveStatus"),
-})
+ACTIVE_READ_CONFIRMATION_MESSAGES: frozenset[tuple[str, str]] = frozenset(
+    {
+        (CIRCUIT_BASS3.lower(), "AdaptHeatCurve"),
+        (CIRCUIT_BASS3.lower(), "AlternativePoint"),
+        (CIRCUIT_BASS3.lower(), "BivalencePointHc"),
+        (CIRCUIT_BASS3.lower(), "BivalencePointHwc"),
+        (CIRCUIT_BASS3.lower(), "BufferChargeOffset"),
+        (CIRCUIT_BASS3.lower(), "CoolingFlowTempDesiredMax"),
+        (CIRCUIT_BASS3.lower(), "CoolingFlowTempDesiredMin"),
+        (CIRCUIT_BASS3.lower(), "CylinderChargeHyst"),
+        (CIRCUIT_BASS3.lower(), "CylinderChargeOffset"),
+        (CIRCUIT_BASS3.lower(), "GlobalSystemOff"),
+        (CIRCUIT_BASS3.lower(), "Hc1AutoOffMode"),
+        (CIRCUIT_BASS3.lower(), "Hc1ExcessTemp"),
+        (CIRCUIT_BASS3.lower(), "Hc1HeatCurve"),
+        (CIRCUIT_BASS3.lower(), "Hc1MaxFlowTempDesired"),
+        (CIRCUIT_BASS3.lower(), "Hc1MinFlowTempDesired"),
+        (CIRCUIT_BASS3.lower(), "Hc1RoomTempSwitchOn"),
+        (CIRCUIT_BASS3.lower(), "Hc1Status"),
+        (CIRCUIT_BASS3.lower(), "Hc1SummerTempLimit"),
+        (CIRCUIT_BASS3.lower(), "HwcLockTime"),
+        (CIRCUIT_BASS3.lower(), "HwcMaxFlowTempDesired"),
+        (CIRCUIT_BASS3.lower(), "HwcParallelLoading"),
+        (CIRCUIT_BASS3.lower(), "MaxCylinderChargeTime"),
+        (CIRCUIT_BASS3.lower(), "MaxRoomHumidity"),
+        (CIRCUIT_BASS3.lower(), "PumpAdditionalTime"),
+        (CIRCUIT_BASS3.lower(), "Z1HolidayTemp"),
+        (CIRCUIT_BASS3.lower(), "Z1ValveStatus"),
+    }
+)
 
 
 class SaunierGeniaCoordinator:
@@ -215,7 +217,7 @@ class SaunierGeniaCoordinator:
         self._canonical_names: dict[tuple[str, str], str] = {}
 
         # Listeners indexed by (circuit_lower, message_lower)
-        self._listeners: dict[tuple[str, str], list[ Callable[[], None] ]] = {}
+        self._listeners: dict[tuple[str, str], list[Callable[[], None]]] = {}
         self._global_listeners: list[Callable[[], None]] = []
 
         # Subscriptions and background tasks cleanup callbacks
@@ -404,7 +406,7 @@ class SaunierGeniaCoordinator:
     def _async_on_mqtt_message(self, msg: mqtt.ReceiveMessage) -> None:
         """Handle incoming MQTT messages from ebusd."""
         topic = msg.topic
-        if topic.endswith("/get") or topic.endswith("/set"):
+        if topic.endswith(("/get", "/set")):
             return
 
         prefix_with_slash = f"{self.mqtt_prefix}/"
@@ -647,9 +649,7 @@ class SaunierGeniaCoordinator:
                 self.hass, SET_CONFIRMATION_DELAY_SECONDS, _confirm_get
             )
 
-    def _apply_optimistic_update(
-        self, circuit: str, message: str, value: Any
-    ) -> None:
+    def _apply_optimistic_update(self, circuit: str, message: str, value: Any) -> None:
         """Store a written value locally using the same field names ebusd publishes.
 
         - Multi-value payloads ("01;01;99", "6;0;22;0") are split and mapped to their
@@ -710,9 +710,7 @@ class SaunierGeniaCoordinator:
             name=f"{self.entry.domain}_initial_hydration",
         )
 
-    async def _async_run_hydration_queue(
-        self, messages: list[tuple[str, str]]
-    ) -> None:
+    async def _async_run_hydration_queue(self, messages: list[tuple[str, str]]) -> None:
         """Publish /get sequentially with 0.8s spacing to avoid eBUS collisions."""
         try:
             for circuit, message in messages:
@@ -738,16 +736,11 @@ class SaunierGeniaCoordinator:
             name=f"{self.entry.domain}_fallback_poll",
         )
 
-    async def _async_force_poll_queue(
-        self, messages: list[tuple[str, str]]
-    ) -> None:
+    async def _async_force_poll_queue(self, messages: list[tuple[str, str]]) -> None:
         """Sequentially request /get on messages with 0.8s spacing."""
-        try:
-            for circuit, message in messages:
-                await self.async_request_get(circuit, message)
-                await asyncio.sleep(HYDRATION_STEP_DELAY_SECONDS)
-        except asyncio.CancelledError:
-            raise
+        for circuit, message in messages:
+            await self.async_request_get(circuit, message)
+            await asyncio.sleep(HYDRATION_STEP_DELAY_SECONDS)
 
     # -------------------------------------------------------------------------
     # Real-Time Thermodynamic Calculations (Section 6.2)
@@ -779,9 +772,7 @@ class SaunierGeniaCoordinator:
             self._set_calculated(CALC_DELTA_T, delta_t)
 
         # 2. Instantaneous Thermal Power (W)
-        hmu_status = (
-            self.get_str(CIRCUIT_HMUX0, "HMUStatusCode", "status") or ""
-        )
+        hmu_status = self.get_str(CIRCUIT_HMUX0, "HMUStatusCode", "status") or ""
         flow_rate = self.get_float(CIRCUIT_HMUX0, "RunDataFlowRate", "value")
         thermal_power = calculate_thermal_power(flow_rate, delta_t, hmu_status)
         if thermal_power is not None:
@@ -811,17 +802,13 @@ class SaunierGeniaCoordinator:
         # 5. Monthly Real COP & Total Historical SCOP
         elec_month = self.get_float(CIRCUIT_HMUX0, "PrEnergyElectricMonth", "energy")
         therm_month = self.get_float(CIRCUIT_HMUX0, "PrEnergyThermalMonth", "energy")
-        monthly_cop = calculate_period_cop(
-            therm_month, elec_month, min_elec_energy=0.0
-        )
+        monthly_cop = calculate_period_cop(therm_month, elec_month, min_elec_energy=0.0)
         if monthly_cop is not None:
             self._set_calculated(CALC_MONTHLY_COP, monthly_cop)
 
         elec_total = self.get_float(CIRCUIT_HMUX0, "PrEnergyElectricTotal", "energy")
         therm_total = self.get_float(CIRCUIT_HMUX0, "PrEnergyThermalTotal", "energy")
-        total_cop = calculate_period_cop(
-            therm_total, elec_total, min_elec_energy=0.0
-        )
+        total_cop = calculate_period_cop(therm_total, elec_total, min_elec_energy=0.0)
         if total_cop is not None:
             self._set_calculated(CALC_TOTAL_COP, total_cop)
 
@@ -844,9 +831,7 @@ class SaunierGeniaCoordinator:
     ) -> None:
         """Activate DHW One-Time Boost (HwcSFMode=load), dynamically overcoming hysteresis."""
         storage_temp = self.get_float(CIRCUIT_BASS3, "HwcStorageTemp", "value")
-        target_temp = (
-            self.get_float(CIRCUIT_BASS3, "HwcTempDesired", "value") or 50.0
-        )
+        target_temp = self.get_float(CIRCUIT_BASS3, "HwcTempDesired", "value") or 50.0
         hyst = (
             self.get_float(
                 CIRCUIT_BASS3, "CylinderChargeHyst", "value", DEFAULT_CYLINDER_HYST
@@ -956,12 +941,8 @@ class SaunierGeniaCoordinator:
         if not self._dhw_boost_active or self._saved_dhw_target_temp is None:
             return
 
-        sf_mode = (
-            self.get_str(CIRCUIT_BASS3, "HwcSFMode", "value") or ""
-        ).lower()
-        hwc_status = (
-            self.get_str(CIRCUIT_BASS3, "HwcStatus", "value") or ""
-        ).lower()
+        sf_mode = (self.get_str(CIRCUIT_BASS3, "HwcSFMode", "value") or "").lower()
+        hwc_status = (self.get_str(CIRCUIT_BASS3, "HwcStatus", "value") or "").lower()
         storage_temp = self.get_float(CIRCUIT_BASS3, "HwcStorageTemp", "value")
 
         if sf_mode == "load" or hwc_status == "load":

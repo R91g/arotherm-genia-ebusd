@@ -13,12 +13,12 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 import unittest
 
 from custom_components.arotherm_genia_ebusd.thermodynamics import (
+    SPECIFIC_HEAT_WATER_FACTOR,
     calculate_delta_t,
-    calculate_thermal_power,
     calculate_live_cop,
     calculate_period_cop,
+    calculate_thermal_power,
     calculate_total_energy,
-    SPECIFIC_HEAT_WATER_FACTOR,
 )
 
 
@@ -41,22 +41,37 @@ class TestThermodynamics(unittest.TestCase):
 
         # None inputs when not in standby
         self.assertIsNone(calculate_thermal_power(None, 5.0, "heat_compressor_active"))
-        self.assertIsNone(calculate_thermal_power(1200.0, None, "heat_compressor_active"))
+        self.assertIsNone(
+            calculate_thermal_power(1200.0, None, "heat_compressor_active")
+        )
 
         # Normal active heating: 1200 l/h * 5.0 K * 1.163 = 6978.0 W
         expected = round(1200.0 * 5.0 * SPECIFIC_HEAT_WATER_FACTOR, 1)
-        self.assertEqual(calculate_thermal_power(1200.0, 5.0, "heat_compressor_active"), expected)
+        self.assertEqual(
+            calculate_thermal_power(1200.0, 5.0, "heat_compressor_active"), expected
+        )
 
         # Normal active cooling (negative delta T): absolute value used
         expected_cool = round(1000.0 * 4.5 * SPECIFIC_HEAT_WATER_FACTOR, 1)
-        self.assertEqual(calculate_thermal_power(1000.0, -4.5, "cool_compressor_active"), expected_cool)
+        self.assertEqual(
+            calculate_thermal_power(1000.0, -4.5, "cool_compressor_active"),
+            expected_cool,
+        )
 
     def test_calculate_live_cop(self) -> None:
         """Test COP/EER calculation, threshold filters, and compressor states."""
-        active_statuses = frozenset({"heat_compressor_active", "hwc_compressor_active", "cool_compressor_active"})
+        active_statuses = frozenset(
+            {
+                "heat_compressor_active",
+                "hwc_compressor_active",
+                "cool_compressor_active",
+            }
+        )
 
         # Active compressor with power > 60 W: 4500 W / 1000 W = 4.5
-        cop, is_active = calculate_live_cop(4500.0, 1000.0, "heat_compressor_active", active_statuses)
+        cop, is_active = calculate_live_cop(
+            4500.0, 1000.0, "heat_compressor_active", active_statuses
+        )
         self.assertEqual(cop, 4.5)
         self.assertTrue(is_active)
 
@@ -70,7 +85,9 @@ class TestThermodynamics(unittest.TestCase):
         self.assertFalse(is_active)
 
         # Low electrical power (idle/standby consumption <= 60 W)
-        cop, is_active = calculate_live_cop(0.0, 25.0, "heat_compressor_active", active_statuses)
+        cop, is_active = calculate_live_cop(
+            0.0, 25.0, "heat_compressor_active", active_statuses
+        )
         self.assertEqual(cop, 0.0)
         self.assertFalse(is_active)
 
@@ -84,7 +101,9 @@ class TestThermodynamics(unittest.TestCase):
         self.assertEqual(calculate_period_cop(100.0, 30.0, min_elec_energy=50.0), 0.0)
 
         # Normal calculation: 12000 Wh thermal / 3000 Wh elec = 4.0
-        self.assertEqual(calculate_period_cop(12000.0, 3000.0, min_elec_energy=50.0), 4.0)
+        self.assertEqual(
+            calculate_period_cop(12000.0, 3000.0, min_elec_energy=50.0), 4.0
+        )
         self.assertEqual(calculate_period_cop(15420.0, 3855.0), 4.0)
 
     def test_calculate_total_energy(self) -> None:
@@ -99,7 +118,6 @@ class TestThermodynamics(unittest.TestCase):
         # Partial missing metrics (e.g. no cooling in winter)
         self.assertEqual(calculate_total_energy(28.0, 69.0, None), 97.0)
         self.assertEqual(calculate_total_energy(None, 69.0, 199300.0), 268.3)
-
 
 
 if __name__ == "__main__":

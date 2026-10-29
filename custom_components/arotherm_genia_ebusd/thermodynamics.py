@@ -63,9 +63,8 @@ def calculate_live_cop(
         cop = round(thermal_power / elec_power, 2)
         return cop, True
 
-    if (
-        status_lower in ("standby", "deicing", "deicing_active")
-        or (elec_power is not None and elec_power <= MIN_ACTIVE_ELECTRICAL_POWER_W)
+    if status_lower in ("standby", "deicing", "deicing_active") or (
+        elec_power is not None and elec_power <= MIN_ACTIVE_ELECTRICAL_POWER_W
     ):
         return 0.0, False
 
@@ -111,5 +110,3 @@ def calculate_total_energy(
     d = dhw_kwh if dhw_kwh is not None else 0.0
     c = (cooling_wh / 1000.0) if cooling_wh is not None else 0.0
     return round(h + d + c, 1)
-
-

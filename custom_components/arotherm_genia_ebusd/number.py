@@ -385,7 +385,7 @@ class SaunierGeniaNumber(SaunierGeniaEntity, NumberEntity):
             return self._last_valid_cooling_value
 
         if self.entity_description.is_integer:
-            return float(int(round(val)))
+            return float(round(val))
         return round(val, 2)
 
     async def async_set_native_value(self, value: float) -> None:
@@ -394,7 +394,7 @@ class SaunierGeniaNumber(SaunierGeniaEntity, NumberEntity):
             self._last_valid_cooling_value = value
 
         payload_val: int | float = (
-            int(round(value)) if self.entity_description.is_integer else value
+            round(value) if self.entity_description.is_integer else value
         )
         if (
             self.entity_description.message == "HwcTempDesired"

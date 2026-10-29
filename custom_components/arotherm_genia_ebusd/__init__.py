@@ -7,7 +7,6 @@ import logging
 import re
 
 import voluptuous as vol
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
@@ -33,9 +32,7 @@ SET_WEEKLY_TIMER_SCHEMA = vol.Schema(
         vol.Required("circuit_type"): vol.In(
             ["heating", "dhw", "cooling", "circulation"]
         ),
-        vol.Required("day"): vol.In(
-            [*WEEKDAYS_LIST, "Weekdays", "All"]
-        ),
+        vol.Required("day"): vol.In([*WEEKDAYS_LIST, "Weekdays", "All"]),
         vol.Optional("slot", default=1): vol.In([1, 2, 3]),
         vol.Required("start_time"): cv.string,
         vol.Required("end_time"): cv.string,
@@ -80,9 +77,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def _async_update_listener(
-    hass: HomeAssistant, entry: ConfigEntry
-) -> None:
+async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Handle options update in real time."""
     coordinator: SaunierGeniaCoordinator | None = hass.data.get(DOMAIN, {}).get(
         entry.entry_id
@@ -93,13 +88,11 @@ async def _async_update_listener(
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    unload_ok = await hass.config_entries.async_unload_platforms(
-        entry, PLATFORMS
-    )
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
-        coordinator: SaunierGeniaCoordinator | None = hass.data.get(
-            DOMAIN, {}
-        ).pop(entry.entry_id, None)
+        coordinator: SaunierGeniaCoordinator | None = hass.data.get(DOMAIN, {}).pop(
+            entry.entry_id, None
+        )
         if coordinator is not None:
             await coordinator.async_unload()
 
@@ -116,13 +109,9 @@ def _async_register_services(hass: HomeAssistant) -> None:
 
         async def _async_handle_set_weekly_timer(call: ServiceCall) -> None:
             """Handle arotherm_genia_ebusd.set_weekly_timer service call."""
-            coordinators: dict[str, SaunierGeniaCoordinator] = hass.data.get(
-                DOMAIN, {}
-            )
+            coordinators: dict[str, SaunierGeniaCoordinator] = hass.data.get(DOMAIN, {})
             if not coordinators:
-                raise HomeAssistantError(
-                    f"No configured instances of {DOMAIN} found."
-                )
+                raise HomeAssistantError(f"No configured instances of {DOMAIN} found.")
 
             circuit_type: str = call.data["circuit_type"]
             day_selection: str = call.data["day"]
@@ -167,13 +156,9 @@ def _async_register_services(hass: HomeAssistant) -> None:
 
         async def _async_handle_force_dhw_boost(call: ServiceCall) -> None:
             """Handle arotherm_genia_ebusd.force_dhw_boost service call."""
-            coordinators: dict[str, SaunierGeniaCoordinator] = hass.data.get(
-                DOMAIN, {}
-            )
+            coordinators: dict[str, SaunierGeniaCoordinator] = hass.data.get(DOMAIN, {})
             if not coordinators:
-                raise HomeAssistantError(
-                    f"No configured instances of {DOMAIN} found."
-                )
+                raise HomeAssistantError(f"No configured instances of {DOMAIN} found.")
 
             boost_temp: float | None = call.data.get("boost_temp")
             for coordinator in coordinators.values():

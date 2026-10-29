@@ -50,4 +50,3 @@ async def async_get_config_entry_diagnostics(
         },
         "bus_state": bus_state,
     }
-

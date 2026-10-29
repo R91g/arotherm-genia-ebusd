@@ -29,12 +29,8 @@ class TestSchemaIntegrity(unittest.TestCase):
         self.manifest_path = os.path.join(self.component_dir, "manifest.json")
         self.hacs_path = os.path.join(self.root_dir, "hacs.json")
         self.strings_path = os.path.join(self.component_dir, "strings.json")
-        self.es_path = os.path.join(
-            self.component_dir, "translations", "es.json"
-        )
-        self.en_path = os.path.join(
-            self.component_dir, "translations", "en.json"
-        )
+        self.es_path = os.path.join(self.component_dir, "translations", "es.json")
+        self.en_path = os.path.join(self.component_dir, "translations", "en.json")
         self.services_path = os.path.join(self.component_dir, "services.yaml")
 
     def test_manifest_schema(self) -> None:
@@ -163,14 +159,21 @@ class TestSchemaIntegrity(unittest.TestCase):
             with open(path, "rb") as fp:
                 header = fp.read(26)
             # PNG signature (8 bytes) + IHDR length (4) + 'IHDR' (4) + width (4) + height (4) + bit_depth (1) + color_type (1)
-            self.assertEqual(header[:8], b"\x89PNG\r\n\x1a\n", f"{filename} is not a valid PNG")
+            self.assertEqual(
+                header[:8], b"\x89PNG\r\n\x1a\n", f"{filename} is not a valid PNG"
+            )
             self.assertEqual(header[12:16], b"IHDR")
             width, height, bit_depth, color_type = struct.unpack(">IIBB", header[16:26])
-            self.assertEqual((width, height), (exp_w, exp_h), f"Invalid dimensions for {filename}")
+            self.assertEqual(
+                (width, height), (exp_w, exp_h), f"Invalid dimensions for {filename}"
+            )
             self.assertEqual(bit_depth, 8)
-            self.assertEqual(color_type, 6, f"{filename} must be RGBA (color_type=6) for transparency")
+            self.assertEqual(
+                color_type,
+                6,
+                f"{filename} must be RGBA (color_type=6) for transparency",
+            )
 
 
 if __name__ == "__main__":
     unittest.main()
-

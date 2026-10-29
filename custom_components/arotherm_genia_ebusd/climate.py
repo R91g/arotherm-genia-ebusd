@@ -67,20 +67,6 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
     _attr_target_temperature_step = 0.5
     _attr_max_temp = 30.0
 
-    _attr_hvac_modes = [
-        HVACMode.OFF,
-        HVACMode.HEAT,
-        HVACMode.COOL,
-        HVACMode.AUTO,
-    ]
-
-    _attr_preset_modes = [
-        PRESET_COMFORT,
-        PRESET_MANUAL,
-        PRESET_ECO,
-        PRESET_BOOST,
-    ]
-
     _attr_supported_features = (
         ClimateEntityFeature.TARGET_TEMPERATURE
         | ClimateEntityFeature.PRESET_MODE
@@ -92,6 +78,18 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
 
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the Zone 1 climate entity."""
+        self._attr_hvac_modes = [
+            HVACMode.OFF,
+            HVACMode.HEAT,
+            HVACMode.COOL,
+            HVACMode.AUTO,
+        ]
+        self._attr_preset_modes = [
+            PRESET_COMFORT,
+            PRESET_MANUAL,
+            PRESET_ECO,
+            PRESET_BOOST,
+        ]
         subscriptions = [
             (CIRCUIT_BASS3, "Z1RoomTemp"),
             (CIRCUIT_BASS3, "Z1ActualRoomTempDesired"),
@@ -461,7 +459,9 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             CIRCUIT_BASS3, "Z1DayTemp", "value"
         )
         previous_season = self._active_season
-        day_temp_valid = current_day_temp is not None and 10.0 <= current_day_temp <= 30.0
+        day_temp_valid = (
+            current_day_temp is not None and 10.0 <= current_day_temp <= 30.0
+        )
 
         if hvac_mode == HVACMode.OFF:
             # Save active season target before shutting down

@@ -8,14 +8,13 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 import setup_mocks  # noqa: F401
 
 from custom_components.arotherm_genia_ebusd.const import (
-    CONF_MANUFACTURER,
     DEFAULT_MANUFACTURER,
     DEFAULT_OUTDOOR_MODEL_SAUNIER,
     DEFAULT_OUTDOOR_MODEL_VAILLANT,
     INDOOR_MODELS_BY_MANUFACTURER,
-    MANUFACTURERS,
     MANUFACTURER_SAUNIER_DUVAL,
     MANUFACTURER_VAILLANT,
+    MANUFACTURERS,
     OUTDOOR_MODELS_BY_MANUFACTURER,
 )
 
@@ -55,4 +54,3 @@ class TestManufacturerTopology(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

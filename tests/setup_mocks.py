@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import sys
+from dataclasses import dataclass
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -54,15 +54,12 @@ class MockEntity:
 
     async def async_added_to_hass(self) -> None:
         """Mock async_added_to_hass."""
-        pass
 
     def async_on_remove(self, func: Any) -> None:
         """Mock async_on_remove."""
-        pass
 
     def async_write_ha_state(self) -> None:
         """Mock async_write_ha_state."""
-        pass
 
 
 sys.modules["homeassistant.helpers.entity"].Entity = MockEntity
@@ -73,6 +70,7 @@ sys.modules["homeassistant.components.select"].SelectEntity = MockEntity
 sys.modules["homeassistant.components.switch"].SwitchEntity = MockEntity
 sys.modules["homeassistant.components.climate"].ClimateEntity = MockEntity
 sys.modules["homeassistant.components.water_heater"].WaterHeaterEntity = MockEntity
+
 
 # Base entity description dataclass compatible with Python 3.10+ dataclass inheritance
 @dataclass(frozen=True, kw_only=True)
@@ -96,17 +94,33 @@ class MockEntityDescription:
     mode: str = "box"
 
 
-sys.modules["homeassistant.components.sensor"].SensorEntityDescription = MockEntityDescription
-sys.modules["homeassistant.components.binary_sensor"].BinarySensorEntityDescription = MockEntityDescription
-sys.modules["homeassistant.components.number"].NumberEntityDescription = MockEntityDescription
-sys.modules["homeassistant.components.select"].SelectEntityDescription = MockEntityDescription
-sys.modules["homeassistant.components.switch"].SwitchEntityDescription = MockEntityDescription
+sys.modules[
+    "homeassistant.components.sensor"
+].SensorEntityDescription = MockEntityDescription
+sys.modules[
+    "homeassistant.components.binary_sensor"
+].BinarySensorEntityDescription = MockEntityDescription
+sys.modules[
+    "homeassistant.components.number"
+].NumberEntityDescription = MockEntityDescription
+sys.modules[
+    "homeassistant.components.select"
+].SelectEntityDescription = MockEntityDescription
+sys.modules[
+    "homeassistant.components.switch"
+].SwitchEntityDescription = MockEntityDescription
 
 # Mock common string enums and constants
 sys.modules["homeassistant.const"].PERCENTAGE = "%"
 sys.modules["homeassistant.const"].UnitOfTemperature = MagicMock(CELSIUS="°C")
 sys.modules["homeassistant.const"].UnitOfPressure = MagicMock(BAR="bar")
 sys.modules["homeassistant.const"].UnitOfPower = MagicMock(WATT="W", KILO_WATT="kW")
-sys.modules["homeassistant.const"].UnitOfEnergy = MagicMock(KILO_WATT_HOUR="kWh", MEGA_WATT_HOUR="MWh")
-sys.modules["homeassistant.const"].UnitOfVolumeFlowRate = MagicMock(CUBIC_METERS_PER_HOUR="m³/h")
-sys.modules["homeassistant.const"].UnitOfTime = MagicMock(HOURS="h", MINUTES="min", SECONDS="s")
+sys.modules["homeassistant.const"].UnitOfEnergy = MagicMock(
+    KILO_WATT_HOUR="kWh", MEGA_WATT_HOUR="MWh"
+)
+sys.modules["homeassistant.const"].UnitOfVolumeFlowRate = MagicMock(
+    CUBIC_METERS_PER_HOUR="m³/h"
+)
+sys.modules["homeassistant.const"].UnitOfTime = MagicMock(
+    HOURS="h", MINUTES="min", SECONDS="s"
+)

@@ -52,9 +52,7 @@ async def async_setup_entry(
     # Weekly schedule summary entities (aggregates the 7 daily time slots into weekly timetable sensors)
     for translation_key, timer_prefix in WEEKLY_SCHEDULE_SENSORS:
         entities.append(
-            SaunierGeniaWeeklyScheduleSensor(
-                coordinator, translation_key, timer_prefix
-            )
+            SaunierGeniaWeeklyScheduleSensor(coordinator, translation_key, timer_prefix)
         )
 
     async_add_entities(entities)
@@ -73,9 +71,7 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
         """Initialize the sensor entity."""
         subs = [(description.circuit, description.message)]
         if description.fallback_circuit and description.fallback_message:
-            subs.append(
-                (description.fallback_circuit, description.fallback_message)
-            )
+            subs.append((description.fallback_circuit, description.fallback_message))
         if description.key == "z1_actual_room_temp_desired":
             subs.extend(
                 [
@@ -106,9 +102,7 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
             return desc.value_fn(self.coordinator)
 
         if desc.device_class == SensorDeviceClass.ENUM:
-            val_str = self.coordinator.get_str(
-                desc.circuit, desc.message, desc.field
-            )
+            val_str = self.coordinator.get_str(desc.circuit, desc.message, desc.field)
             if val_str is None:
                 return None
             val_lower = val_str.lower()
@@ -117,14 +111,8 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
             return None
 
         if desc.is_integer:
-            val_int = self.coordinator.get_int(
-                desc.circuit, desc.message, desc.field
-            )
-            if (
-                val_int is None
-                and desc.fallback_circuit
-                and desc.fallback_message
-            ):
+            val_int = self.coordinator.get_int(desc.circuit, desc.message, desc.field)
+            if val_int is None and desc.fallback_circuit and desc.fallback_message:
                 val_int = self.coordinator.get_int(
                     desc.fallback_circuit,
                     desc.fallback_message,
@@ -132,14 +120,8 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
                 )
             return val_int
 
-        val_float = self.coordinator.get_float(
-            desc.circuit, desc.message, desc.field
-        )
-        if (
-            val_float is None
-            and desc.fallback_circuit
-            and desc.fallback_message
-        ):
+        val_float = self.coordinator.get_float(desc.circuit, desc.message, desc.field)
+        if val_float is None and desc.fallback_circuit and desc.fallback_message:
             val_float = self.coordinator.get_float(
                 desc.fallback_circuit,
                 desc.fallback_message,
@@ -148,9 +130,7 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
         if val_float is not None:
             return val_float
 
-        return self.coordinator.get_field(
-            desc.circuit, desc.message, desc.field
-        )
+        return self.coordinator.get_field(desc.circuit, desc.message, desc.field)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
@@ -170,9 +150,7 @@ class SaunierGeniaWeeklyScheduleSensor(SaunierGeniaEntity, SensorEntity):
         timer_prefix: str,
     ) -> None:
         """Initialize the weekly schedule summary sensor."""
-        subs: list[tuple[str, str]] = [
-            (CIRCUIT_BASS3, f"{timer_prefix}_Slots")
-        ]
+        subs: list[tuple[str, str]] = [(CIRCUIT_BASS3, f"{timer_prefix}_Slots")]
         for day in WEEKDAYS_LIST:
             subs.append((CIRCUIT_BASS3, f"{timer_prefix}_{day}"))
             subs.append((CIRCUIT_BASS3, f"{timer_prefix}_{day}_Slot2"))
@@ -225,9 +203,7 @@ class SaunierGeniaWeeklyScheduleSensor(SaunierGeniaEntity, SensorEntity):
     def _get_day_slots(self, day: str) -> list[str]:
         """Return list of formatted active slots for the given day."""
         slots_msg = (
-            self.coordinator.get_message(
-                CIRCUIT_BASS3, f"{self._timer_prefix}_Slots"
-            )
+            self.coordinator.get_message(CIRCUIT_BASS3, f"{self._timer_prefix}_Slots")
             or {}
         )
         short_key = DAY_SHORT_KEYS[day]
@@ -259,9 +235,7 @@ class SaunierGeniaWeeklyScheduleSensor(SaunierGeniaEntity, SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return structured weekly schedule from Monday to Sunday with Slot 1..3 and active slot counts."""
         slots_msg = (
-            self.coordinator.get_message(
-                CIRCUIT_BASS3, f"{self._timer_prefix}_Slots"
-            )
+            self.coordinator.get_message(CIRCUIT_BASS3, f"{self._timer_prefix}_Slots")
             or {}
         )
         schedule_dict: dict[str, dict[str, Any]] = {}

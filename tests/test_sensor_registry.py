@@ -1,14 +1,16 @@
 """Unit tests for sensor registry, entity descriptions, and unique ID integrity."""
 
-from collections import Counter
 import os
 import sys
 import unittest
+from collections import Counter
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 import setup_mocks  # noqa: F401
 
-from custom_components.arotherm_genia_ebusd.binary_sensor import BINARY_SENSOR_DESCRIPTIONS
+from custom_components.arotherm_genia_ebusd.binary_sensor import (
+    BINARY_SENSOR_DESCRIPTIONS,
+)
 from custom_components.arotherm_genia_ebusd.const import (
     CALC_CIRCUIT,
     CIRCUIT_BASS3,
@@ -25,7 +27,9 @@ from custom_components.arotherm_genia_ebusd.const import (
 )
 from custom_components.arotherm_genia_ebusd.number import NUMBER_DESCRIPTIONS
 from custom_components.arotherm_genia_ebusd.select import SELECT_DESCRIPTIONS
-from custom_components.arotherm_genia_ebusd.sensor_descriptions import SENSOR_DESCRIPTIONS
+from custom_components.arotherm_genia_ebusd.sensor_descriptions import (
+    SENSOR_DESCRIPTIONS,
+)
 from custom_components.arotherm_genia_ebusd.switch import STANDARD_SWITCH_DESCRIPTIONS
 
 
@@ -71,7 +75,9 @@ class TestSensorRegistry(unittest.TestCase):
         # Check for duplicate unique_id suffixes among standard sensors
         counter = Counter(uids)
         duplicates = {k: v for k, v in counter.items() if v > 1}
-        self.assertEqual(duplicates, {}, f"Duplicate sensor unique_ids found: {duplicates}")
+        self.assertEqual(
+            duplicates, {}, f"Duplicate sensor unique_ids found: {duplicates}"
+        )
 
     def test_binary_sensors_validity(self) -> None:
         """Verify binary sensors have valid circuits and unique ID suffixes."""
@@ -86,7 +92,9 @@ class TestSensorRegistry(unittest.TestCase):
 
         counter = Counter(uids)
         duplicates = {k: v for k, v in counter.items() if v > 1}
-        self.assertEqual(duplicates, {}, f"Duplicate binary_sensor unique_ids: {duplicates}")
+        self.assertEqual(
+            duplicates, {}, f"Duplicate binary_sensor unique_ids: {duplicates}"
+        )
 
     def test_numbers_validity(self) -> None:
         """Verify number entities have valid min/max/step values and unique IDs."""
@@ -163,4 +171,3 @@ class TestSensorRegistry(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

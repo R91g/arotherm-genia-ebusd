@@ -149,9 +149,7 @@ class SaunierGeniaCoolingSeasonSwitch(SaunierGeniaEntity, SwitchEntity):
         release_status = self.coordinator.get_str(
             CIRCUIT_BASS3, "CoolingReleaseStatus", "value"
         )
-        end_year = self.coordinator.get_int(
-            CIRCUIT_BASS3, "CoolingEndDate", "year"
-        )
+        end_year = self.coordinator.get_int(CIRCUIT_BASS3, "CoolingEndDate", "year")
         if release_status is None and end_year is None:
             return None
         return (
@@ -161,9 +159,7 @@ class SaunierGeniaCoolingSeasonSwitch(SaunierGeniaEntity, SwitchEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return start/end dates and release status for Lock 1."""
-        start_msg = self.coordinator.get_message(
-            CIRCUIT_BASS3, "CoolingStartDate"
-        )
+        start_msg = self.coordinator.get_message(CIRCUIT_BASS3, "CoolingStartDate")
         end_msg = self.coordinator.get_message(CIRCUIT_BASS3, "CoolingEndDate")
         return {
             "cooling_release_status": self.coordinator.get_str(
@@ -173,8 +169,7 @@ class SaunierGeniaCoolingSeasonSwitch(SaunierGeniaEntity, SwitchEntity):
                 f"{start_msg.get('day'):02d}/{start_msg.get('month'):02d}/20{start_msg.get('year'):02d}"
                 if start_msg
                 and all(
-                    isinstance(start_msg.get(k), int)
-                    for k in ("day", "month", "year")
+                    isinstance(start_msg.get(k), int) for k in ("day", "month", "year")
                 )
                 else None
             ),
@@ -182,8 +177,7 @@ class SaunierGeniaCoolingSeasonSwitch(SaunierGeniaEntity, SwitchEntity):
                 f"{end_msg.get('day'):02d}/{end_msg.get('month'):02d}/20{end_msg.get('year'):02d}"
                 if end_msg
                 and all(
-                    isinstance(end_msg.get(k), int)
-                    for k in ("day", "month", "year")
+                    isinstance(end_msg.get(k), int) for k in ("day", "month", "year")
                 )
                 else None
             ),

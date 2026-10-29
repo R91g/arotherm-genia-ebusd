@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -39,19 +38,17 @@ from .const import (
     DEFAULT_FORCE_DHW_BOOST,
     DEFAULT_HAS_MIGO_LINK,
     DEFAULT_HAS_WIRELESS_ROOM_UNIT,
-    DEFAULT_INDOOR_MODEL,
     DEFAULT_INDOOR_MODEL_SAUNIER,
     DEFAULT_INDOOR_MODEL_VAILLANT,
     DEFAULT_MANUFACTURER,
     DEFAULT_MQTT_PREFIX,
-    DEFAULT_OUTDOOR_MODEL,
     DEFAULT_OUTDOOR_MODEL_SAUNIER,
     DEFAULT_OUTDOOR_MODEL_VAILLANT,
     DOMAIN,
     INDOOR_MODELS_BY_MANUFACTURER,
     INDOOR_MODELS_SAUNIER,
-    MANUFACTURERS,
     MANUFACTURER_VAILLANT,
+    MANUFACTURERS,
     OUTDOOR_MODELS_BY_MANUFACTURER,
     OUTDOOR_MODELS_SAUNIER,
 )
@@ -74,9 +71,11 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            mqtt_prefix = str(
-                user_input.get(CONF_MQTT_PREFIX, DEFAULT_MQTT_PREFIX)
-            ).strip().rstrip("/")
+            mqtt_prefix = (
+                str(user_input.get(CONF_MQTT_PREFIX, DEFAULT_MQTT_PREFIX))
+                .strip()
+                .rstrip("/")
+            )
 
             if not mqtt_prefix:
                 errors[CONF_MQTT_PREFIX] = "invalid_mqtt_prefix"
@@ -166,9 +165,7 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):
                         mode=SelectSelectorMode.DROPDOWN,
                     )
                 ),
-                vol.Required(
-                    CONF_INDOOR_MODEL, default=default_indoor
-                ): SelectSelector(
+                vol.Required(CONF_INDOOR_MODEL, default=default_indoor): SelectSelector(
                     SelectSelectorConfig(
                         options=indoor_models,
                         mode=SelectSelectorMode.DROPDOWN,
@@ -268,9 +265,7 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):
                         mode=SelectSelectorMode.DROPDOWN,
                     )
                 ),
-                vol.Required(
-                    CONF_INDOOR_MODEL, default=default_indoor
-                ): SelectSelector(
+                vol.Required(CONF_INDOOR_MODEL, default=default_indoor): SelectSelector(
                     SelectSelectorConfig(
                         options=indoor_models,
                         mode=SelectSelectorMode.DROPDOWN,
@@ -284,9 +279,7 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):
                 ): BooleanSelector(),
                 vol.Required(
                     CONF_HAS_MIGO_LINK,
-                    default=entry.data.get(
-                        CONF_HAS_MIGO_LINK, DEFAULT_HAS_MIGO_LINK
-                    ),
+                    default=entry.data.get(CONF_HAS_MIGO_LINK, DEFAULT_HAS_MIGO_LINK),
                 ): BooleanSelector(),
             }
         )
@@ -321,9 +314,7 @@ class SaunierGeniaOptionsFlowHandler(OptionsFlow):
             {
                 vol.Required(
                     CONF_FORCE_DHW_BOOST,
-                    default=options.get(
-                        CONF_FORCE_DHW_BOOST, DEFAULT_FORCE_DHW_BOOST
-                    ),
+                    default=options.get(CONF_FORCE_DHW_BOOST, DEFAULT_FORCE_DHW_BOOST),
                 ): BooleanSelector(),
                 vol.Required(
                     CONF_AUTO_COOLING_LOCK_BYPASS,

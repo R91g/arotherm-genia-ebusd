@@ -30,7 +30,7 @@ from .entity import SaunierGeniaEntity
 OP_OFF = "off"
 OP_ECO = "eco"
 OP_PERFORMANCE = "performance"
-OP_BOOST = "boost" 
+OP_BOOST = "boost"
 
 BASS3_TO_HA_OP_MAP: dict[str, str] = {
     "off": OP_OFF,
@@ -66,7 +66,6 @@ class SaunierGeniaWaterHeater(SaunierGeniaEntity, WaterHeaterEntity):
     _attr_min_temp = 35.0
     _attr_max_temp = 68.0
     _attr_target_temperature_step = 0.5
-    _attr_operation_list = [OP_OFF, OP_ECO, OP_PERFORMANCE, OP_BOOST]
     _attr_supported_features = (
         WaterHeaterEntityFeature.TARGET_TEMPERATURE
         | WaterHeaterEntityFeature.OPERATION_MODE
@@ -75,6 +74,7 @@ class SaunierGeniaWaterHeater(SaunierGeniaEntity, WaterHeaterEntity):
 
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the DHW water heater entity."""
+        self._attr_operation_list = [OP_OFF, OP_ECO, OP_PERFORMANCE, OP_BOOST]
         subscriptions = [
             (CIRCUIT_BASS3, "HwcStorageTemp"),
             (CIRCUIT_BASS3, "HwcTempDesired"),
@@ -96,17 +96,13 @@ class SaunierGeniaWaterHeater(SaunierGeniaEntity, WaterHeaterEntity):
     @property
     def current_temperature(self) -> float | None:
         """Return current DHW tank temperature (Probe SP1)."""
-        temp = self.coordinator.get_float(
-            CIRCUIT_BASS3, "HwcStorageTemp", "value"
-        )
+        temp = self.coordinator.get_float(CIRCUIT_BASS3, "HwcStorageTemp", "value")
         return round(temp, 2) if temp is not None else None
 
     @property
     def target_temperature(self) -> float | None:
         """Return target DHW tank setpoint."""
-        return self.coordinator.get_float(
-            CIRCUIT_BASS3, "HwcTempDesired", "value"
-        )
+        return self.coordinator.get_float(CIRCUIT_BASS3, "HwcTempDesired", "value")
 
     @property
     def current_operation(self) -> str | None:
@@ -134,9 +130,7 @@ class SaunierGeniaWaterHeater(SaunierGeniaEntity, WaterHeaterEntity):
             "hwc_flow_temp": self.coordinator.get_float(
                 CIRCUIT_BASS3, "HwcFlowTemp", "value"
             ),
-            "hwc_status": self.coordinator.get_str(
-                CIRCUIT_BASS3, "HwcStatus", "value"
-            ),
+            "hwc_status": self.coordinator.get_str(CIRCUIT_BASS3, "HwcStatus", "value"),
             "cylinder_charge_hyst_k": self.coordinator.get_float(
                 CIRCUIT_BASS3,
                 "CylinderChargeHyst",
