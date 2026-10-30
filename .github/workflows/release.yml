@@ -14,11 +14,9 @@ jobs:
 
       - name: Build HACS ZIP Archive
         run: |
-          mkdir -p build/custom_components
-          cp -r custom_components/arotherm_genia_ebusd build/custom_components/
-          cd build
-          zip -r ../arotherm_genia_ebusd.zip custom_components
-          cd ..
+          cd custom_components/arotherm_genia_ebusd
+          zip -r ../../arotherm_genia_ebusd.zip .
+          cd ../..
 
       - name: Upload ZIP to GitHub Release
         uses: softprops/action-gh-release@v2
