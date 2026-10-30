@@ -97,7 +97,7 @@ Los equipos de aerotermia de Vaillant y Saunier Duval comparten **al 100 % las m
 - **Cola de Hidratación Inicial:** Al arrancar Home Assistant, el coordinador espera `5.0 s` para absorber a coste cero los mensajes `retained` del broker MQTT y solicita secuencialmente (con `0.8 s` de pausa entre tramas) **únicamente los registros que falten**.
 - **Actualización Optimista y Confirmación Selectiva:** Las escrituras sobre registros pasivos `u` (consignas, modos, horarios, fechas) actualizan la interfaz al instante sin disparar lecturas `/get` redundantes que devuelvan valores antiguos en caché, espaciando las secuencias multipaso entre `0.3 s` y `0.6 s`.
 
-### 3. 134 Entidades Nativas Agrupadas en 4 Dispositivos Lógicos
+### 3. 144 Entidades Nativas Agrupadas en 4 Dispositivos Lógicos
 
 | Dispositivo Lógico | Circuito eBUS | Entidades Destacadas |
 | :--- | :---: | :--- |
@@ -106,23 +106,25 @@ Los equipos de aerotermia de Vaillant y Saunier Duval comparten **al 100 % las m
 | **3. Interfaz Hidráulica** (`<Modelo Interior>`) | `76.vwzio` | Estado operativo del circuito secundario (calefacción, refrigeración, ACS, postcirculación, reposo), diagnóstico de válvula de 3 vías / bomba secundaria y monitor de errores activos (`OK` o códigos de avería). |
 | **4. Termostato Inalámbrico** *(Opcional)* | `04.netx3` / `f6` / `broadcast` | Temperatura en el dial inalámbrico, consigna inalámbrica, temperatura exterior por difusión (`Broadcast`) y fecha/hora del bus eBUS. *(Si no hay termostato inalámbrico instalado, los sensores broadcast se asocian automáticamente al Controlador de Clima).* |
 
-**Desglose por Plataforma (134 entidades en total):**
-- `climate` (**1**): Termostato unificado Calefacción / Refrigeración / Auto para Zona 1 con modos preestablecidos (`Programado (Confort)`, `Manual continuo`, `Eco (Reducción nocturna)`, `Anulación rápida (Quick Veto)`).
+**Desglose por Plataforma (144 entidades en total a través de 8 plataformas):**
+- `climate` (**1**): Termostato unificado Calefacción / Refrigeración / Auto para Zona 1 con modos preestablecidos (`Programado (Confort)`, `Manual continuo`, `Eco (Reducción nocturna)`, `Anulación rápida (Quick Veto)`, `Modo Ausencia / Vacaciones`).
 - `water_heater` (**1**): Control del depósito de Agua Caliente Sanitaria (ACS) (`Apagado`, `Programación horaria`, `Continuo (24h)`, `Boost`).
-- `sensor` (**90**): 86 sensores de telemetría, energía, diagnóstico y cálculos termodinámicos + 4 sensores resumen de programación semanal (con el detalle diario completo en sus atributos).
+- `sensor` (**94**): 90 sensores de telemetría, energía, diagnóstico y cálculos termodinámicos + 4 sensores resumen de programación semanal (con el detalle diario completo en sus atributos) + sensores de días restantes de vacaciones y refrigeración.
 - `binary_sensor` (**8**): Compresor en marcha, bomba primaria, desescarche activo, integración de energía activa, demanda de calor Zona 1, autorización hardware de refrigeración, ciclo de frío broadcast y señal física eBUS.
-- `number` (**24**): Todos los parámetros numéricos de usuario e instalador (curva climática, sobretemperatura, impulsión mín./máx., corte de verano, consignas día/noche/manual/veto/frío, consigna/histéresis/offset/tiempos de ACS, puntos de bivalencia y humedad máxima).
+- `number` (**25**): Todos los parámetros numéricos de usuario e instalador (curva climática, sobretemperatura, impulsión mín./máx., corte de verano, consignas día/noche/manual/veto/frío/ausencia, consigna/histéresis/offset/tiempos de ACS, puntos de bivalencia y humedad máxima).
 - `select` (**5**): Modo calefacción Zona 1, modo refrigeración Zona 1, modo ACS, modo reducción nocturna (`eco`/`night`/`off`) y control por temperatura ambiente (`off`/`modulating`/`thermostat`).
-- `switch` (**5**): ACS Puntual (`Boost`), Autorización temporada de frío (`Cerrojo 1`), Curva de calefacción adaptativa, Carga paralela de ACS y calefacción, y Apagado global del sistema *(deshabilitado por defecto por seguridad)*.
+- `switch` (**6**): Modo Ausencia (`Holiday Mode`), ACS Puntual (`Boost`), Autorización temporada de frío (`Cerrojo 1`), Curva de calefacción adaptativa, Carga paralela de ACS y calefacción, y Apagado global del sistema *(deshabilitado por defecto por seguridad)*.
+- `datetime` (**4**): Controles interactivos de interfaz para Fecha/Hora de Inicio y Fin del Modo Ausencia (`datetime`), y Fecha/Hora de Inicio y Fin de Refrigeración Manual (`datetime`).
 
-### 4. Climatización Zona 1: Filtro Anti-Centinela y Doble Cerrojo Automático de Frío
+### 4. Climatización Zona 1: Filtro Anti-Centinela y Gestión Dual de Refrigeración
 - **Filtrado Anti-Centinela de Firmware:**
   - Con la calefacción apagada (`Z1OpMode = off`), el regulador reporta `5.0 °C` (antihielo) en `Z1ActualRoomTempDesired`.
   - Con la refrigeración apagada (`Z1OpModeCooling = off`), reporta `99.0 °C` (`0000c642` en IEEE 754) en `Z1CoolingTempDesired`.
   - La integración filtra ambos valores centinela, memoriza de forma independiente las consignas reales de confort de invierno y verano entre reinicios de Home Assistant (`RestoreEntity`) y evita picos fuera de escala en las gráficas.
-- **Gestión Transparente del Doble Cerrojo de Refrigeración:**
+- **Gestión Transparente del Doble Cerrojo de Refrigeración y Modo Período por Calendario:**
   - Los reguladores Vaillant / Saunier Duval protegen el modo frío mediante dos bloqueos independientes: el **Cerrojo 1** (ventana de calendario `CoolingStartDate`–`CoolingEndDate`) y el **Cerrojo 2** (`Z1OpModeCooling`).
-  - Al seleccionar **`Frío` (`Cool`)** en el termostato de Home Assistant, la integración apaga calefacción, abre automáticamente el **Cerrojo 1** de forma indefinida (`01;01;26` a `01;01;99`), activa el **Cerrojo 2** (`Z1OpModeCooling = day`) y restaura tu consigna de verano guardada.
+  - **Modo Indefinido Abierto (Por Defecto):** Al seleccionar **`Frío` (`Cool`)** en el termostato sin haber configurado fechas previas, la integración apaga calefacción, abre automáticamente el **Cerrojo 1** de forma indefinida (`01;01;26` a `01;01;99`), activa el **Cerrojo 2** (`Z1OpModeCooling = day`) y restaura tu consigna de verano guardada.
+  - **Modo por Período de Calendario:** Si introduces fechas personalizadas desde los selectores interactivos `Fecha/Hora Inicio Frío Manual` y `Fecha/Hora Fin Frío Manual` (antes de encender el frío o mientras está activo), la integración programa tu ventana temporal exacta sin forzar el final abierto, limitando la refrigeración activa estrictamente a dicho intervalo.
   - Al volver a **`Calor` (`Heat`)** o **`Apagado` (`Off`)**, cierra automáticamente el **Cerrojo 1** al epoch `01;01;19` (idéntico al comportamiento de las apps oficiales `myVAILLANT` / `MiGo Link`) y restaura la consigna de invierno.
 
 ### 5. Agua Caliente Sanitaria (`water_heater`): ACS Boost Forzado Inteligente
@@ -312,6 +314,33 @@ Inicia inmediatamente una carga puntual del depósito de ACS (`HwcSFMode = load`
 action: arotherm_genia_ebusd.force_dhw_boost
 data:
   boost_temp: 60.0
+```
+
+### 3. `arotherm_genia_ebusd.set_holiday_mode`
+Activa el Modo Ausencia / Vacaciones (`PRESET_AWAY`) en el regulador `MiPro Sense`, suspendiendo la producción de ACS y reduciendo la calefacción a la temperatura de mantenimiento seleccionada durante una ventana temporal específica o de forma indefinida.
+
+| Parámetro | Requerido | Valores Permitidos | Descripción |
+| :--- | :---: | :--- | :--- |
+| `temperature` | No | `5.0` – `24.0` *(°C)* | Consigna de temperatura ambiente durante la ausencia (por defecto: `12.0 °C`). |
+| `start_date` | No | `AAAA-MM-DD` / `DD/MM/AAAA` | Fecha de inicio de la ausencia (por defecto: hoy). |
+| `start_time` | No | `HH:MM` | Hora de inicio de la ausencia (por defecto: hora actual). |
+| `end_date` | No | `AAAA-MM-DD` / `DD/MM/AAAA` | Fecha de regreso. Si se omite, el modo permanece activo indefinidamente hasta su cancelación manual. |
+| `end_time` | No | `HH:MM` | Hora de regreso (por defecto: `23:59`). |
+
+**Ejemplo de Automatización — Salida de vacaciones hasta el 10 de noviembre con protección antihielo a 12 °C:**
+```yaml
+action: arotherm_genia_ebusd.set_holiday_mode
+data:
+  temperature: 12.0
+  end_date: "2026-11-10"
+  end_time: "18:00"
+```
+
+### 4. `arotherm_genia_ebusd.cancel_holiday_mode`
+Cancela inmediatamente el Modo Ausencia en `15.bass3` y restablece el funcionamiento automático habitual en calefacción y ACS. No requiere parámetros.
+
+```yaml
+action: arotherm_genia_ebusd.cancel_holiday_mode
 ```
 
 ---

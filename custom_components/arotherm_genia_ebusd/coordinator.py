@@ -46,6 +46,7 @@ from .const import (
     DEFAULT_FORCE_DHW_BOOST,
     DEFAULT_HAS_MIGO_LINK,
     DEFAULT_HAS_WIRELESS_ROOM_UNIT,
+    DEFAULT_HOLIDAY_TEMP,
     DEFAULT_INDOOR_MODEL,
     DEFAULT_MANUFACTURER,
     DEFAULT_MQTT_PREFIX,
@@ -53,6 +54,10 @@ from .const import (
     DHW_BOOST_HYST_MARGIN,
     DHW_BOOST_MAX_TIMEOUT_SECONDS,
     ESSENTIAL_HYDRATION_MESSAGES,
+    HOLIDAY_DEFAULT_END_TIME,
+    HOLIDAY_INDEFINITE_END_DATE,
+    HOLIDAY_RESET_DATE,
+    HOLIDAY_RESET_TIME,
     HYDRATION_STEP_DELAY_SECONDS,
     INITIAL_HYDRATION_WAIT_SECONDS,
     SET_CONFIRMATION_DELAY_SECONDS,
@@ -127,6 +132,7 @@ def parse_ebusd_payload(raw_payload: str) -> dict[str, Any]:
 # the 'w' lines in 15.bass3.csv and are used to apply the optimistic local update to the
 # same named fields that ebusd publishes in its MQTT JSON (e.g. day/month/year).
 DATE_WRITE_FIELDS: tuple[str, ...] = ("day", "month", "year")
+TIME_WRITE_FIELDS: tuple[str, ...] = ("hours", "minutes", "seconds")
 TIMER_WRITE_FIELDS: tuple[str, ...] = ("from_hour", "from_min", "to_hour", "to_min")
 
 
@@ -149,8 +155,15 @@ def _multi_field_layout(
     message: str, current: dict[str, Any]
 ) -> tuple[str, ...] | None:
     """Return the ordered field names for a multi-value write of `message`."""
-    if message in ("CoolingStartDate", "CoolingEndDate"):
+    if message in (
+        "CoolingStartDate",
+        "CoolingEndDate",
+        "HolidayStartDate",
+        "HolidayEndDate",
+    ):
         return DATE_WRITE_FIELDS
+    if message in ("HolidayStartTime", "HolidayEndTime"):
+        return TIME_WRITE_FIELDS
     if "Timer_" in message and not message.endswith("_Slots"):
         return TIMER_WRITE_FIELDS
     # Generic fallback: reuse the field order already published by ebusd
@@ -238,6 +251,14 @@ class SaunierGeniaCoordinator:
         self._dhw_boost_seen_load: bool = False
         self._dhw_boost_timeout_unsub: CALLBACK_TYPE | None = None
 
+        # Custom cooling season window state
+        self._custom_cooling_start_date: str | None = None
+        self._custom_cooling_end_date: str | None = None
+
+        # Preselected / pending holiday mode parameters
+        self._preselected_holiday_start_datetime: datetime | None = None
+        self._preselected_holiday_end_datetime: datetime | None = None
+
     # -------------------------------------------------------------------------
     # Configuration & Options Properties
     # -------------------------------------------------------------------------
@@ -311,6 +332,47 @@ class SaunierGeniaCoordinator:
     def dhw_boost_forced_active(self) -> bool:
         """Return True if a forced DHW boost setpoint elevation is currently active."""
         return self._dhw_boost_active
+
+    @property
+    def custom_cooling_start_date(self) -> str | None:
+        """Return custom cooling start date if configured."""
+        return self._custom_cooling_start_date
+
+    def set_custom_cooling_start_date(self, val: str | None) -> None:
+        """Set custom cooling start date."""
+        self._custom_cooling_start_date = val
+
+    @property
+    def custom_cooling_end_date(self) -> str | None:
+        """Return custom cooling end date if configured."""
+        return self._custom_cooling_end_date
+
+    def set_custom_cooling_end_date(self, val: str | None) -> None:
+        """Set custom cooling end date."""
+        self._custom_cooling_end_date = val
+
+    @property
+    def has_custom_cooling_dates(self) -> bool:
+        """Return True if user pre-set custom cooling start or end date."""
+        return bool(self._custom_cooling_start_date or self._custom_cooling_end_date)
+
+    @property
+    def preselected_holiday_start_datetime(self) -> datetime | None:
+        """Return preselected holiday start datetime."""
+        return self._preselected_holiday_start_datetime
+
+    @preselected_holiday_start_datetime.setter
+    def preselected_holiday_start_datetime(self, val: datetime | None) -> None:
+        self._preselected_holiday_start_datetime = val
+
+    @property
+    def preselected_holiday_end_datetime(self) -> datetime | None:
+        """Return preselected holiday end datetime."""
+        return self._preselected_holiday_end_datetime
+
+    @preselected_holiday_end_datetime.setter
+    def preselected_holiday_end_datetime(self, val: datetime | None) -> None:
+        self._preselected_holiday_end_datetime = val
 
     # -------------------------------------------------------------------------
     # Lifecycle Setup & Unload
@@ -995,3 +1057,243 @@ class SaunierGeniaCoordinator:
             await self.async_write_parameter(
                 CIRCUIT_BASS3, "HwcTempDesired", saved_temp
             )
+
+    async def async_activate_holiday_mode(
+        self,
+        temp: float = DEFAULT_HOLIDAY_TEMP,
+        start_date: str | None = None,
+        start_time: str | None = None,
+        end_date: str | None = None,
+        end_time: str | None = None,
+    ) -> None:
+        """Activate Holiday / Away Mode with specified setback temperature and time window."""
+        now = datetime.now()
+        cur_date_str = f"{now.day:02d};{now.month:02d};{now.year % 100:02d}"
+        cur_time_str = f"{now.hour:02d};{now.minute:02d};{now.second:02d}"
+
+        # If explicit arguments not supplied, check preselected datetime buffers
+        if start_date is None and self._preselected_holiday_start_datetime is not None:
+            s_dt = self._preselected_holiday_start_datetime
+            start_date = f"{s_dt.day:02d};{s_dt.month:02d};{s_dt.year % 100:02d}"
+            if start_time is None:
+                start_time = f"{s_dt.hour:02d};{s_dt.minute:02d};{s_dt.second:02d}"
+
+        if end_date is None and self._preselected_holiday_end_datetime is not None:
+            e_dt = self._preselected_holiday_end_datetime
+            end_date = f"{e_dt.day:02d};{e_dt.month:02d};{e_dt.year % 100:02d}"
+            if end_time is None:
+                end_time = f"{e_dt.hour:02d};{e_dt.minute:02d};{e_dt.second:02d}"
+
+        target_start_date = _normalize_date_param(start_date, cur_date_str)
+        target_start_time = _normalize_time_param(start_time, cur_time_str)
+        target_end_date = _normalize_date_param(end_date, HOLIDAY_INDEFINITE_END_DATE)
+        target_end_time = _normalize_time_param(end_time, HOLIDAY_DEFAULT_END_TIME)
+
+        _LOGGER.info(
+            "Activating Holiday / Away Mode: temp=%.1f°C, window=[%s %s to %s %s]",
+            temp,
+            target_start_date,
+            target_start_time,
+            target_end_date,
+            target_end_time,
+        )
+
+        # Step 1: Set setback temperature (EXP float)
+        await self.async_write_parameter(CIRCUIT_BASS3, "HolidayTemp", temp)
+        await asyncio.sleep(0.4)
+
+        # Step 2: Set start date
+        await self.async_write_parameter(
+            CIRCUIT_BASS3, "HolidayStartDate", target_start_date
+        )
+        await asyncio.sleep(0.4)
+
+        # Step 3: Set start time
+        await self.async_write_parameter(
+            CIRCUIT_BASS3, "HolidayStartTime", target_start_time
+        )
+        await asyncio.sleep(0.4)
+
+        # Step 4: Set end date
+        await self.async_write_parameter(
+            CIRCUIT_BASS3, "HolidayEndDate", target_end_date
+        )
+        await asyncio.sleep(0.4)
+
+        # Step 5: Set end time
+        await self.async_write_parameter(
+            CIRCUIT_BASS3, "HolidayEndTime", target_end_time
+        )
+
+    def get_holiday_remaining_days(self) -> int | str:
+        """Calculate remaining days of holiday mode.
+
+        Returns:
+            - 'Inactivo': when holiday mode is off (Z1Status != 'holidayaway' or reset sentinel 2015).
+            - 'Final abierto': when holiday mode is active with indefinite / open-ended end date (year == 99).
+            - int: number of days remaining (>= 0) when holiday mode is active with a defined calendar window.
+        """
+        z1_status = (self.get_str(CIRCUIT_BASS3, "Z1Status", "value") or "").lower()
+        start_msg = self.get_message(CIRCUIT_BASS3, "HolidayStartDate")
+        end_msg = self.get_message(CIRCUIT_BASS3, "HolidayEndDate")
+
+        start_year = start_msg.get("year") if start_msg else None
+        if z1_status != "holidayaway" or start_year == 15:
+            return "Inactivo"
+
+        if not end_msg:
+            return "Inactivo"
+
+        day = end_msg.get("day")
+        month = end_msg.get("month")
+        year = end_msg.get("year")
+        if day is None or month is None or year is None or year == 15:
+            return "Inactivo"
+
+        if year == 99:
+            return "Final abierto"
+
+        try:
+            target_date = datetime(2000 + int(year), int(month), int(day)).date()
+            diff = (target_date - datetime.now().date()).days
+            if diff < 0:
+                return "Inactivo"
+            return diff
+        except (ValueError, TypeError, OverflowError):
+            return "Inactivo"
+
+    def get_holiday_remaining_attributes(self) -> dict[str, Any]:
+        """Return structured extra attributes for holiday duration remaining."""
+        val = self.get_holiday_remaining_days()
+        is_active = val != "Inactivo"
+        is_open_ended = val == "Final abierto"
+        return {
+            "days_remaining": val
+            if isinstance(val, int)
+            else (0 if val == "Inactivo" else None),
+            "is_active": is_active,
+            "is_open_ended": is_open_ended,
+        }
+
+    def get_cooling_remaining_days(self) -> int | str:
+        """Calculate remaining days of cooling period.
+
+        Returns:
+            - 'Inactivo': when cooling is off (release status 'off', year == 19 epoch, or expired).
+            - 'Final abierto': when cooling is active with indefinite / open-ended end date (year == 99).
+            - int: number of days remaining (>= 0) when cooling is active within a defined window.
+        """
+        release_status = self.get_str(CIRCUIT_BASS3, "CoolingReleaseStatus", "value")
+        z1_op_mode_cooling = (
+            self.get_str(CIRCUIT_BASS3, "Z1OpModeCooling", "value") or ""
+        ).lower()
+        end_msg = self.get_message(CIRCUIT_BASS3, "CoolingEndDate")
+
+        if not end_msg:
+            return "Inactivo"
+
+        day = end_msg.get("day")
+        month = end_msg.get("month")
+        year = end_msg.get("year")
+        if day is None or month is None or year is None or year == 19:
+            return "Inactivo"
+
+        # Explicitly off in status and not year 99
+        if (
+            release_status is not None
+            and release_status.lower() == "off"
+            and year != 99
+        ):
+            return "Inactivo"
+        if z1_op_mode_cooling == "off" and year != 99:
+            return "Inactivo"
+
+        if year == 99:
+            return "Final abierto"
+
+        try:
+            target_date = datetime(2000 + int(year), int(month), int(day)).date()
+            diff = (target_date - datetime.now().date()).days
+            if diff < 0:
+                return "Inactivo"
+            return diff
+        except (ValueError, TypeError, OverflowError):
+            return "Inactivo"
+
+    def get_cooling_remaining_attributes(self) -> dict[str, Any]:
+        """Return structured extra attributes for cooling duration remaining."""
+        val = self.get_cooling_remaining_days()
+        is_active = val != "Inactivo"
+        is_open_ended = val == "Final abierto"
+        return {
+            "days_remaining": val
+            if isinstance(val, int)
+            else (0 if val == "Inactivo" else None),
+            "is_active": is_active,
+            "is_open_ended": is_open_ended,
+        }
+
+    async def async_cancel_holiday_mode(self) -> None:
+        """Cancel Holiday / Away Mode and restore central controller to automatic operation."""
+        _LOGGER.info("Cancelling Holiday / Away Mode and restoring auto operation")
+        # Step 1: Reset start date to sentinel 2015
+        await self.async_write_parameter(
+            CIRCUIT_BASS3, "HolidayStartDate", HOLIDAY_RESET_DATE
+        )
+        await asyncio.sleep(0.4)
+
+        # Step 2: Reset start time to 00:00:00
+        await self.async_write_parameter(
+            CIRCUIT_BASS3, "HolidayStartTime", HOLIDAY_RESET_TIME
+        )
+        await asyncio.sleep(0.4)
+
+        # Step 3: Reset end date to sentinel 2015
+        await self.async_write_parameter(
+            CIRCUIT_BASS3, "HolidayEndDate", HOLIDAY_RESET_DATE
+        )
+        await asyncio.sleep(0.4)
+
+        # Step 4: Reset end time to 00:00:00
+        await self.async_write_parameter(
+            CIRCUIT_BASS3, "HolidayEndTime", HOLIDAY_RESET_TIME
+        )
+        await asyncio.sleep(0.4)
+
+        # Step 5: Fire cancel execution trigger flag (UCH 01)
+        await self.async_write_parameter(CIRCUIT_BASS3, "HolidayCancel", 1)
+
+
+def _normalize_date_param(val: str | None, default: str) -> str:
+    """Normalize input date to DD;MM;YY (2-digit year) for ebusd BASS3."""
+    if not val:
+        return default
+    s = val.strip().replace("-", "/").replace(";", "/")
+    parts = s.split("/")
+    if len(parts) == 3:
+        try:
+            if len(parts[0]) == 4:  # YYYY/MM/DD
+                year, month, day = int(parts[0]) % 100, int(parts[1]), int(parts[2])
+            else:  # DD/MM/YYYY or DD/MM/YY
+                day, month, year = int(parts[0]), int(parts[1]), int(parts[2]) % 100
+            return f"{day:02d};{month:02d};{year:02d}"
+        except (ValueError, TypeError):
+            pass
+    return default
+
+
+def _normalize_time_param(val: str | None, default: str) -> str:
+    """Normalize input time to HH;MM;SS for ebusd BASS3."""
+    if not val:
+        return default
+    s = val.strip().replace(":", ";")
+    parts = s.split(";")
+    if len(parts) >= 2:
+        try:
+            h = int(parts[0])
+            m = int(parts[1])
+            sec = int(parts[2]) if len(parts) >= 3 else 0
+            return f"{h:02d};{m:02d};{sec:02d}"
+        except (ValueError, TypeError):
+            pass
+    return default

@@ -26,18 +26,19 @@ from .const import (
     CIRCUIT_NETX3_ALT,
     DEFAULT_COMFORT_TEMP,
     DEFAULT_COOLING_TEMP,
+    DEFAULT_HOLIDAY_TEMP,
     DEVICE_CLIMATE_CONTROLLER,
     DOMAIN,
+    PRESET_AWAY,
+    PRESET_BOOST,
+    PRESET_COMFORT,
+    PRESET_ECO,
+    PRESET_MANUAL,
     SENTINEL_COOLING_THRESHOLD,
     SENTINEL_HEATING_THRESHOLD,
 )
 from .coordinator import SaunierGeniaCoordinator
 from .entity import SaunierGeniaEntity
-
-PRESET_COMFORT = "comfort"
-PRESET_MANUAL = "manual"
-PRESET_ECO = "eco"
-PRESET_BOOST = "boost"
 
 SEASON_HEATING = "heating"
 SEASON_COOLING = "cooling"
@@ -89,6 +90,7 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             PRESET_MANUAL,
             PRESET_ECO,
             PRESET_BOOST,
+            PRESET_AWAY,
         ]
         subscriptions = [
             (CIRCUIT_BASS3, "Z1RoomTemp"),
@@ -107,6 +109,11 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             (CIRCUIT_BASS3, "CoolingReleaseStatus"),
             (CIRCUIT_BASS3, "CoolingStartDate"),
             (CIRCUIT_BASS3, "CoolingEndDate"),
+            (CIRCUIT_BASS3, "HolidayTemp"),
+            (CIRCUIT_BASS3, "HolidayStartDate"),
+            (CIRCUIT_BASS3, "HolidayStartTime"),
+            (CIRCUIT_BASS3, "HolidayEndDate"),
+            (CIRCUIT_BASS3, "HolidayEndTime"),
             (CIRCUIT_BASS3, "CoolingTimer_Monday"),
             (CIRCUIT_BASS3, "SystemOperatingState"),
             (CIRCUIT_BASS3, "DisplayedOutsideTemp"),
@@ -271,11 +278,14 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
     @property
     def preset_mode(self) -> str:
         """Return the current preset mode."""
-        sf_mode = (
-            self.coordinator.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or ""
-        ).lower()
         z1_status = (
             self.coordinator.get_str(CIRCUIT_BASS3, "Z1Status", "value") or ""
+        ).lower()
+        if z1_status == "holidayaway":
+            return PRESET_AWAY
+
+        sf_mode = (
+            self.coordinator.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or ""
         ).lower()
         if sf_mode == "veto" or z1_status == "veto":
             return PRESET_BOOST
@@ -304,6 +314,14 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
 
         # Heating / Auto (heating) / Off context
         current_preset = self.preset_mode
+        if current_preset == PRESET_AWAY:
+            holiday_temp = self.coordinator.get_float(
+                CIRCUIT_BASS3, "HolidayTemp", "value"
+            )
+            if holiday_temp is not None and holiday_temp > 5.0:
+                return holiday_temp
+            return DEFAULT_HOLIDAY_TEMP
+
         day_temp = (
             self.coordinator.get_float(CIRCUIT_BASS3, "Z1DayTemp", "value")
             or self._saved_heating_target
@@ -406,22 +424,24 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
     # -------------------------------------------------------------------------
 
     async def _async_ensure_cooling_lock_open(self) -> None:
-        """Open Lock 1 (CoolingStartDate=01;01;26, CoolingEndDate=01;01;99: indefinite) if auto bypass enabled."""
+        """Open Lock 1 (custom period if pre-set or 01;01;26 to 01;01;99: indefinite) if auto bypass enabled."""
         if not self.coordinator.auto_cooling_lock_bypass:
             return
 
-        # Avoid redundant writes if already open
-        start_year = self.coordinator.get_int(CIRCUIT_BASS3, "CoolingStartDate", "year")
         end_year = self.coordinator.get_int(CIRCUIT_BASS3, "CoolingEndDate", "year")
-        if start_year == 26 and end_year == 99:
+        # If already open with custom dates or open-ended 99, do not overwrite!
+        if end_year is not None and end_year != 19:
             return
 
+        start_date = self.coordinator.custom_cooling_start_date or "01;01;26"
+        end_date = self.coordinator.custom_cooling_end_date or "01;01;99"
+
         await self.coordinator.async_write_parameter(
-            CIRCUIT_BASS3, "CoolingStartDate", "01;01;26"
+            CIRCUIT_BASS3, "CoolingStartDate", start_date
         )
         await asyncio.sleep(0.5)
         await self.coordinator.async_write_parameter(
-            CIRCUIT_BASS3, "CoolingEndDate", "01;01;99"
+            CIRCUIT_BASS3, "CoolingEndDate", end_date
         )
         await asyncio.sleep(0.5)
 
@@ -638,6 +658,12 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             )
             return
 
+        if self.preset_mode == PRESET_AWAY:
+            await self.coordinator.async_write_parameter(
+                CIRCUIT_BASS3, "HolidayTemp", temp_val
+            )
+            return
+
         if self.preset_mode == PRESET_BOOST:
             await self.coordinator.async_write_parameter(
                 CIRCUIT_BASS3, "Z1QuickVetoTemp", temp_val
@@ -663,11 +689,24 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
         )
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
-        """Set preset mode (comfort, manual, eco, boost)."""
+        """Set preset mode (comfort, manual, eco, boost, away)."""
         await self._async_run_transition(self._async_apply_preset_mode(preset_mode))
 
     async def _async_apply_preset_mode(self, preset_mode: str) -> None:
         """Write the eBUS sequence for a new preset (runs with learning paused)."""
+        current_z1_status = (
+            self.coordinator.get_str(CIRCUIT_BASS3, "Z1Status", "value") or ""
+        ).lower()
+
+        # If currently in holiday mode and switching to another preset, cancel holiday mode
+        if current_z1_status == "holidayaway" and preset_mode != PRESET_AWAY:
+            await self.coordinator.async_cancel_holiday_mode()
+            await asyncio.sleep(0.5)
+
+        if preset_mode == PRESET_AWAY:
+            await self.coordinator.async_activate_holiday_mode()
+            return
+
         if preset_mode == PRESET_BOOST:
             await self.coordinator.async_write_parameter(
                 CIRCUIT_BASS3, "Z1SFMode", "veto"

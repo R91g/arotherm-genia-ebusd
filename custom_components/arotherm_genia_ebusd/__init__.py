@@ -14,9 +14,12 @@ from homeassistant.helpers import config_validation as cv
 
 from .const import (
     CIRCUIT_BASS3,
+    DEFAULT_HOLIDAY_TEMP,
     DOMAIN,
     PLATFORMS,
+    SERVICE_CANCEL_HOLIDAY_MODE,
     SERVICE_FORCE_DHW_BOOST,
+    SERVICE_SET_HOLIDAY_MODE,
     SERVICE_SET_WEEKLY_TIMER,
     TIMER_CIRCUIT_PREFIXES,
     WEEKDAYS_LIST,
@@ -46,6 +49,20 @@ FORCE_DHW_BOOST_SCHEMA = vol.Schema(
         ),
     }
 )
+
+SET_HOLIDAY_MODE_SCHEMA = vol.Schema(
+    {
+        vol.Optional("temperature", default=DEFAULT_HOLIDAY_TEMP): vol.All(
+            vol.Coerce(float), vol.Range(min=5.0, max=24.0)
+        ),
+        vol.Optional("start_date"): cv.string,
+        vol.Optional("start_time"): cv.string,
+        vol.Optional("end_date"): cv.string,
+        vol.Optional("end_time"): cv.string,
+    }
+)
+
+CANCEL_HOLIDAY_MODE_SCHEMA = vol.Schema({})
 
 
 def _parse_hhmm(time_str: str) -> tuple[int, int]:
@@ -99,6 +116,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if not hass.data.get(DOMAIN):
             hass.services.async_remove(DOMAIN, SERVICE_SET_WEEKLY_TIMER)
             hass.services.async_remove(DOMAIN, SERVICE_FORCE_DHW_BOOST)
+            hass.services.async_remove(DOMAIN, SERVICE_SET_HOLIDAY_MODE)
+            hass.services.async_remove(DOMAIN, SERVICE_CANCEL_HOLIDAY_MODE)
 
     return unload_ok
 
@@ -171,4 +190,52 @@ def _async_register_services(hass: HomeAssistant) -> None:
             SERVICE_FORCE_DHW_BOOST,
             _async_handle_force_dhw_boost,
             schema=FORCE_DHW_BOOST_SCHEMA,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_SET_HOLIDAY_MODE):
+
+        async def _async_handle_set_holiday_mode(call: ServiceCall) -> None:
+            """Handle arotherm_genia_ebusd.set_holiday_mode service call."""
+            coordinators: dict[str, SaunierGeniaCoordinator] = hass.data.get(DOMAIN, {})
+            if not coordinators:
+                raise HomeAssistantError(f"No configured instances of {DOMAIN} found.")
+
+            temp: float = float(call.data.get("temperature", DEFAULT_HOLIDAY_TEMP))
+            start_date: str | None = call.data.get("start_date")
+            start_time: str | None = call.data.get("start_time")
+            end_date: str | None = call.data.get("end_date")
+            end_time: str | None = call.data.get("end_time")
+
+            for coordinator in coordinators.values():
+                await coordinator.async_activate_holiday_mode(
+                    temp=temp,
+                    start_date=start_date,
+                    start_time=start_time,
+                    end_date=end_date,
+                    end_time=end_time,
+                )
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SET_HOLIDAY_MODE,
+            _async_handle_set_holiday_mode,
+            schema=SET_HOLIDAY_MODE_SCHEMA,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_CANCEL_HOLIDAY_MODE):
+
+        async def _async_handle_cancel_holiday_mode(call: ServiceCall) -> None:
+            """Handle arotherm_genia_ebusd.cancel_holiday_mode service call."""
+            coordinators: dict[str, SaunierGeniaCoordinator] = hass.data.get(DOMAIN, {})
+            if not coordinators:
+                raise HomeAssistantError(f"No configured instances of {DOMAIN} found.")
+
+            for coordinator in coordinators.values():
+                await coordinator.async_cancel_holiday_mode()
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_CANCEL_HOLIDAY_MODE,
+            _async_handle_cancel_holiday_mode,
+            schema=CANCEL_HOLIDAY_MODE_SCHEMA,
         )

@@ -133,6 +133,14 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
         return self.coordinator.get_field(desc.circuit, desc.message, desc.field)
 
     @property
+    def native_unit_of_measurement(self) -> str | None:
+        """Return the unit of measurement, suppressing it for non-numeric states (e.g. Inactivo / Final abierto)."""
+        val = self.native_value
+        if isinstance(val, (int, float)):
+            return self.entity_description.native_unit_of_measurement
+        return None
+
+    @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
         """Return optional extra state attributes."""
         if self.entity_description.attr_fn is not None:

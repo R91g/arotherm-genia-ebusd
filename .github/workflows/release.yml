@@ -1,0 +1,28 @@
+name: Release & Distribution
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-and-attach-zip:
+    name: Build & Attach HACS Release ZIP
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Build HACS ZIP Archive
+        run: |
+          mkdir -p build/custom_components
+          cp -r custom_components/arotherm_genia_ebusd build/custom_components/
+          cd build
+          zip -r ../arotherm_genia_ebusd.zip custom_components
+          cd ..
+
+      - name: Upload ZIP to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: arotherm_genia_ebusd.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

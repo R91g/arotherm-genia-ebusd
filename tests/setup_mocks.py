@@ -13,6 +13,7 @@ MOCKED_MODULES = [
     "homeassistant.components",
     "homeassistant.components.binary_sensor",
     "homeassistant.components.climate",
+    "homeassistant.components.datetime",
     "homeassistant.components.diagnostics",
     "homeassistant.components.mqtt",
     "homeassistant.components.number",
@@ -62,6 +63,13 @@ class MockEntity:
         """Mock async_write_ha_state."""
 
 
+class MockRestoreEntity:
+    """Mock base class for restore state."""
+
+    async def async_get_last_state(self) -> Any:
+        return None
+
+
 sys.modules["homeassistant.helpers.entity"].Entity = MockEntity
 sys.modules["homeassistant.components.sensor"].SensorEntity = MockEntity
 sys.modules["homeassistant.components.binary_sensor"].BinarySensorEntity = MockEntity
@@ -70,6 +78,8 @@ sys.modules["homeassistant.components.select"].SelectEntity = MockEntity
 sys.modules["homeassistant.components.switch"].SwitchEntity = MockEntity
 sys.modules["homeassistant.components.climate"].ClimateEntity = MockEntity
 sys.modules["homeassistant.components.water_heater"].WaterHeaterEntity = MockEntity
+sys.modules["homeassistant.components.datetime"].DateTimeEntity = MockEntity
+sys.modules["homeassistant.helpers.restore_state"].RestoreEntity = MockRestoreEntity
 
 
 # Base entity description dataclass compatible with Python 3.10+ dataclass inheritance
@@ -109,8 +119,18 @@ sys.modules[
 sys.modules[
     "homeassistant.components.switch"
 ].SwitchEntityDescription = MockEntityDescription
+sys.modules[
+    "homeassistant.components.datetime"
+].DateTimeEntityDescription = MockEntityDescription
 
 # Mock common string enums and constants
+from datetime import UTC
+
+sys.modules["homeassistant.util"].dt.get_default_time_zone.return_value = UTC
+sys.modules["homeassistant.util.dt"].get_default_time_zone.return_value = UTC
+sys.modules["homeassistant.util"].dt.as_local.side_effect = lambda dt: dt
+sys.modules["homeassistant.util.dt"].as_local.side_effect = lambda dt: dt
+
 sys.modules["homeassistant.const"].PERCENTAGE = "%"
 sys.modules["homeassistant.const"].UnitOfTemperature = MagicMock(CELSIUS="°C")
 sys.modules["homeassistant.const"].UnitOfPressure = MagicMock(BAR="bar")
@@ -122,5 +142,5 @@ sys.modules["homeassistant.const"].UnitOfVolumeFlowRate = MagicMock(
     CUBIC_METERS_PER_HOUR="m³/h"
 )
 sys.modules["homeassistant.const"].UnitOfTime = MagicMock(
-    HOURS="h", MINUTES="min", SECONDS="s"
+    HOURS="h", MINUTES="min", SECONDS="s", DAYS="d"
 )

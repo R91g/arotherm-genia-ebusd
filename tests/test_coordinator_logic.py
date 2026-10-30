@@ -3,6 +3,9 @@
 import asyncio
 import os
 import sys
+import unittest
+from datetime import datetime, timedelta
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 # Ensure tests/ directory is on path to load setup_mocks
@@ -13,10 +16,10 @@ sys.path.insert(
     0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "hacs"))
 )
 
-import unittest
-
+from custom_components.arotherm_genia_ebusd.const import CIRCUIT_BASS3
 from custom_components.arotherm_genia_ebusd.coordinator import (
     DATE_WRITE_FIELDS,
+    TIME_WRITE_FIELDS,
     TIMER_WRITE_FIELDS,
     SaunierGeniaCoordinator,
     _coerce_scalar,
@@ -60,6 +63,12 @@ class TestCoordinatorLogic(unittest.TestCase):
         # Dates
         self.assertEqual(_multi_field_layout("CoolingStartDate", {}), DATE_WRITE_FIELDS)
         self.assertEqual(_multi_field_layout("CoolingEndDate", {}), DATE_WRITE_FIELDS)
+        self.assertEqual(_multi_field_layout("HolidayStartDate", {}), DATE_WRITE_FIELDS)
+        self.assertEqual(_multi_field_layout("HolidayEndDate", {}), DATE_WRITE_FIELDS)
+
+        # Times
+        self.assertEqual(_multi_field_layout("HolidayStartTime", {}), TIME_WRITE_FIELDS)
+        self.assertEqual(_multi_field_layout("HolidayEndTime", {}), TIME_WRITE_FIELDS)
 
         # Timers
         self.assertEqual(_multi_field_layout("Z1Timer_Monday", {}), TIMER_WRITE_FIELDS)
@@ -181,6 +190,147 @@ class TestCoordinatorLogic(unittest.TestCase):
             [("bass3", "HwcTempDesired", 60.0), ("bass3", "HwcSFMode", "load")],
         )
         self.assertEqual(coord.saved_dhw_target_temp, 50.0)
+
+    def test_holiday_mode_activation_and_cancellation(self) -> None:
+        """Test Holiday Mode activation 5-step write and cancellation reset trigger."""
+        writes: list[tuple[str, str, Any]] = []
+
+        class MockCoordinator:
+            def __init__(self) -> None:
+                self._preselected_holiday_start_datetime = None
+                self._preselected_holiday_end_datetime = None
+
+            async def async_write_parameter(
+                self, circuit: str, message: str, value: Any
+            ) -> None:
+                writes.append((circuit, message, value))
+
+            async_activate_holiday_mode = (
+                SaunierGeniaCoordinator.async_activate_holiday_mode
+            )
+            async_cancel_holiday_mode = (
+                SaunierGeniaCoordinator.async_cancel_holiday_mode
+            )
+
+        coord = MockCoordinator()
+
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            # 1. Activation with explicit parameters
+            writes.clear()
+            asyncio.run(
+                coord.async_activate_holiday_mode(
+                    temp=14.0,
+                    start_date="2026-11-01",
+                    start_time="09:00",
+                    end_date="2026-11-10",
+                    end_time="18:30",
+                )
+            )
+            self.assertEqual(
+                writes,
+                [
+                    ("bass3", "HolidayTemp", 14.0),
+                    ("bass3", "HolidayStartDate", "01;11;26"),
+                    ("bass3", "HolidayStartTime", "09;00;00"),
+                    ("bass3", "HolidayEndDate", "10;11;26"),
+                    ("bass3", "HolidayEndTime", "18;30;00"),
+                ],
+            )
+
+            # 2. Activation with defaults (indefinite mode at 15.0 °C)
+            writes.clear()
+            asyncio.run(coord.async_activate_holiday_mode())
+            self.assertEqual(len(writes), 5)
+            self.assertEqual(writes[0], ("bass3", "HolidayTemp", 15.0))
+            self.assertEqual(writes[1][0:2], ("bass3", "HolidayStartDate"))
+            self.assertEqual(writes[2][0:2], ("bass3", "HolidayStartTime"))
+            self.assertEqual(writes[3], ("bass3", "HolidayEndDate", "01;01;99"))
+            self.assertEqual(writes[4], ("bass3", "HolidayEndTime", "23;59;59"))
+
+            # 3. Cancellation sequence (reset dates/times to 2015 sentinel + trigger flag 1)
+            writes.clear()
+            asyncio.run(coord.async_cancel_holiday_mode())
+            self.assertEqual(
+                writes,
+                [
+                    ("bass3", "HolidayStartDate", "01;01;15"),
+                    ("bass3", "HolidayStartTime", "00;00;00"),
+                    ("bass3", "HolidayEndDate", "01;01;15"),
+                    ("bass3", "HolidayEndTime", "00;00;00"),
+                    ("bass3", "HolidayCancel", 1),
+                ],
+            )
+
+    def test_holiday_and_cooling_remaining_days_states(self) -> None:
+        """Test remaining days calculations: Inactivo, Final abierto, and positive day counts."""
+        coord = SaunierGeniaCoordinator(MagicMock(), MagicMock())
+        c_bass3 = CIRCUIT_BASS3.lower()
+
+        # 1. Holiday mode inactive: returns 'Inactivo'
+        coord._state[(c_bass3, "Z1Status")] = {"value": "auto"}
+        self.assertEqual(coord.get_holiday_remaining_days(), "Inactivo")
+        attrs = coord.get_holiday_remaining_attributes()
+        self.assertEqual(attrs["days_remaining"], 0)
+        self.assertFalse(attrs["is_active"])
+        self.assertFalse(attrs["is_open_ended"])
+
+        # 2. Holiday mode active with open-ended date (year 99): returns 'Final abierto'
+        coord._state[(c_bass3, "Z1Status")] = {"value": "holidayaway"}
+        coord._state[(c_bass3, "HolidayStartDate")] = {
+            "day": 30,
+            "month": 10,
+            "year": 26,
+        }
+        coord._state[(c_bass3, "HolidayEndDate")] = {"day": 1, "month": 1, "year": 99}
+        self.assertEqual(coord.get_holiday_remaining_days(), "Final abierto")
+        attrs = coord.get_holiday_remaining_attributes()
+        self.assertIsNone(attrs["days_remaining"])
+        self.assertTrue(attrs["is_active"])
+        self.assertTrue(attrs["is_open_ended"])
+
+        # 3. Holiday mode active with timed window (e.g. 5 days in future)
+        future_date = datetime.now().date() + timedelta(days=5)
+        coord._state[(c_bass3, "HolidayEndDate")] = {
+            "day": future_date.day,
+            "month": future_date.month,
+            "year": future_date.year % 100,
+        }
+        self.assertEqual(coord.get_holiday_remaining_days(), 5)
+        attrs = coord.get_holiday_remaining_attributes()
+        self.assertEqual(attrs["days_remaining"], 5)
+        self.assertTrue(attrs["is_active"])
+        self.assertFalse(attrs["is_open_ended"])
+
+        # 4. Cooling inactive (year 19 or release status off): returns 'Inactivo'
+        coord._state[(c_bass3, "CoolingEndDate")] = {"day": 1, "month": 1, "year": 19}
+        self.assertEqual(coord.get_cooling_remaining_days(), "Inactivo")
+        c_attrs = coord.get_cooling_remaining_attributes()
+        self.assertEqual(c_attrs["days_remaining"], 0)
+        self.assertFalse(c_attrs["is_active"])
+        self.assertFalse(c_attrs["is_open_ended"])
+
+        # 5. Cooling active with open-ended date (year 99): returns 'Final abierto'
+        coord._state[(c_bass3, "CoolingEndDate")] = {"day": 1, "month": 1, "year": 99}
+        coord._state[(c_bass3, "CoolingReleaseStatus")] = {"value": "on"}
+        coord._state[(c_bass3, "Z1OpModeCooling")] = {"value": "day"}
+        self.assertEqual(coord.get_cooling_remaining_days(), "Final abierto")
+        c_attrs = coord.get_cooling_remaining_attributes()
+        self.assertIsNone(c_attrs["days_remaining"])
+        self.assertTrue(c_attrs["is_active"])
+        self.assertTrue(c_attrs["is_open_ended"])
+
+        # 6. Cooling active with timed window: returns day count
+        c_future = datetime.now().date() + timedelta(days=12)
+        coord._state[(c_bass3, "CoolingEndDate")] = {
+            "day": c_future.day,
+            "month": c_future.month,
+            "year": c_future.year % 100,
+        }
+        self.assertEqual(coord.get_cooling_remaining_days(), 12)
+        c_attrs = coord.get_cooling_remaining_attributes()
+        self.assertEqual(c_attrs["days_remaining"], 12)
+        self.assertTrue(c_attrs["is_active"])
+        self.assertFalse(c_attrs["is_open_ended"])
 
 
 if __name__ == "__main__":

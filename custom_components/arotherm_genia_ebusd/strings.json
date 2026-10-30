@@ -135,6 +135,9 @@
       "z1_cooling_temp_manual": {
         "name": "Zone 1 Manual Cooling Setpoint"
       },
+      "holiday_temp": {
+        "name": "Holiday Mode Temperature Setpoint"
+      },
       "hwc_temp_desired": {
         "name": "DHW Target Temperature"
       },
@@ -220,6 +223,9 @@
       "cooling_season_authorization": {
         "name": "Cooling Season Authorization (Lock 1)"
       },
+      "holiday_mode_switch": {
+        "name": "Away Mode"
+      },
       "adapt_heat_curve": {
         "name": "Adaptive Heating Curve"
       },
@@ -228,6 +234,20 @@
       },
       "global_system_off": {
         "name": "Global System Off (Installer)"
+      }
+    },
+    "datetime": {
+      "holiday_start_datetime": {
+        "name": "Away Mode Start Date"
+      },
+      "holiday_end_datetime": {
+        "name": "Away Mode End Date"
+      },
+      "cooling_start_datetime": {
+        "name": "Manual Cooling Start Date"
+      },
+      "cooling_end_datetime": {
+        "name": "Manual Cooling End Date"
       }
     },
     "binary_sensor": {
@@ -553,6 +573,18 @@
       },
       "cooling_end_date": {
         "name": "Cooling Season End Date"
+      },
+      "holiday_start_date": {
+        "name": "Holiday Mode Start Date"
+      },
+      "holiday_end_date": {
+        "name": "Holiday Mode End Date"
+      },
+      "holiday_duration_remaining": {
+        "name": "Holiday Duration Remaining"
+      },
+      "cooling_duration_remaining": {
+        "name": "Cooling Duration Remaining"
       },
       "bass3_energy_hc_this_month": {
         "name": "Heating Energy Consumed This Month (BASS3)"

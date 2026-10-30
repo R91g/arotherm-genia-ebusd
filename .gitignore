@@ -1,6 +1,7 @@
 # Local archive (personal media, research, logs, manuals)
 _archive/
 scratch/
+*.zip
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

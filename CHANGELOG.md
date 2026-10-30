@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.0] - 2026-10-30
+
+### Added
+- **DateTime Platform (8th native platform):**
+  - `datetime.holiday_start_datetime`: Interactive selector for Away Mode start date and time.
+  - `datetime.holiday_end_datetime`: Interactive selector for Away Mode end date and time.
+  - `datetime.cooling_start_datetime`: Interactive selector for Manual Cooling season start date and time.
+  - `datetime.cooling_end_datetime`: Interactive selector for Manual Cooling season end date and time.
+- **Away / Holiday Mode (`Holiday Mode`):**
+  - `switch.holiday_mode`: Bidirectional toggle switch for system-wide Away Mode.
+  - `climate` Preset Support: Added native `away` preset to Zone 1 climate entity with dynamic fallback to `HolidayTemp` (15.0 °C by default). Changing presets automatically triggers safe eBUS cancellation.
+  - `number.holiday_temp`: Touch-safe numeric box control for away temperature setpoint (5.0 °C – 24.0 °C).
+  - `sensor.holiday_duration_remaining`: Live countdown sensor returning `Inactivo` when off, `Final abierto` when open-ended (year 99), and positive day counts (`N d`) when active.
+  - Actions / Services: `arotherm_genia_ebusd.set_holiday_mode` and `arotherm_genia_ebusd.cancel_holiday_mode`.
+- **Dual Cooling Season Control:**
+  - Automated Open-Ended Mode: Switching to `Cool` or turning on the cooling switch opens Lock 1 indefinitely (`01;01;26` to `01;01;99`).
+  - Calendar Window Mode: Setting start/end dates via the new `datetime` entities programs the exact timeframe on the controller without open-ended override.
+  - `sensor.cooling_duration_remaining`: Live countdown sensor returning `Inactivo` when off, `Final abierto` when open-ended, and positive day counts (`N d`) during active scheduled windows.
+- **Protocol eBUS Definitions (`15.bass3.csv`):**
+  - Full read/write support for `HolidayStartDate`, `HolidayStartTime`, `HolidayEndDate`, `HolidayEndTime`, `HolidayTemp`, and `HolidayCancel`.
+- **Release Automation:**
+  - Added `.github/workflows/release.yml` for automated HACS distribution packaging (`arotherm_genia_ebusd.zip`).
+
+---
+
 ## [1.0.0] - 2026-10-29
 
 ### Added

@@ -93,3 +93,58 @@ force_dhw_boost:
           step: 0.5
           unit_of_measurement: "°C"
           mode: box
+
+set_holiday_mode:
+  name: Activar Modo Ausencia / Vacaciones
+  description: >
+    Activa el Modo Ausencia en el regulador MiPro Sense (15.bass3),
+    suspendiendo la producción de ACS y reduciendo la consigna de calefacción
+    a la temperatura de mantenimiento seleccionada durante una ventana temporal o indefinida.
+  fields:
+    temperature:
+      name: Temperatura de ausencia
+      description: Consigna de temperatura en °C durante la ausencia (por defecto 15.0 °C).
+      required: false
+      default: 15.0
+      example: 15.0
+      selector:
+        number:
+          min: 5.0
+          max: 24.0
+          step: 0.5
+          unit_of_measurement: "°C"
+          mode: box
+    start_date:
+      name: Fecha de inicio (Opcional)
+      description: Fecha de inicio de la ausencia en formato AAAA-MM-DD o DD/MM/AAAA. Por defecto, hoy.
+      required: false
+      example: "2026-10-30"
+      selector:
+        text:
+    start_time:
+      name: Hora de inicio (Opcional)
+      description: Hora de inicio de la ausencia en formato HH:MM. Por defecto, hora actual.
+      required: false
+      example: "10:30"
+      selector:
+        text:
+    end_date:
+      name: Fecha de fin (Opcional)
+      description: Fecha de finalización de la ausencia. Si se omite, se establece de forma abierta/indefinida (hasta cancelación manual).
+      required: false
+      example: "2026-11-05"
+      selector:
+        text:
+    end_time:
+      name: Hora de fin (Opcional)
+      description: Hora de finalización en formato HH:MM (por defecto 23:59).
+      required: false
+      example: "23:59"
+      selector:
+        text:
+
+cancel_holiday_mode:
+  name: Cancelar Modo Ausencia / Vacaciones
+  description: >
+    Cancela de forma inmediata el Modo Ausencia en el regulador MiPro Sense (15.bass3)
+    y restablece el funcionamiento automático en calefacción y agua caliente sanitaria (ACS).

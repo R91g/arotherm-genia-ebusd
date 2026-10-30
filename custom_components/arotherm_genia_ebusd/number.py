@@ -192,6 +192,18 @@ NUMBER_DESCRIPTIONS: tuple[SaunierGeniaNumberEntityDescription, ...] = (
         filter_cooling_sentinel=True,
     ),
     SaunierGeniaNumberEntityDescription(
+        key="holiday_temp",
+        translation_key="holiday_temp",
+        message="HolidayTemp",
+        field="value",
+        native_min_value=5.0,
+        native_max_value=24.0,
+        native_step=0.5,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=NumberDeviceClass.TEMPERATURE,
+        entity_category=EntityCategory.CONFIG,
+    ),
+    SaunierGeniaNumberEntityDescription(
         key="hwc_temp_desired",
         translation_key="hwc_temp_desired",
         message="HwcTempDesired",

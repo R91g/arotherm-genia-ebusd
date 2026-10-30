@@ -12,7 +12,9 @@ import setup_mocks  # noqa: F401
 
 from custom_components.arotherm_genia_ebusd.const import (
     DOMAIN,
+    SERVICE_CANCEL_HOLIDAY_MODE,
     SERVICE_FORCE_DHW_BOOST,
+    SERVICE_SET_HOLIDAY_MODE,
     SERVICE_SET_WEEKLY_TIMER,
 )
 
@@ -138,6 +140,8 @@ class TestSchemaIntegrity(unittest.TestCase):
         # Check that registered service constants are documented in services.yaml
         self.assertIn(f"{SERVICE_SET_WEEKLY_TIMER}:", content)
         self.assertIn(f"{SERVICE_FORCE_DHW_BOOST}:", content)
+        self.assertIn(f"{SERVICE_SET_HOLIDAY_MODE}:", content)
+        self.assertIn(f"{SERVICE_CANCEL_HOLIDAY_MODE}:", content)
 
         # Check basic schema presence: name, description, fields
         self.assertIn("name:", content)

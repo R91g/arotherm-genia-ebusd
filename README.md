@@ -106,23 +106,25 @@ Vaillant and Saunier Duval aerothermal heat pumps share **100% identical eBUS el
 | **3. Hydraulic Interface** (`<Indoor Model>`) | `76.vwzio` | Secondary circuit operating state (heating, cooling, DHW, overrun, standby), 3-way diverter valve / secondary pump diagnostics, and active error monitoring (`OK` or fault codes). |
 | **4. Wireless Room Thermostat** *(Optional)* | `04.netx3` / `f6` / `broadcast` | Wireless room dial temperature, wireless target setpoint, broadcast outdoor temperature, and eBUS system date/time. *(If no wireless unit is installed, broadcast sensors automatically attach to the Climate Controller).* |
 
-**Platform Breakdown (134 entities total):**
-- `climate` (**1**): Unified Heating/Cooling/Auto thermostat for Zone 1 with presets (`Scheduled (Comfort)`, `Continuous Manual`, `Eco (Night setback)`, `Quick Veto Override`).
+**Platform Breakdown (144 entities total across 8 platforms):**
+- `climate` (**1**): Unified Heating/Cooling/Auto thermostat for Zone 1 with presets (`Scheduled (Comfort)`, `Continuous Manual`, `Eco (Night setback)`, `Quick Veto Override`, `Away / Holiday Mode`).
 - `water_heater` (**1**): Domestic Hot Water (DHW) cylinder controller (`Off`, `Time-controlled (Schedule)`, `Continuous (24h)`, `Boost`).
-- `sensor` (**90**): 86 telemetry, energy, diagnostic, and calculated thermodynamic sensors + 4 weekly timer schedule summary sensors (with full daily slot attributes).
+- `sensor` (**94**): 90 telemetry, energy, diagnostic, and calculated thermodynamic sensors + 4 weekly timer schedule summary sensors (with full daily slot attributes).
 - `binary_sensor` (**8**): Compressor running, primary pump, defrost active, energy integration active, Zone 1 heating demand, hardware cooling lock release, broadcast cooling cycle, and physical eBUS signal.
-- `number` (**24**): All installer and user numeric parameters (heating curve, excess temp, min/max flow setpoints, summer limit, day/night/manual/veto/cooling setpoints, DHW setpoint & hysteresis/offset/timers, bivalence points, max room humidity).
+- `number` (**25**): All installer and user numeric parameters (heating curve, excess temp, min/max flow setpoints, summer limit, day/night/manual/veto/cooling/holiday setback setpoints, DHW setpoint & hysteresis/offset/timers, bivalence points, max room humidity).
 - `select` (**5**): Zone 1 heating mode, Zone 1 cooling mode, DHW mode, night lowering mode (`eco`/`night`/`off`), and room temperature modulation mode (`off`/`modulating`/`thermostat`).
-- `switch` (**5**): One-Time DHW Charge (`Boost`), Cooling Season Authorization (`Lock 1`), Adaptive Heating Curve, DHW Parallel Loading, and Global System Off *(disabled by default for safety)*.
+- `switch` (**6**): Away Mode (`Holiday Mode`), One-Time DHW Charge (`Boost`), Cooling Season Authorization (`Lock 1`), Adaptive Heating Curve, DHW Parallel Loading, and Global System Off *(disabled by default for safety)*.
+- `datetime` (**4**): Interactive UI controls for Away Mode Start (`datetime`), Away Mode End (`datetime`), Manual Cooling Start Date (`datetime`), and Manual Cooling End Date (`datetime`).
 
 ### 4. Zone 1 Climate: Anti-Sentinel Filter & Automatic Double-Lock Cooling
 - **Firmware Anti-Sentinel Filtering:**
   - When heating is turned off (`Z1OpMode = off`), the controller reports `5.0 °C` (frost protection) in `Z1ActualRoomTempDesired`.
   - When cooling is turned off (`Z1OpModeCooling = off`), the controller reports `99.0 °C` (`0000c642` IEEE 754 float) in `Z1CoolingTempDesired`.
   - The integration filters out both sentinel values, memorizes your real heating and cooling comfort targets independently across Home Assistant restarts (`RestoreEntity`), and prevents out-of-range UI spikes.
-- **Transparent Double-Lock Cooling Automation:**
+- **Transparent Double-Lock Cooling Automation & Custom Calendar Periods:**
   - Vaillant / Saunier Duval controllers guard active cooling behind two independent locks: **Lock 1** (a calendar date window `CoolingStartDate`–`CoolingEndDate`) and **Lock 2** (`Z1OpModeCooling`).
-  - Selecting **`Cool`** on the Home Assistant thermostat automatically turns off heating, opens **Lock 1** indefinitely (`01;01;26` to `01;01;99`), activates **Lock 2** (`Z1OpModeCooling = day`), and restores your saved cooling target temperature.
+  - **Open-Ended Mode (Default):** Selecting **`Cool`** on the thermostat automatically turns off heating, opens **Lock 1** indefinitely (`01;01;26` to `01;01;99`), activates **Lock 2** (`Z1OpModeCooling = day`), and restores your saved cooling target temperature.
+  - **Custom Window Mode:** If you set custom dates via `Manual Cooling Start Date` and `Manual Cooling End Date` (either before switching on or while running), the integration programs your specific date window without forcing indefinite operation, automatically restricting active cooling to that timeframe.
   - Switching back to **`Heat`** or **`Off`** automatically closes **Lock 1** (`01;01;19` epoch, matching the official `myVAILLANT` / `MiGo Link` app behavior) and restores your heating setpoint.
 
 ### 5. Domestic Hot Water (`water_heater`): Smart Forced DHW Boost
@@ -312,6 +314,33 @@ Triggers an immediate one-time DHW cylinder charge (`HwcSFMode = load`) using th
 action: arotherm_genia_ebusd.force_dhw_boost
 data:
   boost_temp: 60.0
+```
+
+### 3. `arotherm_genia_ebusd.set_holiday_mode`
+Activates the Away / Holiday Mode (`PRESET_AWAY`) on the `MiPro Sense` controller, suspending DHW heating and reducing space heating to the selected setback temperature for a specific or open-ended timeframe.
+
+| Parameter | Required | Allowed Values | Description |
+| :--- | :---: | :--- | :--- |
+| `temperature` | No | `5.0` – `24.0` *(°C)* | Setback room temperature during absence (default: `12.0 °C`). |
+| `start_date` | No | `YYYY-MM-DD` / `DD/MM/YYYY` | Absence start date (default: today). |
+| `start_time` | No | `HH:MM` | Absence start time (default: current time). |
+| `end_date` | No | `YYYY-MM-DD` / `DD/MM/YYYY` | Absence return date. If omitted, mode stays active indefinitely until cancelled. |
+| `end_time` | No | `HH:MM` | Absence return time (default: `23:59`). |
+
+**Automation Example — Depart on holiday until November 10th with 12 °C frost protection:**
+```yaml
+action: arotherm_genia_ebusd.set_holiday_mode
+data:
+  temperature: 12.0
+  end_date: "2026-11-10"
+  end_time: "18:00"
+```
+
+### 4. `arotherm_genia_ebusd.cancel_holiday_mode`
+Immediately terminates the Away / Holiday Mode on `15.bass3` and restores automatic heating and DHW operation. No parameters required.
+
+```yaml
+action: arotherm_genia_ebusd.cancel_holiday_mode
 ```
 
 ---

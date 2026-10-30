@@ -1,5 +1,7 @@
 {
   "name": "aroTHERM & GeniaAir (eBUS)",
   "render_readme": true,
+  "filename": "arotherm_genia_ebusd.zip",
+  "zip_release": true,
   "homeassistant": "2024.4.0"
 }

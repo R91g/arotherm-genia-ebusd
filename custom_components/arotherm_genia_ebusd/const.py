@@ -19,6 +19,7 @@ PLATFORMS: list[Platform] = [
     Platform.NUMBER,
     Platform.SELECT,
     Platform.SWITCH,
+    Platform.DATETIME,
 ]
 
 # Configuration keys and defaults (ConfigFlow)
@@ -188,6 +189,22 @@ DEFAULT_CYLINDER_HYST = 5.0
 # Services
 SERVICE_SET_WEEKLY_TIMER = "set_weekly_timer"
 SERVICE_FORCE_DHW_BOOST = "force_dhw_boost"
+SERVICE_SET_HOLIDAY_MODE = "set_holiday_mode"
+SERVICE_CANCEL_HOLIDAY_MODE = "cancel_holiday_mode"
+
+# Presets
+PRESET_COMFORT = "comfort"
+PRESET_MANUAL = "manual"
+PRESET_ECO = "eco"
+PRESET_BOOST = "boost"
+PRESET_AWAY = "away"
+
+# Holiday / Away Mode defaults and sentinels
+DEFAULT_HOLIDAY_TEMP = 15.0
+HOLIDAY_RESET_DATE = "01;01;15"
+HOLIDAY_RESET_TIME = "00;00;00"
+HOLIDAY_INDEFINITE_END_DATE = "01;01;99"
+HOLIDAY_DEFAULT_END_TIME = "23;59;59"
 
 # Days of week mapping for b5 55 timers
 WEEKDAYS_LIST: list[str] = [
@@ -236,6 +253,11 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_BASS3, "CoolingReleaseStatus"),
     (CIRCUIT_BASS3, "CoolingStartDate"),
     (CIRCUIT_BASS3, "CoolingEndDate"),
+    (CIRCUIT_BASS3, "HolidayTemp"),
+    (CIRCUIT_BASS3, "HolidayStartDate"),
+    (CIRCUIT_BASS3, "HolidayStartTime"),
+    (CIRCUIT_BASS3, "HolidayEndDate"),
+    (CIRCUIT_BASS3, "HolidayEndTime"),
     (CIRCUIT_BASS3, "HwcOpMode"),
     (CIRCUIT_BASS3, "HwcSFMode"),
     (CIRCUIT_BASS3, "HwcStorageTemp"),

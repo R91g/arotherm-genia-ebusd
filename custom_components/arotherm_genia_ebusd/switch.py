@@ -74,6 +74,7 @@ async def async_setup_entry(
     entities: list[SwitchEntity] = [
         SaunierGeniaDhwBoostSwitch(coordinator),
         SaunierGeniaCoolingSeasonSwitch(coordinator),
+        SaunierGeniaHolidayModeSwitch(coordinator),
         *(
             SaunierGeniaStandardSwitch(coordinator, description)
             for description in STANDARD_SWITCH_DESCRIPTIONS
@@ -181,16 +182,19 @@ class SaunierGeniaCoolingSeasonSwitch(SaunierGeniaEntity, SwitchEntity):
                 )
                 else None
             ),
+            "cooling_days_remaining": self.coordinator.get_cooling_remaining_days(),
         }
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        """Open Lock 1 indefinitely (CoolingStartDate=01;01;26, CoolingEndDate=01;01;99)."""
+        """Open Lock 1 (custom period if pre-set or indefinite 01;01;26 to 01;01;99)."""
+        start_date = self.coordinator.custom_cooling_start_date or "01;01;26"
+        end_date = self.coordinator.custom_cooling_end_date or "01;01;99"
         await self.coordinator.async_write_parameter(
-            CIRCUIT_BASS3, "CoolingStartDate", "01;01;26"
+            CIRCUIT_BASS3, "CoolingStartDate", start_date
         )
         await asyncio.sleep(0.5)
         await self.coordinator.async_write_parameter(
-            CIRCUIT_BASS3, "CoolingEndDate", "01;01;99"
+            CIRCUIT_BASS3, "CoolingEndDate", end_date
         )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
@@ -206,6 +210,58 @@ class SaunierGeniaCoolingSeasonSwitch(SaunierGeniaEntity, SwitchEntity):
         await self.coordinator.async_write_parameter(
             CIRCUIT_BASS3, "Z1OpModeCooling", "off"
         )
+
+
+class SaunierGeniaHolidayModeSwitch(SaunierGeniaEntity, SwitchEntity):
+    """Switch for Away / Holiday Mode (Modo Ausencia)."""
+
+    _attr_icon = "mdi:account-arrow-right"
+
+    def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
+        """Initialize the Holiday Mode switch."""
+        super().__init__(
+            coordinator=coordinator,
+            device_key=DEVICE_CLIMATE_CONTROLLER,
+            translation_key="holiday_mode_switch",
+            subscriptions=[
+                (CIRCUIT_BASS3, "Z1Status"),
+                (CIRCUIT_BASS3, "HwcStatus"),
+                (CIRCUIT_BASS3, "HolidayTemp"),
+                (CIRCUIT_BASS3, "HolidayStartDate"),
+                (CIRCUIT_BASS3, "HolidayEndDate"),
+            ],
+            unique_id_suffix="switch_bass3_holiday_mode",
+        )
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return True if controller is in holiday away status."""
+        z1_status = self.coordinator.get_str(CIRCUIT_BASS3, "Z1Status", "value")
+        hwc_status = self.coordinator.get_str(CIRCUIT_BASS3, "HwcStatus", "value")
+        if z1_status is None and hwc_status is None:
+            return None
+        return (z1_status is not None and z1_status.lower() == "holidayaway") or (
+            hwc_status is not None and hwc_status.lower() == "holidayaway"
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return holiday diagnostic attributes."""
+        return {
+            "holiday_ongoing": bool(self.is_on),
+            "holiday_temp": self.coordinator.get_float(
+                CIRCUIT_BASS3, "HolidayTemp", "value"
+            ),
+            "holiday_remaining_days": self.coordinator.get_holiday_remaining_days(),
+        }
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Activate Holiday / Away Mode."""
+        await self.coordinator.async_activate_holiday_mode()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Cancel Holiday / Away Mode."""
+        await self.coordinator.async_cancel_holiday_mode()
 
 
 class SaunierGeniaStandardSwitch(SaunierGeniaEntity, SwitchEntity):

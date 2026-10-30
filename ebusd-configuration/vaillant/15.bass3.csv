@@ -177,6 +177,23 @@ w,,,CoolingFlowTempDesiredMax,cooling max flow temp desired,,,b524,020100002600,
 
 
 # ==============================================================================
+# 4b. HOLIDAY / AWAY MODE LOGIC (BASS3 b524 CIRCUIT 00 00)
+# ==============================================================================
+u,,,HolidayTemp,holiday room temperature setpoint,,,b524,02000000f600,ign,,IGN:4,,,,value,,EXP,,°C,holiday setpoint
+w,,,HolidayTemp,holiday room temperature setpoint,,,b524,02010000f600,value,,EXP,,°C,holiday setpoint
+u,,,HolidayStartDate,holiday start date,,,b524,02000000f200,ign,,IGN:4,,,,day,,UCH,,,,month,,UCH,,,,year,,UCH,,,"Start date for holiday mode (day, month, year)"
+w,,,HolidayStartDate,holiday start date,,,b524,02010000f200,day,,UCH,,,,month,,UCH,,,,year,,UCH,,,"Start date for holiday mode (day, month, year)"
+u,,,HolidayStartTime,holiday start time,,,b524,02000000f400,ign,,IGN:4,,,,hours,,UCH,,,,minutes,,UCH,,,,seconds,,UCH,,,"Start time for holiday mode (hours, minutes, seconds)"
+w,,,HolidayStartTime,holiday start time,,,b524,02010000f400,hours,,UCH,,,,minutes,,UCH,,,,seconds,,UCH,,,"Start time for holiday mode (hours, minutes, seconds)"
+u,,,HolidayEndDate,holiday end date,,,b524,02000000f300,ign,,IGN:4,,,,day,,UCH,,,,month,,UCH,,,,year,,UCH,,,"End date for holiday mode (day, month, year)"
+w,,,HolidayEndDate,holiday end date,,,b524,02010000f300,day,,UCH,,,,month,,UCH,,,,year,,UCH,,,"End date for holiday mode (day, month, year)"
+u,,,HolidayEndTime,holiday end time,,,b524,02000000f500,ign,,IGN:4,,,,hours,,UCH,,,,minutes,,UCH,,,,seconds,,UCH,,,"End time for holiday mode (hours, minutes, seconds)"
+w,,,HolidayEndTime,holiday end time,,,b524,02010000f500,hours,,UCH,,,,minutes,,UCH,,,,seconds,,UCH,,,"End time for holiday mode (hours, minutes, seconds)"
+u,,,HolidayCancel,holiday cancel trigger,,,b524,02000000f700,ign,,IGN:4,,,,value,,UCH,,,holiday cancel trigger
+w,,,HolidayCancel,holiday cancel trigger,,,b524,02010000f700,value,,UCH,,,holiday cancel trigger
+
+
+# ==============================================================================
 # 5. DIAGNOSTICS AND ERROR LOGGING
 # ==============================================================================
 u,,,Currenterror,Current errors,,,b503,0001,error,,UIN,,,error number,error_1,,UIN,,,error number,error_2,,UIN,,,error number,error_3,,UIN,,,error number,error_4,,UIN,,,error number
