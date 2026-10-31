@@ -156,6 +156,33 @@ Consumo Eléctrico Combinado     = Calefacción_kWh (BASS3) + ACS_kWh (BASS3) + 
 2. **Demonio `ebusd` (`v23.2` o superior):** Ejecutándose como **Add-on eBUSd en Home Assistant** o como servicio Linux / contenedor Docker, conectado a tu broker MQTT con el flag **`--mqttjson`** activado.
 3. **Home Assistant (`2024.4.0` o superior):** Con la **[integración oficial MQTT](https://www.home-assistant.io/integrations/mqtt/)** configurada y conectada al mismo broker MQTT que `ebusd`.
 
+### Esquema de Cableado Físico y Coexistencia eBUS
+
+El eBUS es un bus serie diferencial de 2 hilos a 24V diseñado para interconectar todos los componentes de la instalación en paralelo. Puedes conectar tu adaptador eBUS en cualquier punto donde el bus esté accesible (unidad interior / torre hidráulica, unidad exterior o termostato).
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/R91g/arotherm-genia-ebusd/main/docs/images/ebus_wiring_diagram_es.svg" alt="Esquema de cableado eBUS" width="900">
+</p>
+
+#### Puntos Clave de Conexionado:
+* **Borna `BUS (+ / -)` (Conector rojo):** Destinada a accesorios del sistema. En instalaciones estándar, aquí se conecta la pasarela oficial (`myVAILLANT connect` / `MiGo Link`). Puedes conectar el adaptador eBUS en paralelo en este mismo puerto (bien embornando ambos cables en el mismo conector o mediante un par de clemas WAGO 221).
+* **Borna `X25 (A / B)` (Conector naranja):** Aquí entra la línea de comunicación eBUS que viene directamente de la unidad exterior (`aroTHERM plus` / `GeniaAir Max`).
+* **Mismo carril eléctrico interno:** Los conectores `BUS` y `X25` están puenteados internamente en las pistas de la placa de circuito impreso; forman parte del mismo bus físico. Conectar el adaptador en `BUS` o en `X25` es completamente equivalente.
+* **Sin polaridad:** El protocolo eBUS no tiene polaridad. Toda la electrónica (incluido el adaptador) cuenta con puentes rectificadores de entrada, por lo que no importa si inviertes los hilos (`+` con `-`, o `A` con `B`).
+* **Coexistencia 100 % con el módem oficial:** Si tienes instalado `myVAILLANT connect` o `MiGo Link`, **no necesitas desconectarlo ni prescindir de él**. La integración convive pacíficamente en el mismo bus, aprovechando de forma pasiva las peticiones que ya realiza la pasarela oficial para reducir al mínimo el tráfico.
+
+<details>
+<summary>📸 <b>Ver fotografía de instalación real en placa hidráulica</b></summary>
+<br>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/R91g/arotherm-genia-ebusd/main/docs/images/real_installation_pcb.jpg" alt="Foto de instalación real en unidad interior" width="650">
+  <br>
+  <em>Instalación real dentro del cuadro eléctrico de una torre Saunier Duval GeniaSet / Vaillant uniTOWER. Se observa el adaptador eBUS C6 alimentado por USB-C en la parte inferior, conectado en paralelo con la pasarela oficial MiGo Link en la borna roja <code>BUS</code>, mientras que el bus de la unidad exterior entra por la borna naranja <code>X25 (A/B)</code>.</em>
+</p>
+
+</details>
+
 ---
 
 ## Instalación Paso a Paso
@@ -244,7 +271,9 @@ O añádelo manualmente desde HACS:
 
 Toda la configuración se realiza mediante asistente gráfico desde la interfaz de Home Assistant (sin tocar `configuration.yaml`):
 
-1. Ve a **Ajustes → Dispositivos y servicios**.
+[![Abrir tu instancia de Home Assistant e iniciar la configuración de una nueva integración.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=arotherm_genia_ebusd)
+
+1. Ve a **Ajustes → Dispositivos y servicios** (o pulsa en el botón superior de My Home Assistant).
 2. Pulsa **+ Añadir integración** abajo a la derecha y busca **aroTHERM & GeniaAir (eBUS)**.
 3. **Paso 1 — Conexión MQTT y Fabricante:**
    - **Prefijo del tópico MQTT en eBUSd:** Por defecto `ebusd` (coincidente con `--mqtttopic=ebusd/%circuit/%name`).
@@ -281,6 +310,9 @@ Pulsa el botón **Configurar** dentro de la tarjeta de la integración en **Ajus
 La integración registra dos acciones personalizadas bajo el dominio `arotherm_genia_ebusd`, disponibles en **Herramientas para desarrolladores → Acciones** y en Automatizaciones / Scripts.
 
 ### 1. `arotherm_genia_ebusd.set_weekly_timer`
+
+[![Abrir tu instancia de Home Assistant y mostrar las herramientas de desarrollo de servicios.](https://my.home-assistant.io/badges/developer_call_service.svg)](https://my.home-assistant.io/redirect/developer_call_service/?service=arotherm_genia_ebusd.set_weekly_timer)
+
 Modifica las programaciones horarias semanales nativas (`b5 55`) directamente en la memoria del regulador `sensoCOMFORT` / `MiPro Sense` (`15.bass3`), aplicando automáticamente un espaciado de `600 ms` entre días para proteger el bus eBUS.
 
 | Parámetro | Obligatorio | Valores Permitidos | Descripción |
@@ -303,6 +335,9 @@ data:
 ```
 
 ### 2. `arotherm_genia_ebusd.force_dhw_boost`
+
+[![Abrir tu instancia de Home Assistant y mostrar las herramientas de desarrollo de servicios.](https://my.home-assistant.io/badges/developer_call_service.svg)](https://my.home-assistant.io/redirect/developer_call_service/?service=arotherm_genia_ebusd.force_dhw_boost)
+
 Inicia inmediatamente una carga puntual del depósito de ACS (`HwcSFMode = load`) utilizando el algoritmo de bypass de histéresis, permitiendo indicar opcionalmente una temperatura objetivo específica para ese ciclo (ideal para aprovechamiento de excedentes fotovoltaicos).
 
 | Parámetro | Obligatorio | Valores Permitidos | Descripción |

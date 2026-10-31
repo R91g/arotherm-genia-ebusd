@@ -1,0 +1,164 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 590" width="100%" height="100%" style="background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <!-- Soft dropshadow for white cards -->
+    <filter id="soft-shadow" x="-5%" y="-5%" width="112%" height="115%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#64748b" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+
+  <!-- ==================== HEADER ==================== -->
+  <text x="50" y="45" fill="#0f172a" font-size="20" font-weight="700" letter-spacing="-0.3">aroTHERM &amp; GeniaAir — eBUS Parallel Wiring Architecture</text>
+  <text x="50" y="70" fill="#64748b" font-size="13">Non-polar 2-wire bus topology · Seamless parallel coexistence with official MiGo Link / myVAILLANT connect gateway</text>
+
+  <!-- ==================== 1. OUTDOOR UNIT (LEFT) ==================== -->
+  <g transform="translate(50, 110)">
+    <rect width="210" height="135" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5" filter="url(#soft-shadow)"/>
+    <text x="20" y="32" fill="#64748b" font-size="11" font-weight="700" letter-spacing="0.8">OUTDOOR UNIT</text>
+    <text x="20" y="60" fill="#0f172a" font-size="15" font-weight="700">aroTHERM plus /</text>
+    <text x="20" y="80" fill="#0f172a" font-size="15" font-weight="700">GeniaAir Max</text>
+    <text x="20" y="104" fill="#94a3b8" font-size="12">Main PCB (08.hmux0)</text>
+
+    <!-- Terminal block output -->
+    <rect x="150" y="85" width="48" height="28" rx="4" fill="#ea580c"/>
+    <text x="174" y="103" fill="#ffffff" font-size="10" font-weight="700" text-anchor="middle">eBUS</text>
+  </g>
+
+  <!-- ==================== 2. INDOOR UNIT PCB (CENTER TOP) ==================== -->
+  <g transform="translate(310, 95)">
+    <rect width="460" height="165" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" filter="url(#soft-shadow)"/>
+    <rect x="0" y="0" width="460" height="32" rx="12" fill="#f1f5f9"/>
+    <text x="20" y="21" fill="#475569" font-size="11" font-weight="700" letter-spacing="0.5">INDOOR UNIT PCB (uniTOWER / GeniaSet / VWZ MEH)</text>
+
+    <!-- Terminal X25 [A | B] (Orange) -->
+    <g transform="translate(25, 46)">
+      <rect width="180" height="98" rx="8" fill="#fff7ed" stroke="#fdba74" stroke-width="1.5"/>
+      <rect x="15" y="10" width="150" height="26" rx="4" fill="#ea580c"/>
+      <text x="90" y="27" fill="#ffffff" font-size="11" font-weight="800" text-anchor="middle">TERMINAL X25 ( A | B )</text>
+      <text x="90" y="50" fill="#c2410c" font-size="10" font-weight="600" text-anchor="middle">Outdoor eBUS input</text>
+      <!-- Screw heads -->
+      <circle cx="60" cy="74" r="6" fill="#fb923c"/>
+      <circle cx="120" cy="74" r="6" fill="#fb923c"/>
+      <line x1="57" y1="74" x2="63" y2="74" stroke="#ffffff" stroke-width="2"/>
+      <line x1="117" y1="74" x2="123" y2="74" stroke="#ffffff" stroke-width="2"/>
+    </g>
+
+    <!-- Internal bridge dashed -->
+    <path d="M 205 95 L 255 95" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4,4"/>
+    <rect x="210" y="84" width="40" height="22" rx="3" fill="#fef3c7" stroke="#fde68a"/>
+    <text x="230" y="99" fill="#b45309" font-size="10" font-weight="700" text-anchor="middle">Same</text>
+
+    <!-- Terminal BUS [+ | -] (Red) -->
+    <g transform="translate(255, 46)">
+      <rect width="180" height="98" rx="8" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
+      <rect x="15" y="10" width="150" height="26" rx="4" fill="#dc2626"/>
+      <text x="90" y="27" fill="#ffffff" font-size="11" font-weight="800" text-anchor="middle">TERMINAL BUS ( + | - )</text>
+      <text x="90" y="50" fill="#b91c1c" font-size="10" font-weight="600" text-anchor="middle">Accessories / bus output</text>
+      <!-- Screw heads -->
+      <circle cx="60" cy="74" r="6" fill="#f87171"/>
+      <circle cx="120" cy="74" r="6" fill="#f87171"/>
+      <line x1="57" y1="74" x2="63" y2="74" stroke="#ffffff" stroke-width="2"/>
+      <line x1="117" y1="74" x2="123" y2="74" stroke="#ffffff" stroke-width="2"/>
+    </g>
+  </g>
+
+  <!-- ==================== 3. OFFICIAL GATEWAY (RIGHT) ==================== -->
+  <g transform="translate(820, 100)">
+    <rect width="240" height="160" rx="16" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5" filter="url(#soft-shadow)"/>
+    <text x="30" y="42" fill="#0f172a" font-size="17" font-weight="800" letter-spacing="-0.2">Vaillant / Saunier Duval</text>
+    <text x="30" y="65" fill="#64748b" font-size="12" font-weight="500">myVAILLANT / MiGo Link</text>
+    <rect x="30" y="78" width="135" height="18" rx="4" fill="#e0f2fe"/>
+    <text x="36" y="91" fill="#0369a1" font-size="9" font-weight="700">OFFICIAL GATEWAY</text>
+
+    <!-- Bottom ports -->
+    <g transform="translate(30, 118)">
+      <!-- eBUS green port -->
+      <rect x="0" y="0" width="56" height="32" rx="4" fill="#15803d"/>
+      <text x="28" y="17" fill="#ffffff" font-size="10" font-weight="700" text-anchor="middle">eBUS</text>
+      <circle cx="18" cy="25" r="3" fill="#a7f3d0"/>
+      <circle cx="38" cy="25" r="3" fill="#a7f3d0"/>
+      <!-- Power port -->
+      <rect x="66" y="0" width="50" height="32" rx="4" fill="#334155"/>
+      <text x="91" y="20" fill="#ffffff" font-size="9" text-anchor="middle">Power</text>
+      <!-- Ethernet port -->
+      <rect x="126" y="0" width="50" height="32" rx="4" fill="#0284c7"/>
+      <text x="151" y="20" fill="#ffffff" font-size="9" text-anchor="middle">Network</text>
+    </g>
+  </g>
+
+  <!-- ==================== 4. eBUS ADAPTER C6 (BOTTOM CENTER) ==================== -->
+  <g transform="translate(420, 405)">
+    <rect width="260" height="95" rx="16" fill="#ffffff" stroke="#fdba74" stroke-width="2" filter="url(#soft-shadow)"/>
+    
+    <!-- USB-C Power to left: cable at Y=47, text comfortably at Y=26 -->
+    <text x="-95" y="26" fill="#64748b" font-size="10" font-weight="600">USB-C Power (5V)</text>
+    <path d="M -100 47 L -15 47" stroke="#475569" stroke-width="3"/>
+    <rect x="-15" y="38" width="18" height="18" rx="3" fill="#475569"/>
+
+    <!-- eAS Circle Logo -->
+    <circle cx="110" cy="47" r="24" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+    <text x="110" y="53" fill="#0f172a" font-size="14" font-weight="800" text-anchor="middle">eAS</text>
+
+    <!-- Black connector bars -->
+    <rect x="60" y="25" width="6" height="44" rx="2" fill="#334155"/>
+    <rect x="154" y="25" width="6" height="44" rx="2" fill="#334155"/>
+
+    <!-- Green eBUS Screw Terminal (right) -->
+    <g transform="translate(215, 25)">
+      <rect width="45" height="42" rx="4" fill="#15803d"/>
+      <circle cx="15" cy="20" r="4.5" fill="#ffffff"/>
+      <circle cx="30" cy="20" r="4.5" fill="#ffffff"/>
+      <line x1="12" y1="20" x2="18" y2="20" stroke="#15803d" stroke-width="1.5"/>
+      <line x1="27" y1="20" x2="33" y2="20" stroke="#15803d" stroke-width="1.5"/>
+    </g>
+    <text x="50" y="82" fill="#ea580c" font-size="11" font-weight="700">eBUS Adapter v5 / C6 (ebusd.eu)</text>
+  </g>
+
+  <!-- ==================== 5. HOME ASSISTANT (BOTTOM RIGHT) ==================== -->
+  <g transform="translate(800, 410)">
+    <rect width="260" height="85" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" filter="url(#soft-shadow)"/>
+    <rect x="0" y="0" width="260" height="26" rx="12" fill="#e0e7ff"/>
+    <text x="16" y="18" fill="#4338ca" font-size="11" font-weight="700">SMART HOME SERVER</text>
+    <text x="16" y="48" fill="#0f172a" font-size="13" font-weight="700">Home Assistant</text>
+    <text x="16" y="66" fill="#64748b" font-size="11">ebusd Add-on + aroTHERM Integration</text>
+
+    <!-- Wi-Fi dashed line from Adapter to HA -->
+    <path d="M -120 42 L 0 42" stroke="#3b82f6" stroke-width="2" stroke-dasharray="4,4"/>
+    <rect x="-85" y="30" width="55" height="18" rx="4" fill="#eff6ff" stroke="#bfdbfe"/>
+    <text x="-77" y="43" fill="#1d4ed8" font-size="9" font-weight="700">Wi-Fi / IP</text>
+  </g>
+
+  <!-- ==================== eBUS WIRING (CLEAN PATHS) ==================== -->
+  
+  <!-- WIRE 1: Outdoor -> Terminal X25 (Clean straight horizontal to Y=214) -->
+  <path d="M 248 214 L 335 214" stroke="#ea580c" stroke-width="4" stroke-dasharray="6,4"/>
+  <circle cx="335" cy="214" r="4.5" fill="#ea580c"/>
+  <rect x="250" y="188" width="80" height="18" rx="4" fill="#fff7ed" stroke="#fed7aa"/>
+  <text x="255" y="201" fill="#c2410c" font-size="9" font-weight="700">2-wire eBUS</text>
+
+  <!-- WIRE 2: Terminal BUS (Exits cleanly downwards from Y=222) -> Parallel Tap at Y=315 -->
+  <path d="M 655 222 L 655 315" stroke="#ea580c" stroke-width="4" stroke-dasharray="6,4"/>
+
+  <!-- Parallel Tap (WAGO 221) -->
+  <circle cx="655" cy="315" r="7" fill="#ea580c"/>
+  <rect x="475" y="303" width="165" height="24" rx="5" fill="#ffffff" stroke="#ea580c" stroke-width="1.5" filter="url(#soft-shadow)"/>
+  <text x="483" y="319" fill="#c2410c" font-size="10" font-weight="700">Parallel Tap (WAGO 221)</text>
+
+  <!-- BRANCH A: Tap -> Bottom edge of Official Gateway eBUS Port (Y=250) -->
+  <path d="M 655 315 L 878 315 L 878 250" stroke="#ea580c" stroke-width="4" stroke-dasharray="6,4" fill="none"/>
+  <circle cx="878" cy="250" r="4.5" fill="#15803d"/>
+  <rect x="715" y="298" width="95" height="18" rx="4" fill="#fff7ed" stroke="#fed7aa"/>
+  <text x="721" y="311" fill="#c2410c" font-size="9" font-weight="700">To official gateway</text>
+
+  <!-- BRANCH B: Tap -> Top edge of eBUS Adapter C6 Port (Y=430) -->
+  <path d="M 655 315 L 655 430" stroke="#ea580c" stroke-width="4" stroke-dasharray="6,4"/>
+  <circle cx="655" cy="430" r="4.5" fill="#15803d"/>
+  <rect x="668" y="355" width="100" height="18" rx="4" fill="#fff7ed" stroke="#fed7aa"/>
+  <text x="673" y="368" fill="#c2410c" font-size="9" font-weight="700">To eBUS adapter</text>
+
+  <!-- ==================== FOOTNOTE ==================== -->
+  <g transform="translate(50, 530)">
+    <rect width="1010" height="38" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+    <text x="20" y="24" fill="#334155" font-size="11" font-weight="600">💡 Wiring Note:</text>
+    <text x="110" y="24" fill="#475569" font-size="11">eBUS is polarity-insensitive (wires can be reversed). X25 and BUS share the same PCB circuit; you can connect to either.</text>
+  </g>
+</svg>
