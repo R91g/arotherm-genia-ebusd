@@ -156,6 +156,33 @@ Combined Electrical Energy   = Heating_kWh (BASS3) + DHW_kWh (BASS3) + Cooling_k
 2. **`ebusd` Daemon (`v23.2` or newer):** Running either as the **Home Assistant eBUSd Add-on** or as a standalone Linux service / Docker container, connected to your MQTT broker with **`--mqttjson`** enabled.
 3. **Home Assistant (`2024.4.0` or newer):** With the core **[MQTT integration](https://www.home-assistant.io/integrations/mqtt/)** installed and connected to the same MQTT broker as `ebusd`.
 
+### Physical Wiring & Coexistence Architecture
+
+eBUS is a 2-wire, 24V differential serial bus designed to connect all heating devices in parallel. You can connect your eBUS adapter at any point where the bus is accessible (indoor hydraulic station, outdoor unit, or wall controller).
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/R91g/arotherm-genia-ebusd/main/docs/images/ebus_wiring_diagram.svg" alt="eBUS Hardware Wiring Diagram" width="900">
+</p>
+
+#### Key Hardware & Wiring Guidelines:
+* **Terminal `BUS (+ / -)` (Red header):** Intended for system accessories. In typical installations, the official cloud gateway (`myVAILLANT connect` / `MiGo Link`) connects here. You can connect the eBUS adapter in parallel into this same port (by double-crimping the wires into the screw terminal or using a pair of WAGO 221 lever connectors).
+* **Terminal `X25 (A / B)` (Orange header):** The communication line coming from the outdoor unit (`aroTHERM plus` / `GeniaAir Max`) lands here.
+* **Shared Electrical Rail:** Connectors `BUS` and `X25` are interconnected on the PCB traces—they belong to the exact same electrical bus. Connecting your eBUS adapter to `BUS` or `X25` is functionally identical.
+* **Zero Polarity:** The eBUS protocol is polarity-insensitive. All devices feature internal bridge rectifiers, so you do not need to worry about reversing `+` and `-` (or `A` and `B`).
+* **100% Coexistence with Official Gateway:** If you have `myVAILLANT connect` or `MiGo Link` installed, **do not remove or disconnect it**. This integration coexists peacefully on the bus: it passively captures telemetry requested by the cloud gateway, drastically reducing bus utilization.
+
+<details>
+<summary>📸 <b>View Real-World Installation Photograph (Indoor Hydraulic Board)</b></summary>
+<br>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/R91g/arotherm-genia-ebusd/main/docs/images/real_installation_pcb.jpg" alt="Real installation photo inside the indoor unit" width="650">
+  <br>
+  <em>Real installation inside a Saunier Duval GeniaSet / Vaillant uniTOWER electrical enclosure. Notice the eBUS Adapter C6 powered via USB-C at the bottom, connected in parallel with the official MiGo Link gateway into the red <code>BUS</code> terminal, while the outdoor unit bus enters through the orange <code>X25 (A/B)</code> connector.</em>
+</p>
+
+</details>
+
 ---
 
 ## Installation
