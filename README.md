@@ -34,8 +34,9 @@ Designed directly around the native eBUS protocol shared by Vaillant Group heat 
 7. [Custom Actions (Services)](#custom-actions-services)
 8. [Home Assistant Energy Dashboard Setup](#home-assistant-energy-dashboard-setup)
 9. [Diagnostics, Troubleshooting & FAQ](#diagnostics-troubleshooting--faq)
-10. [Development & Testing](#development--testing)
-11. [License & Disclaimer](#license--disclaimer)
+10. [Technical Reference & Reverse Engineering](#technical-reference--reverse-engineering)
+11. [Development & Testing](#development--testing)
+12. [License & Disclaimer](#license--disclaimer)
 
 ---
 
@@ -431,6 +432,22 @@ You should see JSON-formatted payloads (e.g. `ebusd/hmux0/RunDataFlowTemp {"valu
 
 Writing `yes` to `15.bass3/GlobalSystemOff` puts the entire aerothermal installation (including DHW and frost routines depending on firmware) into installer standby. It is disabled by default in the Home Assistant entity registry to prevent accidental voice-assistant or dashboard toggles; advanced users can enable it manually from the Climate Controller device page.
 </details>
+
+---
+
+## Technical Reference & Reverse Engineering
+
+A detailed technical breakdown of the reverse-engineered eBUS protocol is documented in:  
+👉 **[eBUS Protocol Technical Reference (English)](docs/technical_reference.md)** | **[(Versión en Español)](docs/technical_reference_es.md)**
+
+Key topics covered in the reference:
+- **eBUS Topology & Address Mapping:** Full breakdown of master/slave pairings (`03/08`, `10/15`, `71/76`, `f1/f6`).
+- **High-Precision Energy Telemetry (`b5 16`):** The lifetime cumulative energy matrix (`Hc`, `Hwc`, `Cool` for electrical, thermal, and environmental yields) and instantaneous power draw (`PowerStatus` in Watts).
+- **Compressor Dynamics:** Empirical proof of the `/16` divisor for `0x38` modulation data type and the $0.8\%$ agreement on the `0D5E` water-side heat meter.
+- **Weekly Schedule Programming (`b5 55`):** 3-slot daily multi-timer structure and the `=FFFF` padding requirements.
+- **Hardware Locks & Safety Latches:** The seasonal cooling double-lock mechanism, the `HwcSFMode = load` latch behavior, and quick-veto overrides.
+- **Probe Standardization:** Using `tempv` with 4-byte padding (`IGN:4`) to prevent invalid sensor states on absent physical probes.
+- **2400-Baud Bus Management:** Multi-tier polling strategy and software write locks to prevent bus collision storms.
 
 ---
 

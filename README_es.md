@@ -34,8 +34,9 @@ Construida directamente sobre la arquitectura electrónica eBUS compartida por e
 7. [Acciones Personalizadas (Servicios)](#acciones-personalizadas-servicios)
 8. [Configuración en el Panel de Energía de Home Assistant](#configuración-en-el-panel-de-energía-de-home-assistant)
 9. [Diagnósticos, Solución de Problemas y Preguntas Frecuentes](#diagnósticos-solución-de-problemas-y-preguntas-frecuentes)
-10. [Desarrollo y Pruebas](#desarrollo-y-pruebas)
-11. [Licencia y Aviso Legal](#licencia-y-aviso-legal)
+10. [Referencia Técnica e Ingeniería Inversa](#referencia-técnica-e-ingeniería-inversa)
+11. [Desarrollo y Pruebas](#desarrollo-y-pruebas)
+12. [Licencia y Aviso Legal](#licencia-y-aviso-legal)
 
 ---
 
@@ -431,6 +432,22 @@ Debes recibir cargas en formato JSON (p. ej. `ebusd/hmux0/RunDataFlowTemp {"valu
 
 Escribir `yes` en `15.bass3/GlobalSystemOff` deja toda la instalación aerotérmica en espera global a nivel de instalador. Viene deshabilitado por defecto en el registro de entidades de Home Assistant para evitar pulsaciones accidentales desde paneles o asistentes de voz; los usuarios avanzados pueden habilitarlo manualmente desde la ficha del dispositivo Controlador de Clima.
 </details>
+
+---
+
+## Referencia Técnica e Ingeniería Inversa
+
+Para consultar el desglose técnico exhaustivo de todo el protocolo eBUS obtenido mediante ingeniería inversa, visita:  
+👉 **[Referencia Técnica e Ingeniería Inversa de eBUS (Español)](docs/technical_reference_es.md)** | **[(English Version)](docs/technical_reference.md)**
+
+Temas clave documentados en detalle:
+- **Topología del Bus y Asignación de Direcciones:** Desglose maestro/esclavo (`03/08`, `10/15`, `71/76`, `f1/f6`).
+- **Telemetría de Energía de Alta Precisión (`b5 16`):** Matriz de acumuladores de por vida (`Hc`, `Hwc`, `Cool` para consumo eléctrico, calor útil y rendimiento ambiental) y potencia instantánea (`PowerStatus` en Vatios).
+- **Dinámica del Compresor:** Demostración empírica del divisor `/16` para el tipo de modulación `0x38` y la precisión del $0,8\%$ del calorímetro `0D5E`.
+- **Programación Horaria Semanal (`b5 55`):** Temporizadores de hasta 3 franjas diarias y el requisito del relleno obligatorio `=FFFF`.
+- **Enclavamientos y Cerrojos de Seguridad:** El mecanismo de doble cerrojo en refrigeración, el comportamiento de pestillo (*latch*) de `HwcSFMode = load` y las anulaciones temporales (Quick Veto).
+- **Estandarización de Sondas no Instaladas:** Uso de `tempv` con relleno de 4 bytes (`IGN:4`) para evitar lecturas corruptas en sondas ausentes.
+- **Gestión del Ancho de Banda a 2.400 Baudios:** Política de sondeo en tres niveles y cerrojos de concurrencia software.
 
 ---
 
