@@ -223,35 +223,26 @@ Cada byte de día indica cuántas franjas horarias ($0$ a $3$) están configurad
 
 ## 6. Enclavamientos, Modos Especiales y Cerrojos de Seguridad
 
-```mermaid
-stateDiagram-v2
-    [*] --> Standby
-    Standby --> CalefaccionActiva: Demanda termostato y Hc1Mode != off
-    Standby --> ACSActiva: T_deposito < Consigna - Histeresis
-    Standby --> PestilloACS: HwcSFMode escrito a 'load'
-    
-    state PestilloACS {
-        [*] --> CargaUnica: Valvula 3 vias a ACS
-        CargaUnica --> ConsignaAlcanzada: T_deposito >= Consigna
-        ConsignaAlcanzada --> PestilloRetenido: HwcSFMode SIGUE en 'load'!
-        PestilloRetenido --> [*]: Requiere escritura explicita 'auto'
-    }
-    
-    PestilloACS --> CalefaccionActiva: Limpiado a 'auto' y hay demanda clima
-    CalefaccionActiva --> Standby: Integral de energia satisfecha
-    
-    state EnvolventeFrio {
-        [*] --> ComprobacionCalendario
-        ComprobacionCalendario --> CalendarioBloqueado: Fecha fuera de StartDate..EndDate
-        ComprobacionCalendario --> CalendarioDesbloqueado: Fecha dentro o EndDate = 2099
-        CalendarioDesbloqueado --> ComprobacionTemperatura: T_exterior >= 15°C umbral
-        ComprobacionTemperatura --> FrioAutorizado: Cerrojo 1 liberado!
-        FrioAutorizado --> ModoFrio: Z1OpModeCooling != off
-    }
-```
-
 ### 6.1 El Mecanismo de Doble Cerrojo de Refrigeración
-Para proteger instalaciones de suelo radiante frente a condensaciones y evitar el arranque indebido de frío en invierno, el firmware implementa dos compuertas secuenciales:
+
+Para evitar condensaciones accidentales o arranques indebidos de frío en invierno, el firmware implementa dos compuertas secuenciales:
+
+```mermaid
+flowchart TD
+    Req["Demanda de Frío Iniciada<br/>(Termostato de Zona / Servicio Climate)"] --> Gate1{"Compuerta 1: Ventana de Calendario<br/>¿CoolingStartDate &le; Hoy &le; CoolingEndDate?"}
+    
+    Gate1 -- "No (Fecha Fuera de Temporada)" --> Lock1["Bloqueo Hardware Activo<br/>CoolingReleaseStatus = off<br/>(Válvula de 4 vías desenergizada)"]
+    
+    Gate1 -- "Sí (O Bypass HA con fin en 2099)" --> TempCheck{"Protección Frigorífica Hardware<br/>¿Tª Exterior &ge; Umbral Frío (15 °C)?"}
+    
+    TempCheck -- "No" --> LockTemp["Bloqueo de Seguridad del Compresor<br/>CoolingReleaseStatus = off"]
+    TempCheck -- "Sí" --> Release["Compuerta 1 Liberada<br/>CoolingReleaseStatus = on"]
+    
+    Release --> Gate2{"Compuerta 2: Modo de Zona<br/>¿Z1OpModeCooling &ne; off?"}
+    
+    Gate2 -- "No (Modo en off)" --> OffMode["Circuito de Clima en Espera<br/>Compresor no invierte ciclo"]
+    Gate2 -- "Sí (Modo auto o day)" --> ActiveCool["Ciclo Frigorífico Invertido Activo<br/>Impulsión modulada hacia Z1CoolingTemp"]
+```
 
 #### Compuerta 1: Cerrojo de Calendario Estacional (`CoolingStartDate` y `CoolingEndDate`)
 - La compuerta interna de calendario está abierta cuando:
@@ -265,11 +256,42 @@ Para proteger instalaciones de suelo radiante frente a condensaciones y evitar e
 - `Z1CoolingTemp`: Consigna base fuera de franja. Fijada en **30,0 °C**, garantiza que la máquina jamás enfriará por la noche ni durante horas con tarifas eléctricas caras.
 
 ### 6.2 El Cerrojo de ACS Puntual (`HwcSFMode = load`)
+
+```mermaid
+flowchart TD
+    Trigger["Activación de ACS Puntual<br/>(Escritura HwcSFMode = 'load')"] --> CheckRun{"¿Bomba de calor activa<br/>en calefacción?"}
+    
+    CheckRun -- "Sí (Compresor ya en marcha)" --> ShareStart["Arranque Compartido de Compresor<br/>(Válvula de 3 vías desvía sin parar motor)"]
+    CheckRun -- "No (Sistema en reposo)" --> NewStart["Arranque normal en frío de ciclo ACS"]
+    
+    ShareStart --> Charging["Carga de Interacumulador a Potencia Nominal"]
+    NewStart --> Charging
+    
+    Charging --> Reached{"¿Tª Depósito &ge; Consigna Deseada?"}
+    Reached -- "Sí" --> LatchState["¡Pestillo Retenido en Firmware!<br/>HwcSFMode CONTINÚA en 'load'"]
+    
+    LatchState --> Warning["CRÍTICO: El regulador retiene prioridad ACS<br/>y NO retornará a calefacción por sí solo"]
+    Warning --> ResetCmd["Acción Obligatoria:<br/>Escritura explícita de HwcSFMode = 'auto'"]
+    ResetCmd --> NormalMode["Retorno a Operación Normal del Sistema"]
+```
+
 - **Comportamiento como Pestillo (*Latch*):** Escribir `load` fuerza una carga inmediata del acumulador de ACS. No obstante, **este registro NO se auto-resetea a `auto` al alcanzar la consigna**. Permanece en `load` indefinidamente; si no se envía una orden explícita de `auto`, el sistema retiene la prioridad de ACS de forma permanente.
 - **Estrategia de Eficiencia Energética (Arranque Compartido de Compresor):** Activar `HwcSFMode = load` cuando la bomba de calor ya está funcionando en calefacción desvía la válvula de 3 vías hacia el acumulador de agua. Esto transfiere la inercia térmica sin detener el compresor, ahorrando un ciclo completo de arranque mecánico y prolongando la vida útil del equipo.
 
-### 6.3 Anulación Temporal Rápida (`Z1QuickVetoTemp`)
-Permite alterar la temperatura de consigna de confort de forma inmediata sin modificar los horarios de la EEPROM. La anulación expira automáticamente en cuanto el reloj interno alcanza el siguiente hito programado en el calendario semanal.
+### 6.3 Algoritmo de DHW Boost Inteligente
+En el firmware de Vaillant, `CylinderChargeHyst` impone una caída mínima de $5,0\text{ K}$ (configurable entre $3,0\text{ K}$ y $10,0\text{ K}$) antes de iniciar el calentamiento. Si el interacumulador está a $51\ ^\circ\text{C}$ y la consigna es de $55\ ^\circ\text{C}$, un comando de boost manual suele ser rechazado por el firmware porque:
+$$T_{\text{depósito}} > T_{\text{consigna}} - \text{Histéresis} \quad (51 > 55 - 5 = 50)$$
+
+Nuestro algoritmo de sobrealimentación inteligente calcula una consigna temporal dinámica:
+$$T_{\text{consigna\_boost}} = T_{\text{depósito}} + \text{Histéresis} + 1,5\ ^\circ\text{C}$$
+Escribe esta consigna temporal en `HwcTempDesired`, activa `HwcSFMode = load`, espera a que el compresor enganche la carga, y restaura automáticamente la consigna original al finalizar el ciclo.
+
+### 6.4 Filtrado de Consignas Centinela (Anti-Sentinel Spikes)
+Cuando se apaga la calefacción o la refrigeración, el firmware inyecta valores centinela en los registros de consigna deseada:
+- Calefacción apagada: la consigna cae a **$5,0\ ^\circ\text{C}$** (centinela antihielo).
+- Refrigeración apagada: la consigna salta a **$99,0\ ^\circ\text{C}$** o cae a **$5,0\ ^\circ\text{C}$**.
+
+Exponer estos valores crudos a Home Assistant descompone los controles del termostato. La integración aplica un filtro con memoria: retiene la última consigna de confort válida del usuario en memoria interna y expone el estado `HVACMode.OFF` sin corromper el selector de temperatura.
 
 ---
 
@@ -289,3 +311,18 @@ La integración de Home Assistant incorpora un **motor de serialización asíncr
 1. **Candado Global Asíncrono:** Todas las operaciones de escritura adquieren un cerrojo interno `asyncio.Lock()`.
 2. **Verificación Posterior de Lectura (*Read-After-Write*):** Tras emitir cualquier escritura, el coordinador aguarda un intervalo de pausa (`0,8 s`), lanza una lectura de verificación para comprobar que la EEPROM aceptó el nuevo valor, y solo entonces libera el candado.
 3. **Filtro Antirrebote (*Debounce*):** Los ajustes rápidos en la interfaz (como deslizar una consigna de temperatura) se filtran para enviar únicamente el valor final estabilizado al bus físico.
+
+---
+
+## 9. Detección Pasiva de Metadatos y Números de Serie
+
+En lugar de lanzar sondeos invasivos para consultar los números de serie en el bus, la integración escucha de forma pasiva los tópicos MQTT retenidos que `ebusd` emite durante su secuencia de inicio:
+- **Tópico:** `ebusd/scan.<circuito>/id`
+- **Formato del Payload:** `MF=Vaillant;ID=HMUX0;SW=0407;HW=0504;...`
+
+El analizador extrae automáticamente:
+1. **Número de Serie de Código de Barras de 28 Caracteres:** En formato `21YYWWPPPPSSSSSSSSNNNNNNNNNN` (prefijo de marca `21`, país `22`, año/semana de fabricación, planta de producción y número de serie único).
+2. **Versión de Firmware (`sw_version`):** Registrada limpiamente como `SW 04.07`.
+3. **Revisión de Hardware (`hw_version`):** Registrada limpiamente como `HW 05.04`.
+
+Esto puebla de forma nativa las fichas de dispositivo del Registro de Dispositivos de Home Assistant con **cero telegramas de sondeo** en el bus físico.

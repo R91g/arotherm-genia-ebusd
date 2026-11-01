@@ -223,35 +223,25 @@ Each day byte returns an integer ($0$ to $3$) representing how many time windows
 
 ## 6. Hardware Locks, Safety Latches & Special Modes
 
-```mermaid
-stateDiagram-v2
-    [*] --> Standby
-    Standby --> HeatingActive: Room thermostat demand & Hc1Mode != off
-    Standby --> DHWActive: Cylinder T < Target - Hysteresis
-    Standby --> DHWLatch: HwcSFMode written to 'load'
-    
-    state DHWLatch {
-        [*] --> OneShotCharging: Priority diverter valve to DHW
-        OneShotCharging --> TargetReached: Cylinder T >= Target
-        TargetReached --> LatchRetained: HWCSfMode STILL reads 'load'!
-        LatchRetained --> [*]: Explicit write 'auto' required
-    }
-    
-    DHWLatch --> HeatingActive: Cleared to 'auto' & Heating demand exists
-    HeatingActive --> Standby: Energy integral satisfied
-    
-    state CoolingEnvelope {
-        [*] --> CalendarCheck
-        CalendarCheck --> LockedCalendar: Date outside StartDate..EndDate
-        CalendarCheck --> UnlockedCalendar: Date inside or EndDate = 2099
-        UnlockedCalendar --> TemperatureCheck: Outdoor T >= 15°C threshold
-        TemperatureCheck --> CoolingAuthorized: Hardware Lock 1 cleared!
-        CoolingAuthorized --> CoolingRun: Z1OpModeCooling != off
-    }
-```
-
 ### 6.1 The Cooling Double-Lock Safety Mechanism
-To protect radiant floor installations from catastrophic condensation and prevent accidental chilling in winter, the firmware enforces two sequential gates:
+To protect radiant floor installations from condensation damage and prevent accidental chilling in winter, the firmware enforces two sequential gates:
+
+```mermaid
+flowchart TD
+    Req["Cooling Demand Initiated<br/>(Thermostat Zone / Climate Service)"] --> Gate1{"Gate 1: Calendar Window<br/>CoolingStartDate &le; Today &le; CoolingEndDate?"}
+    
+    Gate1 -- "No (Date Out of Bounds)" --> Lock1["Hardware Lockout Active<br/>CoolingReleaseStatus = off<br/>(4-Way Reversing Valve Disabled)"]
+    
+    Gate1 -- "Yes (Or 2099 HA Bypass)" --> TempCheck{"Outdoor Temperature Safeguard<br/>Outdoor Temp &ge; Hardware Cutoff (15 °C)?"}
+    
+    TempCheck -- "No" --> LockTemp["Compressor Protection Lockout<br/>CoolingReleaseStatus = off"]
+    TempCheck -- "Yes" --> Release["Gate 1 Cleared<br/>CoolingReleaseStatus = on"]
+    
+    Release --> Gate2{"Gate 2: Zone Mode<br/>Z1OpModeCooling &ne; off?"}
+    
+    Gate2 -- "No (Off Mode)" --> OffMode["Cooling Circuit Idle<br/>Compressor Not Inverted"]
+    Gate2 -- "Yes (Auto / Day Mode)" --> ActiveCool["Refrigeration Cycle Inverted<br/>Flow Regulated to Z1CoolingTemp"]
+```
 
 #### Gate 1: Seasonal Calendar Lock (`CoolingStartDate` & `CoolingEndDate`)
 - The internal calendar gate is active when:
@@ -265,11 +255,42 @@ To protect radiant floor installations from catastrophic condensation and preven
 - `Z1CoolingTemp`: Base setback target outside active time slots. Setting this to **30.0 °C** guarantees the unit will never run cooling cycles at night or during expensive peak tariff hours.
 
 ### 6.2 The Forced DHW One-Shot Latch (`HwcSFMode = load`)
+
+```mermaid
+flowchart TD
+    Trigger["Forced DHW Boost Triggered<br/>(Write HwcSFMode = 'load')"] --> CheckRun{"Heat pump already active<br/>in central heating?"}
+    
+    CheckRun -- "Yes (Compressor Running)" --> ShareStart["Compressor Start Shared<br/>(3-Way Valve Diverts Without Stopping Motor)"]
+    CheckRun -- "No (System in Standby)" --> NewStart["Normal DHW Cycle Cold Start"]
+    
+    ShareStart --> Charging["Cylinder Reheating at Rated Thermal Power"]
+    NewStart --> Charging
+    
+    Charging --> Reached{"Cylinder Temp &ge; Target Setpoint?"}
+    Reached -- "Yes" --> LatchState["Firmware Latch Retained!<br/>HwcSFMode STILL reads 'load'"]
+    
+    LatchState --> Warning["CRITICAL: Controller locks DHW priority<br/>and will NOT return to heating automatically"]
+    Warning --> ResetCmd["Mandatory Action:<br/>Explicit write of HwcSFMode = 'auto'"]
+    ResetCmd --> NormalMode["Normal Climate System Operation Restored"]
+```
+
 - **Latch Behavior:** Writing `load` to `ctlv3/HwcSFMode` or `bass3/HwcSFMode` forces an immediate DHW cylinder recharge. However, **this register does NOT clear itself back to `auto`** upon reaching setpoint. It acts as an operational latch; if not explicitly cleared by the caller, the system remains in DHW priority indefinitely.
 - **Efficiency Optimization (Compressor Start Sharing):** Triggering `HwcSFMode = load` while the heat pump is already running in space heating diverts the 3-way valve directly to the water cylinder. This transfers thermal inertia without stopping the compressor, saving a mechanical start cycle and preserving compressor bearing life.
 
-### 6.3 Quick Veto Temporary Override (`Z1QuickVetoTemp`)
-Writing a temperature setpoint to `Z1QuickVetoTemp` overrides the active room comfort target without altering the weekly schedule stored in EEPROM. The override expires automatically the moment the internal clock reaches the next programmed timer transition.
+### 6.3 Smart Forced DHW Boost Algorithm
+In Vaillant firmware, `CylinderChargeHyst` enforces a minimum drop of $5.0\text{ K}$ (or installer configurable $3.0\text{ K}$ to $10.0\text{ K}$) before heating engages. If the cylinder is at $51\ ^\circ\text{C}$ and target is $55\ ^\circ\text{C}$, a manual boost command would normally be rejected because:
+$$T_{\text{storage}} > T_{\text{target}} - \text{Hysteresis} \quad (51 > 55 - 5 = 50)$$
+
+Our smart boost algorithm calculates a dynamic temporary setpoint:
+$$T_{\text{target\_boost}} = T_{\text{storage}} + \text{Hysteresis} + 1.5\ ^\circ\text{C}$$
+It writes this temporary setpoint to `HwcTempDesired`, fires `HwcSFMode = load`, waits for the compressor to engage, and automatically restores the original setpoint once completed.
+
+### 6.4 Anti-Sentinel Temperature Filtering
+When space heating or cooling is disabled, the firmware emits sentinel values into the target setpoint registers:
+- Heating off: setpoint drops to **$5.0\ ^\circ\text{C}$** (anti-frost sentinel).
+- Cooling off: setpoint jumps to **$99.0\ ^\circ\text{C}$** or drops to **$5.0\ ^\circ\text{C}$**.
+
+Exposing raw values directly to Home Assistant causes thermostat cards to violently oscillate. The integration implements a stateful filter: it caches the user's legitimate comfort setpoint in internal memory and exposes `HVACMode.OFF` without corrupting the target temperature display.
 
 ---
 
@@ -289,3 +310,18 @@ The Home Assistant integration incorporates an **asynchronous serialization engi
 1. **Global Async Lock:** All write telegrams acquire an internal `asyncio.Lock()`.
 2. **Read-After-Write Verification:** After issuing any write command, the coordinator waits a minimum pacing interval (`0.8 s`), issues a read command to verify that the microcontroller's EEPROM accepted the new value, and only then releases the lock for subsequent operations.
 3. **Write Debouncing:** Rapid UI adjustments (e.g. dragging a temperature slider) are debounced so only the final settled setpoint is dispatched to the physical bus.
+
+---
+
+## 9. Passive Device Metadata & Serial Number Extraction
+
+Rather than polling manufacturer serial numbers across the bus, the integration listens to the retained MQTT discovery topics emitted by `ebusd`:
+- **Topic:** `ebusd/scan.<circuit>/id`
+- **Payload Format:** `MF=Vaillant;ID=HMUX0;SW=0407;HW=0504;...`
+
+The parser extracts:
+1. **28-Character Barcode Serial Number:** Formatted as `21YYWWPPPPSSSSSSSSNNNNNNNNNN` (Brand prefix `21`, country `22`, production year/week, manufacturing plant, and unit sequence).
+2. **Firmware Version (`sw_version`):** Automatically registers as `SW 04.07`.
+3. **Hardware Revision (`hw_version`):** Automatically registers as `HW 05.04`.
+
+This populates the Home Assistant Device Registry natively with zero active bus queries.
