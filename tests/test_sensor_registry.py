@@ -1,5 +1,6 @@
 """Unit tests for sensor registry, entity descriptions, and unique ID integrity."""
 
+import json
 import os
 import sys
 import unittest
@@ -20,6 +21,7 @@ from custom_components.arotherm_genia_ebusd.const import (
     CIRCUIT_NETX3,
     CIRCUIT_NETX3_ALT,
     CIRCUIT_VWZIO,
+    DEPRECATED_UNIQUE_ID_SUFFIXES,
     DEVICE_CLIMATE_CONTROLLER,
     DEVICE_HYDRAULIC_INTERFACE,
     DEVICE_OUTDOOR_UNIT,
@@ -29,6 +31,7 @@ from custom_components.arotherm_genia_ebusd.number import NUMBER_DESCRIPTIONS
 from custom_components.arotherm_genia_ebusd.select import SELECT_DESCRIPTIONS
 from custom_components.arotherm_genia_ebusd.sensor_descriptions import (
     SENSOR_DESCRIPTIONS,
+    WEEKLY_SCHEDULE_SENSORS,
 )
 from custom_components.arotherm_genia_ebusd.switch import STANDARD_SWITCH_DESCRIPTIONS
 
@@ -167,6 +170,44 @@ class TestSensorRegistry(unittest.TestCase):
                     tkey_lower,
                     f"Forbidden brand '{brand}' found in translation_key '{desc.translation_key}'",
                 )
+
+    def test_sensor_translations_and_deprecated_non_overlap(self) -> None:
+        """Verify every sensor translation_key exists in strings/en/es and deprecated IDs do not collide."""
+        root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        comp_dir = os.path.join(root_dir, "custom_components", "arotherm_genia_ebusd")
+        with open(os.path.join(comp_dir, "strings.json"), encoding="utf-8") as fp:
+            strings = json.load(fp)
+        with open(
+            os.path.join(comp_dir, "translations", "en.json"), encoding="utf-8"
+        ) as fp:
+            en = json.load(fp)
+        with open(
+            os.path.join(comp_dir, "translations", "es.json"), encoding="utf-8"
+        ) as fp:
+            es = json.load(fp)
+
+        self.assertEqual(strings, en, "strings.json and translations/en.json diverged")
+
+        sensor_keys_strings = set(strings["entity"]["sensor"].keys())
+        sensor_keys_es = set(es["entity"]["sensor"].keys())
+        self.assertEqual(sensor_keys_strings, sensor_keys_es)
+
+        expected_sensor_tkeys = {
+            desc.translation_key or desc.key for desc in SENSOR_DESCRIPTIONS
+        } | {tkey for tkey, _ in WEEKLY_SCHEDULE_SENSORS}
+        self.assertEqual(expected_sensor_tkeys, sensor_keys_strings)
+
+        active_uids = {
+            f"{d.circuit.lower()}_{d.message.lower()}_{d.field.lower()}"
+            for d in SENSOR_DESCRIPTIONS
+        } | {
+            f"binary_{d.circuit.lower()}_{d.message.lower()}_{d.field.lower()}"
+            for d in BINARY_SENSOR_DESCRIPTIONS
+        }
+        overlap = active_uids & set(DEPRECATED_UNIQUE_ID_SUFFIXES)
+        self.assertEqual(
+            overlap, set(), f"Active unique_id overlaps deprecated list: {overlap}"
+        )
 
 
 if __name__ == "__main__":

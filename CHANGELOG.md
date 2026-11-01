@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.0] - 2026-11-01
+
+### Added
+- **Passive Hardware Detection & Serial Numbers (eBUSd Scan):**
+  - Zero-overhead passive listening to `ebusd/scan.*` and `ebusd/Scan.*/#` without active bus polling.
+  - Automatic extraction and assembly of 28-character hardware serial numbers (`Scan.<zz>/Id`) for Outdoor Unit, Hydraulic Interface, Climate Controller, and Wireless Thermostat.
+  - Dynamic detection of firmware `SW` and hardware `HW` versions (supporting both CSV semicolon-delimited strings and JSON payloads).
+  - Real-time Device Registry propagation via `dr.async_update_device` and `DeviceInfo`.
+  - Robust fallback defaults (`0407`/`0504`, `0708`/`4304`, `0500`/`0504`, `0129`/`0404`) ensuring metadata is available even before bus scan finishes.
+- **Home Assistant Energy Dashboard Native Integration:**
+  - Direct integration of verified 32-bit IEEE 754 float (`EXP`) registers in `Wh` with `total_increasing` state class:
+    - Heating Electrical & Thermal Energy (`PrEnergyElectricHc`, `PrEnergyThermalHc`).
+    - Domestic Hot Water Electrical & Thermal Energy (`PrEnergyElectricHwc`, `PrEnergyThermalHwc`).
+    - Cooling Electrical & Thermal Energy (`PrEnergyElectricCool`, `PrEnergyThermalCool`).
+    - Monthly mode energy yield tracking (`PrEnergySumHcThisMonth`, `PrEnergySumHwcThisMonth`, `PrEnergySumCoolThisMonth`).
+- **Thermodynamic Performance Metrics:**
+  - Real Historical Heating SCOP (`PrEnergyThermalHc / PrEnergyElectricHc`).
+  - Real Historical DHW COP (`PrEnergyThermalHwc / PrEnergyElectricHwc`).
+  - Real Historical Cooling EER (`PrEnergyThermalCool / PrEnergyElectricCool`).
+  - Global Historical System Efficiency (SCOP Global: total thermal energy / total electrical energy).
+- **Device Registry Modernization:**
+  - Full compliance with Home Assistant 2026/2027 Device Registry architecture: migrated deprecated `via_device` parameter to `via_device_id`.
+  - Pre-registration of parent Outdoor Unit device during `async_setup_entry` guaranteeing child devices link into topology seamlessly without deprecation warnings.
+
+### Changed
+- **Paced Hydration Queue Pruning:**
+  - Reduced essential hydration queue strictly to 54 active-read (`r`/`r9`) messages, eliminating `ERR: invalid position` errors on passive eBUS registers.
+  - Retained strict 2400-baud half-duplex CSMA/CD delay pacing to prevent bus arbitration storms with wall units (sensoCOMFORT / MiPro Sense).
+- **Automated Migration of Legacy Virtual Entities:**
+  - Integrated `_async_cleanup_deprecated_entities` to automatically purge deprecated virtual COP unique IDs from earlier versions upon startup.
+
+---
+
 ## [1.1.0] - 2026-10-30
 
 ### Added

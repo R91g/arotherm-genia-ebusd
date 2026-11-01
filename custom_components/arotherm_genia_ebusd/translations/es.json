@@ -350,17 +350,26 @@
       "calculated_live_cop": {
         "name": "COP / EER instantáneo en vivo"
       },
-      "calculated_daily_cop": {
-        "name": "COP diario real"
+      "calculated_hc_cop": {
+        "name": "COP histórico calefacción"
       },
-      "calculated_monthly_cop": {
-        "name": "COP mensual real"
+      "calculated_hwc_cop": {
+        "name": "COP histórico ACS"
       },
-      "calculated_total_cop": {
-        "name": "SCOP histórico global"
+      "calculated_cool_eer": {
+        "name": "EER histórico refrigeración"
       },
-      "calculated_total_energy": {
-        "name": "Consumo eléctrico total combinado aerotermia"
+      "calculated_global_efficiency": {
+        "name": "Rendimiento histórico global (COP/EER)"
+      },
+      "calculated_system_total_energy": {
+        "name": "Consumo eléctrico total aerotermia"
+      },
+      "calculated_heating_total_energy": {
+        "name": "Consumo eléctrico total calefacción"
+      },
+      "calculated_dhw_total_energy": {
+        "name": "Consumo eléctrico total ACS"
       },
       "primary_flow_rate": {
         "name": "Caudal volumétrico circuito primario"
@@ -422,41 +431,29 @@
           "water": "Agua Caliente Sanitaria (ACS)"
         }
       },
-      "energy_electric_today": {
-        "name": "Energía eléctrica consumida hoy"
+      "energy_electric_cool": {
+        "name": "Consumo eléctrico total refrigeración"
       },
-      "energy_electric_month": {
-        "name": "Energía eléctrica consumida este mes"
+      "energy_thermal_hc": {
+        "name": "Energía térmica total calefacción"
       },
-      "energy_electric_total": {
-        "name": "Energía eléctrica consumida total histórica"
+      "energy_thermal_hwc": {
+        "name": "Energía térmica total ACS"
       },
-      "energy_cooling_electric_today": {
-        "name": "Energía eléctrica refrigeración hoy"
+      "energy_thermal_cool": {
+        "name": "Energía térmica total refrigeración"
       },
-      "energy_cooling_electric_month": {
-        "name": "Energía eléctrica refrigeración este mes"
+      "energy_env_yield_hc": {
+        "name": "Energía ambiental captada calefacción"
       },
-      "energy_cooling_electric_total": {
-        "name": "Energía eléctrica refrigeración total histórica"
+      "energy_env_yield_hwc": {
+        "name": "Energía ambiental captada ACS"
       },
-      "energy_thermal_today": {
-        "name": "Energía térmica entregada hoy"
+      "energy_electric_hc_outdoor": {
+        "name": "Consumo eléctrico calefacción (Unidad exterior)"
       },
-      "energy_thermal_month": {
-        "name": "Energía térmica entregada este mes"
-      },
-      "energy_thermal_total": {
-        "name": "Energía térmica entregada total histórica"
-      },
-      "energy_heating_today": {
-        "name": "Energía térmica calefacción hoy"
-      },
-      "energy_heating_month": {
-        "name": "Energía térmica calefacción este mes"
-      },
-      "energy_heating_total": {
-        "name": "Energía térmica calefacción total histórica"
+      "energy_electric_hwc_outdoor": {
+        "name": "Consumo eléctrico ACS (Unidad exterior)"
       },
       "stats_hmu_hours": {
         "name": "Horas de funcionamiento unidad exterior"
@@ -629,6 +626,21 @@
       },
       "vwzio_current_error": {
         "name": "Diagnóstico de errores activos"
+      },
+      "vwzio_electric_power": {
+        "name": "Potencia eléctrica instantánea"
+      },
+      "vwzio_energy_electric_hc": {
+        "name": "Consumo eléctrico calefacción (Módulo hidráulico)"
+      },
+      "vwzio_energy_electric_hwc": {
+        "name": "Consumo eléctrico ACS (Módulo hidráulico)"
+      },
+      "vwzio_energy_thermal_hc": {
+        "name": "Energía térmica calefacción (Módulo hidráulico)"
+      },
+      "vwzio_energy_thermal_hwc": {
+        "name": "Energía térmica ACS (Módulo hidráulico)"
       },
       "wireless_room_temp_dial": {
         "name": "Consigna en selector (Dial) del termostato inalámbrico"

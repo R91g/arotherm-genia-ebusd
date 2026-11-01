@@ -17,13 +17,16 @@ from homeassistant.helpers.event import async_call_later, async_track_time_inter
 
 from .const import (
     CALC_CIRCUIT,
-    CALC_DAILY_COP,
+    CALC_COOL_EER,
     CALC_DELTA_T,
+    CALC_DHW_TOTAL_ENERGY,
+    CALC_GLOBAL_EFFICIENCY,
+    CALC_HC_COP,
+    CALC_HEATING_TOTAL_ENERGY,
+    CALC_HWC_COP,
     CALC_LIVE_COP,
-    CALC_MONTHLY_COP,
+    CALC_SYSTEM_TOTAL_ENERGY,
     CALC_THERMAL_POWER,
-    CALC_TOTAL_COP,
-    CALC_TOTAL_ENERGY,
     CIRCUIT_BASS3,
     CIRCUIT_BROADCAST,
     CIRCUIT_GLOBAL,
@@ -42,6 +45,7 @@ from .const import (
     CONF_OUTDOOR_MODEL,
     DEFAULT_AUTO_COOLING_LOCK_BYPASS,
     DEFAULT_CYLINDER_HYST,
+    DEFAULT_DEVICE_VERSIONS,
     DEFAULT_FALLBACK_POLL_INTERVAL,
     DEFAULT_FORCE_DHW_BOOST,
     DEFAULT_HAS_MIGO_LINK,
@@ -51,8 +55,10 @@ from .const import (
     DEFAULT_MANUFACTURER,
     DEFAULT_MQTT_PREFIX,
     DEFAULT_OUTDOOR_MODEL,
+    DEVICE_OUTDOOR_UNIT,
     DHW_BOOST_HYST_MARGIN,
     DHW_BOOST_MAX_TIMEOUT_SECONDS,
+    DOMAIN,
     ESSENTIAL_HYDRATION_MESSAGES,
     HOLIDAY_DEFAULT_END_TIME,
     HOLIDAY_INDEFINITE_END_DATE,
@@ -60,37 +66,47 @@ from .const import (
     HOLIDAY_RESET_TIME,
     HYDRATION_STEP_DELAY_SECONDS,
     INITIAL_HYDRATION_WAIT_SECONDS,
+    SCAN_ADDRESS_TO_DEVICE_KEY,
+    SCAN_TOPIC_CIRCUITS,
     SET_CONFIRMATION_DELAY_SECONDS,
 )
 from .thermodynamics import (
-    MIN_DAILY_ELECTRICAL_ENERGY_WH,
+    MIN_CUMULATIVE_ELECTRICAL_ENERGY_WH,
+    calculate_combined_efficiency,
+    calculate_combined_mode_energy,
     calculate_delta_t,
     calculate_live_cop,
     calculate_period_cop,
+    calculate_system_total_energy,
     calculate_thermal_power,
-    calculate_total_energy,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
-# Inputs in hmux0 that trigger recalculation of thermodynamic sensors
-THERMO_TRIGGER_MESSAGES: set[str] = {
-    "RunDataFlowTemp",
-    "RunDataReturnTemp",
-    "Status01",
-    "RunDataFlowRate",
-    "RunDataElectricPowerConsumption",
-    "HMUStatusCode",
-    "PrEnergyElectricToday",
-    "PrEnergyThermalToday",
-    "PrEnergyElectricMonth",
-    "PrEnergyThermalMonth",
-    "PrEnergyElectricTotal",
-    "PrEnergyThermalTotal",
-    "PrEnergyCoolingElectricTotal",
-    "PrEnergySumHc",
-    "PrEnergySumHwc",
-}
+# Inputs in hmux0 and vwzio that trigger recalculation of thermodynamic & energy sensors
+THERMO_TRIGGER_MESSAGES: frozenset[tuple[str, str]] = frozenset(
+    {
+        (CIRCUIT_HMUX0, "rundataflowtemp"),
+        (CIRCUIT_HMUX0, "rundatareturntemp"),
+        (CIRCUIT_HMUX0, "status01"),
+        (CIRCUIT_HMUX0, "rundataflowrate"),
+        (CIRCUIT_HMUX0, "rundataelectricpowerconsumption"),
+        (CIRCUIT_HMUX0, "powerstatus"),
+        (CIRCUIT_HMUX0, "energyyieldprecision"),
+        (CIRCUIT_HMUX0, "hmustatuscode"),
+        (CIRCUIT_HMUX0, "prenergyelectrichc"),
+        (CIRCUIT_HMUX0, "prenergyelectrichwc"),
+        (CIRCUIT_HMUX0, "prenergyelectriccool"),
+        (CIRCUIT_HMUX0, "prenergythermalhc"),
+        (CIRCUIT_HMUX0, "prenergythermalhwc"),
+        (CIRCUIT_HMUX0, "prenergythermalcool"),
+        (CIRCUIT_VWZIO, "powerstatus"),
+        (CIRCUIT_VWZIO, "prenergyelectrichc"),
+        (CIRCUIT_VWZIO, "prenergyelectrichwc"),
+        (CIRCUIT_VWZIO, "prenergythermalhc"),
+        (CIRCUIT_VWZIO, "prenergythermalhwc"),
+    }
+)
 
 ACTIVE_COMPRESSOR_STATUSES: set[str] = {
     "heat_compressor_active",
@@ -259,6 +275,14 @@ class SaunierGeniaCoordinator:
         self._preselected_holiday_start_datetime: datetime | None = None
         self._preselected_holiday_end_datetime: datetime | None = None
 
+        # Passive hardware and software version detection from ebusd scan.*
+        self._device_versions: dict[str, dict[str, str | None]] = {
+            k: dict(v) for k, v in DEFAULT_DEVICE_VERSIONS.items()
+        }
+
+        # Root outdoor device registry ID for child device topology (via_device_id)
+        self._outdoor_device_id: str | None = None
+
     # -------------------------------------------------------------------------
     # Configuration & Options Properties
     # -------------------------------------------------------------------------
@@ -322,6 +346,28 @@ class SaunierGeniaCoordinator:
                 CONF_FALLBACK_POLL_INTERVAL, DEFAULT_FALLBACK_POLL_INTERVAL
             )
         )
+
+    @property
+    def outdoor_device_id(self) -> str | None:
+        """Return the internal Home Assistant Device Registry ID for the outdoor unit."""
+        if self._outdoor_device_id:
+            return self._outdoor_device_id
+        if not self.hass:
+            return None
+        from homeassistant.helpers import device_registry as dr
+
+        dev_reg = dr.async_get(self.hass)
+        entry_id = self.entry.entry_id
+        outdoor_id = f"{entry_id}_{DEVICE_OUTDOOR_UNIT}"
+        device = dev_reg.async_get_device(identifiers={(DOMAIN, outdoor_id)})
+        if device:
+            self._outdoor_device_id = device.id
+            return device.id
+        return None
+
+    def set_outdoor_device_id(self, device_id: str | None) -> None:
+        """Set the internal Device Registry ID for the outdoor unit."""
+        self._outdoor_device_id = device_id
 
     @property
     def saved_dhw_target_temp(self) -> float | None:
@@ -398,6 +444,23 @@ class SaunierGeniaCoordinator:
                 self.hass, topic, self._async_on_mqtt_message, qos=0
             )
             self._mqtt_unsubs.append(unsub)
+
+        # Passive scan topics subscription for SW/HW and serial detection
+        for scan_circuit in SCAN_TOPIC_CIRCUITS:
+            unsub_root = await mqtt.async_subscribe(
+                self.hass,
+                f"{prefix}/{scan_circuit}",
+                self._async_on_mqtt_message,
+                qos=0,
+            )
+            self._mqtt_unsubs.append(unsub_root)
+            unsub_sub = await mqtt.async_subscribe(
+                self.hass,
+                f"{prefix}/{scan_circuit}/#",
+                self._async_on_mqtt_message,
+                qos=0,
+            )
+            self._mqtt_unsubs.append(unsub_sub)
 
         _LOGGER.debug(
             "Subscribed to ebusd MQTT topics under prefix '%s'; scheduling initial hydration in %.1fs",
@@ -477,10 +540,20 @@ class SaunierGeniaCoordinator:
 
         rel_topic = topic[len(prefix_with_slash) :]
         parts = rel_topic.split("/")
-        if len(parts) < 2:
+        if not parts or not parts[0]:
             return
 
         circuit_raw = parts[0]
+        circuit_lower = circuit_raw.lower()
+
+        # Intercept scan messages for passive SW/HW and serial number detection
+        if circuit_lower.startswith("scan."):
+            self._async_handle_scan_message(parts, msg.payload)
+            return
+
+        if len(parts) < 2:
+            return
+
         message_name = parts[1]
 
         # Ignore command suffixes if nested
@@ -514,8 +587,8 @@ class SaunierGeniaCoordinator:
         # Notify subscribers for this (circuit, message)
         self._async_notify_message_listeners(circuit_key, message_name)
 
-        # Trigger thermodynamic calculations if relevant outdoor unit telemetry changed
-        if circuit_key == CIRCUIT_HMUX0 and message_name in THERMO_TRIGGER_MESSAGES:
+        # Trigger thermodynamic calculations if relevant outdoor unit or hydraulic module telemetry changed
+        if (circuit_key, msg_lower) in THERMO_TRIGGER_MESSAGES:
             self._async_recalculate_thermodynamics()
 
         # Check DHW boost restoration conditions when bass3 HwcSFMode or HwcStorageTemp updates
@@ -791,8 +864,34 @@ class SaunierGeniaCoordinator:
             return
         if self._hydration_task is not None and not self._hydration_task.done():
             return
-        # Poll core operational messages with gentle spacing
-        core_messages = ESSENTIAL_HYDRATION_MESSAGES[:40]
+        # Poll core operational messages + live telemetry & b5 16 energy counters with gentle spacing
+        fallback_energy_messages: list[tuple[str, str]] = [
+            (CIRCUIT_HMUX0, "HMUStatusCode"),
+            (CIRCUIT_HMUX0, "StateCompressor"),
+            (CIRCUIT_HMUX0, "PowerStatus"),
+            (CIRCUIT_HMUX0, "RunDataElectricPowerConsumption"),
+            (CIRCUIT_HMUX0, "RunDataFlowRate"),
+            (CIRCUIT_HMUX0, "RunDataFlowTemp"),
+            (CIRCUIT_HMUX0, "RunDataReturnTemp"),
+            (CIRCUIT_HMUX0, "PrEnergyElectricHc"),
+            (CIRCUIT_HMUX0, "PrEnergyElectricHwc"),
+            (CIRCUIT_HMUX0, "PrEnergyElectricCool"),
+            (CIRCUIT_HMUX0, "PrEnergyThermalHc"),
+            (CIRCUIT_HMUX0, "PrEnergyThermalHwc"),
+            (CIRCUIT_HMUX0, "PrEnergyThermalCool"),
+            (CIRCUIT_HMUX0, "PrEnergyEnvYieldHc"),
+            (CIRCUIT_HMUX0, "PrEnergyEnvYieldHwc"),
+            (CIRCUIT_VWZIO, "PowerStatus"),
+            (CIRCUIT_VWZIO, "PrEnergyElectricHc"),
+            (CIRCUIT_VWZIO, "PrEnergyElectricHwc"),
+            (CIRCUIT_VWZIO, "PrEnergyThermalHc"),
+            (CIRCUIT_VWZIO, "PrEnergyThermalHwc"),
+        ]
+        core_messages = list(
+            dict.fromkeys(
+                [*ESSENTIAL_HYDRATION_MESSAGES[:40], *fallback_energy_messages]
+            )
+        )
         self._hydration_task = self.hass.async_create_background_task(
             self._async_force_poll_queue(core_messages),
             name=f"{self.entry.domain}_fallback_poll",
@@ -819,7 +918,7 @@ class SaunierGeniaCoordinator:
 
     @callback
     def _async_recalculate_thermodynamics(self) -> None:
-        """Recalculate Delta T, Thermal Power, Live COP, Daily COP, Monthly COP, and Total SCOP."""
+        """Recalculate Delta T, Thermal Power, Live COP, Mode Totals (Wh), and Historical COP/EER."""
         # 1. Primary Flow and Return Temperatures -> Delta T (K)
         flow_temp = self.get_float(CIRCUIT_HMUX0, "RunDataFlowTemp", "value")
         if flow_temp is None:
@@ -844,6 +943,8 @@ class SaunierGeniaCoordinator:
         elec_power = self.get_float(
             CIRCUIT_HMUX0, "RunDataElectricPowerConsumption", "power"
         )
+        if elec_power is None:
+            elec_power = self.get_float(CIRCUIT_HMUX0, "PowerStatus", "power")
         live_cop, is_active = calculate_live_cop(
             thermal_power, elec_power, hmu_status, frozenset(ACTIVE_COMPRESSOR_STATUSES)
         )
@@ -852,37 +953,78 @@ class SaunierGeniaCoordinator:
                 self.last_active_cop = live_cop
             self._set_calculated(CALC_LIVE_COP, live_cop)
 
-        # 4. Daily Real COP
-        elec_today = self.get_float(CIRCUIT_HMUX0, "PrEnergyElectricToday", "energy")
-        therm_today = self.get_float(CIRCUIT_HMUX0, "PrEnergyThermalToday", "energy")
-        daily_cop = calculate_period_cop(
-            therm_today, elec_today, min_elec_energy=MIN_DAILY_ELECTRICAL_ENERGY_WH
+        # 4. Per-Mode & Combined System Cumulative Electrical Energy (Wh)
+        hmux0_elec_hc = self.get_float(CIRCUIT_HMUX0, "PrEnergyElectricHc", "energy")
+        hmux0_elec_hwc = self.get_float(CIRCUIT_HMUX0, "PrEnergyElectricHwc", "energy")
+        hmux0_elec_cool = self.get_float(
+            CIRCUIT_HMUX0, "PrEnergyElectricCool", "energy"
         )
-        if daily_cop is not None:
-            self._set_calculated(CALC_DAILY_COP, daily_cop)
+        vwzio_elec_hc = self.get_float(CIRCUIT_VWZIO, "PrEnergyElectricHc", "energy")
+        vwzio_elec_hwc = self.get_float(CIRCUIT_VWZIO, "PrEnergyElectricHwc", "energy")
 
-        # 5. Monthly Real COP & Total Historical SCOP
-        elec_month = self.get_float(CIRCUIT_HMUX0, "PrEnergyElectricMonth", "energy")
-        therm_month = self.get_float(CIRCUIT_HMUX0, "PrEnergyThermalMonth", "energy")
-        monthly_cop = calculate_period_cop(therm_month, elec_month, min_elec_energy=0.0)
-        if monthly_cop is not None:
-            self._set_calculated(CALC_MONTHLY_COP, monthly_cop)
+        heating_total_wh = calculate_combined_mode_energy(hmux0_elec_hc, vwzio_elec_hc)
+        if heating_total_wh is not None:
+            self._set_calculated(CALC_HEATING_TOTAL_ENERGY, heating_total_wh)
 
-        elec_total = self.get_float(CIRCUIT_HMUX0, "PrEnergyElectricTotal", "energy")
-        therm_total = self.get_float(CIRCUIT_HMUX0, "PrEnergyThermalTotal", "energy")
-        total_cop = calculate_period_cop(therm_total, elec_total, min_elec_energy=0.0)
-        if total_cop is not None:
-            self._set_calculated(CALC_TOTAL_COP, total_cop)
+        dhw_total_wh = calculate_combined_mode_energy(hmux0_elec_hwc, vwzio_elec_hwc)
+        if dhw_total_wh is not None:
+            self._set_calculated(CALC_DHW_TOTAL_ENERGY, dhw_total_wh)
 
-        # Combined Total Electrical Energy Consumed (Heating + DHW + Cooling)
-        hc_total = self.get_float(CIRCUIT_BASS3, "PrEnergySumHc", "value")
-        hwc_total = self.get_float(CIRCUIT_BASS3, "PrEnergySumHwc", "value")
-        cool_total = self.get_float(
-            CIRCUIT_HMUX0, "PrEnergyCoolingElectricTotal", "energy"
+        system_total_wh = calculate_system_total_energy(
+            heating_total_wh, dhw_total_wh, hmux0_elec_cool
         )
-        total_energy = calculate_total_energy(hc_total, hwc_total, cool_total)
-        if total_energy is not None:
-            self._set_calculated(CALC_TOTAL_ENERGY, total_energy)
+        if system_total_wh is not None:
+            self._set_calculated(CALC_SYSTEM_TOTAL_ENERGY, system_total_wh)
+
+        # 5. Verified Cumulative Mode & Global Efficiency (COP / EER)
+        hmux0_therm_hc = self.get_float(CIRCUIT_HMUX0, "PrEnergyThermalHc", "energy")
+        hmux0_therm_hwc = self.get_float(CIRCUIT_HMUX0, "PrEnergyThermalHwc", "energy")
+        hmux0_therm_cool = self.get_float(
+            CIRCUIT_HMUX0, "PrEnergyThermalCool", "energy"
+        )
+        vwzio_therm_hc = self.get_float(CIRCUIT_VWZIO, "PrEnergyThermalHc", "energy")
+        vwzio_therm_hwc = self.get_float(CIRCUIT_VWZIO, "PrEnergyThermalHwc", "energy")
+
+        hc_cop = calculate_combined_efficiency(
+            (hmux0_therm_hc, vwzio_therm_hc),
+            (hmux0_elec_hc, vwzio_elec_hc),
+        )
+        if hc_cop is not None:
+            self._set_calculated(CALC_HC_COP, hc_cop)
+
+        hwc_cop = calculate_combined_efficiency(
+            (hmux0_therm_hwc, vwzio_therm_hwc),
+            (hmux0_elec_hwc, vwzio_elec_hwc),
+        )
+        if hwc_cop is not None:
+            self._set_calculated(CALC_HWC_COP, hwc_cop)
+
+        cool_eer = calculate_period_cop(
+            hmux0_therm_cool,
+            hmux0_elec_cool,
+            min_elec_energy=MIN_CUMULATIVE_ELECTRICAL_ENERGY_WH,
+        )
+        if cool_eer is not None:
+            self._set_calculated(CALC_COOL_EER, cool_eer)
+
+        global_efficiency = calculate_combined_efficiency(
+            (
+                hmux0_therm_hc,
+                vwzio_therm_hc,
+                hmux0_therm_hwc,
+                vwzio_therm_hwc,
+                hmux0_therm_cool,
+            ),
+            (
+                hmux0_elec_hc,
+                vwzio_elec_hc,
+                hmux0_elec_hwc,
+                vwzio_elec_hwc,
+                hmux0_elec_cool,
+            ),
+        )
+        if global_efficiency is not None:
+            self._set_calculated(CALC_GLOBAL_EFFICIENCY, global_efficiency)
 
     # -------------------------------------------------------------------------
     # Smart Forced DHW Boost Manager (Section 7.2)
@@ -1262,6 +1404,174 @@ class SaunierGeniaCoordinator:
 
         # Step 5: Fire cancel execution trigger flag (UCH 01)
         await self.async_write_parameter(CIRCUIT_BASS3, "HolidayCancel", 1)
+
+    # -------------------------------------------------------------------------
+    # Passive Scan & Hardware/Software Version Detection
+    # -------------------------------------------------------------------------
+
+    def get_device_sw_version(self, device_key: str) -> str | None:
+        """Return detected or default software version for device."""
+        return self._device_versions.get(device_key, {}).get("sw")
+
+    def get_device_hw_version(self, device_key: str) -> str | None:
+        """Return detected or default hardware version for device."""
+        return self._device_versions.get(device_key, {}).get("hw")
+
+    def get_device_serial_number(self, device_key: str) -> str | None:
+        """Return detected serial number for device if available."""
+        return self._device_versions.get(device_key, {}).get("serial_number")
+
+    @callback
+    def _async_handle_scan_message(self, parts: list[str], raw_payload: Any) -> None:
+        """Passively extract SW, HW, and serial numbers from ebusd scan.* MQTT messages."""
+        circuit_name = parts[0]
+        addr = circuit_name.lower().replace("scan.", "").strip()
+        device_key = SCAN_ADDRESS_TO_DEVICE_KEY.get(addr)
+        if not device_key:
+            return
+
+        payload_str = (
+            raw_payload.decode("utf-8", errors="replace")
+            if isinstance(raw_payload, (bytes, bytearray))
+            else str(raw_payload)
+        ).strip()
+        if not payload_str:
+            return
+
+        parsed = parse_ebusd_payload(payload_str)
+
+        detected_sw: str | None = None
+        detected_hw: str | None = None
+        detected_serial: str | None = None
+
+        # 1. Check dictionary keys (from ebusd --mqttjson or parsed dict)
+        for k, v in parsed.items():
+            k_lower = k.lower()
+            if k_lower == "sw" and v is not None:
+                detected_sw = str(v).strip()
+            elif k_lower == "hw" and v is not None:
+                detected_hw = str(v).strip()
+
+        # 2. Check semicolon-delimited string format (e.g. "Vaillant;HMUX0;0407;0504")
+        val_str = str(parsed.get("value", "") or payload_str).strip()
+        if ";" in val_str:
+            tokens = [t.strip() for t in val_str.split(";")]
+            clean = [t for t in tokens if t]
+            # Standard scan string: MF;ID;SW;HW
+            if len(clean) >= 4 and clean[0].lower() in (
+                "vaillant",
+                "saunier duval",
+                "saunierduval",
+                "sd",
+            ):
+                detected_sw = clean[2]
+                detected_hw = clean[3]
+            elif len(clean) == 3 and not any(len(t) > 6 for t in clean):
+                detected_sw = clean[1]
+                detected_hw = clean[2]
+
+        # 3. Check for serial number:
+        # a) 7-part semicolon token string (e.g. "21;24;10;0020123456;1234;567890;N1")
+        if ";" in val_str:
+            id_tokens = [t.strip() for t in val_str.split(";") if t.strip()]
+            if len(id_tokens) == 7:
+                joined = "".join(id_tokens)
+                if len(joined) == 28:
+                    detected_serial = joined
+
+        # b) JSON fields from Scan.<zz>/Id
+        if not detected_serial:
+            p_product = str(parsed.get("product") or "").strip()
+            p_counter = str(parsed.get("counter") or "").strip()
+            if p_product and p_counter:
+                p_prefix = str(parsed.get("prefix") or "").strip()
+                p_year = str(parsed.get("year") or "").strip()
+                p_week = str(parsed.get("week") or "").strip()
+                p_supplier = str(parsed.get("supplier") or "").strip()
+                p_suffix = str(parsed.get("suffix") or "").strip()
+                candidate = f"{p_prefix}{p_year}{p_week}{p_product}{p_supplier}{p_counter}{p_suffix}"
+                if len(candidate) == 28:
+                    detected_serial = candidate
+
+        # c) Explicit serial / id fields
+        if not detected_serial:
+            for field in ("serial", "serial_number", "serialnumber"):
+                if field in parsed:
+                    candidate = str(parsed[field]).strip()
+                    if len(candidate) >= 20:
+                        detected_serial = candidate
+                        break
+            if not detected_serial and "id" in parsed:
+                candidate = str(parsed["id"]).strip()
+                if len(candidate) == 28:
+                    detected_serial = candidate
+
+        # d) Raw 28-char string under an Id topic (e.g. Scan.08/Id)
+        if (
+            not detected_serial
+            and len(parts) >= 2
+            and parts[1].lower() in ("id", "identification")
+        ):
+            clean_val = val_str.replace(";", "").replace(" ", "").strip()
+            if len(clean_val) == 28:
+                detected_serial = clean_val
+
+        # Update cache and notify Device Registry if any property changed
+        target_dict = self._device_versions.setdefault(device_key, {})
+        updated = False
+        if detected_sw and target_dict.get("sw") != detected_sw:
+            target_dict["sw"] = detected_sw
+            updated = True
+        if detected_hw and target_dict.get("hw") != detected_hw:
+            target_dict["hw"] = detected_hw
+            updated = True
+        if detected_serial and target_dict.get("serial_number") != detected_serial:
+            target_dict["serial_number"] = detected_serial
+            updated = True
+
+        if updated:
+            _LOGGER.info(
+                "Passively detected hardware info for %s (%s): SW=%s, HW=%s, Serial=%s",
+                device_key,
+                addr,
+                target_dict.get("sw"),
+                target_dict.get("hw"),
+                target_dict.get("serial_number"),
+            )
+            self._async_update_device_registry(device_key)
+
+    @callback
+    def _async_update_device_registry(self, device_key: str) -> None:
+        """Update Home Assistant Device Registry with detected hardware/software versions and serial."""
+        if not self.hass:
+            return
+
+        try:
+            from homeassistant.helpers import device_registry as dr
+
+            dev_reg = dr.async_get(self.hass)
+            entry_id = self.entry.entry_id
+            device_id_key = f"{entry_id}_{device_key}"
+            device = dev_reg.async_get_device(identifiers={(DOMAIN, device_id_key)})
+            if not device:
+                return
+
+            ver_info = self._device_versions.get(device_key, {})
+            kwargs: dict[str, Any] = {}
+            if ver_info.get("sw"):
+                kwargs["sw_version"] = ver_info["sw"]
+            if ver_info.get("hw"):
+                kwargs["hw_version"] = ver_info["hw"]
+            if ver_info.get("serial_number"):
+                kwargs["serial_number"] = ver_info["serial_number"]
+
+            if kwargs:
+                dev_reg.async_update_device(device.id, **kwargs)
+                _LOGGER.debug(
+                    "Updated Device Registry for %s with %s", device_id_key, kwargs
+                )
+        except Exception:
+            _LOGGER.exception("Failed to update Device Registry for %s", device_key)
 
 
 def _normalize_date_param(val: str | None, default: str) -> str:

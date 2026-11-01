@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
@@ -36,6 +38,27 @@ def build_device_info(
     ):
         device_key = DEVICE_CLIMATE_CONTROLLER
 
+    sw_version = (
+        coordinator.get_device_sw_version(device_key)
+        if hasattr(coordinator, "get_device_sw_version")
+        else None
+    )
+    hw_version = (
+        coordinator.get_device_hw_version(device_key)
+        if hasattr(coordinator, "get_device_hw_version")
+        else None
+    )
+    serial_number = (
+        coordinator.get_device_serial_number(device_key)
+        if hasattr(coordinator, "get_device_serial_number")
+        else None
+    )
+    outdoor_device_id = (
+        coordinator.outdoor_device_id
+        if hasattr(coordinator, "outdoor_device_id")
+        else None
+    )
+
     if device_key == DEVICE_OUTDOOR_UNIT:
         outdoor_model = coordinator.outdoor_model
         return DeviceInfo(
@@ -43,8 +66,9 @@ def build_device_info(
             name=f"{outdoor_model} (Unidad Exterior)",
             manufacturer=manufacturer,
             model=OUTDOOR_MODEL_SPECS.get(outdoor_model, outdoor_model),
-            sw_version="0407",
-            hw_version="0504",
+            sw_version=sw_version,
+            hw_version=hw_version,
+            serial_number=serial_number,
         )
 
     if device_key == DEVICE_CLIMATE_CONTROLLER:
@@ -58,28 +82,34 @@ def build_device_info(
             if is_vaillant
             else "MiPro Sense SRC 720/3 (BASS3)"
         )
-        return DeviceInfo(
-            identifiers={(DOMAIN, f"{entry_id}_{DEVICE_CLIMATE_CONTROLLER}")},
-            name=controller_name,
-            manufacturer=manufacturer,
-            model=controller_model,
-            sw_version="0708",
-            hw_version="4304",
-            via_device=(DOMAIN, outdoor_id),
-        )
+        info_kwargs: dict[str, Any] = {
+            "identifiers": {(DOMAIN, f"{entry_id}_{DEVICE_CLIMATE_CONTROLLER}")},
+            "name": controller_name,
+            "manufacturer": manufacturer,
+            "model": controller_model,
+            "sw_version": sw_version,
+            "hw_version": hw_version,
+            "serial_number": serial_number,
+        }
+        if outdoor_device_id:
+            info_kwargs["via_device_id"] = outdoor_device_id
+        return DeviceInfo(**info_kwargs)
 
     if device_key == DEVICE_HYDRAULIC_INTERFACE:
         indoor_model = coordinator.indoor_model
         display_name = f"Interfaz Hidráulica {indoor_model}"
-        return DeviceInfo(
-            identifiers={(DOMAIN, f"{entry_id}_{DEVICE_HYDRAULIC_INTERFACE}")},
-            name=display_name,
-            manufacturer=manufacturer,
-            model=INDOOR_MODEL_SPECS.get(indoor_model, indoor_model),
-            sw_version="0500",
-            hw_version="0504",
-            via_device=(DOMAIN, outdoor_id),
-        )
+        info_kwargs = {
+            "identifiers": {(DOMAIN, f"{entry_id}_{DEVICE_HYDRAULIC_INTERFACE}")},
+            "name": display_name,
+            "manufacturer": manufacturer,
+            "model": INDOOR_MODEL_SPECS.get(indoor_model, indoor_model),
+            "sw_version": sw_version,
+            "hw_version": hw_version,
+            "serial_number": serial_number,
+        }
+        if outdoor_device_id:
+            info_kwargs["via_device_id"] = outdoor_device_id
+        return DeviceInfo(**info_kwargs)
 
     # DEVICE_WIRELESS_THERMOSTAT
     thermostat_name = (
@@ -87,15 +117,18 @@ def build_device_info(
         if is_vaillant
         else "Termostato Inalámbrico MiPro Sense"
     )
-    return DeviceInfo(
-        identifiers={(DOMAIN, f"{entry_id}_{DEVICE_WIRELESS_THERMOSTAT}")},
-        name=thermostat_name,
-        manufacturer=manufacturer,
-        model="Receptor Radio NETX3 (0020260979)",
-        sw_version="0708",
-        hw_version="4304",
-        via_device=(DOMAIN, outdoor_id),
-    )
+    info_kwargs = {
+        "identifiers": {(DOMAIN, f"{entry_id}_{DEVICE_WIRELESS_THERMOSTAT}")},
+        "name": thermostat_name,
+        "manufacturer": manufacturer,
+        "model": "Receptor Radio NETX3 (0020260979)",
+        "sw_version": sw_version,
+        "hw_version": hw_version,
+        "serial_number": serial_number,
+    }
+    if outdoor_device_id:
+        info_kwargs["via_device_id"] = outdoor_device_id
+    return DeviceInfo(**info_kwargs)
 
 
 class SaunierGeniaEntity(Entity):

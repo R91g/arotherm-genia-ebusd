@@ -16,7 +16,7 @@
 
 **aroTHERM & GeniaAir (eBUS)** (`arotherm_genia_ebusd`) es una **integración personalizada 100 % local (`local_push`) e independiente de la nube para Home Assistant**, diseñada para bombas de calor aerotérmicas R290 de **Vaillant** y **Saunier Duval** gobernadas por reguladores **`sensoCOMFORT` (`VRC 720`)** o **`MiPro Sense` (`SRC 720`)** a través de [**eBUSd**](https://github.com/john30/ebusd).
 
-Construida directamente sobre la arquitectura electrónica eBUS compartida por el Grupo Vaillant (`08.hmux0`, `15.bass3`, `76.vwzio`, `04.netx3`), sustituye el caos de entidades del auto-descubrimiento MQTT crudo y la dependencia de servidores externos por **134 entidades nativas fuertemente tipadas**, motor termodinámico y cálculo de COP/SCOP en tiempo real, filtrado de valores centinela de firmware, gestión automática del Doble Cerrojo de refrigeración y algoritmo inteligente de ACS Puntual (Boost Forzado).
+Construida directamente sobre la arquitectura electrónica eBUS compartida por el Grupo Vaillant (`08.hmux0`, `15.bass3`, `76.vwzio`, `04.netx3`), sustituye el caos de entidades del auto-descubrimiento MQTT crudo y la dependencia de servidores externos por **148 entidades nativas fuertemente tipadas**, motor termodinámico y cálculo de COP/EER en tiempo real, filtrado de valores centinela de firmware, gestión automática del Doble Cerrojo de refrigeración y algoritmo inteligente de ACS Puntual (Boost Forzado).
 
 ---
 
@@ -51,7 +51,7 @@ Construida directamente sobre la arquitectura electrónica eBUS compartida por e
 | **Automatización Doble Cerrojo de Frío** | ✅ Gestionado en app oficial | ❌ Edición manual de registros/fechas | ✅ **Cerrojo 1 y Cerrojo 2 automáticos** |
 | **Filtro Anti-Centinela de Consignas** | ✅ Oculto por la app oficial | ❌ Muestra picos de `5.0 °C` y `99.0 °C` | ✅ **Filtrado + memoria estacional** |
 | **ACS Boost Inteligente (`ΔT < 5 K`)** | ❌ Bloqueado por histéresis de `5.0 K` | ❌ Bloqueado por histéresis de `5.0 K` | ✅ **Bypass automático de histéresis** |
-| **Potencia Térmica y COP / SCOP en vivo** | ❌ Estimaciones diarias/mensuales | ❌ Registros aislados sin cálculo | ✅ **ΔT, W y COP Vivo/Diario/Mensual** |
+| **Potencia Térmica y COP / EER en vivo** | ❌ Estimaciones diarias/mensuales | ❌ Registros aislados sin cálculo | ✅ **ΔT, W y COP/EER en vivo e histórico** |
 
 ---
 
@@ -97,19 +97,19 @@ Los equipos de aerotermia de Vaillant y Saunier Duval comparten **al 100 % las m
 - **Cola de Hidratación Inicial:** Al arrancar Home Assistant, el coordinador espera `5.0 s` para absorber a coste cero los mensajes `retained` del broker MQTT y solicita secuencialmente (con `0.8 s` de pausa entre tramas) **únicamente los registros que falten**.
 - **Actualización Optimista y Confirmación Selectiva:** Las escrituras sobre registros pasivos `u` (consignas, modos, horarios, fechas) actualizan la interfaz al instante sin disparar lecturas `/get` redundantes que devuelvan valores antiguos en caché, espaciando las secuencias multipaso entre `0.3 s` y `0.6 s`.
 
-### 3. 144 Entidades Nativas Agrupadas en 4 Dispositivos Lógicos
+### 3. 148 Entidades Nativas Agrupadas en 4 Dispositivos Lógicos
 
 | Dispositivo Lógico | Circuito eBUS | Entidades Destacadas |
 | :--- | :---: | :--- |
-| **1. Unidad Exterior** (`<Modelo Exterior>`) | `08.hmux0` | Monitor operativo en vivo (52+ estados `S.xx`/`S.xxx`), RPM/RPS/modulación del compresor, alta presión R290, pasos EEV, ventiladores, caudal primario, temperaturas de impulsión/retorno de alta precisión, contadores IEEE 754 (`EXP`) eléctricos y térmicos, horas/arranques y **sensores termodinámicos calculados**. |
+| **1. Unidad Exterior** (`<Modelo Exterior>`) | `08.hmux0` | Monitor operativo en vivo (52+ estados `S.xx`/`S.xxx`), RPM/RPS/modulación del compresor, alta presión R290, pasos EEV, ventiladores, caudal primario, temperaturas de impulsión/retorno de alta precisión, contadores IEEE 754 (`EXP`) eléctricos, térmicos y de energía ambiental por modo (`Wh`), horas/arranques y **sensores termodinámicos y de energía total calculados**. |
 | **2. Controlador de Clima** (`sensoCOMFORT` / `MiPro Sense`) | `15.bass3` | **Climatización Zona 1 (`climate`)**, **Agua Caliente Sanitaria (`water_heater`)**, curvas climáticas, límites de impulsión, puntos de bivalencia, presión de agua, contadores de energía por servicio (`PrEnergySumHc` / `PrEnergySumHwc`), resúmenes de programación semanal e interruptores de sistema. |
-| **3. Interfaz Hidráulica** (`<Modelo Interior>`) | `76.vwzio` | Estado operativo del circuito secundario (calefacción, refrigeración, ACS, postcirculación, reposo), diagnóstico de válvula de 3 vías / bomba secundaria y monitor de errores activos (`OK` o códigos de avería). |
+| **3. Interfaz Hidráulica** (`<Modelo Interior>`) | `76.vwzio` | Estado operativo del circuito secundario (calefacción, refrigeración, ACS, postcirculación, reposo), potencia eléctrica instantánea (`W`), contadores de energía `b5 16` (`Wh`), diagnóstico de válvula de 3 vías / bomba secundaria y monitor de errores activos (`OK` o códigos de avería). |
 | **4. Termostato Inalámbrico** *(Opcional)* | `04.netx3` / `f6` / `broadcast` | Temperatura en el dial inalámbrico, consigna inalámbrica, temperatura exterior por difusión (`Broadcast`) y fecha/hora del bus eBUS. *(Si no hay termostato inalámbrico instalado, los sensores broadcast se asocian automáticamente al Controlador de Clima).* |
 
-**Desglose por Plataforma (144 entidades en total a través de 8 plataformas):**
+**Desglose por Plataforma (148 entidades en total a través de 8 plataformas):**
 - `climate` (**1**): Termostato unificado Calefacción / Refrigeración / Auto para Zona 1 con modos preestablecidos (`Programado (Confort)`, `Manual continuo`, `Eco (Reducción nocturna)`, `Anulación rápida (Quick Veto)`, `Modo Ausencia / Vacaciones`).
 - `water_heater` (**1**): Control del depósito de Agua Caliente Sanitaria (ACS) (`Apagado`, `Programación horaria`, `Continuo (24h)`, `Boost`).
-- `sensor` (**94**): 90 sensores de telemetría, energía, diagnóstico y cálculos termodinámicos + 4 sensores resumen de programación semanal (con el detalle diario completo en sus atributos) + sensores de días restantes de vacaciones y refrigeración.
+- `sensor` (**98**): 94 sensores de telemetría, energía en `Wh`, diagnóstico y cálculos termodinámicos + 4 sensores resumen de programación semanal (con el detalle diario completo en sus atributos) + sensores de días restantes de vacaciones y refrigeración.
 - `binary_sensor` (**8**): Compresor en marcha, bomba primaria, desescarche activo, integración de energía activa, demanda de calor Zona 1, autorización hardware de refrigeración, ciclo de frío broadcast y señal física eBUS.
 - `number` (**25**): Todos los parámetros numéricos de usuario e instalador (curva climática, sobretemperatura, impulsión mín./máx., corte de verano, consignas día/noche/manual/veto/frío/ausencia, consigna/histéresis/offset/tiempos de ACS, puntos de bivalencia y humedad máxima).
 - `select` (**5**): Modo calefacción Zona 1, modo refrigeración Zona 1, modo ACS, modo reducción nocturna (`eco`/`night`/`off`) y control por temperatura ambiente (`off`/`modulating`/`thermostat`).
@@ -133,14 +133,14 @@ Los equipos de aerotermia de Vaillant y Saunier Duval comparten **al 100 % las m
   1. Cuando `T_depósito > (T_consigna - Histéresis)`, al activar **`Boost`** (desde la tarjeta `water_heater`, el interruptor **ACS Puntual (Boost)** o la acción `arotherm_genia_ebusd.force_dhw_boost`), el coordinador memoriza tu consigna actual, eleva temporalmente `HwcTempDesired` de forma dinámica a **`T_depósito + Histéresis + 1.5 °C`** (con tope en `68.0 °C`) y tras `1.0 s` envía `HwcSFMode = load`, garantizando el arranque inmediato del compresor sea cual sea tu consigna habitual (`45 °C`, `50 °C`, `55 °C`...).
   2. Supervisa continuamente la carga y **restaura automáticamente tu consigna original de ACS** en cuanto finaliza el ciclo (`HwcSFMode == auto`), se alcanza la temperatura objetivo, se cancela manualmente o vence el temporizador de seguridad de 60 minutos.
 
-### 6. Motor Termodinámico y de Eficiencia COP / SCOP en Tiempo Real
-Calculado automáticamente por el coordinador con cada actualización de telemetría de `08.hmux0` y `15.bass3`:
+### 6. Motor Termodinámico y de Eficiencia COP / EER en Tiempo Real
+Calculado automáticamente por el coordinador con cada actualización de telemetría de `08.hmux0` y `76.vwzio`:
 ```text
 Salto Térmico Primario ΔT (K)   = T_impulsión (RunDataFlowTemp) - T_retorno (RunDataReturnTemp)
 Potencia Térmica Instantánea    = Caudal (L/h) × |ΔT| (K) × 1.163   [Vatios]
 COP / EER Instantáneo en Vivo   = Potencia_Térmica (W) / Potencia_Eléctrica (W)
-COP Diario / Mensual / SCOP     = Energía_Térmica_Entregada / Energía_Eléctrica_Consumida
-Consumo Eléctrico Combinado     = Calefacción_kWh (BASS3) + ACS_kWh (BASS3) + Frío_kWh (HMUX0)
+COP / EER Histórico por Modo    = (Térmica_HMUX0_Wh + Térmica_VWZIO_Wh) / (Eléc_HMUX0_Wh + Eléc_VWZIO_Wh)
+Consumo Eléctrico Total (Wh)    = Calefacción_Total_Wh + ACS_Total_Wh + Refrigeración_Total_Wh
 ```
 *(Incluye puesta a cero durante desescarches y compresor en reposo para evitar falsos picos de COP por caudal residual de la bomba circuladora).*
 
@@ -382,18 +382,18 @@ action: arotherm_genia_ebusd.cancel_holiday_mode
 
 ## Configuración en el Panel de Energía de Home Assistant
 
-La integración proporciona sensores acumulativos `TOTAL_INCREASING` diseñados específicamente para la jerarquía padre/hijo de **Dispositivos individuales** del Panel de Energía de Home Assistant, evitando cualquier duplicidad de consumos:
+La integración proporciona sensores acumulativos `TOTAL_INCREASING` con precisión sub-kWh (`Wh`, IEEE 754 `EXP`) que suman automáticamente la unidad exterior (`08.hmux0`) y el módulo hidráulico interior (`76.vwzio`), diseñados específicamente para la jerarquía padre/hijo de **Dispositivos individuales** del Panel de Energía de Home Assistant (`Padre == Calefacción + ACS + Refrigeración`, evitando cualquier duplicidad de consumos):
 
 1. Ve a **Ajustes → Paneles de control → Energía → Dispositivos individuales** y pulsa **Añadir dispositivo**.
 2. **Añade el Dispositivo Padre (Consumo Total Aerotermia):**
-   - Selecciona **`Consumo eléctrico total combinado aerotermia`** (`calculated_total_energy`, en `kWh`, perteneciente al dispositivo **Unidad Exterior**).
+   - Selecciona **`Consumo eléctrico total aerotermia`** (`calculated_system_total_energy`, en `Wh`, perteneciente al dispositivo **Unidad Exterior**).
    - Asígnale un nombre descriptivo (p. ej. `Aerotermia (Total)`).
-3. **Añade los 3 Sub-dispositivos Hijos** (seleccionando en **`Dispositivo superior / Incluido en`** → `Consumo eléctrico total combinado aerotermia` en cada uno):
-   - **Calefacción:** `Consumo calefacción total (BASS3)` (`bass3_energy_hc_total`, en `kWh`, en el dispositivo Controlador de Clima).
-   - **Agua Caliente Sanitaria (ACS):** `Consumo ACS total (BASS3)` (`bass3_energy_hwc_total`, en `kWh`, en el dispositivo Controlador de Clima).
-   - **Refrigeración:** `Energía eléctrica refrigeración total histórica` (`energy_cooling_electric_total`, en `Wh`, en el dispositivo Unidad Exterior).
+3. **Añade los 3 Sub-dispositivos Hijos** (seleccionando en **`Dispositivo superior / Incluido en`** → `Consumo eléctrico total aerotermia` en cada uno):
+   - **Calefacción:** `Consumo eléctrico total calefacción` (`calculated_heating_total_energy`, en `Wh`, en el dispositivo Unidad Exterior).
+   - **Agua Caliente Sanitaria (ACS):** `Consumo eléctrico total ACS` (`calculated_dhw_total_energy`, en `Wh`, en el dispositivo Unidad Exterior).
+   - **Refrigeración:** `Consumo eléctrico total refrigeración` (`energy_electric_cool`, en `Wh`, en el dispositivo Unidad Exterior).
 
-Home Assistant agrupará los tres servicios bajo un desplegable `>` dentro del dispositivo padre y mostrará el desglose exacto de **Calefacción vs. ACS vs. Refrigeración** en las barras de consumo y el diagrama de Sankey sin contabilizar ningún vatio-hora dos veces.
+Home Assistant calculará automáticamente los consumos por hora, día, mes y año a partir de estos contadores hardware en `Wh`, agrupando los tres servicios bajo un desplegable `>` dentro del dispositivo padre y mostrando el desglose exacto de **Calefacción vs. ACS vs. Refrigeración** en las barras de consumo y el diagrama de Sankey sin contabilizar ningún vatio-hora dos veces. *(Los contadores individuales de `08.hmux0` frente a `76.vwzio` siguen disponibles en la sección Diagnóstico por si deseas consultar qué parte corresponde al compresor y cuál al módulo hidráulico).*
 
 ---
 

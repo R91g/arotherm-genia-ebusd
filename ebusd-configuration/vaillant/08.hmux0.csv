@@ -11,21 +11,21 @@ uw,,,SetMode,target power and mode from regulator,,,b510,00,hcmode,,UCH,0=auto;1
 uw,,,StatusCirPump,Status circulation pump,,,b512,00,value,,UCH,0=off;100=on,,
 uw,,,StatusCirPumpTarget,Status circulation pump target,,,b512,04,value,,UCH,,,
 
-# Precision energy yield and electrical consumption (32-bit float captured from app f1 -> 08)
-u,,,EnergyYieldPrecision,precision energy yield and consumption,,,b516,14,status,,UCH,0=standby;1=heating;2=hwc,,,yield,,EXP,,kWh,"cumulative environmental yield (kWh)",consumed,,EXP,,kWh,"cumulative electrical consumption (kWh)"
-u,,,PrHeader,energy header query,,,b516,1000ffff01000000,ign,,IGN:7,,,,value,,EXP,,,
-u,,,PrEnergyElectricToday,electrical energy today,,,b516,1000ffff83030000,ign,,IGN:7,,,,energy,,EXP,,Wh,"daily consumed electrical energy"
-u,,,PrEnergyElectricMonth,electrical energy this month,,,b516,1000ffff83040000,ign,,IGN:7,,,,energy,,EXP,,Wh,"monthly consumed electrical energy"
-u,,,PrEnergyElectricTotal,electrical energy total,,,b516,1000ffff83050000,ign,,IGN:7,,,,energy,,EXP,,Wh,"total historical consumed electrical energy"
-u,,,PrEnergyCoolingElectricToday,cooling electrical energy today,,,b516,1000ffff84030000,ign,,IGN:7,,,,energy,,EXP,,Wh,"daily cooling electrical energy"
-u,,,PrEnergyCoolingElectricMonth,cooling electrical energy this month,,,b516,1000ffff84040000,ign,,IGN:7,,,,energy,,EXP,,Wh,"monthly cooling electrical energy"
-u,,,PrEnergyCoolingElectricTotal,cooling electrical energy total,,,b516,1000ffff84050000,ign,,IGN:7,,,,energy,,EXP,,Wh,"total historical cooling electrical energy"
-u,,,PrEnergyThermalToday,thermal energy today,,,b516,1000ffff49030000,ign,,IGN:7,,,,energy,,EXP,,Wh,"daily delivered thermal energy"
-u,,,PrEnergyThermalMonth,thermal energy this month,,,b516,1000ffff49040000,ign,,IGN:7,,,,energy,,EXP,,Wh,"monthly delivered thermal energy"
-u,,,PrEnergyThermalTotal,thermal energy total,,,b516,1000ffff49050000,ign,,IGN:7,,,,energy,,EXP,,Wh,"total historical delivered thermal energy"
-u,,,PrEnergyHeatingToday,heating thermal energy today,,,b516,1000ffff42030000,ign,,IGN:7,,,,energy,,EXP,,Wh,"daily heating thermal energy"
-u,,,PrEnergyHeatingMonth,heating thermal energy this month,,,b516,1000ffff42040000,ign,,IGN:7,,,,energy,,EXP,,Wh,"monthly heating thermal energy"
-u,,,PrEnergyHeatingTotal,heating thermal energy total,,,b516,1000ffff42050000,ign,,IGN:7,,,,energy,,EXP,,Wh,"total historical heating thermal energy"
+# Instantaneous power and IEEE 754 precision energy counters (b516 - active r without poll + passive u)
+u,,,EnergyStatsDescriptor,energy statistics EEPROM table descriptor,,,b516,11,data,,HEX:9,,,
+r,,,PowerStatus,instantaneous power consumption and active mode,,,b516,14,status,,UCH,0=standby;1=heating;2=hwc;3=cooling,,active energy integration mode,power,,EXP,,W,"instantaneous electrical power",fuel_power,,EXP,,W,"instantaneous fuel power"
+u,,,PrEnergySolarTotal,total solar energy sum,,,b516,1000ffff01000000,ign,,IGN:7,,,,energy,,EXP,,Wh,
+r,,,PrEnergyElectricHc,total heating electrical energy consumed,,,b516,1000ffff83030000,ign,,IGN:7,,,,energy,,EXP,,Wh,"cumulative heating consumed electrical energy"
+r,,,PrEnergyElectricHwc,total hot water electrical energy consumed,,,b516,1000ffff83040000,ign,,IGN:7,,,,energy,,EXP,,Wh,"cumulative hot water consumed electrical energy"
+r,,,PrEnergyElectricCool,total cooling electrical energy consumed,,,b516,1000ffff83050000,ign,,IGN:7,,,,energy,,EXP,,Wh,"cumulative cooling consumed electrical energy"
+u,,,PrEnergyFuelHc,total heating fuel energy consumed (unsupported on heat pump),,,b516,1000ffff84030000,ign,,IGN:7,,,,energy,,EXP,,Wh,
+u,,,PrEnergyFuelHwc,total hot water fuel energy consumed (unsupported on heat pump),,,b516,1000ffff84040000,ign,,IGN:7,,,,energy,,EXP,,Wh,
+r,,,PrEnergyThermalHc,total heating thermal energy delivered,,,b516,1000ffff49030000,ign,,IGN:7,,,,energy,,EXP,,Wh,"cumulative heating delivered thermal energy"
+r,,,PrEnergyThermalHwc,total hot water thermal energy delivered,,,b516,1000ffff49040000,ign,,IGN:7,,,,energy,,EXP,,Wh,"cumulative hot water delivered thermal energy"
+r,,,PrEnergyThermalCool,total cooling thermal energy extracted,,,b516,1000ffff49050000,ign,,IGN:7,,,,energy,,EXP,,Wh,"cumulative cooling extracted thermal energy"
+r,,,PrEnergyEnvYieldHc,total heating environmental energy yield,,,b516,1000ffff42030000,ign,,IGN:7,,,,energy,,EXP,,Wh,"cumulative heating environmental energy yield"
+r,,,PrEnergyEnvYieldHwc,total hot water environmental energy yield,,,b516,1000ffff42040000,ign,,IGN:7,,,,energy,,EXP,,Wh,"cumulative hot water environmental energy yield"
+u,,,PrEnergyEnvYieldCool,total cooling environmental energy yield,,,b516,1000ffff42050000,ign,,IGN:7,,,,energy,,EXP,,Wh,
 
 
 # Compressor and fan modulation state (Controller 10 -> 08)
@@ -79,9 +79,9 @@ u,,,RunStatsImmersionHeaterStarts,,,,b509,540200e60b,ign,,IGN:4,,,,value,,UIN,,,
 # 3. STATISTICS AND GLOBAL STATE (PASSIVE u)
 # ==============================================================================
 u,,,State,,,,b511,07,energy,,UCH,,,,energy_1,,UIN,,kWh,,onoff,,UCH,0=off;1=on,,,state,,UCH,1=ready;11=error;9=heating;17=cooling;129=heating_water,,
-u,,,Status01,flow/return/outside/hwc/storage temperature/pump status,,,b511,01,temp,,D1C,,°C,flow temperature,temp_1,,D1C,,°C,return temperature,temp_2,,D2B,,°C,outside temperature,temp_3,,D1C,,°C,hot water temperature,temp_4,,D1C,,°C,storage temperature,pumpstate,,UCH,0=off;1=on;2=overrun;4=hwc,,pump status
-u,,,Status02,operating mode/maximum temp/current temp,,,b511,02,hwcmode,,UCH,0=disabled;1=on;2=off;3=auto,,hot water mode,temp,,UCH,,°C,max temperature,temp_1,,D1C,,°C,current temperature,temp_2,,UCH,,°C,max temperature,temp_3,,D1C,,°C,current temperature
-u,,,Status,Status,,,b511,03,temp,,D2C,,°C,temperature,press,,FLT,,bar,pressure,press_1,,FLT,,bar,pressure,hcmode,,UCH,0=off;1=cooling;3=heat;4=water,,boiler mode,hex,,HEX,,,
+u,,,Status01,flow/return/outside/hwc/storage temperature/pump status,,,b511,01,flow_temp,,D1C,,°C,flow temperature,return_temp,,D1C,,°C,return temperature,outside_temp,,D2B,,°C,outside temperature,hwc_temp,,D1C,,°C,hot water temperature,storage_temp,,D1C,,°C,storage temperature,pumpstate,,UCH,0=off;1=on;2=overrun;4=hwc,,pump status
+u,,,Status02,operating mode/maximum temp/current temp,,,b511,02,hwcmode,,UCH,0=disabled;1=on;2=off;3=auto,,hot water mode,max_temp,,UCH,,°C,max temperature,current_temp,,D1C,,°C,current temperature,max_temp_1,,UCH,,°C,max temperature,current_temp_1,,D1C,,°C,current temperature
+u,,,Status,Status,,,b511,03,temp,,D2C,,°C,temperature,press,,FLT,,bar,pressure,press_1,,FLT,,bar,pressure,hcmode,,UCH,0=off;1=cooling;3=heat;4=water,,boiler mode,hex,,HEX:1,,,
 u,,,Currenterror,Current errors,,,b503,0001,error,,UIN,,,error number,error_1,,UIN,,,error number,error_2,,UIN,,,error number,error_3,,UIN,,,error number,error_4,,UIN,,,error number
 u,,,Errorhistory,Error_History,,,b503,0101,index,m,UCH,,,,status,,UCH,,,Status,time,,VTM,,,time,date,,HDA:3,,,date,error,,UIN,,,error number
 u,,,HMUStatusCode,outdoor unit status code,,,b503,0003,status,,UIN,34=frost_protect;100=standby;101=heat_compressor_shutdown;102=heat_compressor_blocked;103=heat_prerun;104=heat_compressor_active;107=heat_overrun;111=cool_compressor_shutdown;112=cool_compressor_blocked;113=cool_prerun;114=cool_compressor_active;117=cool_overrun;125=heat_immersion_heater_active;132=hwc_compressor_blocked;133=hwc_prerun;134=hwc_compressor_active;135=hwc_immersion_heater_active;137=hwc_overrun;141=heat_immersion_heater_shutdown;142=heat_immersion_heater_blocked;151=hwc_immersion_heater_shutdown;152=hwc_immersion_heater_blocked;202=air_purging_program_active;240=compressor_oil_heating_active;252=fan1_blocked;255=fan1_airinlet_too_high;256=fan1_airinlet_too_low;260=fan2_blocked;275=building_circuit_flow_too_low;277=building_circuit_pump_fault;280=frequency_converter_fault_compressor;281=frequency_converter_fault_mains_voltage;282=frequency_converter_fault_overheating;283=deicing_time_too_long;284=deicing_flow_temp_too_low;285=compressor_outlet_temp_too_high;286=hot_gas_temp_switch_open;287=fan1_wind;288=fan2_wind;289=current_limt_active;302=high_pressure_switch_open;303=compressor_outlet_temp_too_high_1;304=evaporation_temp_too_low;305=condensation_temp_too_low;306=evaporation_temp_too_high;308=condensation_temp_too_high;312=building_circuit_return_temp_too_low;314=building_circuit_return_temp_too_high;351=immersion_heater_flow_temp_too_high;516=deicing_active;575=frequency_converter_fault;581=connection_fault_frequency_converter;590=four_port_valve_position_fault,,outdoor unit status,data,,HEX:8,,,

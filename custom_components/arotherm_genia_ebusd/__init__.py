@@ -11,11 +11,16 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 
 from .const import (
     CIRCUIT_BASS3,
     DEFAULT_HOLIDAY_TEMP,
+    DEPRECATED_UNIQUE_ID_SUFFIXES,
+    DEVICE_OUTDOOR_UNIT,
     DOMAIN,
+    OUTDOOR_MODEL_SPECS,
     PLATFORMS,
     SERVICE_CANCEL_HOLIDAY_MODE,
     SERVICE_FORCE_DHW_BOOST,
@@ -75,6 +80,22 @@ def _parse_hhmm(time_str: str) -> tuple[int, int]:
     return int(match.group(1)), int(match.group(2))
 
 
+def _async_cleanup_deprecated_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Remove obsolete entity registry entries from earlier b5 16 definitions."""
+    ent_reg = er.async_get(hass)
+    deprecated_uids = {
+        f"{entry.entry_id}_{suffix}" for suffix in DEPRECATED_UNIQUE_ID_SUFFIXES
+    }
+    for reg_entry in list(er.async_entries_for_config_entry(ent_reg, entry.entry_id)):
+        if reg_entry.unique_id in deprecated_uids:
+            _LOGGER.info(
+                "Removing deprecated entity %s (unique_id=%s)",
+                reg_entry.entity_id,
+                reg_entry.unique_id,
+            )
+            ent_reg.async_remove(reg_entry.entity_id)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Saunier Duval GeniaAir Max ES & MiPro Sense from a config entry."""
     # 1. Initialize and connect the centralized eBUSd MQTT coordinator
@@ -83,13 +104,32 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
-    # 2. Forward entry setup to all supported platforms (sensor, climate, etc.)
+    # 2. Clean up deprecated b5 16 entities before forwarding platform setups
+    _async_cleanup_deprecated_entities(hass, entry)
+
+    # 3. Pre-register parent outdoor device in device registry so child devices can use via_device_id
+    dev_reg = dr.async_get(hass)
+    outdoor_id = f"{entry.entry_id}_{DEVICE_OUTDOOR_UNIT}"
+    outdoor_model = coordinator.outdoor_model
+    outdoor_device = dev_reg.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, outdoor_id)},
+        name=f"{outdoor_model} (Unidad Exterior)",
+        manufacturer=coordinator.manufacturer,
+        model=OUTDOOR_MODEL_SPECS.get(outdoor_model, outdoor_model),
+        sw_version=coordinator.get_device_sw_version(DEVICE_OUTDOOR_UNIT),
+        hw_version=coordinator.get_device_hw_version(DEVICE_OUTDOOR_UNIT),
+        serial_number=coordinator.get_device_serial_number(DEVICE_OUTDOOR_UNIT),
+    )
+    coordinator.set_outdoor_device_id(outdoor_device.id)
+
+    # 4. Forward entry setup to all supported platforms (sensor, climate, etc.)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # 3. Listen for options updates (e.g. DHW boost temp, cooling bypass toggle)
+    # 4. Listen for options updates (e.g. DHW boost temp, cooling bypass toggle)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
-    # 4. Register custom integration services (timers, DHW boost)
+    # 5. Register custom integration services (timers, DHW boost)
     _async_register_services(hass)
     return True
 

@@ -6,7 +6,7 @@ from __future__ import annotations
 # P (W) = FlowRate (l/h) * |Delta T (K)| * (4186 J/(kg*K) / 3600 s) = FlowRate * |Delta T| * 1.163
 SPECIFIC_HEAT_WATER_FACTOR = 1.163
 MIN_ACTIVE_ELECTRICAL_POWER_W = 60.0
-MIN_DAILY_ELECTRICAL_ENERGY_WH = 50.0
+MIN_CUMULATIVE_ELECTRICAL_ENERGY_WH = 50.0
 
 
 def calculate_delta_t(
@@ -76,10 +76,10 @@ def calculate_period_cop(
     elec_energy: float | None,
     min_elec_energy: float = 0.0,
 ) -> float | None:
-    """Calculate cumulative COP for a given time window (daily, monthly, or total historical SCOP).
+    """Calculate cumulative COP / EER for a given operating mode or total.
 
     Returns:
-        - COP rounded to 2 decimals if electrical energy exceeds the minimum threshold.
+        - COP/EER rounded to 2 decimals if electrical energy exceeds the minimum threshold.
         - 0.0 if electrical energy is below threshold.
         - None if either metric is unavailable.
     """
@@ -92,21 +92,52 @@ def calculate_period_cop(
     return 0.0
 
 
-def calculate_total_energy(
-    heating_kwh: float | None,
-    dhw_kwh: float | None,
-    cooling_wh: float | None,
+def calculate_combined_efficiency(
+    thermal_parts: tuple[float | None, ...],
+    elec_parts: tuple[float | None, ...],
+    min_elec_energy: float = MIN_CUMULATIVE_ELECTRICAL_ENERGY_WH,
 ) -> float | None:
-    """Calculate cumulative total electrical energy (kWh) from heating, DHW, and cooling.
+    """Calculate cumulative COP / EER across multiple hardware components or modes.
 
-    Returns:
-        - Sum in kWh rounded to 1 decimal place.
-        - None if all inputs are None.
+    Requires all component registers to be hydrated (non-None) before emitting
+    to avoid transient distortions during initial staggered startup hydration.
     """
-    if heating_kwh is None and dhw_kwh is None and cooling_wh is None:
+    if not thermal_parts or not elec_parts:
+        return None
+    if any(p is None for p in thermal_parts) or any(p is None for p in elec_parts):
         return None
 
-    h = heating_kwh if heating_kwh is not None else 0.0
-    d = dhw_kwh if dhw_kwh is not None else 0.0
-    c = (cooling_wh / 1000.0) if cooling_wh is not None else 0.0
-    return round(h + d + c, 1)
+    total_therm = sum(p for p in thermal_parts if p is not None)
+    total_elec = sum(p for p in elec_parts if p is not None)
+    return calculate_period_cop(
+        total_therm, total_elec, min_elec_energy=min_elec_energy
+    )
+
+
+def calculate_combined_mode_energy(
+    outdoor_wh: float | None,
+    indoor_wh: float | None,
+) -> float | None:
+    """Combine outdoor unit (08.hmux0) and indoor hydraulic module (76.vwzio) energy in Wh.
+
+    Strictly waits for both counters to be hydrated (non-None) so TOTAL_INCREASING
+    statistics never record an artificial upward step during startup hydration.
+    """
+    if outdoor_wh is None or indoor_wh is None:
+        return None
+    return round(outdoor_wh + indoor_wh, 1)
+
+
+def calculate_system_total_energy(
+    heating_total_wh: float | None,
+    dhw_total_wh: float | None,
+    cooling_wh: float | None,
+) -> float | None:
+    """Calculate cumulative system electrical energy (Wh) across Heating + DHW + Cooling.
+
+    Strictly requires all 3 service totals to be hydrated (non-None) so Home Assistant's
+    Energy Dashboard never logs an artificial step when messages arrive out of order.
+    """
+    if heating_total_wh is None or dhw_total_wh is None or cooling_wh is None:
+        return None
+    return round(heating_total_wh + dhw_total_wh + cooling_wh, 1)

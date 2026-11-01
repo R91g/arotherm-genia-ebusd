@@ -63,10 +63,12 @@ def _check_defrost_active(coord: SaunierGeniaCoordinator) -> bool | None:
 
 
 def _check_energy_integration(coord: SaunierGeniaCoordinator) -> bool | None:
-    status = coord.get_str(CIRCUIT_HMUX0, "EnergyYieldPrecision", "status")
+    status = coord.get_str(CIRCUIT_HMUX0, "PowerStatus", "status")
+    if status is None:
+        status = coord.get_str(CIRCUIT_HMUX0, "EnergyYieldPrecision", "status")
     if status is None:
         return None
-    return status.lower() in ("active", "hwc", "heating", "2", "1")
+    return status.lower() in ("active", "heating", "hwc", "cooling", "1", "2", "3")
 
 
 def _check_z1_heating_demand(coord: SaunierGeniaCoordinator) -> bool | None:
@@ -139,7 +141,7 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[SaunierGeniaBinarySensorEntityDescription, ...
         translation_key="energy_integration_active",
         device_key=DEVICE_OUTDOOR_UNIT,
         circuit=CIRCUIT_HMUX0,
-        message="EnergyYieldPrecision",
+        message="PowerStatus",
         field="status",
         device_class=BinarySensorDeviceClass.POWER,
         is_on_fn=_check_energy_integration,
@@ -216,6 +218,8 @@ class SaunierGeniaBinarySensor(SaunierGeniaEntity, BinarySensorEntity):
         subs = [(description.circuit, description.message)]
         if description.key == "compressor_active":
             subs.append((CIRCUIT_HMUX0, "RunDataCompressorSpeed"))
+        elif description.key == "energy_integration_active":
+            subs.append((CIRCUIT_HMUX0, "EnergyYieldPrecision"))
 
         c = description.circuit.lower()
         m = description.message.lower()

@@ -98,6 +98,15 @@ class MockCoordinatorForDatetime:
     def preselected_holiday_end_datetime(self, val: datetime | None) -> None:
         self._preselected_holiday_end_datetime = val
 
+    def get_device_sw_version(self, device_key: str) -> str | None:
+        return "0100"
+
+    def get_device_hw_version(self, device_key: str) -> str | None:
+        return "0200"
+
+    def get_device_serial_number(self, device_key: str) -> str | None:
+        return None
+
     def get_holiday_remaining_days(self) -> int:
         return 5
 

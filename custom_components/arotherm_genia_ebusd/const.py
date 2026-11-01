@@ -159,15 +159,69 @@ CIRCUIT_NETX3_ALT = "f6"
 CIRCUIT_BROADCAST = "broadcast"
 CIRCUIT_GLOBAL = "global"
 
+# eBUS Scan address mapping for passive hardware & software version detection
+SCAN_ADDRESS_TO_DEVICE_KEY: dict[str, str] = {
+    "08": DEVICE_OUTDOOR_UNIT,
+    "15": DEVICE_CLIMATE_CONTROLLER,
+    "76": DEVICE_HYDRAULIC_INTERFACE,
+    "04": DEVICE_WIRELESS_THERMOSTAT,
+    "f6": DEVICE_WIRELESS_THERMOSTAT,
+}
+
+SCAN_TOPIC_CIRCUITS: tuple[str, ...] = (
+    "scan.08",
+    "scan.15",
+    "scan.76",
+    "scan.04",
+    "scan.f6",
+    "Scan.08",
+    "Scan.15",
+    "Scan.76",
+    "Scan.04",
+    "Scan.f6",
+)
+
+# Fallback hardware and software versions if scan has not arrived yet
+DEFAULT_DEVICE_VERSIONS: dict[str, dict[str, str]] = {
+    DEVICE_OUTDOOR_UNIT: {"sw": "0407", "hw": "0504"},
+    DEVICE_CLIMATE_CONTROLLER: {"sw": "0708", "hw": "4304"},
+    DEVICE_HYDRAULIC_INTERFACE: {"sw": "0500", "hw": "0504"},
+    DEVICE_WIRELESS_THERMOSTAT: {"sw": "0129", "hw": "0404"},
+}
+
 # Calculated virtual sensor keys stored under ("calculated", <key>)
 CALC_CIRCUIT = "calculated"
 CALC_DELTA_T = "calculated_delta_t"
 CALC_THERMAL_POWER = "calculated_thermal_power"
 CALC_LIVE_COP = "calculated_live_cop"
-CALC_DAILY_COP = "calculated_daily_cop"
-CALC_MONTHLY_COP = "calculated_monthly_cop"
-CALC_TOTAL_COP = "calculated_total_cop"
-CALC_TOTAL_ENERGY = "calculated_total_energy"
+CALC_HC_COP = "calculated_hc_cop"
+CALC_HWC_COP = "calculated_hwc_cop"
+CALC_COOL_EER = "calculated_cool_eer"
+CALC_GLOBAL_EFFICIENCY = "calculated_global_efficiency"
+CALC_HEATING_TOTAL_ENERGY = "calculated_heating_total_energy"
+CALC_DHW_TOTAL_ENERGY = "calculated_dhw_total_energy"
+CALC_SYSTEM_TOTAL_ENERGY = "calculated_system_total_energy"
+
+# Deprecated unique_id suffixes automatically removed from entity_registry on setup
+DEPRECATED_UNIQUE_ID_SUFFIXES: tuple[str, ...] = (
+    "calculated_calculated_daily_cop_value",
+    "calculated_calculated_monthly_cop_value",
+    "calculated_calculated_total_cop_value",
+    "calculated_calculated_total_energy_value",
+    "hmux0_prenergyelectrictoday_energy",
+    "hmux0_prenergyelectricmonth_energy",
+    "hmux0_prenergyelectrictotal_energy",
+    "hmux0_prenergycoolingelectrictoday_energy",
+    "hmux0_prenergycoolingelectricmonth_energy",
+    "hmux0_prenergycoolingelectrictotal_energy",
+    "hmux0_prenergythermaltoday_energy",
+    "hmux0_prenergythermalmonth_energy",
+    "hmux0_prenergythermaltotal_energy",
+    "hmux0_prenergyheatingtoday_energy",
+    "hmux0_prenergyheatingmonth_energy",
+    "hmux0_prenergyheatingtotal_energy",
+    "binary_hmux0_energyyieldprecision_status",
+)
 
 # Timing & Hydration Constants
 # Note: Physical eBUS runs at 2400 baud (~240 bytes/s). The delays below ensure reliable
@@ -235,40 +289,16 @@ TIMER_CIRCUIT_PREFIXES: dict[str, str] = {
 }
 
 # Essential eBUSd messages for Initial Staggered Hydration (/get queue)
+# ONLY messages with active read priority (r / r1..r9) on the physical bus.
+# Purely passive ('u') messages (temperatures, modes, runstats) are populated
+# automatically via retained MQTT topics and periodic master broadcasts (f1 / 10).
 ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
-    # Climate Controller (15.bass3) - Primary operational states & setpoints
-    (CIRCUIT_BASS3, "SystemOperatingState"),
-    (CIRCUIT_BASS3, "Z1OpMode"),
-    (CIRCUIT_BASS3, "Z1OpModeCooling"),
-    (CIRCUIT_BASS3, "Z1RoomTemp"),
-    (CIRCUIT_BASS3, "Z1ActualRoomTempDesired"),
-    (CIRCUIT_BASS3, "Z1DayTemp"),
+    # Climate Controller (15.bass3) - Actively readable setpoints, offsets & energy counters (r9)
     (CIRCUIT_BASS3, "Z1NightTemp"),
-    (CIRCUIT_BASS3, "Z1ManualTemp"),
     (CIRCUIT_BASS3, "Z1QuickVetoTemp"),
-    (CIRCUIT_BASS3, "Z1CoolingTemp"),
-    (CIRCUIT_BASS3, "Z1CoolingTempDesired"),
-    (CIRCUIT_BASS3, "Z1HeatingState"),
-    (CIRCUIT_BASS3, "Z1Status"),
     (CIRCUIT_BASS3, "CoolingReleaseStatus"),
-    (CIRCUIT_BASS3, "CoolingStartDate"),
-    (CIRCUIT_BASS3, "CoolingEndDate"),
-    (CIRCUIT_BASS3, "HolidayTemp"),
-    (CIRCUIT_BASS3, "HolidayStartDate"),
-    (CIRCUIT_BASS3, "HolidayStartTime"),
-    (CIRCUIT_BASS3, "HolidayEndDate"),
-    (CIRCUIT_BASS3, "HolidayEndTime"),
-    (CIRCUIT_BASS3, "HwcOpMode"),
     (CIRCUIT_BASS3, "HwcSFMode"),
-    (CIRCUIT_BASS3, "HwcStorageTemp"),
-    (CIRCUIT_BASS3, "HwcTempDesired"),
     (CIRCUIT_BASS3, "HwcFlowTemp"),
-    (CIRCUIT_BASS3, "HwcStatus"),
-    (CIRCUIT_BASS3, "WaterPressure"),
-    (CIRCUIT_BASS3, "DisplayedOutsideTemp"),
-    (CIRCUIT_BASS3, "OutsideTempAvg"),
-    (CIRCUIT_BASS3, "Hc1FlowTemp"),
-    (CIRCUIT_BASS3, "Hc1ActualFlowTempDesired"),
     (CIRCUIT_BASS3, "Hc1HeatCurve"),
     (CIRCUIT_BASS3, "Hc1ExcessTemp"),
     (CIRCUIT_BASS3, "Hc1MinFlowTempDesired"),
@@ -278,8 +308,6 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_BASS3, "CoolingFlowTempDesiredMax"),
     (CIRCUIT_BASS3, "Hc1AutoOffMode"),
     (CIRCUIT_BASS3, "Hc1RoomTempSwitchOn"),
-    (CIRCUIT_BASS3, "Hc1PumpStatus"),
-    (CIRCUIT_BASS3, "HydraulicScheme"),
     (CIRCUIT_BASS3, "HwcMaxFlowTempDesired"),
     (CIRCUIT_BASS3, "CylinderChargeHyst"),
     (CIRCUIT_BASS3, "CylinderChargeOffset"),
@@ -298,15 +326,9 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_BASS3, "PrEnergySumHwcThisMonth"),
     (CIRCUIT_BASS3, "PrEnergySumHwcLastMonth"),
     (CIRCUIT_BASS3, "PrEnergySumHwc"),
-    (CIRCUIT_BASS3, "YieldTotal"),
-    # Outdoor Unit (08.hmux0) - Live telemetry & energy counters
-    (CIRCUIT_HMUX0, "HMUStatusCode"),
-    (CIRCUIT_HMUX0, "StateCompressor"),
-    (CIRCUIT_HMUX0, "StatusCirPump"),
-    (CIRCUIT_HMUX0, "SetMode"),
-    (CIRCUIT_HMUX0, "EnergyYieldPrecision"),
+    # Outdoor Unit (08.hmux0) - Active live telemetry & energy counters (r / r1..r9)
+    (CIRCUIT_HMUX0, "PowerStatus"),
     (CIRCUIT_HMUX0, "RunDataElectricPowerConsumption"),
-    (CIRCUIT_HMUX0, "RunDataFlowRate"),
     (CIRCUIT_HMUX0, "RunDataHighPressure"),
     (CIRCUIT_HMUX0, "RunDataFlowTemp"),
     (CIRCUIT_HMUX0, "RunDataReturnTemp"),
@@ -314,44 +336,20 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_HMUX0, "RunDataCompressorInletTemp"),
     (CIRCUIT_HMUX0, "RunDataCompressorOutletTemp"),
     (CIRCUIT_HMUX0, "RunDataEEVOutletTemp"),
-    (CIRCUIT_HMUX0, "RunDataCondenserOutTemp"),
-    (CIRCUIT_HMUX0, "RunDataBuildingCPumpPower"),
-    (CIRCUIT_HMUX0, "RunDataCompressorSpeed"),
-    (CIRCUIT_HMUX0, "RunDataFan1Speed"),
-    (CIRCUIT_HMUX0, "RunDataEEVPositionAbs"),
-    (CIRCUIT_HMUX0, "PrEnergyElectricToday"),
-    (CIRCUIT_HMUX0, "PrEnergyElectricMonth"),
-    (CIRCUIT_HMUX0, "PrEnergyElectricTotal"),
-    (CIRCUIT_HMUX0, "PrEnergyCoolingElectricToday"),
-    (CIRCUIT_HMUX0, "PrEnergyCoolingElectricMonth"),
-    (CIRCUIT_HMUX0, "PrEnergyThermalToday"),
-    (CIRCUIT_HMUX0, "PrEnergyThermalMonth"),
-    (CIRCUIT_HMUX0, "PrEnergyThermalTotal"),
-    (CIRCUIT_HMUX0, "PrEnergyHeatingToday"),
-    (CIRCUIT_HMUX0, "PrEnergyHeatingMonth"),
-    (CIRCUIT_HMUX0, "PrEnergyHeatingTotal"),
-    (CIRCUIT_HMUX0, "RunStatsHMUHours"),
-    (CIRCUIT_HMUX0, "RunStatsCompressorHours"),
-    (CIRCUIT_HMUX0, "RunStatsCompressorStarts"),
-    (CIRCUIT_HMUX0, "RunStatsHcHours"),
-    (CIRCUIT_HMUX0, "RunStatsHcStarts"),
-    (CIRCUIT_HMUX0, "RunStatsHwcHours"),
-    (CIRCUIT_HMUX0, "RunStatsHwcStarts"),
-    (CIRCUIT_HMUX0, "RunStatsBuildingPumpHours"),
-    (CIRCUIT_HMUX0, "RunStatsBuildingCPumpStarts"),
-    (CIRCUIT_HMUX0, "RunStats4PortValveHours"),
-    (CIRCUIT_HMUX0, "RunStats4PortValveSwitches"),
-    (CIRCUIT_HMUX0, "RunStatsFan1Hours"),
-    (CIRCUIT_HMUX0, "RunStatsDeiceHours"),
-    # Weekly schedule slots & daily timers
-    (CIRCUIT_BASS3, "Z1Timer_Slots"),
-    (CIRCUIT_BASS3, "HwcTimer_Slots"),
-    (CIRCUIT_BASS3, "CoolingTimer_Slots"),
-    (CIRCUIT_BASS3, "CirculationTimer_Slots"),
-] + [
-    (CIRCUIT_BASS3, f"{prefix}_{day}")
-    for prefix in ("Z1Timer", "HwcTimer", "CoolingTimer", "CirculationTimer")
-    for day in WEEKDAYS_LIST
+    (CIRCUIT_HMUX0, "PrEnergyElectricHc"),
+    (CIRCUIT_HMUX0, "PrEnergyElectricHwc"),
+    (CIRCUIT_HMUX0, "PrEnergyElectricCool"),
+    (CIRCUIT_HMUX0, "PrEnergyThermalHc"),
+    (CIRCUIT_HMUX0, "PrEnergyThermalHwc"),
+    (CIRCUIT_HMUX0, "PrEnergyThermalCool"),
+    (CIRCUIT_HMUX0, "PrEnergyEnvYieldHc"),
+    (CIRCUIT_HMUX0, "PrEnergyEnvYieldHwc"),
+    # Hydraulic Interface (76.vwzio) - Active power & energy counters (r)
+    (CIRCUIT_VWZIO, "PowerStatus"),
+    (CIRCUIT_VWZIO, "PrEnergyElectricHc"),
+    (CIRCUIT_VWZIO, "PrEnergyElectricHwc"),
+    (CIRCUIT_VWZIO, "PrEnergyThermalHc"),
+    (CIRCUIT_VWZIO, "PrEnergyThermalHwc"),
 ]
 
 # All 52 HMUStatusCode values (plus normalized aliases)

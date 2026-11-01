@@ -14,11 +14,13 @@ import unittest
 
 from custom_components.arotherm_genia_ebusd.thermodynamics import (
     SPECIFIC_HEAT_WATER_FACTOR,
+    calculate_combined_efficiency,
+    calculate_combined_mode_energy,
     calculate_delta_t,
     calculate_live_cop,
     calculate_period_cop,
+    calculate_system_total_energy,
     calculate_thermal_power,
-    calculate_total_energy,
 )
 
 
@@ -106,18 +108,75 @@ class TestThermodynamics(unittest.TestCase):
         )
         self.assertEqual(calculate_period_cop(15420.0, 3855.0), 4.0)
 
-    def test_calculate_total_energy(self) -> None:
-        """Test total electrical energy combination (Heating + DHW + Cooling)."""
-        # None inputs
-        self.assertIsNone(calculate_total_energy(None, None, None))
+    def test_calculate_combined_mode_energy_and_system_total(self) -> None:
+        """Test Wh mode totals (08.hmux0 + 76.vwzio) and partial-hydration guards."""
+        # Partial hydration must strictly return None to protect TOTAL_INCREASING
+        self.assertIsNone(calculate_combined_mode_energy(None, None))
+        self.assertIsNone(calculate_combined_mode_energy(19876.6, None))
+        self.assertIsNone(calculate_combined_mode_energy(None, 8375.9))
 
-        # Heating 27.6 kWh, DHW 69.5 kWh, Cooling 199300.0 Wh -> 296.4 kWh
-        total = calculate_total_energy(27.6, 69.5, 199300.0)
-        self.assertEqual(total, 296.4)
+        # Verified hardware audit values (Wh):
+        # Heating: 19876.6 (hmux0) + 8375.9 (vwzio) = 28252.5 Wh
+        heating_wh = calculate_combined_mode_energy(19876.6, 8375.9)
+        self.assertEqual(heating_wh, 28252.5)
 
-        # Partial missing metrics (e.g. no cooling in winter)
-        self.assertEqual(calculate_total_energy(28.0, 69.0, None), 97.0)
-        self.assertEqual(calculate_total_energy(None, 69.0, 199300.0), 268.3)
+        # DHW: 69524.0 (hmux0) + 0.0 (vwzio) = 69524.0 Wh
+        dhw_wh = calculate_combined_mode_energy(69524.0, 0.0)
+        self.assertEqual(dhw_wh, 69524.0)
+
+        # System total partial hydration guards
+        self.assertIsNone(calculate_system_total_energy(None, 69524.0, 218460.1))
+        self.assertIsNone(calculate_system_total_energy(28252.5, None, 218460.1))
+        self.assertIsNone(calculate_system_total_energy(28252.5, 69524.0, None))
+
+        # System total: 28252.5 + 69524.0 + 218460.1 = 316236.6 Wh (Parent == sum of 3 Children)
+        cool_wh = 218460.1
+        total_wh = calculate_system_total_energy(heating_wh, dhw_wh, cool_wh)
+        self.assertEqual(total_wh, 316236.6)
+        self.assertEqual(total_wh, round(heating_wh + dhw_wh + cool_wh, 1))
+
+    def test_calculate_combined_efficiency(self) -> None:
+        """Test verified mode COP/EER and global efficiency across 08.hmux0 + 76.vwzio."""
+        # Partial hydration must return None
+        self.assertIsNone(
+            calculate_combined_efficiency((46218.2, None), (19876.6, 8375.9))
+        )
+        self.assertIsNone(
+            calculate_combined_efficiency((46218.2, 0.0), (19876.6, None))
+        )
+
+        # Below minimum threshold returns 0.0
+        self.assertEqual(
+            calculate_combined_efficiency(
+                (40.0, 0.0), (20.0, 10.0), min_elec_energy=50.0
+            ),
+            0.0,
+        )
+
+        # Verified hardware audit values:
+        # 1. Heating COP: 46218.2 / (19876.6 + 8375.9) = 1.64
+        self.assertEqual(
+            calculate_combined_efficiency((46218.2, 0.0), (19876.6, 8375.9)),
+            1.64,
+        )
+        # 2. DHW COP: 246403.5 / (69524.0 + 0.0) = 3.54
+        self.assertEqual(
+            calculate_combined_efficiency((246403.5, 0.0), (69524.0, 0.0)),
+            3.54,
+        )
+        # 3. Cooling EER: 981270.4 / 218460.1 = 4.49
+        self.assertEqual(
+            calculate_period_cop(981270.4, 218460.1, min_elec_energy=50.0),
+            4.49,
+        )
+        # 4. Global Efficiency (Heating + DHW + Cooling): 1273892.1 / 316236.6 = 4.03
+        self.assertEqual(
+            calculate_combined_efficiency(
+                (46218.2, 0.0, 246403.5, 0.0, 981270.4),
+                (19876.6, 8375.9, 69524.0, 0.0, 218460.1),
+            ),
+            4.03,
+        )
 
 
 if __name__ == "__main__":

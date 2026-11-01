@@ -16,7 +16,7 @@
 
 **aroTHERM & GeniaAir (eBUS)** (`arotherm_genia_ebusd`) is a **100% local (`local_push`), cloud-independent Home Assistant custom integration** for **Vaillant** and **Saunier Duval** R290 air-to-water heat pumps managed by **`sensoCOMFORT` (`VRC 720`)** or **`MiPro Sense` (`SRC 720`)** system controllers via [**eBUSd**](https://github.com/john30/ebusd).
 
-Designed directly around the native eBUS protocol shared by Vaillant Group heat pumps (`08.hmux0`, `15.bass3`, `76.vwzio`, `04.netx3`), this integration replaces raw MQTT auto-discovery clutter and cloud API dependencies with **134 strongly typed entities**, real-time thermodynamic & COP calculations, firmware sentinel filtering, automatic Double-Lock cooling management, and Smart Forced DHW Boost.
+Designed directly around the native eBUS protocol shared by Vaillant Group heat pumps (`08.hmux0`, `15.bass3`, `76.vwzio`, `04.netx3`), this integration replaces raw MQTT auto-discovery clutter and cloud API dependencies with **148 strongly typed entities**, real-time thermodynamic & COP/EER calculations, firmware sentinel filtering, automatic Double-Lock cooling management, and Smart Forced DHW Boost.
 
 ---
 
@@ -51,7 +51,7 @@ Designed directly around the native eBUS protocol shared by Vaillant Group heat 
 | **Cooling Double-Lock Automation** | ✅ Handled in vendor app | ❌ Manual multi-register hex/date edits | ✅ **Automatic Lock 1 & Lock 2** |
 | **Anti-Sentinel Setpoint Filtering** | ✅ Hidden by vendor app | ❌ Exposes `5.0 °C` & `99.0 °C` spikes | ✅ **Filtered + seasonal memory** |
 | **Smart Forced DHW Boost (`ΔT < 5 K`)** | ❌ Blocked by `5.0 K` hysteresis | ❌ Blocked by `5.0 K` hysteresis | ✅ **Automatic hysteresis bypass** |
-| **Live Thermal Power & COP / SCOP** | ❌ Coarse daily/monthly estimates | ❌ Raw unlinked registers | ✅ **Real-time ΔT, W, Live/Daily/Monthly COP** |
+| **Live Thermal Power & COP / EER** | ❌ Coarse daily/monthly estimates | ❌ Raw unlinked registers | ✅ **Real-time ΔT, W, Live & Mode COP/EER** |
 
 ---
 
@@ -97,19 +97,19 @@ Vaillant and Saunier Duval aerothermal heat pumps share **100% identical eBUS el
 - **Startup Hydration Queue:** On Home Assistant startup, the coordinator waits `5.0 s` to absorb retained MQTT payloads at zero bus cost, then requests **only missing registers** sequentially with `0.8 s` spacing.
 - **Optimistic Updates & Selective Confirmation:** Writes to passive `u` registers (setpoints, modes, schedules, dates) apply immediate optimistic UI state updates without triggering redundant `/get` cache rebounds, while multi-step transitions use `0.3 s`–`0.6 s` bus pacing.
 
-### 3. 134 Native Entities Organized into 4 Logical Devices
+### 3. 148 Native Entities Organized into 4 Logical Devices
 
 | Logical Device | eBUS Circuit | Highlights |
 | :--- | :---: | :--- |
-| **1. Outdoor Unit** (`<Outdoor Model>`) | `08.hmux0` | Live operating monitor (52+ `S.xx`/`S.xxx` states), compressor RPM/RPS/modulation, R290 high pressure, EEV steps, fan speeds, primary flow rate, high-precision flow/return temps, IEEE 754 (`EXP`) electrical & thermal energy counters, runtime hours/starts, and **calculated thermodynamic sensors**. |
+| **1. Outdoor Unit** (`<Outdoor Model>`) | `08.hmux0` | Live operating monitor (52+ `S.xx`/`S.xxx` states), compressor RPM/RPS/modulation, R290 high pressure, EEV steps, fan speeds, primary flow rate, high-precision flow/return temps, IEEE 754 (`EXP`) per-mode electrical, thermal & environmental yield counters (`Wh`), runtime hours/starts, and **calculated thermodynamic & system energy sensors**. |
 | **2. Climate Controller** (`sensoCOMFORT` / `MiPro Sense`) | `15.bass3` | **Zone 1 Climate (`climate`)**, **Domestic Hot Water (`water_heater`)**, heating curves, flow temperature limits, bivalence points, water pressure, service energy counters (`PrEnergySumHc` / `PrEnergySumHwc`), weekly schedule summaries, and configuration switches. |
-| **3. Hydraulic Interface** (`<Indoor Model>`) | `76.vwzio` | Secondary circuit operating state (heating, cooling, DHW, overrun, standby), 3-way diverter valve / secondary pump diagnostics, and active error monitoring (`OK` or fault codes). |
+| **3. Hydraulic Interface** (`<Indoor Model>`) | `76.vwzio` | Secondary circuit operating state (heating, cooling, DHW, overrun, standby), instantaneous electrical power (`W`), `b5 16` auxiliary/secondary energy counters (`Wh`), 3-way diverter valve / secondary pump diagnostics, and active error monitoring (`OK` or fault codes). |
 | **4. Wireless Room Thermostat** *(Optional)* | `04.netx3` / `f6` / `broadcast` | Wireless room dial temperature, wireless target setpoint, broadcast outdoor temperature, and eBUS system date/time. *(If no wireless unit is installed, broadcast sensors automatically attach to the Climate Controller).* |
 
-**Platform Breakdown (144 entities total across 8 platforms):**
+**Platform Breakdown (148 entities total across 8 platforms):**
 - `climate` (**1**): Unified Heating/Cooling/Auto thermostat for Zone 1 with presets (`Scheduled (Comfort)`, `Continuous Manual`, `Eco (Night setback)`, `Quick Veto Override`, `Away / Holiday Mode`).
 - `water_heater` (**1**): Domestic Hot Water (DHW) cylinder controller (`Off`, `Time-controlled (Schedule)`, `Continuous (24h)`, `Boost`).
-- `sensor` (**94**): 90 telemetry, energy, diagnostic, and calculated thermodynamic sensors + 4 weekly timer schedule summary sensors (with full daily slot attributes).
+- `sensor` (**98**): 94 telemetry, `Wh`-precision energy, diagnostic, and calculated thermodynamic sensors + 4 weekly timer schedule summary sensors (with full daily slot attributes).
 - `binary_sensor` (**8**): Compressor running, primary pump, defrost active, energy integration active, Zone 1 heating demand, hardware cooling lock release, broadcast cooling cycle, and physical eBUS signal.
 - `number` (**25**): All installer and user numeric parameters (heating curve, excess temp, min/max flow setpoints, summer limit, day/night/manual/veto/cooling/holiday setback setpoints, DHW setpoint & hysteresis/offset/timers, bivalence points, max room humidity).
 - `select` (**5**): Zone 1 heating mode, Zone 1 cooling mode, DHW mode, night lowering mode (`eco`/`night`/`off`), and room temperature modulation mode (`off`/`modulating`/`thermostat`).
@@ -133,20 +133,20 @@ Vaillant and Saunier Duval aerothermal heat pumps share **100% identical eBUS el
   1. Whenever `T_tank > (T_target - Hysteresis)`, triggering **`Boost`** (via the `water_heater` card, the **One-Time DHW Charge (Boost)** switch, or the `arotherm_genia_ebusd.force_dhw_boost` action) saves your current setpoint, dynamically raises `HwcTempDesired` to **`T_tank + Hysteresis + 1.5 °C`** (capped at `68.0 °C`), and sends `HwcSFMode = load` `1.0 s` later to guarantee immediate compressor ignition regardless of your normal DHW setpoint.
   2. The coordinator continuously monitors the charging cycle and **automatically restores your original DHW setpoint** as soon as charging finishes (`HwcSFMode == auto`), the target is reached, boost is manually cancelled, or the 60-minute safety timeout elapses.
 
-### 6. Real-Time Thermodynamic & COP / SCOP Engine
-Computed automatically inside the coordinator whenever live `08.hmux0` and `15.bass3` telemetry arrives:
+### 6. Real-Time Thermodynamic & COP / EER Engine
+Computed automatically inside the coordinator whenever live `08.hmux0` and `76.vwzio` telemetry arrives:
 ```text
 Primary ΔT (K)               = T_flow (RunDataFlowTemp) - T_return (RunDataReturnTemp)
 Instantaneous Thermal Power  = Flow_Rate (L/h) × |ΔT| (K) × 1.163   [Watts]
 Live Instantaneous COP / EER = Thermal_Power (W) / Electric_Power (W)
-Daily / Monthly / Total COP  = Thermal_Energy_Delivered / Electrical_Energy_Consumed
-Combined Electrical Energy   = Heating_kWh (BASS3) + DHW_kWh (BASS3) + Cooling_kWh (HMUX0)
+Mode & Global COP / EER      = (HMUX0_Thermal_Wh + VWZIO_Thermal_Wh) / (HMUX0_Elec_Wh + VWZIO_Elec_Wh)
+Total System Energy (Wh)     = Heating_Total_Wh + DHW_Total_Wh + Cooling_Total_Wh
 ```
 *(Includes zero-clamping during defrost cycles and compressor standby to avoid phantom COP spikes from residual circulation pump flow).*
 
 ### 7. Touch-Safe Controls (`NumberMode.BOX`) & Brand-Neutral `unique_id`s
 - **Touch Safety:** Every `number` entity enforces `NumberMode.BOX` (numeric input field with `+`/`-` steppers) rather than sliders, preventing accidental changes to heating curves or bivalence points while scrolling on a smartphone.
-- **Zero-Loss Reconfiguration:** All 134 entity `unique_id`s follow `{entry_id}_{circuit}_{message}_{field}` with zero brand strings. Reconfiguring manufacturer or hardware models never orphans entities or breaks historical energy graphs.
+- **Zero-Loss Reconfiguration:** All 148 entity `unique_id`s follow `{entry_id}_{circuit}_{message}_{field}` with zero brand strings. Reconfiguring manufacturer or hardware models never orphans entities or breaks historical energy graphs.
 
 ---
 
@@ -382,18 +382,18 @@ action: arotherm_genia_ebusd.cancel_holiday_mode
 
 ## Home Assistant Energy Dashboard Setup
 
-The integration exposes cumulative `TOTAL_INCREASING` energy sensors specifically structured for Home Assistant's **Individual Devices** energy hierarchy (with parent/child nesting to prevent double-counting):
+The integration exposes sub-kWh (`Wh`, IEEE 754 `EXP`) cumulative `TOTAL_INCREASING` energy sensors combining the outdoor heat pump (`08.hmux0`) and the indoor hydraulic module (`76.vwzio`), structured specifically for Home Assistant's **Individual Devices** energy hierarchy (with parent/child nesting so `Parent == Heating + DHW + Cooling` with zero double-counting):
 
 1. Open **Settings → Dashboards → Energy → Individual devices** and click **Add device**.
 2. **Add the Parent (Total Heat Pump) Sensor:**
-   - Select **`Combined Historical Electrical Energy`** (`calculated_total_energy`, in `kWh`) on the **Outdoor Unit** device.
+   - Select **`Total System Electrical Energy`** (`calculated_system_total_energy`, in `Wh`, on the **Outdoor Unit** device).
    - Give it a friendly name (e.g. `Heat Pump (Total)`).
-3. **Add the 3 Nested Child Sensors** (marking **`Included in`** → `Combined Historical Electrical Energy` on each one):
-   - **Heating:** `Total Heating Energy Consumed (BASS3)` (`bass3_energy_hc_total`, in `kWh`, on the Climate Controller device).
-   - **Domestic Hot Water (DHW):** `Total DHW Energy Consumed (BASS3)` (`bass3_energy_hwc_total`, in `kWh`, on the Climate Controller device).
-   - **Cooling:** `Total Historical Cooling Electrical Energy` (`energy_cooling_electric_total`, in `Wh`, on the Outdoor Unit device).
+3. **Add the 3 Nested Child Sensors** (marking **`Included in`** → `Total System Electrical Energy` on each one):
+   - **Heating:** `Total Heating Electrical Energy` (`calculated_heating_total_energy`, in `Wh`, on the Outdoor Unit device).
+   - **Domestic Hot Water (DHW):** `Total DHW Electrical Energy` (`calculated_dhw_total_energy`, in `Wh`, on the Outdoor Unit device).
+   - **Cooling:** `Total Cooling Electrical Energy` (`energy_electric_cool`, in `Wh`, on the Outdoor Unit device).
 
-Home Assistant will display an expandable `>` breakdown of **Heating vs. DHW vs. Cooling** electricity consumption inside your Energy Dashboard and Sankey chart without counting a single watt-hour twice.
+Home Assistant automatically calculates hourly, daily, monthly, and yearly deltas from these `Wh`-resolution hardware counters and displays an expandable `>` breakdown of **Heating vs. DHW vs. Cooling** electricity consumption inside your Energy Dashboard and Sankey chart without counting a single watt-hour twice. *(Component-level `08.hmux0` vs `76.vwzio` counters remain available under Diagnostic sensors if you ever wish to inspect compressor vs. hydraulic module consumption separately).*
 
 ---
 

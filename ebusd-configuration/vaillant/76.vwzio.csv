@@ -12,23 +12,22 @@ uw,,,SetMode,target power and mode from regulator,,,b510,00,hcmode,,UCH,0=auto;1
 # ==============================================================================
 # 2. TEMPERATURES AND PUMP STATES (CONTROLLER 10 -> 76)
 # ==============================================================================
-u,,,Status01,circuit temperatures and pump state,,,b511,01,flow_temp,,D1C,,°C,flow temperature,return_temp,,D1C,,°C,return temperature,temp_2,,D2B,,°C,outside temperature,temp_3,,D1C,,°C,hot water temperature,temp_4,,D1C,,°C,storage temperature,pumpstate,,UCH,0=off;1=on;2=overrun;4=hwc,,pump status
+u,,,Status01,circuit temperatures and pump state,,,b511,01,flow_temp,,D1C,,°C,flow temperature,return_temp,,D1C,,°C,return temperature,outside_temp,,D2B,,°C,outside temperature,hwc_temp,,D1C,,°C,hot water temperature,storage_temp,,D1C,,°C,storage temperature,pumpstate,,UCH,0=off;1=on;2=overrun;4=hwc,,pump status
 u,,,SecondaryCircuitStatus,secondary pump and circuit status,,,b512,0f0201,status,,HEX:7,,,
 u,,,SecondaryCircuitStatusStandby,secondary pump and circuit status standby,,,b512,0f0001,status,,HEX:7,,,
 u,,,SecondaryCircuitStatusHwc,secondary pump and circuit status hwc,,,b512,0f0202,status,,HEX:7,,,
 u,,,SecondaryCircuitStatus03,secondary pump and circuit status 03,,,b512,0f0301,status,,HEX:7,,,
 
 # ==============================================================================
-# 3. ENERGY TELEMETRY AND DIAGNOSTICS (APP f1 -> 76)
+# 3. ENERGY TELEMETRY AND DIAGNOSTICS (b516 - ACTIVE r WITHOUT POLL + PASSIVE u)
 # ==============================================================================
-u,,,EnergyYieldPrecision,precision energy yield and consumption,,,b516,14,status,,UCH,0=standby;1=heating;2=hwc,,,yield,,EXP,,kWh,"cumulative environmental yield (kWh)",consumed,,EXP,,kWh,"cumulative electrical consumption (kWh)"
-u,,,PrHeader,energy header query,,,b516,1000ffff01000000,ign,,IGN:7,,,,value,,EXP,,,
-u,,,PrEnergyElectricToday,electrical energy today,,,b516,1000ffff83030000,ign,,IGN:7,,,,energy,,EXP,,Wh,"daily consumed electrical energy"
-u,,,PrEnergyElectricMonth,electrical energy this month,,,b516,1000ffff83040000,ign,,IGN:7,,,,energy,,EXP,,Wh,"monthly consumed electrical energy"
-u,,,PrEnergyElectricTotal,electrical energy total,,,b516,1000ffff83050000,ign,,IGN:7,,,,energy,,EXP,,Wh,"total historical consumed electrical energy"
-u,,,PrEnergyThermalToday,thermal energy today,,,b516,1000ffff49030000,ign,,IGN:7,,,,energy,,EXP,,Wh,"daily delivered thermal energy"
-u,,,PrEnergyThermalMonth,thermal energy this month,,,b516,1000ffff49040000,ign,,IGN:7,,,,energy,,EXP,,Wh,"monthly delivered thermal energy"
-u,,,PrEnergyThermalTotal,thermal energy total,,,b516,1000ffff49050000,ign,,IGN:7,,,,energy,,EXP,,Wh,"total historical delivered thermal energy"
+u,,,EnergyStatsDescriptor,energy statistics EEPROM table descriptor,,,b516,11,data,,HEX:9,,,
+r,,,PowerStatus,instantaneous power consumption and active mode,,,b516,14,status,,UCH,0=standby;1=heating;2=hwc;3=cooling,,active energy integration mode,power,,EXP,,W,"instantaneous electrical power",fuel_power,,EXP,,W,"instantaneous fuel power"
+u,,,PrEnergySolarTotal,total solar energy sum,,,b516,1000ffff01000000,ign,,IGN:7,,,,energy,,EXP,,Wh,
+r,,,PrEnergyElectricHc,total heating electrical energy consumed,,,b516,1000ffff83030000,ign,,IGN:7,,,,energy,,EXP,,Wh,"cumulative heating and standby consumed electrical energy"
+r,,,PrEnergyElectricHwc,total hot water electrical energy consumed,,,b516,1000ffff83040000,ign,,IGN:7,,,,energy,,EXP,,Wh,"cumulative hot water consumed electrical energy"
+r,,,PrEnergyThermalHc,total heating thermal energy delivered,,,b516,1000ffff49030000,ign,,IGN:7,,,,energy,,EXP,,Wh,"cumulative heating delivered thermal energy"
+r,,,PrEnergyThermalHwc,total hot water thermal energy delivered,,,b516,1000ffff49040000,ign,,IGN:7,,,,energy,,EXP,,Wh,"cumulative hot water delivered thermal energy"
 
 u,,,RunStatsHcStarts,,,,b509,540200c00b,ign,,IGN:4,,,,value,,UIN,,,total starts of heating mode
 u,,,RunStatsHwcStarts,,,,b509,540200c10b,ign,,IGN:4,,,,value,,UIN,,,total starts of Hwc mode

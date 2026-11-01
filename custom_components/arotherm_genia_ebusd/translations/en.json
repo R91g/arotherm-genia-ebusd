@@ -350,17 +350,26 @@
       "calculated_live_cop": {
         "name": "Live Instantaneous COP / EER"
       },
-      "calculated_daily_cop": {
-        "name": "Daily Real COP"
+      "calculated_hc_cop": {
+        "name": "Historical Heating COP"
       },
-      "calculated_monthly_cop": {
-        "name": "Monthly Real COP"
+      "calculated_hwc_cop": {
+        "name": "Historical DHW COP"
       },
-      "calculated_total_cop": {
-        "name": "Historical Total SCOP"
+      "calculated_cool_eer": {
+        "name": "Historical Cooling EER"
       },
-      "calculated_total_energy": {
-        "name": "Combined Historical Electrical Energy"
+      "calculated_global_efficiency": {
+        "name": "Historical Global Efficiency (COP/EER)"
+      },
+      "calculated_system_total_energy": {
+        "name": "Total System Electrical Energy"
+      },
+      "calculated_heating_total_energy": {
+        "name": "Total Heating Electrical Energy"
+      },
+      "calculated_dhw_total_energy": {
+        "name": "Total DHW Electrical Energy"
       },
       "primary_flow_rate": {
         "name": "Primary Circuit Water Flow Rate"
@@ -422,41 +431,29 @@
           "water": "Domestic Hot Water (DHW)"
         }
       },
-      "energy_electric_today": {
-        "name": "Electrical Energy Consumed Today"
+      "energy_electric_cool": {
+        "name": "Total Cooling Electrical Energy"
       },
-      "energy_electric_month": {
-        "name": "Electrical Energy Consumed This Month"
+      "energy_thermal_hc": {
+        "name": "Total Heating Thermal Energy"
       },
-      "energy_electric_total": {
-        "name": "Total Historical Electrical Energy Consumed"
+      "energy_thermal_hwc": {
+        "name": "Total DHW Thermal Energy"
       },
-      "energy_cooling_electric_today": {
-        "name": "Cooling Electrical Energy Today"
+      "energy_thermal_cool": {
+        "name": "Total Cooling Thermal Energy"
       },
-      "energy_cooling_electric_month": {
-        "name": "Cooling Electrical Energy This Month"
+      "energy_env_yield_hc": {
+        "name": "Heating Environmental Energy Yield"
       },
-      "energy_cooling_electric_total": {
-        "name": "Total Historical Cooling Electrical Energy"
+      "energy_env_yield_hwc": {
+        "name": "DHW Environmental Energy Yield"
       },
-      "energy_thermal_today": {
-        "name": "Thermal Energy Delivered Today"
+      "energy_electric_hc_outdoor": {
+        "name": "Outdoor Unit Heating Electrical Energy"
       },
-      "energy_thermal_month": {
-        "name": "Thermal Energy Delivered This Month"
-      },
-      "energy_thermal_total": {
-        "name": "Total Historical Thermal Energy Delivered"
-      },
-      "energy_heating_today": {
-        "name": "Heating Thermal Energy Today"
-      },
-      "energy_heating_month": {
-        "name": "Heating Thermal Energy This Month"
-      },
-      "energy_heating_total": {
-        "name": "Total Historical Heating Thermal Energy"
+      "energy_electric_hwc_outdoor": {
+        "name": "Outdoor Unit DHW Electrical Energy"
       },
       "stats_hmu_hours": {
         "name": "Outdoor Unit Operating Hours"
@@ -629,6 +626,21 @@
       },
       "vwzio_current_error": {
         "name": "Active Error Diagnostics"
+      },
+      "vwzio_electric_power": {
+        "name": "Instantaneous Electric Power Consumption"
+      },
+      "vwzio_energy_electric_hc": {
+        "name": "Hydraulic Module Heating Electrical Energy"
+      },
+      "vwzio_energy_electric_hwc": {
+        "name": "Hydraulic Module DHW Electrical Energy"
+      },
+      "vwzio_energy_thermal_hc": {
+        "name": "Hydraulic Module Heating Thermal Energy"
+      },
+      "vwzio_energy_thermal_hwc": {
+        "name": "Hydraulic Module DHW Thermal Energy"
       },
       "wireless_room_temp_dial": {
         "name": "Wireless Thermostat Dial Setting"
