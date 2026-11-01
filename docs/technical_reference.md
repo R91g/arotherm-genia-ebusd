@@ -15,7 +15,7 @@ In the eBUS specification, every physical intelligent micro-controller occupies 
 - **Slave Address:** Used to passively listen, acknowledge frames, and answer queries addressed to it.
 
 The mandatory mathematical relationship between master and slave addresses is:
-$$\text{Address}_{\text{Slave}} = \text{Address}_{\text{Master}} + 0\text{x}05$$
+$$\text{Addr}_{\text{Slave}} = \text{Addr}_{\text{Master}} + 0\text{x}05$$
 
 ### 1.2 Hardware Identification & Device Map
 
@@ -228,19 +228,19 @@ To protect radiant floor installations from condensation damage and prevent acci
 
 ```mermaid
 flowchart TD
-    Req["Cooling Demand Initiated<br/>(Thermostat Zone / Climate Service)"] --> Gate1{"Gate 1: Calendar Window<br/>CoolingStartDate &le; Today &le; CoolingEndDate?"}
+    Req["Cooling Demand Initiated<br/>(Thermostat Zone / Service)"] --> Gate1["Gate 1: Calendar Window<br/>Is date within season?"]
     
-    Gate1 -- "No (Date Out of Bounds)" --> Lock1["Hardware Lockout Active<br/>CoolingReleaseStatus = off<br/>(4-Way Reversing Valve Disabled)"]
+    Gate1 -- No --> Lock1["Hardware Lockout Active<br/>CoolingReleaseStatus = off<br/>(4-Way Valve Disabled)"]
     
-    Gate1 -- "Yes (Or 2099 HA Bypass)" --> TempCheck{"Outdoor Temperature Safeguard<br/>Outdoor Temp &ge; Hardware Cutoff (15 °C)?"}
+    Gate1 -- Yes --> TempCheck["Refrigeration Safeguard<br/>Outdoor Temp ≥ 15 °C?"]
     
-    TempCheck -- "No" --> LockTemp["Compressor Protection Lockout<br/>CoolingReleaseStatus = off"]
-    TempCheck -- "Yes" --> Release["Gate 1 Cleared<br/>CoolingReleaseStatus = on"]
+    TempCheck -- No --> Lock1
+    TempCheck -- Yes --> Release["Gate 1 Cleared<br/>CoolingReleaseStatus = on"]
     
-    Release --> Gate2{"Gate 2: Zone Mode<br/>Z1OpModeCooling &ne; off?"}
+    Release --> Gate2["Gate 2: Zone Mode<br/>Z1OpModeCooling != off?"]
     
-    Gate2 -- "No (Off Mode)" --> OffMode["Cooling Circuit Idle<br/>Compressor Not Inverted"]
-    Gate2 -- "Yes (Auto / Day Mode)" --> ActiveCool["Refrigeration Cycle Inverted<br/>Flow Regulated to Z1CoolingTemp"]
+    Gate2 -- No --> OffMode["Cooling Circuit Idle<br/>Compressor Not Inverted"]
+    Gate2 -- Yes --> ActiveCool["Reverse Cycle Active<br/>Flow to Z1CoolingTemp"]
 ```
 
 #### Gate 1: Seasonal Calendar Lock (`CoolingStartDate` & `CoolingEndDate`)
@@ -258,16 +258,16 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Trigger["Forced DHW Boost Triggered<br/>(Write HwcSFMode = 'load')"] --> CheckRun{"Heat pump already active<br/>in central heating?"}
+    Trigger["Forced DHW Boost<br/>(Write HwcSFMode = 'load')"] --> CheckRun["Compressor already active<br/>in space heating?"]
     
-    CheckRun -- "Yes (Compressor Running)" --> ShareStart["Compressor Start Shared<br/>(3-Way Valve Diverts Without Stopping Motor)"]
-    CheckRun -- "No (System in Standby)" --> NewStart["Normal DHW Cycle Cold Start"]
+    CheckRun -- Yes --> ShareStart["Compressor Start Shared<br/>(3-Way Valve Diverts<br/>Without Stopping Motor)"]
+    CheckRun -- No --> NewStart["Normal DHW Cold Start"]
     
-    ShareStart --> Charging["Cylinder Reheating at Rated Thermal Power"]
+    ShareStart --> Charging["Cylinder Reheating<br/>at Rated Thermal Power"]
     NewStart --> Charging
     
-    Charging --> Reached{"Cylinder Temp &ge; Target Setpoint?"}
-    Reached -- "Yes" --> LatchState["Firmware Latch Retained!<br/>HwcSFMode STILL reads 'load'"]
+    Charging --> Reached["Cylinder Reached Target?"]
+    Reached -- Yes --> LatchState["Firmware Latch Retained!<br/>HwcSFMode STILL reads 'load'"]
     
     LatchState --> Warning["CRITICAL: Controller locks DHW priority<br/>and will NOT return to heating automatically"]
     Warning --> ResetCmd["Mandatory Action:<br/>Explicit write of HwcSFMode = 'auto'"]
@@ -282,7 +282,7 @@ In Vaillant firmware, `CylinderChargeHyst` enforces a minimum drop of $5.0\text{
 $$T_{\text{storage}} > T_{\text{target}} - \text{Hysteresis} \quad (51 > 55 - 5 = 50)$$
 
 Our smart boost algorithm calculates a dynamic temporary setpoint:
-$$T_{\text{target\_boost}} = T_{\text{storage}} + \text{Hysteresis} + 1.5\ ^\circ\text{C}$$
+$$T_{\text{boost}} = T_{\text{storage}} + \text{Hysteresis} + 1.5\ ^\circ\text{C}$$
 It writes this temporary setpoint to `HwcTempDesired`, fires `HwcSFMode = load`, waits for the compressor to engage, and automatically restores the original setpoint once completed.
 
 ### 6.4 Anti-Sentinel Temperature Filtering

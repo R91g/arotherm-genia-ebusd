@@ -456,7 +456,7 @@ Key topics covered in the reference:
 This repository includes an offline unit test suite (requiring zero live Home Assistant runtime dependencies) and GitHub Actions workflows for **Hassfest**, **HACS Validation**, and **Ruff** linting:
 
 ```bash
-# Run all 23 unit tests (thermodynamics, config flow, unique_id registry, schema parity)
+# Run all 38 unit tests (thermodynamics, config flow, unique_id registry, schema parity)
 python -m unittest discover tests -v
 
 # Run Ruff linter & formatting checks

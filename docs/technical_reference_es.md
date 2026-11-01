@@ -15,7 +15,7 @@ En la especificación de eBUS, cada microcontrolador físico inteligente ocupa o
 - **Dirección Esclavo (Slave):** Utilizada para escuchar pasivamente, responder a consultas y recibir parámetros dirigidos a él.
 
 La relación matemática fija e inmutable entre ambas direcciones es:
-$$\text{Dirección}_{\text{Slave}} = \text{Dirección}_{\text{Master}} + 0\text{x}05$$
+$$\text{Dir}_{\text{Slave}} = \text{Dir}_{\text{Master}} + 0\text{x}05$$
 
 ### 1.2 Identificación de Hardware y Mapa de Dispositivos
 
@@ -169,18 +169,18 @@ Consultado cada 60 segundos por `f1`:
 ### 4.1 El Divisor de Utilización del Compresor (`CompressorUtil`)
 En el bloque de diagnóstico `b5 09 540200`, la modulación porcentual del compresor se transmite con el tipo de datos `0x38` (56 en decimal). Las pruebas empíricas cruzadas en diferentes modelos de la plataforma demostraron que requiere un **divisor de 16**:
 
-$$\text{Utilización del Compresor (\%)} = \frac{\text{Valor Raw}}{16}$$
+$$\text{Utilizacion (\%)} = \frac{\text{Valor Raw}}{16}$$
 
 La relación matemática entre la velocidad de rotación ($f$ en rps) y el porcentaje de modulación sigue la recta:
 
-$$\text{Utilización (\%)} \approx 0.989 \times \text{rps} - 18.8$$
+$$\text{Utilizacion (\%)} \approx 0.989 \times \text{rps} - 18.8$$
 
 A la velocidad mínima de rotación ($f_{\text{corte}} \approx 19\text{ rps}$), la utilización reporta **$1,0\%$**. A $60\text{ rps}$, el valor raw `649` arroja:
 $$\frac{649}{16} = \mathbf{40,56\%}$$
 Coincidiendo con exactitud con los menús de instalador de la máquina.
 
 ### 4.2 Calorímetro de Agua Integrado (`HmuHeatOutput`, `0D5E`)
-El registro `0D5E` decodifica la potencia térmica útil en Vatios (`W`). La validación frente al cálculo termodinámico mediante caudalímetro calibrado y sondas de ida/retorno ($P = Q \times \Delta T \times 1.163$):
+El registro `0D5E` decodifica la potencia térmica útil en Vatios (`W`). La validación frente al cálculo termodinámico mediante caudalímetro calibrado y sondas de ida/retorno ($P_{\text{term}} = Q \times \Delta T \times 1.163$):
 - Potencia física calculada: **3.710 W**
 - Valor en el registro `0D5E`: **3.680,65 W**
 - Discrepancia: **$0,8\%$**
@@ -229,19 +229,19 @@ Para evitar condensaciones accidentales o arranques indebidos de frío en invier
 
 ```mermaid
 flowchart TD
-    Req["Demanda de Frío Iniciada<br/>(Termostato de Zona / Servicio Climate)"] --> Gate1{"Compuerta 1: Ventana de Calendario<br/>¿CoolingStartDate &le; Hoy &le; CoolingEndDate?"}
+    Req["Demanda de Frío Iniciada<br/>(Termostato de Zona / Servicio)"] --> Gate1["Compuerta 1: Calendario<br/>¿Fecha dentro de temporada?"]
     
-    Gate1 -- "No (Fecha Fuera de Temporada)" --> Lock1["Bloqueo Hardware Activo<br/>CoolingReleaseStatus = off<br/>(Válvula de 4 vías desenergizada)"]
+    Gate1 -- No --> Lock1["Bloqueo Hardware Activo<br/>CoolingReleaseStatus = off<br/>(Válvula de 4 vías desenergizada)"]
     
-    Gate1 -- "Sí (O Bypass HA con fin en 2099)" --> TempCheck{"Protección Frigorífica Hardware<br/>¿Tª Exterior &ge; Umbral Frío (15 °C)?"}
+    Gate1 -- Sí --> TempCheck["Protección Frigorífica<br/>¿Tª Exterior ≥ 15 °C?"]
     
-    TempCheck -- "No" --> LockTemp["Bloqueo de Seguridad del Compresor<br/>CoolingReleaseStatus = off"]
-    TempCheck -- "Sí" --> Release["Compuerta 1 Liberada<br/>CoolingReleaseStatus = on"]
+    TempCheck -- No --> Lock1
+    TempCheck -- Sí --> Release["Compuerta 1 Liberada<br/>CoolingReleaseStatus = on"]
     
-    Release --> Gate2{"Compuerta 2: Modo de Zona<br/>¿Z1OpModeCooling &ne; off?"}
+    Release --> Gate2["Compuerta 2: Modo de Zona<br/>¿Z1OpModeCooling != off?"]
     
-    Gate2 -- "No (Modo en off)" --> OffMode["Circuito de Clima en Espera<br/>Compresor no invierte ciclo"]
-    Gate2 -- "Sí (Modo auto o day)" --> ActiveCool["Ciclo Frigorífico Invertido Activo<br/>Impulsión modulada hacia Z1CoolingTemp"]
+    Gate2 -- No --> OffMode["Circuito de Clima en Espera<br/>Compresor no invierte ciclo"]
+    Gate2 -- Sí --> ActiveCool["Ciclo Frigorífico Invertido<br/>Impulsión modulada a Z1CoolingTemp"]
 ```
 
 #### Compuerta 1: Cerrojo de Calendario Estacional (`CoolingStartDate` y `CoolingEndDate`)
@@ -259,16 +259,16 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Trigger["Activación de ACS Puntual<br/>(Escritura HwcSFMode = 'load')"] --> CheckRun{"¿Bomba de calor activa<br/>en calefacción?"}
+    Trigger["Activación de ACS Puntual<br/>(Escritura HwcSFMode = 'load')"] --> CheckRun["¿Bomba de calor activa<br/>en calefacción?"]
     
-    CheckRun -- "Sí (Compresor ya en marcha)" --> ShareStart["Arranque Compartido de Compresor<br/>(Válvula de 3 vías desvía sin parar motor)"]
-    CheckRun -- "No (Sistema en reposo)" --> NewStart["Arranque normal en frío de ciclo ACS"]
+    CheckRun -- Sí --> ShareStart["Arranque Compartido de Compresor<br/>(Válvula 3 vías desvía sin parar motor)"]
+    CheckRun -- No --> NewStart["Arranque normal en frío de ciclo ACS"]
     
-    ShareStart --> Charging["Carga de Interacumulador a Potencia Nominal"]
+    ShareStart --> Charging["Carga de Interacumulador<br/>a Potencia Nominal"]
     NewStart --> Charging
     
-    Charging --> Reached{"¿Tª Depósito &ge; Consigna Deseada?"}
-    Reached -- "Sí" --> LatchState["¡Pestillo Retenido en Firmware!<br/>HwcSFMode CONTINÚA en 'load'"]
+    Charging --> Reached["¿Tª Depósito alcanza consigna?"]
+    Reached -- Sí --> LatchState["¡Pestillo Retenido en Firmware!<br/>HwcSFMode CONTINÚA en 'load'"]
     
     LatchState --> Warning["CRÍTICO: El regulador retiene prioridad ACS<br/>y NO retornará a calefacción por sí solo"]
     Warning --> ResetCmd["Acción Obligatoria:<br/>Escritura explícita de HwcSFMode = 'auto'"]
@@ -280,10 +280,10 @@ flowchart TD
 
 ### 6.3 Algoritmo de DHW Boost Inteligente
 En el firmware de Vaillant, `CylinderChargeHyst` impone una caída mínima de $5,0\text{ K}$ (configurable entre $3,0\text{ K}$ y $10,0\text{ K}$) antes de iniciar el calentamiento. Si el interacumulador está a $51\ ^\circ\text{C}$ y la consigna es de $55\ ^\circ\text{C}$, un comando de boost manual suele ser rechazado por el firmware porque:
-$$T_{\text{depósito}} > T_{\text{consigna}} - \text{Histéresis} \quad (51 > 55 - 5 = 50)$$
+$$T_{\text{deposito}} > T_{\text{consigna}} - \text{Histeresis} \quad (51 > 55 - 5 = 50)$$
 
 Nuestro algoritmo de sobrealimentación inteligente calcula una consigna temporal dinámica:
-$$T_{\text{consigna\_boost}} = T_{\text{depósito}} + \text{Histéresis} + 1,5\ ^\circ\text{C}$$
+$$T_{\text{boost}} = T_{\text{deposito}} + \text{Histeresis} + 1.5\ ^\circ\text{C}$$
 Escribe esta consigna temporal en `HwcTempDesired`, activa `HwcSFMode = load`, espera a que el compresor enganche la carga, y restaura automáticamente la consigna original al finalizar el ciclo.
 
 ### 6.4 Filtrado de Consignas Centinela (Anti-Sentinel Spikes)

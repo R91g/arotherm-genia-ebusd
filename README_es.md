@@ -456,7 +456,7 @@ Temas clave documentados en detalle:
 Este repositorio incluye una batería de tests unitarios offline (ejecutables sin depender de una instancia activa de Home Assistant) y flujos de integración continua en GitHub Actions para **Hassfest**, **Validación HACS** y **Ruff**:
 
 ```bash
-# Ejecutar los 23 tests unitarios (termodinámica, config flow, registro unique_id, paridad de esquemas)
+# Ejecutar los 38 tests unitarios (termodinámica, config flow, registro unique_id, paridad de esquemas)
 python -m unittest discover tests -v
 
 # Verificar estilo y formato con Ruff
