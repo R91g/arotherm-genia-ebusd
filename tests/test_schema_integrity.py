@@ -5,8 +5,8 @@ import os
 import re
 import struct
 import sys
-from typing import Any
 import unittest
+from typing import Any
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 import setup_mocks  # noqa: F401
