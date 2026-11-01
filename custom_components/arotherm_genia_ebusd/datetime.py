@@ -38,7 +38,6 @@ class SaunierGeniaHolidayStartDateTime(SaunierGeniaEntity, DateTimeEntity):
     """DateTime entity for Holiday / Away Mode Start Date and Time."""
 
     _attr_entity_category = EntityCategory.CONFIG
-    _attr_icon = "mdi:calendar-arrow-right"
 
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the Holiday Start DateTime entity."""
@@ -104,7 +103,6 @@ class SaunierGeniaHolidayEndDateTime(SaunierGeniaEntity, DateTimeEntity):
     """DateTime entity for Holiday / Away Mode End Date and Time."""
 
     _attr_entity_category = EntityCategory.CONFIG
-    _attr_icon = "mdi:calendar-arrow-left"
 
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the Holiday End DateTime entity."""
@@ -170,7 +168,6 @@ class SaunierGeniaCoolingStartDateTime(SaunierGeniaEntity, DateTimeEntity):
     """DateTime entity for Cooling Season Start Date (Lock 1)."""
 
     _attr_entity_category = EntityCategory.CONFIG
-    _attr_icon = "mdi:snowflake-check"
 
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the Cooling Start DateTime entity."""
@@ -219,7 +216,6 @@ class SaunierGeniaCoolingEndDateTime(SaunierGeniaEntity, DateTimeEntity):
     """DateTime entity for Cooling Season End Date (Lock 1)."""
 
     _attr_entity_category = EntityCategory.CONFIG
-    _attr_icon = "mdi:snowflake-check"
 
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the Cooling End DateTime entity."""

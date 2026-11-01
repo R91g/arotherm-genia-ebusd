@@ -1,0 +1,485 @@
+{
+  "services": {
+    "set_weekly_timer": "mdi:calendar-clock",
+    "force_dhw_boost": "mdi:water-boiler-alert",
+    "set_holiday_mode": "mdi:bag-suitcase",
+    "cancel_holiday_mode": "mdi:bag-suitcase-off"
+  },
+  "entity": {
+    "climate": {
+      "zone_1_climate": {
+        "default": "mdi:thermostat",
+        "state": {
+          "off": "mdi:thermostat-box",
+          "heat": "mdi:radiator",
+          "cool": "mdi:snowflake",
+          "auto": "mdi:thermostat-auto"
+        }
+      }
+    },
+    "water_heater": {
+      "dhw_water_heater": {
+        "default": "mdi:water-boiler",
+        "state": {
+          "off": "mdi:water-boiler-off",
+          "eco": "mdi:water-boiler",
+          "performance": "mdi:water-boiler",
+          "boost": "mdi:water-boiler-alert"
+        }
+      }
+    },
+    "select": {
+      "z1_op_mode": {
+        "default": "mdi:thermostat",
+        "state": {
+          "off": "mdi:power-off",
+          "auto": "mdi:calendar-clock",
+          "day": "mdi:white-balance-sunny",
+          "night": "mdi:weather-night"
+        }
+      },
+      "z1_op_mode_cooling": {
+        "default": "mdi:snowflake",
+        "state": {
+          "off": "mdi:snowflake-off",
+          "auto": "mdi:calendar-clock",
+          "day": "mdi:snowflake"
+        }
+      },
+      "hwc_op_mode": {
+        "default": "mdi:water-boiler",
+        "state": {
+          "off": "mdi:water-boiler-off",
+          "auto": "mdi:calendar-clock",
+          "day": "mdi:water-boiler",
+          "night": "mdi:weather-night"
+        }
+      },
+      "hc1_auto_off_mode": {
+        "default": "mdi:power-sleep",
+        "state": {
+          "eco": "mdi:leaf",
+          "night": "mdi:weather-night",
+          "off": "mdi:power-off"
+        }
+      },
+      "hc1_room_temp_switch_on": {
+        "default": "mdi:thermostat",
+        "state": {
+          "off": "mdi:thermostat-box",
+          "modulating": "mdi:tune",
+          "thermostat": "mdi:thermometer-check"
+        }
+      }
+    },
+    "switch": {
+      "dhw_boost_switch": {
+        "default": "mdi:lightning-bolt",
+        "state": {
+          "on": "mdi:lightning-bolt",
+          "off": "mdi:lightning-bolt-outline"
+        }
+      },
+      "cooling_season_authorization": {
+        "default": "mdi:snowflake-check",
+        "state": {
+          "on": "mdi:snowflake-check",
+          "off": "mdi:snowflake-off"
+        }
+      },
+      "holiday_mode_switch": {
+        "default": "mdi:bag-suitcase",
+        "state": {
+          "on": "mdi:bag-suitcase",
+          "off": "mdi:bag-suitcase-off"
+        }
+      },
+      "global_system_off": {
+        "default": "mdi:power",
+        "state": {
+          "on": "mdi:power-off",
+          "off": "mdi:power"
+        }
+      },
+      "adapt_heat_curve": {
+        "default": "mdi:chart-bell-curve",
+        "state": {
+          "on": "mdi:chart-bell-curve",
+          "off": "mdi:chart-bell-curve-cumulative"
+        }
+      },
+      "hwc_parallel_loading": {
+        "default": "mdi:swap-horizontal",
+        "state": {
+          "on": "mdi:swap-horizontal",
+          "off": "mdi:swap-horizontal-bold"
+        }
+      }
+    },
+    "datetime": {
+      "cooling_start_datetime": {
+        "default": "mdi:calendar-arrow-right"
+      },
+      "cooling_end_datetime": {
+        "default": "mdi:calendar-arrow-left"
+      },
+      "holiday_start_datetime": {
+        "default": "mdi:calendar-arrow-right"
+      },
+      "holiday_end_datetime": {
+        "default": "mdi:calendar-arrow-left"
+      }
+    },
+    "binary_sensor": {
+      "compressor_active": {
+        "default": "mdi:heat-pump",
+        "state": {
+          "on": "mdi:heat-pump",
+          "off": "mdi:heat-pump-outline"
+        }
+      },
+      "primary_circulation_pump": {
+        "default": "mdi:pump",
+        "state": {
+          "on": "mdi:pump",
+          "off": "mdi:pump-off"
+        }
+      },
+      "defrost_active": {
+        "default": "mdi:snowflake-melt",
+        "state": {
+          "on": "mdi:snowflake-melt",
+          "off": "mdi:snowflake-off"
+        }
+      },
+      "energy_integration_active": {
+        "default": "mdi:calculator",
+        "state": {
+          "on": "mdi:calculator",
+          "off": "mdi:calculator-variant-outline"
+        }
+      },
+      "z1_heating_demand": {
+        "default": "mdi:radiator",
+        "state": {
+          "on": "mdi:radiator",
+          "off": "mdi:radiator-off"
+        }
+      },
+      "cooling_release_status": {
+        "default": "mdi:snowflake-check",
+        "state": {
+          "on": "mdi:snowflake-check",
+          "off": "mdi:snowflake-off"
+        }
+      },
+      "broadcast_cooling_active": {
+        "default": "mdi:snowflake",
+        "state": {
+          "on": "mdi:snowflake",
+          "off": "mdi:snowflake-off"
+        }
+      },
+      "ebusd_signal": {
+        "default": "mdi:network",
+        "state": {
+          "on": "mdi:network-outline",
+          "off": "mdi:network-off-outline"
+        }
+      }
+    },
+    "sensor": {
+      "hmu_status_code": {
+        "default": "mdi:heat-pump",
+        "state": {
+          "standby": "mdi:power-sleep",
+          "frost_protect": "mdi:snowflake-alert",
+          "heat_prerun": "mdi:pump",
+          "heat_compressor_active": "mdi:heat-pump",
+          "heat_compressor_blocked": "mdi:alert-circle",
+          "heat_compressor_shutdown": "mdi:heat-pump-outline",
+          "heat_overrun": "mdi:pump-clock",
+          "cool_prerun": "mdi:pump",
+          "cool_compressor_active": "mdi:snowflake",
+          "cool_compressor_blocked": "mdi:alert-circle",
+          "cool_compressor_shutdown": "mdi:snowflake-alert",
+          "cool_overrun": "mdi:pump-clock",
+          "hwc_prerun": "mdi:pump",
+          "hwc_compressor_active": "mdi:water-boiler",
+          "hwc_compressor_blocked": "mdi:alert-circle",
+          "hwc_overrun": "mdi:pump-clock",
+          "heat_immersion_heater_active": "mdi:heating-coil",
+          "heat_immersion_active": "mdi:heating-coil",
+          "hwc_immersion_heater_active": "mdi:heating-coil",
+          "hwc_immersion_active": "mdi:heating-coil",
+          "deicing": "mdi:snowflake-melt",
+          "deicing_active": "mdi:snowflake-melt",
+          "compressor_oil_heating_active": "mdi:oil",
+          "air_purging_program_active": "mdi:air-filter",
+          "frequency_converter_fault": "mdi:alert-circle",
+          "fan1_blocked": "mdi:fan-alert",
+          "fan2_blocked": "mdi:fan-alert",
+          "four_port_valve_position_fault": "mdi:valve"
+        }
+      },
+      "system_operating_state": {
+        "default": "mdi:heat-pump",
+        "state": {
+          "standby": "mdi:power-sleep",
+          "heating": "mdi:heat-pump",
+          "cooling": "mdi:snowflake",
+          "dhw": "mdi:water-boiler"
+        }
+      },
+      "z1_status": {
+        "default": "mdi:thermostat",
+        "state": {
+          "auto": "mdi:calendar-clock",
+          "ventilation": "mdi:fan",
+          "veto": "mdi:hand-back-right",
+          "holidayaway": "mdi:bag-suitcase",
+          "load": "mdi:lightning-bolt",
+          "off": "mdi:power-off"
+        }
+      },
+      "hwc_status": {
+        "default": "mdi:water-boiler",
+        "state": {
+          "auto": "mdi:calendar-clock",
+          "holidayaway": "mdi:bag-suitcase",
+          "load": "mdi:lightning-bolt",
+          "off": "mdi:water-boiler-off"
+        }
+      },
+      "vwzio_secondary_circuit_status": {
+        "default": "mdi:pipe-valve",
+        "state": {
+          "standby": "mdi:power-sleep",
+          "heating": "mdi:radiator",
+          "cooling": "mdi:snowflake",
+          "dhw": "mdi:water-boiler",
+          "overrun": "mdi:pump-clock"
+        }
+      },
+      "vwzio_secondary_circuit_hwc": {
+        "default": "mdi:pipe-valve",
+        "state": {
+          "standby": "mdi:power-sleep",
+          "dhw": "mdi:water-boiler"
+        }
+      },
+      "setmode_hc_mode": {
+        "default": "mdi:tune",
+        "state": {
+          "auto": "mdi:calendar-clock",
+          "off": "mdi:power-off",
+          "heat": "mdi:radiator",
+          "water": "mdi:water-boiler"
+        }
+      },
+      "electric_power_consumption": {
+        "default": "mdi:lightning-bolt"
+      },
+      "calculated_thermal_power": {
+        "default": "mdi:fire"
+      },
+      "calculated_live_cop": {
+        "default": "mdi:gauge"
+      },
+      "calculated_hc_cop": {
+        "default": "mdi:gauge"
+      },
+      "calculated_hwc_cop": {
+        "default": "mdi:gauge"
+      },
+      "calculated_cool_eer": {
+        "default": "mdi:gauge"
+      },
+      "calculated_global_efficiency": {
+        "default": "mdi:gauge-full"
+      },
+      "calculated_delta_t": {
+        "default": "mdi:thermometer-water"
+      },
+      "water_pressure": {
+        "default": "mdi:gauge"
+      },
+      "primary_flow_rate": {
+        "default": "mdi:waves-arrow-right"
+      },
+      "refrigerant_high_pressure": {
+        "default": "mdi:gauge"
+      },
+      "compressor_modulation": {
+        "default": "mdi:percent"
+      },
+      "compressor_speed_rpm": {
+        "default": "mdi:speedometer"
+      },
+      "compressor_speed_rps": {
+        "default": "mdi:speedometer"
+      },
+      "fan1_speed": {
+        "default": "mdi:fan"
+      },
+      "fan2_speed": {
+        "default": "mdi:fan"
+      },
+      "building_cpump_power": {
+        "default": "mdi:pump"
+      },
+      "stats_4port_valve_hours": {
+        "default": "mdi:valve"
+      },
+      "stats_4port_valve_switches": {
+        "default": "mdi:valve"
+      },
+      "stats_compressor_hours": {
+        "default": "mdi:timer-sand"
+      },
+      "stats_compressor_starts": {
+        "default": "mdi:counter"
+      },
+      "stats_building_cpump_hours": {
+        "default": "mdi:timer-sand"
+      },
+      "stats_building_cpump_starts": {
+        "default": "mdi:counter"
+      },
+      "stats_deice_hours": {
+        "default": "mdi:timer-sand"
+      },
+      "stats_fan1_hours": {
+        "default": "mdi:timer-sand"
+      },
+      "stats_fan2_hours": {
+        "default": "mdi:timer-sand"
+      },
+      "stats_immersion_heater_hours": {
+        "default": "mdi:timer-sand"
+      },
+      "stats_immersion_heater_starts": {
+        "default": "mdi:counter"
+      },
+      "z1_weekly_schedule_summary": {
+        "default": "mdi:calendar-clock"
+      },
+      "hwc_weekly_schedule_summary": {
+        "default": "mdi:calendar-clock"
+      },
+      "cooling_weekly_schedule_summary": {
+        "default": "mdi:calendar-clock"
+      },
+      "circulation_weekly_schedule_summary": {
+        "default": "mdi:calendar-clock"
+      },
+      "yield_total": {
+        "default": "mdi:chart-line"
+      },
+      "solar_yield_total": {
+        "default": "mdi:solar-power"
+      },
+      "energy_thermal_hc": {
+        "default": "mdi:fire"
+      },
+      "energy_thermal_hwc": {
+        "default": "mdi:water-boiler"
+      },
+      "energy_thermal_cool": {
+        "default": "mdi:snowflake"
+      },
+      "energy_electric_hc_outdoor": {
+        "default": "mdi:lightning-bolt"
+      },
+      "energy_electric_hwc_outdoor": {
+        "default": "mdi:lightning-bolt"
+      },
+      "energy_electric_cool": {
+        "default": "mdi:lightning-bolt"
+      },
+      "energy_env_yield_hc": {
+        "default": "mdi:leaf"
+      },
+      "energy_env_yield_hwc": {
+        "default": "mdi:leaf"
+      }
+    },
+    "number": {
+      "hc1_heat_curve": {
+        "default": "mdi:chart-bell-curve"
+      },
+      "holiday_temp": {
+        "default": "mdi:thermometer"
+      },
+      "hwc_temp_desired": {
+        "default": "mdi:thermometer-water"
+      },
+      "z1_day_temp": {
+        "default": "mdi:white-balance-sunny"
+      },
+      "z1_night_temp": {
+        "default": "mdi:weather-night"
+      },
+      "z1_manual_temp": {
+        "default": "mdi:hand-back-right"
+      },
+      "z1_quick_veto_temp": {
+        "default": "mdi:lightning-bolt"
+      },
+      "z1_cooling_temp_manual": {
+        "default": "mdi:snowflake"
+      },
+      "z1_cooling_temp_time_controlled": {
+        "default": "mdi:snowflake-clock"
+      },
+      "cylinder_charge_hyst": {
+        "default": "mdi:arrow-expand-vertical"
+      },
+      "cylinder_charge_offset": {
+        "default": "mdi:plus-minus"
+      },
+      "buffer_charge_offset": {
+        "default": "mdi:plus-minus"
+      },
+      "max_room_humidity": {
+        "default": "mdi:water-percent"
+      },
+      "alternative_point": {
+        "default": "mdi:thermometer"
+      },
+      "bivalence_point_hc": {
+        "default": "mdi:thermometer-chevron-down"
+      },
+      "bivalence_point_hwc": {
+        "default": "mdi:thermometer-chevron-down"
+      },
+      "hc1_min_flow_temp_desired": {
+        "default": "mdi:thermometer-chevron-down"
+      },
+      "hc1_max_flow_temp_desired": {
+        "default": "mdi:thermometer-chevron-up"
+      },
+      "cooling_flow_temp_desired_min": {
+        "default": "mdi:thermometer-chevron-down"
+      },
+      "cooling_flow_temp_desired_max": {
+        "default": "mdi:thermometer-chevron-up"
+      },
+      "hc1_summer_temp_limit": {
+        "default": "mdi:weather-sunny-alert"
+      },
+      "hc1_excess_temp": {
+        "default": "mdi:plus-minus"
+      },
+      "max_cylinder_charge_time": {
+        "default": "mdi:timer-outline"
+      },
+      "hwc_lock_time": {
+        "default": "mdi:timer-lock-outline"
+      },
+      "hwc_max_flow_temp_desired": {
+        "default": "mdi:thermometer-chevron-up"
+      }
+    }
+  }
+}

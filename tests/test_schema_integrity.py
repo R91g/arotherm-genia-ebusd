@@ -5,6 +5,7 @@ import os
 import re
 import struct
 import sys
+from typing import Any
 import unittest
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
@@ -31,6 +32,7 @@ class TestSchemaIntegrity(unittest.TestCase):
         self.manifest_path = os.path.join(self.component_dir, "manifest.json")
         self.hacs_path = os.path.join(self.root_dir, "hacs.json")
         self.strings_path = os.path.join(self.component_dir, "strings.json")
+        self.icons_path = os.path.join(self.component_dir, "icons.json")
         self.es_path = os.path.join(self.component_dir, "translations", "es.json")
         self.en_path = os.path.join(self.component_dir, "translations", "en.json")
         self.services_path = os.path.join(self.component_dir, "services.yaml")
@@ -177,6 +179,70 @@ class TestSchemaIntegrity(unittest.TestCase):
                 6,
                 f"{filename} must be RGBA (color_type=6) for transparency",
             )
+
+    def test_icons_schema(self) -> None:
+        """Verify icons.json exists, complies with HACS/Hassfest and maps to valid MDI icons."""
+        self.assertTrue(os.path.exists(self.icons_path), "icons.json missing in integration root")
+        with open(self.icons_path, "r", encoding="utf-8") as fp:
+            icons = json.load(fp)
+
+        # MDI validation pattern: must start with 'mdi:' followed by lowercase alphanumeric/hyphen
+        mdi_pattern = re.compile(r"^mdi:[a-z0-9-]+$")
+
+        def validate_icons(obj: Any, path: str = "") -> None:
+            if isinstance(obj, str):
+                self.assertTrue(
+                    obj.startswith("mdi:"),
+                    f"Icon at {path} ('{obj}') must start with 'mdi:'",
+                )
+                self.assertTrue(
+                    mdi_pattern.match(obj),
+                    f"Icon at {path} ('{obj}') contains invalid characters",
+                )
+            elif isinstance(obj, dict):
+                for k, v in obj.items():
+                    validate_icons(v, f"{path}.{k}" if path else k)
+            elif isinstance(obj, list):
+                for idx, v in enumerate(obj):
+                    validate_icons(v, f"{path}[{idx}]")
+
+        validate_icons(icons)
+
+        # Verify services mapped in icons.json exist in services.yaml
+        with open(self.services_path, "r", encoding="utf-8") as fp:
+            services_content = fp.read()
+
+        for service_name in icons.get("services", {}):
+            self.assertIn(
+                f"{service_name}:",
+                services_content,
+                f"Service '{service_name}' in icons.json does not exist in services.yaml",
+            )
+
+        # Verify entities mapped in icons.json exist in strings.json
+        with open(self.strings_path, "r", encoding="utf-8") as fp:
+            strings_data = json.load(fp)
+
+        strings_entities = strings_data.get("entity", {})
+        for platform, entities in icons.get("entity", {}).items():
+            self.assertIn(
+                platform,
+                strings_entities,
+                f"Platform '{platform}' in icons.json not found in strings.json",
+            )
+            for entity_key in entities:
+                self.assertIn(
+                    entity_key,
+                    strings_entities[platform],
+                    f"Entity '{platform}.{entity_key}' in icons.json not found in strings.json",
+                )
+
+        # Confirm critical dynamic state icon mappings
+        self.assertIn("dhw_water_heater", icons["entity"]["water_heater"])
+        self.assertIn("hmu_status_code", icons["entity"]["sensor"])
+        self.assertIn("zone_1_climate", icons["entity"]["climate"])
+        self.assertIn("z1_op_mode", icons["entity"]["select"])
+        self.assertIn("dhw_boost_switch", icons["entity"]["switch"])
 
 
 if __name__ == "__main__":

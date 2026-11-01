@@ -215,8 +215,6 @@ class SaunierGeniaCoolingSeasonSwitch(SaunierGeniaEntity, SwitchEntity):
 class SaunierGeniaHolidayModeSwitch(SaunierGeniaEntity, SwitchEntity):
     """Switch for Away / Holiday Mode (Modo Ausencia)."""
 
-    _attr_icon = "mdi:account-arrow-right"
-
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the Holiday Mode switch."""
         super().__init__(
