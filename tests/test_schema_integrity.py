@@ -182,7 +182,9 @@ class TestSchemaIntegrity(unittest.TestCase):
 
     def test_icons_schema(self) -> None:
         """Verify icons.json exists, complies with HACS/Hassfest and maps to valid MDI icons."""
-        self.assertTrue(os.path.exists(self.icons_path), "icons.json missing in integration root")
+        self.assertTrue(
+            os.path.exists(self.icons_path), "icons.json missing in integration root"
+        )
         with open(self.icons_path, "r", encoding="utf-8") as fp:
             icons = json.load(fp)
 
