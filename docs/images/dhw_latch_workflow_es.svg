@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 700" width="100%" height="100%" style="background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <filter id="soft-shadow" x="-4%" y="-4%" width="108%" height="112%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#475569" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#64748b"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#16a34a"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#2563eb"/>
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#d97706"/>
+    </marker>
+  </defs>
+
+  <!-- HEADER -->
+  <text x="40" y="38" fill="#0f172a" font-size="18" font-weight="800" letter-spacing="-0.2">Pestillo de Carga de ACS Puntual y Arranque Compartido</text>
+  <text x="40" y="58" fill="#64748b" font-size="12.5">Comportamiento de firmware de HwcSFMode = load y optimizaci&#243;n de desgaste de compresor</text>
+
+  <!-- STEP 1: TRIGGER -->
+  <g transform="translate(240, 78)" filter="url(#soft-shadow)">
+    <rect width="480" height="50" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+    <text x="240" y="21" fill="#0284c7" font-size="11" font-weight="800" letter-spacing="0.6" text-anchor="middle">ACTIVACI&#211;N DE ACS PUNTUAL</text>
+    <text x="240" y="38" fill="#334155" font-size="12" font-weight="600" text-anchor="middle">Escritura en bus: HwcSFMode = load (o bot&#243;n DHW Boost en Home Assistant)</text>
+  </g>
+
+  <!-- Arrow down to decision -->
+  <path d="M 480 128 L 480 152" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- STEP 2: DECISION CARD -->
+  <g transform="translate(240, 154)" filter="url(#soft-shadow)">
+    <rect width="480" height="52" rx="10" fill="#f8fafc" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="240" y="23" fill="#1e40af" font-size="12" font-weight="800" letter-spacing="0.5" text-anchor="middle">&#191;BOMBA DE CALOR EN MARCHA EN CALEFACCI&#211;N?</text>
+    <text x="240" y="40" fill="#64748b" font-size="11" text-anchor="middle">Verificaci&#243;n del estado del inversor y de la v&#225;lvula de 3 v&#237;as</text>
+  </g>
+
+  <!-- Split paths: Left Yes (Shared start), Right No (Cold start) -->
+  <path d="M 320 206 L 320 232 L 250 232 L 250 252" fill="none" stroke="#16a34a" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow-green)"/>
+  <text x="275" y="226" fill="#15803d" font-size="11" font-weight="800">S&#205;</text>
+
+  <path d="M 640 206 L 640 232 L 710 232 L 710 252" fill="none" stroke="#2563eb" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow-blue)"/>
+  <text x="665" y="226" fill="#1d4ed8" font-size="11" font-weight="800">NO</text>
+
+  <!-- Branch Yes Card (Shared start) -->
+  <g transform="translate(40, 254)" filter="url(#soft-shadow)">
+    <rect width="420" height="64" rx="10" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.5"/>
+    <text x="210" y="22" fill="#166534" font-size="11.5" font-weight="800" text-anchor="middle">ARRANQUE COMPARTIDO (M&#193;XIMA EFICIENCIA)</text>
+    <text x="210" y="39" fill="#15803d" font-size="11" text-anchor="middle">La v&#225;lvula de 3 v&#237;as desv&#237;a el flujo t&#233;rmico al acumulador</text>
+    <text x="210" y="54" fill="#166534" font-size="10.5" font-weight="700" text-anchor="middle">Transfiere inercia t&#233;rmica SIN detener el compresor &#183; Ahorra 1 ciclo</text>
+  </g>
+
+  <!-- Branch No Card (Cold start) -->
+  <g transform="translate(500, 254)" filter="url(#soft-shadow)">
+    <rect width="420" height="64" rx="10" fill="#eff6ff" stroke="#60a5fa" stroke-width="1.5"/>
+    <text x="210" y="22" fill="#1e40af" font-size="11.5" font-weight="800" text-anchor="middle">ARRANQUE NORMAL EN FR&#205;O</text>
+    <text x="210" y="39" fill="#2563eb" font-size="11" text-anchor="middle">Compresor arranca desde reposo a frecuencia nominal</text>
+    <text x="210" y="54" fill="#1e3a8a" font-size="10.5" text-anchor="middle">Carga t&#233;rmica dedicada a interacumulador</text>
+  </g>
+
+  <!-- Dual Entry paths to Reheating Box (Separate, Symmetric & Non-Overlapping) -->
+  <path d="M 250 318 L 250 338 L 430 338 L 430 358" fill="none" stroke="#16a34a" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow-green)"/>
+  <path d="M 710 318 L 710 338 L 530 338 L 530 358" fill="none" stroke="#2563eb" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow-blue)"/>
+
+  <!-- STEP 3: REHEATING PROCESS -->
+  <g transform="translate(200, 360)" filter="url(#soft-shadow)">
+    <rect width="560" height="48" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+    <text x="280" y="20" fill="#0f172a" font-size="12" font-weight="800" letter-spacing="0.4" text-anchor="middle">CARGA T&#201;RMICA DE INTERACUMULADOR A PLENA POTENCIA</text>
+    <text x="280" y="37" fill="#64748b" font-size="11" text-anchor="middle">Bomba circuladora modulando &#183; Intercambiador de placas transfiriendo calor</text>
+  </g>
+
+  <path d="M 480 408 L 480 426" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- STEP 4: TARGET REACHED CHECK -->
+  <g transform="translate(240, 428)" filter="url(#soft-shadow)">
+    <rect width="480" height="46" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+    <text x="240" y="20" fill="#334155" font-size="11.5" font-weight="800" text-anchor="middle">&#191;TEMPERATURA DE DEP&#211;SITO ALCANZA LA CONSIGNA DESEADA?</text>
+    <text x="240" y="35" fill="#64748b" font-size="10.5" text-anchor="middle">Terminaci&#243;n del ciclo t&#233;rmico de carga</text>
+  </g>
+
+  <path d="M 480 474 L 480 494" fill="none" stroke="#d97706" stroke-width="2" marker-end="url(#arrow-amber)"/>
+  <text x="495" y="488" fill="#b45309" font-size="10" font-weight="800">S&#205;</text>
+
+  <!-- STEP 5: THE FIRMWARE LATCH WARNING BOX -->
+  <g transform="translate(140, 496)" filter="url(#soft-shadow)">
+    <rect width="680" height="74" rx="10" fill="#fffbeb" stroke="#f59e0b" stroke-width="2"/>
+    <rect x="0" y="0" width="680" height="26" rx="10" fill="#fef3c7"/>
+    <text x="340" y="18" fill="#b45309" font-size="11.5" font-weight="800" letter-spacing="0.5" text-anchor="middle">&#161;PESTILLO RETENIDO EN FIRMWARE!</text>
+    <text x="340" y="44" fill="#92400e" font-size="12" font-weight="700" text-anchor="middle">HwcSFMode CONTIN&#218;A en "load" tras finalizar el agua caliente</text>
+    <text x="340" y="61" fill="#b45309" font-size="11" text-anchor="middle">El firmware mantiene prioridad de ACS indefinidamente y NO volver&#225; a calefacci&#243;n por s&#237; solo</text>
+  </g>
+
+  <path d="M 480 570 L 480 588" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- STEP 6: MANDATORY ACTION -->
+  <g transform="translate(180, 590)" filter="url(#soft-shadow)">
+    <rect width="600" height="42" rx="8" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="300" y="17" fill="#1d4ed8" font-size="11" font-weight="800" letter-spacing="0.5" text-anchor="middle">ACCI&#211;N REQUERIDA: ESCRITURA EXPL&#205;CITA DE HwcSFMode = auto</text>
+    <text x="300" y="32" fill="#2563eb" font-size="10.5" text-anchor="middle">La integraci&#243;n env&#237;a autom&#225;ticamente este comando de liberaci&#243;n</text>
+  </g>
+
+  <path d="M 480 632 L 480 648" fill="none" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/>
+
+  <!-- STEP 7: RESTORED TO NORMAL -->
+  <g transform="translate(260, 650)">
+    <rect width="440" height="38" rx="8" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+    <text x="220" y="16" fill="#065f46" font-size="11" font-weight="800" letter-spacing="0.4" text-anchor="middle">RETORNO A OPERACI&#211;N NORMAL</text>
+    <text x="220" y="30" fill="#047857" font-size="10.5" font-weight="600" text-anchor="middle">La calefacci&#243;n recupera el control t&#233;rmico de la vivienda</text>
+  </g>
+</svg>

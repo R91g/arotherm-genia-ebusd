@@ -226,22 +226,9 @@ Each day byte returns an integer ($0$ to $3$) representing how many time windows
 ### 6.1 The Cooling Double-Lock Safety Mechanism
 To protect radiant floor installations from condensation damage and prevent accidental chilling in winter, the firmware enforces two sequential gates:
 
-```mermaid
-flowchart TD
-    Req["Cooling Demand Initiated<br/>(Thermostat Zone / Service)"] --> Gate1["Gate 1: Calendar Window<br/>Is date within season?"]
-    
-    Gate1 -- No --> Lock1["Hardware Lockout Active<br/>CoolingReleaseStatus = off<br/>(4-Way Valve Disabled)"]
-    
-    Gate1 -- Yes --> TempCheck["Refrigeration Safeguard<br/>Outdoor Temp ≥ 15 °C?"]
-    
-    TempCheck -- No --> Lock1
-    TempCheck -- Yes --> Release["Gate 1 Cleared<br/>CoolingReleaseStatus = on"]
-    
-    Release --> Gate2["Gate 2: Zone Mode<br/>Z1OpModeCooling != off?"]
-    
-    Gate2 -- No --> OffMode["Cooling Circuit Idle<br/>Compressor Not Inverted"]
-    Gate2 -- Yes --> ActiveCool["Reverse Cycle Active<br/>Flow to Z1CoolingTemp"]
-```
+<p align="center">
+  <img src="images/cooling_double_lock.svg" alt="Cooling Double-Lock Safety Mechanism" width="940">
+</p>
 
 #### Gate 1: Seasonal Calendar Lock (`CoolingStartDate` & `CoolingEndDate`)
 - The internal calendar gate is active when:
@@ -256,23 +243,9 @@ flowchart TD
 
 ### 6.2 The Forced DHW One-Shot Latch (`HwcSFMode = load`)
 
-```mermaid
-flowchart TD
-    Trigger["Forced DHW Boost<br/>(Write HwcSFMode = 'load')"] --> CheckRun["Compressor already active<br/>in space heating?"]
-    
-    CheckRun -- Yes --> ShareStart["Compressor Start Shared<br/>(3-Way Valve Diverts<br/>Without Stopping Motor)"]
-    CheckRun -- No --> NewStart["Normal DHW Cold Start"]
-    
-    ShareStart --> Charging["Cylinder Reheating<br/>at Rated Thermal Power"]
-    NewStart --> Charging
-    
-    Charging --> Reached["Cylinder Reached Target?"]
-    Reached -- Yes --> LatchState["Firmware Latch Retained!<br/>HwcSFMode STILL reads 'load'"]
-    
-    LatchState --> Warning["CRITICAL: Controller locks DHW priority<br/>and will NOT return to heating automatically"]
-    Warning --> ResetCmd["Mandatory Action:<br/>Explicit write of HwcSFMode = 'auto'"]
-    ResetCmd --> NormalMode["Normal Climate System Operation Restored"]
-```
+<p align="center">
+  <img src="images/dhw_latch_workflow.svg" alt="Forced DHW One-Shot Latch and Compressor Start Sharing" width="940">
+</p>
 
 - **Latch Behavior:** Writing `load` to `ctlv3/HwcSFMode` or `bass3/HwcSFMode` forces an immediate DHW cylinder recharge. However, **this register does NOT clear itself back to `auto`** upon reaching setpoint. It acts as an operational latch; if not explicitly cleared by the caller, the system remains in DHW priority indefinitely.
 - **Efficiency Optimization (Compressor Start Sharing):** Triggering `HwcSFMode = load` while the heat pump is already running in space heating diverts the 3-way valve directly to the water cylinder. This transfers thermal inertia without stopping the compressor, saving a mechanical start cycle and preserving compressor bearing life.

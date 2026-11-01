@@ -227,22 +227,9 @@ Cada byte de día indica cuántas franjas horarias ($0$ a $3$) están configurad
 
 Para evitar condensaciones accidentales o arranques indebidos de frío en invierno, el firmware implementa dos compuertas secuenciales:
 
-```mermaid
-flowchart TD
-    Req["Demanda de Frío Iniciada<br/>(Termostato de Zona / Servicio)"] --> Gate1["Compuerta 1: Calendario<br/>¿Fecha dentro de temporada?"]
-    
-    Gate1 -- No --> Lock1["Bloqueo Hardware Activo<br/>CoolingReleaseStatus = off<br/>(Válvula de 4 vías desenergizada)"]
-    
-    Gate1 -- Sí --> TempCheck["Protección Frigorífica<br/>¿Tª Exterior ≥ 15 °C?"]
-    
-    TempCheck -- No --> Lock1
-    TempCheck -- Sí --> Release["Compuerta 1 Liberada<br/>CoolingReleaseStatus = on"]
-    
-    Release --> Gate2["Compuerta 2: Modo de Zona<br/>¿Z1OpModeCooling != off?"]
-    
-    Gate2 -- No --> OffMode["Circuito de Clima en Espera<br/>Compresor no invierte ciclo"]
-    Gate2 -- Sí --> ActiveCool["Ciclo Frigorífico Invertido<br/>Impulsión modulada a Z1CoolingTemp"]
-```
+<p align="center">
+  <img src="images/cooling_double_lock_es.svg" alt="Mecanismo de Doble Cerrojo de Refrigeración" width="940">
+</p>
 
 #### Compuerta 1: Cerrojo de Calendario Estacional (`CoolingStartDate` y `CoolingEndDate`)
 - La compuerta interna de calendario está abierta cuando:
@@ -257,23 +244,9 @@ flowchart TD
 
 ### 6.2 El Cerrojo de ACS Puntual (`HwcSFMode = load`)
 
-```mermaid
-flowchart TD
-    Trigger["Activación de ACS Puntual<br/>(Escritura HwcSFMode = 'load')"] --> CheckRun["¿Bomba de calor activa<br/>en calefacción?"]
-    
-    CheckRun -- Sí --> ShareStart["Arranque Compartido de Compresor<br/>(Válvula 3 vías desvía sin parar motor)"]
-    CheckRun -- No --> NewStart["Arranque normal en frío de ciclo ACS"]
-    
-    ShareStart --> Charging["Carga de Interacumulador<br/>a Potencia Nominal"]
-    NewStart --> Charging
-    
-    Charging --> Reached["¿Tª Depósito alcanza consigna?"]
-    Reached -- Sí --> LatchState["¡Pestillo Retenido en Firmware!<br/>HwcSFMode CONTINÚA en 'load'"]
-    
-    LatchState --> Warning["CRÍTICO: El regulador retiene prioridad ACS<br/>y NO retornará a calefacción por sí solo"]
-    Warning --> ResetCmd["Acción Obligatoria:<br/>Escritura explícita de HwcSFMode = 'auto'"]
-    ResetCmd --> NormalMode["Retorno a Operación Normal del Sistema"]
-```
+<p align="center">
+  <img src="images/dhw_latch_workflow_es.svg" alt="Pestillo de Carga de ACS Puntual y Arranque Compartido" width="940">
+</p>
 
 - **Comportamiento como Pestillo (*Latch*):** Escribir `load` fuerza una carga inmediata del acumulador de ACS. No obstante, **este registro NO se auto-resetea a `auto` al alcanzar la consigna**. Permanece en `load` indefinidamente; si no se envía una orden explícita de `auto`, el sistema retiene la prioridad de ACS de forma permanente.
 - **Estrategia de Eficiencia Energética (Arranque Compartido de Compresor):** Activar `HwcSFMode = load` cuando la bomba de calor ya está funcionando en calefacción desvía la válvula de 3 vías hacia el acumulador de agua. Esto transfiere la inercia térmica sin detener el compresor, ahorrando un ciclo completo de arranque mecánico y prolongando la vida útil del equipo.
