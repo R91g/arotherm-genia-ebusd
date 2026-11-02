@@ -28,6 +28,7 @@ from .const import (
     CALC_SYSTEM_TOTAL_ENERGY,
     CALC_THERMAL_POWER,
     CIRCUIT_BASS3,
+    CIRCUIT_BASV3,
     CIRCUIT_BROADCAST,
     CIRCUIT_GLOBAL,
     CIRCUIT_HMUX0,
@@ -43,6 +44,7 @@ from .const import (
     CONF_MANUFACTURER,
     CONF_MQTT_PREFIX,
     CONF_OUTDOOR_MODEL,
+    CONTROLLER_CIRCUITS,
     DEFAULT_AUTO_COOLING_LOCK_BYPASS,
     DEFAULT_CYLINDER_HYST,
     DEFAULT_DEVICE_VERSIONS,
@@ -66,6 +68,7 @@ from .const import (
     HOLIDAY_RESET_TIME,
     HYDRATION_STEP_DELAY_SECONDS,
     INITIAL_HYDRATION_WAIT_SECONDS,
+    MANUFACTURER_VAILLANT,
     SCAN_ADDRESS_TO_DEVICE_KEY,
     SCAN_TOPIC_CIRCUITS,
     SET_CONFIRMATION_DELAY_SECONDS,
@@ -283,6 +286,13 @@ class SaunierGeniaCoordinator:
         # Root outdoor device registry ID for child device topology (via_device_id)
         self._outdoor_device_id: str | None = None
 
+        # Active controller circuit name ('basv3' for Vaillant, 'bass3' for Saunier Duval)
+        self._active_controller_circuit: str = (
+            CIRCUIT_BASV3
+            if self.manufacturer == MANUFACTURER_VAILLANT
+            else CIRCUIT_BASS3
+        )
+
     # -------------------------------------------------------------------------
     # Configuration & Options Properties
     # -------------------------------------------------------------------------
@@ -307,6 +317,11 @@ class SaunierGeniaCoordinator:
     def indoor_model(self) -> str:
         """Return configured indoor hydraulic interface model."""
         return str(self.entry.data.get(CONF_INDOOR_MODEL, DEFAULT_INDOOR_MODEL))
+
+    @property
+    def active_controller_circuit(self) -> str:
+        """Return active eBUS circuit name for the system controller ('basv3' or 'bass3')."""
+        return self._active_controller_circuit
 
     @property
     def has_wireless_room_unit(self) -> bool:
@@ -429,6 +444,7 @@ class SaunierGeniaCoordinator:
         prefix = self.mqtt_prefix
         circuits_to_subscribe = [
             CIRCUIT_BASS3,
+            CIRCUIT_BASV3,
             CIRCUIT_HMUX0,
             CIRCUIT_VWZIO,
             CIRCUIT_NETX3,
@@ -587,12 +603,22 @@ class SaunierGeniaCoordinator:
         # Notify subscribers for this (circuit, message)
         self._async_notify_message_listeners(circuit_key, message_name)
 
+        # Dynamic aliasing for climate controller circuits (bass3 <-> basv3)
+        if circuit_key in CONTROLLER_CIRCUITS:
+            self._active_controller_circuit = circuit_key
+            alt_circuit = (
+                CIRCUIT_BASS3 if circuit_key == CIRCUIT_BASV3 else CIRCUIT_BASV3
+            )
+            self._canonical_names[(alt_circuit, msg_lower)] = message_name
+            self._state[(alt_circuit, message_name)] = parsed
+            self._async_notify_message_listeners(alt_circuit, message_name)
+
         # Trigger thermodynamic calculations if relevant outdoor unit or hydraulic module telemetry changed
         if (circuit_key, msg_lower) in THERMO_TRIGGER_MESSAGES:
             self._async_recalculate_thermodynamics()
 
-        # Check DHW boost restoration conditions when bass3 HwcSFMode or HwcStorageTemp updates
-        if circuit_key == CIRCUIT_BASS3 and message_name in (
+        # Check DHW boost restoration conditions when bass3/basv3 HwcSFMode or HwcStorageTemp updates
+        if circuit_key in CONTROLLER_CIRCUITS and message_name in (
             "HwcSFMode",
             "HwcStorageTemp",
             "HwcStatus",
@@ -745,7 +771,12 @@ class SaunierGeniaCoordinator:
 
     async def async_request_get(self, circuit: str, message: str) -> None:
         """Publish an empty payload to <mqtt_prefix>/<circuit>/<message>/get."""
-        topic = f"{self.mqtt_prefix}/{circuit}/{message}/get"
+        target_circuit = (
+            self._active_controller_circuit
+            if circuit.lower() in CONTROLLER_CIRCUITS
+            else circuit
+        )
+        topic = f"{self.mqtt_prefix}/{target_circuit}/{message}/get"
         await mqtt.async_publish(self.hass, topic, "", qos=0, retain=False)
 
     async def async_write_parameter(
@@ -755,7 +786,9 @@ class SaunierGeniaCoordinator:
         value: Any,
     ) -> None:
         """Publish a write command to <mqtt_prefix>/<circuit>/<message>/set and schedule confirmation /get."""
-        topic = f"{self.mqtt_prefix}/{circuit}/{message}/set"
+        is_controller = circuit.lower() in CONTROLLER_CIRCUITS
+        target_circuit = self._active_controller_circuit if is_controller else circuit
+        topic = f"{self.mqtt_prefix}/{target_circuit}/{message}/set"
         payload = str(value)
         _LOGGER.debug("Publishing eBUSd write: %s -> '%s'", topic, payload)
 
@@ -764,13 +797,20 @@ class SaunierGeniaCoordinator:
         # controller (10) polls the register again, so it must update the real field names.
         self._apply_optimistic_update(circuit, message, value)
         self._async_notify_message_listeners(circuit, message)
+        if is_controller:
+            alt_circuit = (
+                CIRCUIT_BASS3 if circuit.lower() == CIRCUIT_BASV3 else CIRCUIT_BASV3
+            )
+            self._apply_optimistic_update(alt_circuit, message, value)
+            self._async_notify_message_listeners(alt_circuit, message)
 
         await mqtt.async_publish(self.hass, topic, payload, qos=0, retain=False)
 
         # Schedule confirmation /get ONLY for active read commands (r / r9 whitelist).
         # For all passive 'u' commands (setpoints, modes, timers, dates), NEVER send /get,
         # perfectly preserving the optimistic UI update without stale cache rebounds.
-        key = (circuit.lower(), message)
+        check_circuit = CIRCUIT_BASS3.lower() if is_controller else circuit.lower()
+        key = (check_circuit, message)
         if key in ACTIVE_READ_CONFIRMATION_MESSAGES:
             if key in self._pending_get_unsubs:
                 self._pending_get_unsubs.pop(key)()
@@ -1439,6 +1479,31 @@ class SaunierGeniaCoordinator:
             return
 
         parsed = parse_ebusd_payload(payload_str)
+        val_str = str(parsed.get("value", "") or payload_str).strip()
+
+        # Passive detection of active controller circuit from address 15 scan
+        if addr == "15":
+            payload_upper = (
+                f"{val_str} {parsed.get('id', '')} {parsed.get('ID', '')}"
+            ).upper()
+            if (
+                "BASV" in payload_upper
+                and self._active_controller_circuit != CIRCUIT_BASV3
+            ):
+                _LOGGER.info(
+                    "Detected Vaillant sensoCOMFORT (BASV3) on eBUS address 15; setting controller circuit to %s",
+                    CIRCUIT_BASV3,
+                )
+                self._active_controller_circuit = CIRCUIT_BASV3
+            elif (
+                "BASS" in payload_upper
+                and self._active_controller_circuit != CIRCUIT_BASS3
+            ):
+                _LOGGER.info(
+                    "Detected Saunier Duval MiPro Sense (BASS3) on eBUS address 15; setting controller circuit to %s",
+                    CIRCUIT_BASS3,
+                )
+                self._active_controller_circuit = CIRCUIT_BASS3
 
         detected_sw: str | None = None
         detected_hw: str | None = None
@@ -1453,7 +1518,6 @@ class SaunierGeniaCoordinator:
                 detected_hw = str(v).strip()
 
         # 2. Check semicolon-delimited string format (e.g. "Vaillant;HMUX0;0407;0504")
-        val_str = str(parsed.get("value", "") or payload_str).strip()
         if ";" in val_str:
             tokens = [t.strip() for t in val_str.split(";")]
             clean = [t for t in tokens if t]

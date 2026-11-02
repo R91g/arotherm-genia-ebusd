@@ -33,10 +33,14 @@ from custom_components.arotherm_genia_ebusd.const import (
     CALC_LIVE_COP,
     CALC_SYSTEM_TOTAL_ENERGY,
     CIRCUIT_BASS3,
+    CIRCUIT_BASV3,
+    CONF_MANUFACTURER,
     DEVICE_CLIMATE_CONTROLLER,
     DEVICE_HYDRAULIC_INTERFACE,
     DEVICE_OUTDOOR_UNIT,
     DEVICE_WIRELESS_THERMOSTAT,
+    MANUFACTURER_SAUNIER_DUVAL,
+    MANUFACTURER_VAILLANT,
 )
 from custom_components.arotherm_genia_ebusd.coordinator import (
     DATE_WRITE_FIELDS,
@@ -622,6 +626,101 @@ class TestCoordinatorLogic(unittest.TestCase):
             dev_info_thermostat_linked.get("via_device_id"), "reg_outdoor_12345"
         )
         self.assertNotIn("via_device", dev_info_thermostat_linked)
+
+    def test_controller_circuit_aliasing_bass3_and_basv3(self) -> None:
+        """Test bidirectional aliasing, scan detection, and routing between bass3 and basv3."""
+        hass = MagicMock()
+        entry_saunier = MagicMock()
+        entry_saunier.entry_id = "test_saunier"
+        entry_saunier.data = {CONF_MANUFACTURER: MANUFACTURER_SAUNIER_DUVAL}
+
+        coord_saunier = SaunierGeniaCoordinator(hass, entry_saunier)
+        self.assertEqual(coord_saunier.active_controller_circuit, CIRCUIT_BASS3)
+
+        entry_vaillant = MagicMock()
+        entry_vaillant.entry_id = "test_vaillant"
+        entry_vaillant.data = {CONF_MANUFACTURER: MANUFACTURER_VAILLANT}
+
+        coord = SaunierGeniaCoordinator(hass, entry_vaillant)
+        self.assertEqual(coord.active_controller_circuit, CIRCUIT_BASV3)
+
+        # 1. Passive detection via scan.15 ID
+        def push_mqtt(topic: str, payload: str) -> None:
+            msg = MagicMock()
+            msg.topic = topic
+            msg.payload = payload
+            coord._async_on_mqtt_message(msg)
+
+        # Send Saunier Duval scan -> should switch active controller circuit to bass3
+        push_mqtt("ebusd/scan.15", "Saunier Duval;BASS3;0708;4304")
+        self.assertEqual(coord.active_controller_circuit, CIRCUIT_BASS3)
+
+        # Send Vaillant scan JSON -> should switch active controller circuit to basv3
+        push_mqtt(
+            "ebusd/scan.15",
+            '{"MF": "Vaillant", "ID": "BASV3", "SW": "0708", "HW": "4304"}',
+        )
+        self.assertEqual(coord.active_controller_circuit, CIRCUIT_BASV3)
+
+        # 2. Ingestion & Aliasing: Entity listens on CIRCUIT_BASS3, incoming arrives on CIRCUIT_BASV3
+        callback_called = False
+
+        def on_room_temp_updated() -> None:
+            nonlocal callback_called
+            callback_called = True
+
+        coord.async_add_listener(CIRCUIT_BASS3, "Z1RoomTemp", on_room_temp_updated)
+
+        push_mqtt("ebusd/basv3/Z1RoomTemp", '{"temp": {"value": 21.5}}')
+        self.assertTrue(callback_called)
+        self.assertEqual(coord.get_float(CIRCUIT_BASS3, "Z1RoomTemp", "temp"), 21.5)
+        self.assertEqual(coord.get_float(CIRCUIT_BASV3, "Z1RoomTemp", "temp"), 21.5)
+
+        # Reverse aliasing: Entity listens on CIRCUIT_BASV3, incoming arrives on CIRCUIT_BASS3
+        rev_callback_called = False
+
+        def on_day_temp_updated() -> None:
+            nonlocal rev_callback_called
+            rev_callback_called = True
+
+        coord.async_add_listener(CIRCUIT_BASV3, "Z1DayTemp", on_day_temp_updated)
+
+        push_mqtt("ebusd/bass3/Z1DayTemp", '{"temp": {"value": 22.0}}')
+        self.assertTrue(rev_callback_called)
+        self.assertEqual(coord.get_float(CIRCUIT_BASS3, "Z1DayTemp", "temp"), 22.0)
+        self.assertEqual(coord.get_float(CIRCUIT_BASV3, "Z1DayTemp", "temp"), 22.0)
+        self.assertEqual(coord.active_controller_circuit, CIRCUIT_BASS3)
+
+        # Switch back to basv3
+        push_mqtt("ebusd/basv3/Z1DayTemp", '{"temp": {"value": 22.5}}')
+        self.assertEqual(coord.active_controller_circuit, CIRCUIT_BASV3)
+
+        # 3. Parameter writing and active /get routing
+        async def run_write_tests() -> None:
+            with patch(
+                "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                new=AsyncMock(),
+            ) as mock_pub:
+                # When active circuit is basv3, calling async_write_parameter with CIRCUIT_BASS3 routes to basv3 topic
+                await coord.async_write_parameter(CIRCUIT_BASS3, "Z1DayTemp", 23.0)
+                mock_pub.assert_called_with(
+                    hass, "ebusd/basv3/Z1DayTemp/set", "23.0", qos=0, retain=False
+                )
+                # Both circuits reflect optimistic update
+                self.assertEqual(
+                    coord.get_float(CIRCUIT_BASS3, "Z1DayTemp", "temp"), 23.0
+                )
+                self.assertEqual(
+                    coord.get_float(CIRCUIT_BASV3, "Z1DayTemp", "temp"), 23.0
+                )
+
+                # async_request_get with CIRCUIT_BASS3 routes to basv3 topic
+                await coord.async_request_get(CIRCUIT_BASS3, "Z1RoomTemp")
+                mock_pub.assert_called_with(
+                    hass, "ebusd/basv3/Z1RoomTemp/get", "", qos=0, retain=False
+                )
+
+        asyncio.run(run_write_tests())
 
 
 if __name__ == "__main__":

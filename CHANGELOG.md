@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.2] - 2026-11-02
+
+### Added
+- **Native Vaillant sensoCOMFORT (VRC 720) Dual-Circuit Architecture (`basv3`):**
+  - Added twin configuration template `ebusd-configuration/vaillant/15.basv3.csv` alongside `15.bass3.csv`, enabling out-of-the-box recognition by eBUSd for Vaillant sensoCOMFORT systems reporting eBUS device ID `BASV3`.
+  - Implemented bidirectional controller circuit aliasing (`bass3` <-> `basv3`) in the coordinator. Home Assistant entities seamlessly subscribe and publish without needing code branching across individual entity platforms.
+  - Added passive controller circuit auto-detection from eBUS address `15` scan messages (`ID=BASV3` dynamically selects `basv3`; `ID=BASS3` selects `bass3`).
+  - Added dynamic routing for parameter write commands (`/set`) and active telemetry requests (`/get`), targeting the system's active controller circuit while applying instant optimistic UI updates across both circuits.
+  - Comprehensive unit test suite coverage (`test_controller_circuit_aliasing_bass3_and_basv3` and `test_code_quality`) ensuring full linting, formatting, and behavioral compliance.
+  - Closes Issue #1 (reported by `@john-cooper-lumera`).
+
 ## [1.2.1] - 2026-11-01
 
 ### Added
