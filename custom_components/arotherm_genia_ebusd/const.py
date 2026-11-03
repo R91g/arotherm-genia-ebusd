@@ -223,6 +223,8 @@ DEPRECATED_UNIQUE_ID_SUFFIXES: tuple[str, ...] = (
     "hmux0_prenergyheatingmonth_energy",
     "hmux0_prenergyheatingtotal_energy",
     "binary_hmux0_energyyieldprecision_status",
+    "hmux0_statecompressor_comp_speed",
+    "binary_hmux0_statecompressor_comp_speed",
 )
 
 # Timing & Hydration Constants
@@ -329,7 +331,12 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_BASS3, "PrEnergySumHwcLastMonth"),
     (CIRCUIT_BASS3, "PrEnergySumHwc"),
     # Outdoor Unit (08.hmux0) - Active live telemetry & energy counters (r / r1..r9)
+    (CIRCUIT_HMUX0, "HMUStatusCode"),
     (CIRCUIT_HMUX0, "PowerStatus"),
+    (CIRCUIT_HMUX0, "RunDataCompressorSpeed"),
+    (CIRCUIT_HMUX0, "RunDataFan1Speed"),
+    (CIRCUIT_HMUX0, "RunDataFlowRate"),
+    (CIRCUIT_HMUX0, "RunDataBuildingCPumpPower"),
     (CIRCUIT_HMUX0, "RunDataElectricPowerConsumption"),
     (CIRCUIT_HMUX0, "RunDataHighPressure"),
     (CIRCUIT_HMUX0, "RunDataFlowTemp"),
@@ -456,3 +463,28 @@ VWZIO_SECONDARY_HWC_OPTIONS: list[str] = [
     "standby",
     "dhw",
 ]
+
+# Home Assistant Repairs (issue_registry) Identifiers
+ISSUE_OUTDATED_HMUX0_CSV = "outdated_hmux0_csv"
+ISSUE_MISSING_CUSTOM_CSV = "missing_custom_csv"
+ISSUE_NO_EBUSD_MQTT_TRAFFIC = "no_ebusd_mqtt_traffic"
+ISSUE_MQTTJSON_NOT_ENABLED = "mqttjson_not_enabled"
+
+# Signature messages proving our custom 08.hmux0.csv is loaded in ebusd
+HMUX0_CUSTOM_SIGNATURE_MESSAGES: tuple[str, ...] = (
+    "RunDataFlowTemp",
+    "RunDataReturnTemp",
+    "RunDataElectricPowerConsumption",
+    "StateCompressor",
+    "HMUStatusCode",
+    "PrEnergyElectricHc",
+)
+
+# Message names only present in default upstream ebusd.eu hmu.inc / 08.hmu.csv
+UPSTREAM_DEFAULT_CSV_MESSAGES: frozenset[str] = frozenset(
+    {
+        "waterthroughput",
+        "currentconsumedpower",
+        "currentyieldpower",
+    }
+)

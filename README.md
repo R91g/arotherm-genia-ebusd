@@ -16,7 +16,7 @@
 
 **aroTHERM & GeniaAir (eBUS)** (`arotherm_genia_ebusd`) is a **100% local (`local_push`), cloud-independent Home Assistant custom integration** for **Vaillant** and **Saunier Duval** R290 air-to-water heat pumps managed by **`sensoCOMFORT` (`VRC 720`)** or **`MiPro Sense` (`SRC 720`)** system controllers via [**eBUSd**](https://github.com/john30/ebusd).
 
-Designed directly around the native eBUS protocol shared by Vaillant Group heat pumps (`08.hmux0`, `15.bass3`, `76.vwzio`, `04.netx3`), this integration replaces raw MQTT auto-discovery clutter and cloud API dependencies with **148 strongly typed entities**, real-time thermodynamic & COP/EER calculations, firmware sentinel filtering, automatic Double-Lock cooling management, and Smart Forced DHW Boost.
+Designed directly around the native eBUS protocol shared by Vaillant Group heat pumps (`08.hmux0`, `15.bass3` / `15.basv3`, `76.vwzio`, `04.netx3`), this integration replaces raw MQTT auto-discovery clutter and cloud API dependencies with **147 strongly typed entities**, real-time thermodynamic & COP/EER calculations, firmware sentinel filtering, automatic Double-Lock cooling management, and Smart Forced DHW Boost.
 
 ---
 
@@ -79,7 +79,7 @@ Vaillant and Saunier Duval aerothermal heat pumps share **100% identical eBUS el
 
 | Component Role | Vaillant Models | Saunier Duval Models | eBUS Address |
 | :--- | :--- | :--- | :---: |
-| **System Climate Controller (Required)** | `sensoCOMFORT VRC 720` (`720/2`, `720/3`) | `MiPro Sense SRC 720` (`720/2`, `720/3`) | `15` (`BASS3`) |
+| **System Climate Controller (Required)** | `sensoCOMFORT VRC 720` (`720/2`, `720/3`) | `MiPro Sense SRC 720` (`720/2`, `720/3`) | `15` (`BASS3` / `BASV3`) |
 | **Wireless Room Thermostat / RF Receiver (Optional)** | `sensoCOMFORT RF VRC 720f` (`NETX3`) | `MiPro Sense RF SRC 720f` (`NETX3`) | `04` / `f6` |
 | **Official Cloud Gateway (Optional — Passive Synergy)** | `myVAILLANT connect VR 940f` / `sensoNET VR 921` | `MiGo Link SR 940f` | Master `f1` |
 
@@ -98,19 +98,19 @@ Vaillant and Saunier Duval aerothermal heat pumps share **100% identical eBUS el
 - **Startup Hydration Queue:** On Home Assistant startup, the coordinator waits `5.0 s` to absorb retained MQTT payloads at zero bus cost, then requests **only missing registers** sequentially with `0.8 s` spacing.
 - **Optimistic Updates & Selective Confirmation:** Writes to passive `u` registers (setpoints, modes, schedules, dates) apply immediate optimistic UI state updates without triggering redundant `/get` cache rebounds, while multi-step transitions use `0.3 s`–`0.6 s` bus pacing.
 
-### 3. 148 Native Entities Organized into 4 Logical Devices
+### 3. 147 Native Entities Organized into 4 Logical Devices
 
 | Logical Device | eBUS Circuit | Highlights |
 | :--- | :---: | :--- |
-| **1. Outdoor Unit** (`<Outdoor Model>`) | `08.hmux0` | Live operating monitor (52+ `S.xx`/`S.xxx` states), compressor RPM/RPS/modulation, R290 high pressure, EEV steps, fan speeds, primary flow rate, high-precision flow/return temps, IEEE 754 (`EXP`) per-mode electrical, thermal & environmental yield counters (`Wh`), runtime hours/starts, and **calculated thermodynamic & system energy sensors**. |
-| **2. Climate Controller** (`sensoCOMFORT` / `MiPro Sense`) | `15.bass3` | **Zone 1 Climate (`climate`)**, **Domestic Hot Water (`water_heater`)**, heating curves, flow temperature limits, bivalence points, water pressure, service energy counters (`PrEnergySumHc` / `PrEnergySumHwc`), weekly schedule summaries, and configuration switches. |
+| **1. Outdoor Unit** (`<Outdoor Model>`) | `08.hmux0` | Live operating monitor (52+ `S.xx`/`S.xxx` states), compressor speed (`r/s`) & modulation (`%`), R290 high pressure, EEV steps, fan speeds, primary flow rate, high-precision flow/return temps, IEEE 754 (`EXP`) per-mode electrical, thermal & environmental yield counters (`Wh`), runtime hours/starts, and **calculated thermodynamic & system energy sensors**. |
+| **2. Climate Controller** (`sensoCOMFORT` / `MiPro Sense`) | `15.bass3` / `15.basv3` | **Zone 1 Climate (`climate`)**, **Domestic Hot Water (`water_heater`)**, heating curves, flow temperature limits, bivalence points, water pressure, service energy counters (`PrEnergySumHc` / `PrEnergySumHwc`), weekly schedule summaries, and configuration switches. |
 | **3. Hydraulic Interface** (`<Indoor Model>`) | `76.vwzio` | Secondary circuit operating state (heating, cooling, DHW, overrun, standby), instantaneous electrical power (`W`), `b5 16` auxiliary/secondary energy counters (`Wh`), 3-way diverter valve / secondary pump diagnostics, and active error monitoring (`OK` or fault codes). |
 | **4. Wireless Room Thermostat** *(Optional)* | `04.netx3` / `f6` / `broadcast` | Wireless room dial temperature, wireless target setpoint, broadcast outdoor temperature, and eBUS system date/time. *(If no wireless unit is installed, broadcast sensors automatically attach to the Climate Controller).* |
 
-**Platform Breakdown (148 entities total across 8 platforms):**
+**Platform Breakdown (147 entities total across 8 platforms):**
 - `climate` (**1**): Unified Heating/Cooling/Auto thermostat for Zone 1 with presets (`Scheduled (Comfort)`, `Continuous Manual`, `Eco (Night setback)`, `Quick Veto Override`, `Away / Holiday Mode`).
 - `water_heater` (**1**): Domestic Hot Water (DHW) cylinder controller (`Off`, `Time-controlled (Schedule)`, `Continuous (24h)`, `Boost`).
-- `sensor` (**98**): 94 telemetry, `Wh`-precision energy, diagnostic, and calculated thermodynamic sensors + 4 weekly timer schedule summary sensors (with full daily slot attributes).
+- `sensor` (**97**): 93 telemetry, `Wh`-precision energy, diagnostic, and calculated thermodynamic sensors + 4 weekly timer schedule summary sensors (with full daily slot attributes).
 - `binary_sensor` (**8**): Compressor running, primary pump, defrost active, energy integration active, Zone 1 heating demand, hardware cooling lock release, broadcast cooling cycle, and physical eBUS signal.
 - `number` (**25**): All installer and user numeric parameters (heating curve, excess temp, min/max flow setpoints, summer limit, day/night/manual/veto/cooling/holiday setback setpoints, DHW setpoint & hysteresis/offset/timers, bivalence points, max room humidity).
 - `select` (**5**): Zone 1 heating mode, Zone 1 cooling mode, DHW mode, night lowering mode (`eco`/`night`/`off`), and room temperature modulation mode (`off`/`modulating`/`thermostat`).
@@ -147,7 +147,7 @@ Total System Energy (Wh)     = Heating_Total_Wh + DHW_Total_Wh + Cooling_Total_W
 
 ### 7. Touch-Safe Controls (`NumberMode.BOX`) & Brand-Neutral `unique_id`s
 - **Touch Safety:** Every `number` entity enforces `NumberMode.BOX` (numeric input field with `+`/`-` steppers) rather than sliders, preventing accidental changes to heating curves or bivalence points while scrolling on a smartphone.
-- **Zero-Loss Reconfiguration:** All 148 entity `unique_id`s follow `{entry_id}_{circuit}_{message}_{field}` with zero brand strings. Reconfiguring manufacturer or hardware models never orphans entities or breaks historical energy graphs.
+- **Zero-Loss Reconfiguration:** All 147 entity `unique_id`s follow `{entry_id}_{circuit}_{message}_{field}` with zero brand strings. Reconfiguring manufacturer or hardware models never orphans entities or breaks historical energy graphs.
 
 ---
 
@@ -203,7 +203,8 @@ Copy the CSV files into your `ebusd` configuration directory preserving the exac
 └── vaillant/
     ├── 04.netx3.csv           <-- Wireless room thermostat receiver
     ├── 08.hmux0.csv           <-- Outdoor heat pump board (aroTHERM plus / GeniaAir Max)
-    ├── 15.bass3.csv           <-- Climate controller (sensoCOMFORT VRC 720 / MiPro Sense SRC 720)
+    ├── 15.bass3.csv           <-- Climate controller (MiPro Sense SRC 720 / sensoCOMFORT VRC 720)
+    ├── 15.basv3.csv           <-- Climate controller (sensoCOMFORT VRC 720 reporting BASV3)
     ├── 76.vwzio.csv           <-- Hydraulic module / tower (VWZ MEH / uniTOWER / HPIM 7 / GeniaSet)
     └── f6.netx3.csv           <-- Wireless room thermostat passive RF frames
 ```
@@ -211,7 +212,7 @@ Copy the CSV files into your `ebusd` configuration directory preserving the exac
 #### Option A: Home Assistant eBUSd Add-on
 1. Copy `ebusd-configuration/broadcast.csv` to:
    `/addon_configs/b4d7ad18_ebusd/ebusd-configuration/en/broadcast.csv`
-2. Copy all 5 files inside `ebusd-configuration/vaillant/*.csv` to:
+2. Copy all 6 files inside `ebusd-configuration/vaillant/*.csv` to:
    `/addon_configs/b4d7ad18_ebusd/ebusd-configuration/en/vaillant/`
 3. Configure your eBUSd Add-on startup parameters to load the local CSVs, enable JSON MQTT output, and allow write commands:
    ```text
@@ -456,7 +457,7 @@ Key topics covered in the reference:
 This repository includes an offline unit test suite (requiring zero live Home Assistant runtime dependencies) and GitHub Actions workflows for **Hassfest**, **HACS Validation**, and **Ruff** linting:
 
 ```bash
-# Run all 39 unit tests (thermodynamics, config flow, unique_id registry, schema parity)
+# Run all 44 unit tests (thermodynamics, config flow, unique_id registry, schema parity)
 python -m unittest discover tests -v
 
 # Run Ruff linter & formatting checks

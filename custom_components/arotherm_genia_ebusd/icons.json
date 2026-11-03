@@ -198,16 +198,16 @@
           "heat_compressor_active": "mdi:heat-pump",
           "heat_compressor_blocked": "mdi:alert-circle",
           "heat_compressor_shutdown": "mdi:heat-pump-outline",
-          "heat_overrun": "mdi:pump-clock",
+          "heat_overrun": "mdi:pump",
           "cool_prerun": "mdi:pump",
           "cool_compressor_active": "mdi:snowflake",
           "cool_compressor_blocked": "mdi:alert-circle",
           "cool_compressor_shutdown": "mdi:snowflake-alert",
-          "cool_overrun": "mdi:pump-clock",
+          "cool_overrun": "mdi:pump",
           "hwc_prerun": "mdi:pump",
           "hwc_compressor_active": "mdi:water-boiler",
           "hwc_compressor_blocked": "mdi:alert-circle",
-          "hwc_overrun": "mdi:pump-clock",
+          "hwc_overrun": "mdi:pump",
           "heat_immersion_heater_active": "mdi:heating-coil",
           "heat_immersion_active": "mdi:heating-coil",
           "hwc_immersion_heater_active": "mdi:heating-coil",
@@ -258,7 +258,7 @@
           "heating": "mdi:radiator",
           "cooling": "mdi:snowflake",
           "dhw": "mdi:water-boiler",
-          "overrun": "mdi:pump-clock"
+          "overrun": "mdi:pump"
         }
       },
       "vwzio_secondary_circuit_hwc": {
@@ -312,9 +312,6 @@
       },
       "compressor_modulation": {
         "default": "mdi:percent"
-      },
-      "compressor_speed_rpm": {
-        "default": "mdi:speedometer"
       },
       "compressor_speed_rps": {
         "default": "mdi:speedometer"
@@ -430,7 +427,7 @@
         "default": "mdi:snowflake"
       },
       "z1_cooling_temp_time_controlled": {
-        "default": "mdi:snowflake-clock"
+        "default": "mdi:snowflake-thermometer"
       },
       "cylinder_charge_hyst": {
         "default": "mdi:arrow-expand-vertical"

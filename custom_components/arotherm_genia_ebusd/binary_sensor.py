@@ -39,12 +39,49 @@ class SaunierGeniaBinarySensorEntityDescription(BinarySensorEntityDescription):
 
 
 def _check_compressor_active(coord: SaunierGeniaCoordinator) -> bool | None:
-    speed = coord.get_float(CIRCUIT_HMUX0, "StateCompressor", "comp_speed")
-    if speed is not None:
-        return speed > 0
+    state_bytes = coord.get_str(CIRCUIT_HMUX0, "StateCompressor", "state_bytes")
+    if state_bytes:
+        parts = state_bytes.strip().split()
+        if len(parts) >= 4:
+            try:
+                b5 = int(parts[0], 16)
+                b8 = int(parts[3], 16)
+                return b5 == 0x09 or b8 > 0
+            except ValueError:
+                pass
+    status = coord.get_str(CIRCUIT_HMUX0, "HMUStatusCode", "status")
+    if status is not None:
+        s_lower = status.lower().strip()
+        if s_lower in (
+            "heat_compressor_active",
+            "hwc_compressor_active",
+            "cool_compressor_active",
+            "deicing",
+            "deicing_active",
+        ):
+            return True
+        if s_lower in (
+            "standby",
+            "frost_protect",
+            "heat_prerun",
+            "hwc_prerun",
+            "cool_prerun",
+            "heat_overrun",
+            "hwc_overrun",
+            "cool_overrun",
+            "heat_compressor_shutdown",
+            "heat_compressor_blocked",
+            "hwc_compressor_blocked",
+            "cool_compressor_shutdown",
+            "cool_compressor_blocked",
+        ):
+            return False
     rps = coord.get_float(CIRCUIT_HMUX0, "RunDataCompressorSpeed", "value")
     if rps is not None:
         return rps > 0
+    modulation = coord.get_float(CIRCUIT_HMUX0, "StateCompressor", "modulation")
+    if modulation is not None:
+        return modulation > 0
     return None
 
 
@@ -112,7 +149,7 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[SaunierGeniaBinarySensorEntityDescription, ...
         device_key=DEVICE_OUTDOOR_UNIT,
         circuit=CIRCUIT_HMUX0,
         message="StateCompressor",
-        field="comp_speed",
+        field="modulation",
         device_class=BinarySensorDeviceClass.RUNNING,
         is_on_fn=_check_compressor_active,
     ),
@@ -218,6 +255,7 @@ class SaunierGeniaBinarySensor(SaunierGeniaEntity, BinarySensorEntity):
         subs = [(description.circuit, description.message)]
         if description.key == "compressor_active":
             subs.append((CIRCUIT_HMUX0, "RunDataCompressorSpeed"))
+            subs.append((CIRCUIT_HMUX0, "HMUStatusCode"))
         elif description.key == "energy_integration_active":
             subs.append((CIRCUIT_HMUX0, "EnergyYieldPrecision"))
 

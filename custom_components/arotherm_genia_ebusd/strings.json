@@ -58,6 +58,24 @@
       }
     }
   },
+  "issues": {
+    "outdated_hmux0_csv": {
+      "title": "Outdated 08.hmux0.csv file in eBUSd",
+      "description": "Your `ebusd` instance is using an older version of `vaillant/08.hmux0.csv`. While compressor state and modulation are decoded in software, please copy the updated `ebusd-configuration/vaillant/08.hmux0.csv` (v1.2.3+) into your `ebusd` configuration folder and restart `ebusd` to enable active `r2`/`r3` polling for compressor speed, fan speed, flow rate, and status code. This repair notice will clear automatically once `ebusd` reloads the updated CSV."
+    },
+    "missing_custom_csv": {
+      "title": "Custom eBUSd CSV files not loaded",
+      "description": "Your `ebusd` instance is connected to the eBUS but is not loading the required CSV definitions from `ebusd-configuration/` (it appears to be using default `ebusd.eu` files). Please copy `broadcast.csv` and `vaillant/*.csv` from this repository into your `ebusd` configuration directory, configure `--configpath`, and restart `ebusd`. This repair notice will clear automatically as soon as telemetry arrives."
+    },
+    "no_ebusd_mqtt_traffic": {
+      "title": "No MQTT traffic received on prefix '{mqtt_prefix}'",
+      "description": "Home Assistant has not received any messages from `ebusd` under the configured MQTT topic prefix `{mqtt_prefix}/#`. Please verify that: (1) the MQTT topic prefix matches your `ebusd` configuration (`--mqtttopic=ebusd/%circuit/%name`), and (2) the `ebusd` add-on or service is running and connected to your MQTT broker. This repair notice will clear automatically as soon as the first message arrives."
+    },
+    "mqttjson_not_enabled": {
+      "title": "The --mqttjson flag is not enabled in eBUSd",
+      "description": "Your `ebusd` instance is publishing plain-text semicolon-separated values instead of JSON objects. Please add `--mqttjson` to your `ebusd` startup arguments and restart `ebusd` so multi-field telemetry (compressor state, weekly timers, dates, and live power) can be decoded properly. This repair notice will clear automatically once JSON messages arrive."
+    }
+  },
   "entity": {
     "climate": {
       "zone_1_climate": {
@@ -400,9 +418,6 @@
       },
       "building_cpump_power": {
         "name": "Building Circuit Pump Power"
-      },
-      "compressor_speed_rpm": {
-        "name": "Compressor Speed (RPM)"
       },
       "compressor_speed_rps": {
         "name": "Compressor Frequency (RPS)"

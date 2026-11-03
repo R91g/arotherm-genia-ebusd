@@ -20,6 +20,7 @@ from custom_components.arotherm_genia_ebusd.__init__ import (
     _async_cleanup_deprecated_entities,
 )
 from custom_components.arotherm_genia_ebusd.binary_sensor import (
+    _check_compressor_active,
     _check_energy_integration,
 )
 from custom_components.arotherm_genia_ebusd.const import (
@@ -39,6 +40,11 @@ from custom_components.arotherm_genia_ebusd.const import (
     DEVICE_HYDRAULIC_INTERFACE,
     DEVICE_OUTDOOR_UNIT,
     DEVICE_WIRELESS_THERMOSTAT,
+    DOMAIN,
+    ISSUE_MISSING_CUSTOM_CSV,
+    ISSUE_MQTTJSON_NOT_ENABLED,
+    ISSUE_NO_EBUSD_MQTT_TRAFFIC,
+    ISSUE_OUTDATED_HMUX0_CSV,
     MANUFACTURER_SAUNIER_DUVAL,
     MANUFACTURER_VAILLANT,
 )
@@ -52,6 +58,9 @@ from custom_components.arotherm_genia_ebusd.coordinator import (
     parse_ebusd_payload,
 )
 from custom_components.arotherm_genia_ebusd.entity import build_device_info
+from custom_components.arotherm_genia_ebusd.sensor_descriptions import (
+    _get_compressor_modulation,
+)
 
 
 class TestCoordinatorLogic(unittest.TestCase):
@@ -444,6 +453,14 @@ class TestCoordinatorLogic(unittest.TestCase):
         old_cop.entity_id = "sensor.old_daily_cop"
         old_cop.unique_id = "entry123_calculated_calculated_daily_cop_value"
 
+        old_rpm = MagicMock()
+        old_rpm.entity_id = "sensor.old_comp_speed_rpm"
+        old_rpm.unique_id = "entry123_hmux0_statecompressor_comp_speed"
+
+        old_bin_comp = MagicMock()
+        old_bin_comp.entity_id = "binary_sensor.old_comp_active"
+        old_bin_comp.unique_id = "entry123_binary_hmux0_statecompressor_comp_speed"
+
         active_entry = MagicMock()
         active_entry.entity_id = "sensor.new_system_total"
         active_entry.unique_id = (
@@ -453,6 +470,8 @@ class TestCoordinatorLogic(unittest.TestCase):
         er_mod.async_entries_for_config_entry.return_value = [
             old_entry,
             old_cop,
+            old_rpm,
+            old_bin_comp,
             active_entry,
         ]
 
@@ -462,7 +481,76 @@ class TestCoordinatorLogic(unittest.TestCase):
 
         ent_reg.async_remove.assert_any_call("sensor.old_electric_today")
         ent_reg.async_remove.assert_any_call("sensor.old_daily_cop")
-        self.assertEqual(ent_reg.async_remove.call_count, 2)
+        ent_reg.async_remove.assert_any_call("sensor.old_comp_speed_rpm")
+        ent_reg.async_remove.assert_any_call("binary_sensor.old_comp_active")
+        self.assertEqual(ent_reg.async_remove.call_count, 4)
+
+    def test_compressor_active_ignores_comp_speed_and_uses_modulation_or_rps(
+        self,
+    ) -> None:
+        """Test _check_compressor_active and _get_compressor_modulation decode state_bytes, HMUStatusCode, and rps."""
+        entry = MagicMock()
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {}
+        coord = SaunierGeniaCoordinator(MagicMock(), entry)
+
+        def push_mqtt(topic: str, payload: str) -> None:
+            msg = MagicMock()
+            msg.topic = topic
+            msg.payload = payload
+            coord._async_on_mqtt_message(msg)
+
+        # 0. Unhydrated: returns None
+        self.assertIsNone(_check_compressor_active(coord))
+        self.assertIsNone(_get_compressor_modulation(coord))
+
+        # 1. Idle state where StateCompressor.comp_speed is non-zero (603) and state_bytes is 00 00 00 00
+        push_mqtt(
+            "ebusd/hmux0/StateCompressor",
+            '{"comp_speed": {"value": 603}, "fan_speed": {"value": 15}, "modulation": {"value": 0}, "state_bytes": {"value": "00 00 00 00"}}',
+        )
+        self.assertFalse(_check_compressor_active(coord))
+        self.assertEqual(_get_compressor_modulation(coord), 0.0)
+
+        # 2. Prerun / Overrun where legacy CSV byte 4 ('modulation') is 4 or 31, but state_bytes is 08 00 00 00
+        push_mqtt(
+            "ebusd/hmux0/StateCompressor",
+            '{"comp_speed": {"value": 616}, "fan_speed": {"value": 15}, "modulation": {"value": 31}, "state_bytes": {"value": "08 00 00 00"}}',
+        )
+        self.assertFalse(_check_compressor_active(coord))
+        self.assertEqual(_get_compressor_modulation(coord), 0.0)
+
+        # 3. Active heating run where state_bytes is 09 00 00 66 (0x66 = 102% modulation)
+        # Even if legacy CSV 'modulation' byte 4 is stuck at 4, _get_compressor_modulation reads 102.0%
+        push_mqtt(
+            "ebusd/hmux0/StateCompressor",
+            '{"comp_speed": {"value": 614}, "fan_speed": {"value": 26128}, "modulation": {"value": 4}, "state_bytes": {"value": "09 00 00 66"}}',
+        )
+        self.assertTrue(_check_compressor_active(coord))
+        self.assertEqual(_get_compressor_modulation(coord), 102.0)
+
+        # 4. Fallback to HMUStatusCode when state_bytes is absent
+        coord._state.clear()
+        coord._canonical_names.clear()
+        push_mqtt("ebusd/hmux0/HMUStatusCode", '{"status": {"value": "standby"}}')
+        self.assertFalse(_check_compressor_active(coord))
+        push_mqtt("ebusd/hmux0/HMUStatusCode", '{"status": {"value": "heat_prerun"}}')
+        self.assertFalse(_check_compressor_active(coord))
+        push_mqtt("ebusd/hmux0/HMUStatusCode", '{"status": {"value": "heat_overrun"}}')
+        self.assertFalse(_check_compressor_active(coord))
+        push_mqtt(
+            "ebusd/hmux0/HMUStatusCode",
+            '{"status": {"value": "heat_compressor_active"}}',
+        )
+        self.assertTrue(_check_compressor_active(coord))
+
+        # 5. Fallback to RunDataCompressorSpeed when StateCompressor and HMUStatusCode are absent
+        coord._state.clear()
+        coord._canonical_names.clear()
+        push_mqtt("ebusd/hmux0/RunDataCompressorSpeed", '{"value": {"value": 0.0}}')
+        self.assertFalse(_check_compressor_active(coord))
+        push_mqtt("ebusd/hmux0/RunDataCompressorSpeed", '{"value": {"value": 50.0}}')
+        self.assertTrue(_check_compressor_active(coord))
 
     def test_passive_scan_version_and_serial_detection(self) -> None:
         """Test passive detection of SW/HW versions and 28-char serial numbers from ebusd scan.*."""
@@ -721,6 +809,87 @@ class TestCoordinatorLogic(unittest.TestCase):
                 )
 
         asyncio.run(run_write_tests())
+
+    def test_repair_issues_outdated_and_missing_csv_detection(self) -> None:
+        """Test automatic Home Assistant Repair issue creation and clearing for CSV compatibility."""
+        import sys
+
+        ir_mod = sys.modules["homeassistant.helpers.issue_registry"]
+        ir_mod.async_create_issue.reset_mock()
+        ir_mod.async_delete_issue.reset_mock()
+
+        hass = MagicMock()
+        entry = MagicMock()
+        entry.entry_id = "test_repairs"
+        entry.data = {}
+        coord = SaunierGeniaCoordinator(hass, entry)
+
+        def push_mqtt(topic: str, payload: str) -> None:
+            msg = MagicMock()
+            msg.topic = topic
+            msg.payload = payload
+            coord._async_on_mqtt_message(msg)
+
+        # 1. Legacy 08.hmux0.csv StateCompressor (with 'comp_speed') raises outdated_hmux0_csv
+        push_mqtt(
+            "ebusd/hmux0/StateCompressor",
+            '{"comp_speed": {"value": 598}, "fan_speed": {"value": 15}, "modulation": {"value": 0}, "state_bytes": {"value": "00 00 00 00"}}',
+        )
+        self.assertIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
+        ir_mod.async_create_issue.assert_called_once()
+
+        # Upgrading 08.hmux0.csv ('flow_temp' present) automatically deletes outdated_hmux0_csv
+        push_mqtt(
+            "ebusd/hmux0/StateCompressor",
+            '{"flow_temp": {"value": 37.38}, "modulation": {"value": 0}, "mode_flags": {"value": 0}, "state_bytes": {"value": "00 00 00 00"}}',
+        )
+        self.assertNotIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
+        ir_mod.async_delete_issue.assert_called_with(
+            hass, DOMAIN, ISSUE_OUTDATED_HMUX0_CSV
+        )
+
+        # 2. Missing custom CSV detection: upstream default hmu message or post-hydration with bus signal
+        coord._state.clear()
+        coord._canonical_names.clear()
+        ir_mod.async_create_issue.reset_mock()
+        ir_mod.async_delete_issue.reset_mock()
+
+        push_mqtt("ebusd/global/signal", "true")
+        coord._async_verify_custom_csv_after_hydration()
+        self.assertIn(ISSUE_MISSING_CUSTOM_CSV, coord._active_repair_issues)
+        ir_mod.async_create_issue.assert_called_once()
+
+        # Receiving any custom 08.hmux0 signature message clears missing_custom_csv automatically
+        push_mqtt("ebusd/hmux0/RunDataFlowTemp", '{"value": {"value": 35.5}}')
+        self.assertNotIn(ISSUE_MISSING_CUSTOM_CSV, coord._active_repair_issues)
+        ir_mod.async_delete_issue.assert_called_with(
+            hass, DOMAIN, ISSUE_MISSING_CUSTOM_CSV
+        )
+
+        # 3. No MQTT traffic on configured prefix after hydration raises no_ebusd_mqtt_traffic
+        coord._state.clear()
+        coord._canonical_names.clear()
+        coord._active_repair_issues.clear()
+        ir_mod.async_create_issue.reset_mock()
+        ir_mod.async_delete_issue.reset_mock()
+
+        coord._async_verify_custom_csv_after_hydration()
+        self.assertIn(ISSUE_NO_EBUSD_MQTT_TRAFFIC, coord._active_repair_issues)
+        ir_mod.async_create_issue.assert_called_once()
+
+        # First incoming message clears no_ebusd_mqtt_traffic automatically
+        push_mqtt("ebusd/global/signal", "true")
+        self.assertNotIn(ISSUE_NO_EBUSD_MQTT_TRAFFIC, coord._active_repair_issues)
+        ir_mod.async_delete_issue.assert_called_with(
+            hass, DOMAIN, ISSUE_NO_EBUSD_MQTT_TRAFFIC
+        )
+
+        # 4. Plain-text semicolon multi-field payload raises mqttjson_not_enabled, JSON clears it
+        push_mqtt("ebusd/hmux0/Status01", "37.0;35.0;20.5;-;50.0;on")
+        self.assertIn(ISSUE_MQTTJSON_NOT_ENABLED, coord._active_repair_issues)
+
+        push_mqtt("ebusd/hmux0/Status01", '{"temp1": {"value": 37.0}}')
+        self.assertNotIn(ISSUE_MQTTJSON_NOT_ENABLED, coord._active_repair_issues)
 
 
 if __name__ == "__main__":

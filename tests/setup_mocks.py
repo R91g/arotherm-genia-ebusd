@@ -32,6 +32,7 @@ MOCKED_MODULES = [
     "homeassistant.helpers.entity_platform",
     "homeassistant.helpers.entity_registry",
     "homeassistant.helpers.event",
+    "homeassistant.helpers.issue_registry",
     "homeassistant.helpers.restore_state",
     "homeassistant.helpers.selector",
     "homeassistant.util",
@@ -77,6 +78,9 @@ sys.modules["homeassistant.helpers"].entity_registry = sys.modules[
 ]
 sys.modules["homeassistant.helpers"].device_registry = sys.modules[
     "homeassistant.helpers.device_registry"
+]
+sys.modules["homeassistant.helpers"].issue_registry = sys.modules[
+    "homeassistant.helpers.issue_registry"
 ]
 sys.modules["homeassistant.helpers.device_registry"].DeviceInfo = dict
 sys.modules["homeassistant.components.sensor"].SensorEntity = MockEntity

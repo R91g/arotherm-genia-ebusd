@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.3] - 2026-11-03
+
+> [!IMPORTANT]
+> **Action Recommended:** Please update `ebusd-configuration/vaillant/08.hmux0.csv` in your `ebusd` configuration folder and restart `ebusd` to enable active `r2`/`r3` polling (`RunDataCompressorSpeed`, `RunDataFan1Speed`, `RunDataFlowRate`, `RunDataBuildingCPumpPower`, `HMUStatusCode`) and the corrected `StateCompressor` field definitions. Home Assistant will automatically display a **Repairs** notice until the updated `08.hmux0.csv` is loaded.
+
+### Added
+- **Automated Home Assistant Repairs for eBUSd & MQTT Diagnostics (`issue_registry`):**
+  - `outdated_hmux0_csv`: Passively inspects incoming `ebusd/hmux0/StateCompressor` MQTT JSON keys (`comp_speed` vs `flow_temp`), raising a native Home Assistant Repair warning when an older `08.hmux0.csv` is detected and clearing it automatically in real time once `ebusd` reloads the v1.2.3+ file.
+  - `missing_custom_csv`: Automatically raises a Home Assistant Repair warning if `ebusd` has active bus signal (`global/signal = true`) or publishes default `ebusd.eu` messages (`WaterThroughput`, `CurrentConsumedPower`) without loading the custom `08.hmux0.csv` definitions, clearing itself immediately once custom telemetry arrives.
+  - `no_ebusd_mqtt_traffic`: Raises a Repair warning after initial hydration if zero MQTT messages have arrived on `<mqtt_prefix>/#` (wrong MQTT topic prefix or `ebusd` disconnected from broker), clearing itself automatically on the first message.
+  - `mqttjson_not_enabled`: Raises a Repair warning if multi-field telemetry arrives as semicolon-separated plain text instead of JSON objects (missing `--mqttjson` startup argument in `ebusd`), clearing itself once JSON payloads arrive.
+
+### Fixed
+- **9-Byte `StateCompressor` (`b5 11 00`) Decoding, Compressor State & Modulation Fix:**
+  - Fixed `binary_sensor.compressor_active` (`Compressor running`) remaining permanently `On` in standby because `StateCompressor` bytes `0..1` (`comp_speed` in earlier CSVs) actually encode `flow_temp` in $1/16\ ^\circ\text{C}$ (`DATA2c`).
+  - Fixed `sensor.compressor_modulation` (`Compressor modulation`) staying stuck at `4.0%` during full-power heating and jumping to `31.0%` during pump overrun because byte `4` encodes a mode/valve bitmask (`0` standby, `4` heating, `24` DHW, `31` overrun, `104` cooling), whereas **true compressor modulation (`0–102%`)** resides in byte `3` and is mirrored in byte `8` (4th byte of `state_bytes`).
+  - Implemented backward-compatible `state_bytes` decoding in Python (`_check_compressor_active` reading byte `5`: `0x09` = active, `0x00`/`0x08` = off; `_get_compressor_modulation` reading byte `8` with fallback to `modulation`), ensuring accurate state and modulation even before updating `08.hmux0.csv`.
+  - Removed redundant `compressor_speed_rpm` entity (and added automatic Entity Registry cleanup in `DEPRECATED_UNIQUE_ID_SUFFIXES`), standardizing on the true rotational speed sensor `compressor_speed_rps` (`RunDataCompressorSpeed`, `r/s`).
+- **Missing MDI Icons Fixed (`icons.json`):**
+  - Replaced non-existent `mdi:snowflake-clock` on `number.z1_cooling_temp_time_controlled` with valid `mdi:snowflake-thermometer`, and `mdi:pump-clock` on `*_overrun` states with valid `mdi:pump` (validated all 71 unique icon names against the official `@mdi/svg` catalog).
+
+### Changed
+- **Active `r2`/`r3` Telemetry Polling in `08.hmux0.csv`:**
+  - Updated `StateCompressor` (`b511,00`) field layout in `08.hmux0.csv` (`flow_temp`, `modulation` at byte 3, `mode_flags` at byte 4, `state_bytes`).
+  - Promoted `RunDataCompressorSpeed`, `RunDataFlowRate`, and `HMUStatusCode` from passive `u` to active `r2`, and `RunDataFan1Speed` and `RunDataBuildingCPumpPower` to `r3` (plus added them to `ESSENTIAL_HYDRATION_MESSAGES`), ensuring 1–3 minute refresh intervals instead of waiting 10–60 minutes for cloud gateway (`f1`) sweeps.
+- **Cleanup:** Removed unused `ebusd-configuration/mqtt-hassio.cfg.default` reference file.
+
+---
+
 ## [1.2.2] - 2026-11-02
 
 ### Added

@@ -24,7 +24,7 @@ Una instalación monobloc estándar (ya sea con suelo radiante, radiadores o fan
 | Dirección Master | Dirección Slave | Dispositivo Físico | Identificador de Firmware | Archivo CSV Activo | Función en la Instalación |
 | :---: | :---: | :--- | :--- | :--- | :--- |
 | **`03`** | **`08`** | Unidad Exterior Monobloc | `MF=Vaillant;ID=HMUX0` | `08.hmux0.csv` | Compresor inverter de velocidad variable, ventilador modulante ECM, válvula de expansión electrónica (EEV), válvula de 4 vías de inversión de ciclo, presostato/sensor de presión de agua, sondas frigoríficas de freón R290, calorímetro de agua. |
-| **`10`** | **`15`** | Centralita Climática de Pared | `MF=Vaillant;ID=BASS3`<br>*(MiPro Sense / sensoCOMFORT)* | `15.bass3.csv` | Regulador maestro del sistema, cálculo de curva de calefacción, sonda ambiente de sala, matriz de programación horaria semanal (b5 55), consignas de ACS y clima, modo vacaciones. |
+| **`10`** | **`15`** | Centralita Climática de Pared | `MF=Vaillant;ID=BASS3` / `ID=BASV3`<br>*(MiPro Sense / sensoCOMFORT)* | `15.bass3.csv`<br>`15.basv3.csv` | Regulador maestro del sistema, cálculo de curva de calefacción, sonda ambiente de sala, matriz de programación horaria semanal (b5 55), consignas de ACS y clima, modo vacaciones. |
 | **`71`** | **`76`** | Módulo Hidráulico Interior / Torre | `MF=Vaillant;ID=VWZIO`<br>*(HPIM 7 / MEH 97/7)* | `76.vwzio.csv` | Válvula de 3 vías de derivación a ACS, bomba circuladora secundaria de impulsión, etapas de apoyo eléctrico (si existen), telemetría de caudal. |
 | **`f1`** | **`f6`** | Pasarela de Comunicaciones Wi-Fi | `MF=Vaillant;ID=NETX3`<br>*(MiGo Link / sensoNET)* | `f6.netx3.csv` | Conexión con los servidores en la nube del fabricante, sincronización horaria de red NTP, motor de sondeo de la app móvil oficial. |
 | **`ff`** | **`04`** | Interfaz de Aplicación Gateway | `MF=Vaillant;ID=NETX3` | `04.netx3.csv` | Canal broadcast y pasarela de diagnósticos avanzados de la app móvil. |
@@ -78,10 +78,10 @@ La pasarela oficial actúa como un maestro de sondeo de alta frecuencia en el bu
 3. **El Barrido de Programaciones Horarias:** Periódicamente (y siempre que el usuario abre la aplicación móvil oficial), `f1` consulta `b5 55 a4` (conteo de franjas) seguido de `b5 55 a5` en los circuitos `00`, `01`, `02` y `03` para sincronizar los calendarios semanales.
 4. **Sincronización Horaria Broadcast:** Transmite telegramas de sincronización horaria UTC/local para mantener en hora todos los relojes de los microcontroladores esclavos.
 
-### 2.2 El Regulador Climático Maestro (`10` / `BASS3`)
+### 2.2 El Regulador Climático Maestro (`10` / `BASS3` / `BASV3`)
 La centralita de pared gobierna la termodinámica, las curvas de calefacción y el cierre diario:
 1. **El Bucle de Modulación Continuo (10–30 s):** Envía el comando `uw_10 00` (`SetMode`) al módulo hidráulico (`76`) y a la unidad exterior (`08`). Este telegrama fija el modo del sistema (`0=auto`, `1=off`, `2=heat`, `3=water`), la consigna de impulsión calculada (`flowtempdesired`, en formato `D1C`), la consigna de ACS (`hwctempdesired`) y los estados de bomba.
-2. **Lectura Hidráulica Continua (10–15 s):** Consulta `b5 11 01` (`Status01`) a `76` y `08`, recopilando temperaturas de impulsión, retorno, interacumulador, exterior y estado de bombas (`0=off`, `1=on`, `2=overrun`, `4=hwc`).
+2. **Lectura Hidráulica Continua (10–15 s) y Estado de Compresor (60 s):** Consulta `b5 11 01` (`Status01`) a `76` y `08` cada 10–15 s, recopilando temperaturas de impulsión, retorno, interacumulador, exterior y estado de bombas (`0=off`, `1=on`, `2=overrun`, `4=hwc`), y consulta `b5 11 00` (`StateCompressor`) a `08` cada 60 s para conocer el estado operativo del compresor y su porcentaje de modulación.
 3. **El Cierre de Medianoche en EEPROM (`00:00:01` Diario):** Exactamente a un segundo de la medianoche, `10` emite el comando descriptor `b5 16 11`, rota los cubos diarios de energía en la EEPROM de `08` y `76`, fija el balance del día anterior y avanza la fecha empaquetada de 16 bits.
 
 ### 2.3 La Bomba de Calor Exterior Monobloc (`03` / `HMUX0`)
@@ -91,10 +91,10 @@ Procesa continuamente sus lazos internos de seguridad y refrigeración:
 
 ### 2.4 Estrategia de Sondeo de eBUSd y Home Assistant
 Dado que `f1` y `10` ya generan tráfico considerable, consultar cientos de entidades saturaría la línea. Por ello, diseñamos una **estrategia de cuatro niveles**:
-- **Nivel 1 (`@poll(1)`):** Exclusivo para la **Potencia Eléctrica en Tiempo Real** (`RunDataElectricPowerConsumption` en `08.hmux0`). Rota cada ~10 segundos.
-- **Nivel 2 (`@poll(3)`):** Exclusivo para la **Presión del Circuito Hidráulico** (`WaterPressure`). Rota cada ~30 segundos.
-- **Nivel 3 (`@poll(9)`):** Acumuladores lentos, temperatura exterior y consignas (~3,5 minutos por rotación).
-- **Escucha Pasiva Pura (`u`):** Las 140 entidades de horarios semanales (`*_Timer*`), los históricos EEPROM y los registros `PowerStatus` tienen **cero coste de tráfico**. Se capturan pasivamente aprovechando las consultas que `f1` y `10` ya emiten en el bus.
+- **Nivel 1 (`r1` / `@poll(1)`):** Exclusivo para la **Potencia Eléctrica en Tiempo Real** (`RunDataElectricPowerConsumption` en `08.hmux0`). Rota cada ~10 segundos.
+- **Nivel 2 (`r2` / `r3`):** Reservado para la **Dinámica Operativa Principal** (`RunDataCompressorSpeed`, `RunDataFlowRate`, `HMUStatusCode`, `RunDataFlowTemp`, `RunDataReturnTemp` en `r2`; `WaterPressure`, `RunDataFan1Speed` y `RunDataBuildingCPumpPower` en `r3`). Garantiza actualizaciones cada 1–3 minutos sin depender de que la pasarela `f1` pregunte por el ventilador o el caudal una sola vez por hora.
+- **Nivel 3 (`r9` / `@poll(9)`):** Acumuladores lentos, temperatura exterior y consignas (~3,5 minutos por rotación).
+- **Escucha Pasiva Pura (`u`):** Las 140 entidades de horarios semanales (`*_Timer*`), `StateCompressor` (`b5 11 00`), los históricos EEPROM y los registros `PowerStatus` tienen **cero coste de tráfico**. Se capturan pasivamente aprovechando las consultas que `f1` y `10` ya emiten en el bus.
 
 ---
 
@@ -166,7 +166,18 @@ Consultado cada 60 segundos por `f1`:
 
 ## 4. Dinámica del Compresor, Modulación y Calorimetría
 
-### 4.1 El Divisor de Utilización del Compresor (`CompressorUtil`)
+### 4.1 Decodificación de los 9 Bytes de `StateCompressor` (`b5 11 00`)
+Cada 60 segundos, la centralita (`10`) consulta el registro `b5 11 00` (`StateCompressor`) a la unidad exterior (`08`), que responde con una trama de 9 bytes `[b0, b1, b2, b3, b4, b5, b6, b7, b8]`. El contraste empírico en vivo en modos de reposo, preventilación, calefacción, ACS, refrigeración y post-circulación reveló la estructura exacta de cada byte:
+
+| Posición de Byte | Campo en CSV | Tipo de Dato | Magnitud Física y Comportamiento Verificado |
+| :---: | :--- | :---: | :--- |
+| **`0..1`** (`b0, b1`) | `flow_temp` | `DATA2c` (`°C`) | **Temperatura de impulsión en $1/16\ ^\circ\text{C}$** ($\text{Raw} / 16 = \text{RunDataFlowTemp}$). P. ej., un valor raw de `598` equivale a $37,375\ ^\circ\text{C}$. *(Anteriormente identificado erróneamente como RPM de 16 bits, razón por la cual marcaba `330–650` incluso en reposo).* |
+| **`2`** (`b2`) | `ign` | `IGN:1` | Byte de estado interno (`0x0e`..`0x10` / decimal `14`..`16`). |
+| **`3`** (`b3`) | `modulation` | `UCH` (`%`) | **Modulación Real del Compresor (`0–102 %`)**. Marca `0 %` en reposo, preventilación y post-circulación, y `25 %..102 %` con el compresor en marcha. *(Agrupar `b2..b3` como `UIN` de 16 bits desplazaba antes `b3` al byte alto: $16 + 256 \times b_3$).* |
+| **`4`** (`b4`) | `mode_flags` | `UCH` | **Máscara de modo operativo y válvula desviadora**: `0` = reposo, `1..4` = calefacción, `21..24` = ACS, `31` = post-circulación, `100..104` = refrigeración. |
+| **`5..8`** (`b5..b8`) | `state_bytes` | `HEX:4` | **Estado Hardware del Compresor y Espejo de Modulación**:<br>• **`b5` (1.er byte):** `0x00` = reposo, `0x08` = bomba en preventilación/post-circulación (compresor **APAGADO**), `0x09` = **compresor ENCENDIDO** (Calefacción, ACS o Refrigeración).<br>• **`b6..b7`:** `00 00`.<br>• **`b8` (4.º byte):** Espejo hexadecimal exacto de `b3` (`0x00` apagado; `0x19`..`0x66` = `25 %..102 %` en marcha). |
+
+### 4.2 El Divisor de Utilización del Compresor (`CompressorUtil`)
 En el bloque de diagnóstico `b5 09 540200`, la modulación porcentual del compresor se transmite con el tipo de datos `0x38` (56 en decimal). Las pruebas empíricas cruzadas en diferentes modelos de la plataforma demostraron que requiere un **divisor de 16**:
 
 $$\text{Utilizacion (\%)} = \frac{\text{Valor Raw}}{16}$$
@@ -179,7 +190,7 @@ A la velocidad mínima de rotación ($f_{\text{corte}} \approx 19\text{ rps}$), 
 $$\frac{649}{16} = \mathbf{40,56\%}$$
 Coincidiendo con exactitud con los menús de instalador de la máquina.
 
-### 4.2 Calorímetro de Agua Integrado (`HmuHeatOutput`, `0D5E`)
+### 4.3 Calorímetro de Agua Integrado (`HmuHeatOutput`, `0D5E`)
 El registro `0D5E` decodifica la potencia térmica útil en Vatios (`W`). La validación frente al cálculo termodinámico mediante caudalímetro calibrado y sondas de ida/retorno ($P_{\text{term}} = Q \times \Delta T \times 1.163$):
 - Potencia física calculada: **3.710 W**
 - Valor en el registro `0D5E`: **3.680,65 W**
@@ -187,7 +198,7 @@ El registro `0D5E` decodifica la potencia térmica útil en Vatios (`W`). La val
 
 Esto confirma que `0D5E` actúa como un contador de calor con grado de precisión metrológica en el lado de agua del intercambiador de placas.
 
-### 4.3 Telemetría del Circuito Frigorífico R290 (`08.hmux0`)
+### 4.4 Telemetría del Circuito Frigorífico R290 (`08.hmux0`)
 Los sub-registros bajo `b5 09 540200` exponen la termodinámica del gas refrigerante:
 - **`09C5`:** Modulación PWM y potencia de la bomba circuladora primaria.
 - **`0A28`:** Posición absoluta de pasos de la Válvula de Expansión Electrónica EEV (0 a 500 pasos).

@@ -16,7 +16,7 @@
 
 **aroTHERM & GeniaAir (eBUS)** (`arotherm_genia_ebusd`) es una **integración personalizada 100 % local (`local_push`) e independiente de la nube para Home Assistant**, diseñada para bombas de calor aerotérmicas R290 de **Vaillant** y **Saunier Duval** gobernadas por reguladores **`sensoCOMFORT` (`VRC 720`)** o **`MiPro Sense` (`SRC 720`)** a través de [**eBUSd**](https://github.com/john30/ebusd).
 
-Construida directamente sobre la arquitectura electrónica eBUS compartida por el Grupo Vaillant (`08.hmux0`, `15.bass3`, `76.vwzio`, `04.netx3`), sustituye el caos de entidades del auto-descubrimiento MQTT crudo y la dependencia de servidores externos por **148 entidades nativas fuertemente tipadas**, motor termodinámico y cálculo de COP/EER en tiempo real, filtrado de valores centinela de firmware, gestión automática del Doble Cerrojo de refrigeración y algoritmo inteligente de ACS Puntual (Boost Forzado).
+Construida directamente sobre la arquitectura electrónica eBUS compartida por el Grupo Vaillant (`08.hmux0`, `15.bass3` / `15.basv3`, `76.vwzio`, `04.netx3`), sustituye el caos de entidades del auto-descubrimiento MQTT crudo y la dependencia de servidores externos por **147 entidades nativas fuertemente tipadas**, motor termodinámico y cálculo de COP/EER en tiempo real, filtrado de valores centinela de firmware, gestión automática del Doble Cerrojo de refrigeración y algoritmo inteligente de ACS Puntual (Boost Forzado).
 
 ---
 
@@ -79,7 +79,7 @@ Los equipos de aerotermia de Vaillant y Saunier Duval comparten **al 100 % las m
 
 | Rol del Componente | Modelos Vaillant | Modelos Saunier Duval | Dirección eBUS |
 | :--- | :--- | :--- | :---: |
-| **Controlador de Clima del Sistema (Requerido)** | `sensoCOMFORT VRC 720` (`720/2`, `720/3`) | `MiPro Sense SRC 720` (`720/2`, `720/3`) | `15` (`BASS3`) |
+| **Controlador de Clima del Sistema (Requerido)** | `sensoCOMFORT VRC 720` (`720/2`, `720/3`) | `MiPro Sense SRC 720` (`720/2`, `720/3`) | `15` (`BASS3` / `BASV3`) |
 | **Termostato Inalámbrico / Receptor RF (Opcional)** | `sensoCOMFORT RF VRC 720f` (`NETX3`) | `MiPro Sense RF SRC 720f` (`NETX3`) | `04` / `f6` |
 | **Pasarela Oficial en Nube (Opcional — Sinergia Pasiva)** | `myVAILLANT connect VR 940f` / `sensoNET VR 921` | `MiGo Link SR 940f` | Maestro `f1` |
 
@@ -98,19 +98,19 @@ Los equipos de aerotermia de Vaillant y Saunier Duval comparten **al 100 % las m
 - **Cola de Hidratación Inicial:** Al arrancar Home Assistant, el coordinador espera `5.0 s` para absorber a coste cero los mensajes `retained` del broker MQTT y solicita secuencialmente (con `0.8 s` de pausa entre tramas) **únicamente los registros que falten**.
 - **Actualización Optimista y Confirmación Selectiva:** Las escrituras sobre registros pasivos `u` (consignas, modos, horarios, fechas) actualizan la interfaz al instante sin disparar lecturas `/get` redundantes que devuelvan valores antiguos en caché, espaciando las secuencias multipaso entre `0.3 s` y `0.6 s`.
 
-### 3. 148 Entidades Nativas Agrupadas en 4 Dispositivos Lógicos
+### 3. 147 Entidades Nativas Agrupadas en 4 Dispositivos Lógicos
 
 | Dispositivo Lógico | Circuito eBUS | Entidades Destacadas |
 | :--- | :---: | :--- |
-| **1. Unidad Exterior** (`<Modelo Exterior>`) | `08.hmux0` | Monitor operativo en vivo (52+ estados `S.xx`/`S.xxx`), RPM/RPS/modulación del compresor, alta presión R290, pasos EEV, ventiladores, caudal primario, temperaturas de impulsión/retorno de alta precisión, contadores IEEE 754 (`EXP`) eléctricos, térmicos y de energía ambiental por modo (`Wh`), horas/arranques y **sensores termodinámicos y de energía total calculados**. |
-| **2. Controlador de Clima** (`sensoCOMFORT` / `MiPro Sense`) | `15.bass3` | **Climatización Zona 1 (`climate`)**, **Agua Caliente Sanitaria (`water_heater`)**, curvas climáticas, límites de impulsión, puntos de bivalencia, presión de agua, contadores de energía por servicio (`PrEnergySumHc` / `PrEnergySumHwc`), resúmenes de programación semanal e interruptores de sistema. |
+| **1. Unidad Exterior** (`<Modelo Exterior>`) | `08.hmux0` | Monitor operativo en vivo (52+ estados `S.xx`/`S.xxx`), velocidad (`r/s`) y modulación (`%`) del compresor, alta presión R290, pasos EEV, ventiladores, caudal primario, temperaturas de impulsión/retorno de alta precisión, contadores IEEE 754 (`EXP`) eléctricos, térmicos y de energía ambiental por modo (`Wh`), horas/arranques y **sensores termodinámicos y de energía total calculados**. |
+| **2. Controlador de Clima** (`sensoCOMFORT` / `MiPro Sense`) | `15.bass3` / `15.basv3` | **Climatización Zona 1 (`climate`)**, **Agua Caliente Sanitaria (`water_heater`)**, curvas climáticas, límites de impulsión, puntos de bivalencia, presión de agua, contadores de energía por servicio (`PrEnergySumHc` / `PrEnergySumHwc`), resúmenes de programación semanal e interruptores de sistema. |
 | **3. Interfaz Hidráulica** (`<Modelo Interior>`) | `76.vwzio` | Estado operativo del circuito secundario (calefacción, refrigeración, ACS, postcirculación, reposo), potencia eléctrica instantánea (`W`), contadores de energía `b5 16` (`Wh`), diagnóstico de válvula de 3 vías / bomba secundaria y monitor de errores activos (`OK` o códigos de avería). |
 | **4. Termostato Inalámbrico** *(Opcional)* | `04.netx3` / `f6` / `broadcast` | Temperatura en el dial inalámbrico, consigna inalámbrica, temperatura exterior por difusión (`Broadcast`) y fecha/hora del bus eBUS. *(Si no hay termostato inalámbrico instalado, los sensores broadcast se asocian automáticamente al Controlador de Clima).* |
 
-**Desglose por Plataforma (148 entidades en total a través de 8 plataformas):**
+**Desglose por Plataforma (147 entidades en total a través de 8 plataformas):**
 - `climate` (**1**): Termostato unificado Calefacción / Refrigeración / Auto para Zona 1 con modos preestablecidos (`Programado (Confort)`, `Manual continuo`, `Eco (Reducción nocturna)`, `Anulación rápida (Quick Veto)`, `Modo Ausencia / Vacaciones`).
 - `water_heater` (**1**): Control del depósito de Agua Caliente Sanitaria (ACS) (`Apagado`, `Programación horaria`, `Continuo (24h)`, `Boost`).
-- `sensor` (**98**): 94 sensores de telemetría, energía en `Wh`, diagnóstico y cálculos termodinámicos + 4 sensores resumen de programación semanal (con el detalle diario completo en sus atributos) + sensores de días restantes de vacaciones y refrigeración.
+- `sensor` (**97**): 93 sensores de telemetría, energía en `Wh`, diagnóstico y cálculos termodinámicos + 4 sensores resumen de programación semanal (con el detalle diario completo en sus atributos) + sensores de días restantes de vacaciones y refrigeración.
 - `binary_sensor` (**8**): Compresor en marcha, bomba primaria, desescarche activo, integración de energía activa, demanda de calor Zona 1, autorización hardware de refrigeración, ciclo de frío broadcast y señal física eBUS.
 - `number` (**25**): Todos los parámetros numéricos de usuario e instalador (curva climática, sobretemperatura, impulsión mín./máx., corte de verano, consignas día/noche/manual/veto/frío/ausencia, consigna/histéresis/offset/tiempos de ACS, puntos de bivalencia y humedad máxima).
 - `select` (**5**): Modo calefacción Zona 1, modo refrigeración Zona 1, modo ACS, modo reducción nocturna (`eco`/`night`/`off`) y control por temperatura ambiente (`off`/`modulating`/`thermostat`).
@@ -146,7 +146,7 @@ Consumo Eléctrico Total (Wh)    = Calefacción_Total_Wh + ACS_Total_Wh + Refrig
 *(Incluye puesta a cero durante desescarches y compresor en reposo para evitar falsos picos de COP por caudal residual de la bomba circuladora).*
 
 ### 7. Seguridad Táctil (`NumberMode.BOX`) e Identificadores `unique_id` Neutros
-- **Seguridad Táctil:** Los 24 controles `number` utilizan cajas numéricas con botones `+`/`-` (`NumberMode.BOX`) en lugar de barras deslizantes, evitando modificar por accidente la curva climática o los puntos de bivalencia al hacer scroll desde el móvil.
+- **Seguridad Táctil:** Los 25 controles `number` utilizan cajas numéricas con botones `+`/`-` (`NumberMode.BOX`) en lugar de barras deslizantes, evitando modificar por accidente la curva climática o los puntos de bivalencia al hacer scroll desde el móvil.
 - **Reconfiguración sin Pérdida de Datos:** Todos los `unique_id` siguen estrictamente el patrón `{entry_id}_{circuito}_{mensaje}_{campo}`, sin cadenas de marca. Cambiar de fabricante o modelo mediante **Reconfigurar** conserva al 100 % las entidades, automatizaciones y estadísticas históricas.
 
 ---
@@ -203,7 +203,8 @@ Copia los archivos CSV en el directorio de configuración de `ebusd` respetando 
 └── vaillant/
     ├── 04.netx3.csv           <-- Receptor radio del termostato inalámbrico
     ├── 08.hmux0.csv           <-- Placa unidad exterior (aroTHERM plus / GeniaAir Max)
-    ├── 15.bass3.csv           <-- Controlador de clima (sensoCOMFORT VRC 720 / MiPro Sense SRC 720)
+    ├── 15.bass3.csv           <-- Controlador de clima (MiPro Sense SRC 720 / sensoCOMFORT VRC 720)
+    ├── 15.basv3.csv           <-- Controlador de clima (sensoCOMFORT VRC 720 que reporta BASV3)
     ├── 76.vwzio.csv           <-- Módulo o torre hidráulica (VWZ MEH / uniTOWER / HPIM 7 / GeniaSet)
     └── f6.netx3.csv           <-- Tramas RF pasivas del termostato inalámbrico
 ```
@@ -211,7 +212,7 @@ Copia los archivos CSV en el directorio de configuración de `ebusd` respetando 
 #### Opción A: Add-on eBUSd en Home Assistant
 1. Copia `ebusd-configuration/broadcast.csv` en:
    `/addon_configs/b4d7ad18_ebusd/ebusd-configuration/en/broadcast.csv`
-2. Copia los 5 archivos de `ebusd-configuration/vaillant/*.csv` en:
+2. Copia los 6 archivos de `ebusd-configuration/vaillant/*.csv` en:
    `/addon_configs/b4d7ad18_ebusd/ebusd-configuration/en/vaillant/`
 3. Configura los argumentos de arranque del Add-on eBUSd para cargar los CSV locales, activar el formato JSON y permitir la escritura:
    ```text
@@ -456,7 +457,7 @@ Temas clave documentados en detalle:
 Este repositorio incluye una batería de tests unitarios offline (ejecutables sin depender de una instancia activa de Home Assistant) y flujos de integración continua en GitHub Actions para **Hassfest**, **Validación HACS** y **Ruff**:
 
 ```bash
-# Ejecutar los 39 tests unitarios (termodinámica, config flow, registro unique_id, paridad de esquemas)
+# Ejecutar los 44 tests unitarios (termodinámica, config flow, registro unique_id, paridad de esquemas)
 python -m unittest discover tests -v
 
 # Verificar estilo y formato con Ruff

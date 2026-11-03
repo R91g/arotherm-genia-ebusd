@@ -261,6 +261,25 @@ def _get_live_cop_attrs(coord: SaunierGeniaCoordinator) -> dict[str, Any]:
     return {"last_active_cop": coord.last_active_cop}
 
 
+def _get_compressor_modulation(coord: SaunierGeniaCoordinator) -> float | None:
+    """Return true compressor modulation (%) from StateCompressor.
+
+    In b511 00 (StateCompressor), byte 3 and byte 8 (the 4th byte of state_bytes)
+    carry the real compressor modulation percentage (0% in standby/prerun/overrun,
+    25..102% when active), whereas byte 4 in older CSVs was a mode bitmask (e.g. 4 in heating).
+    Reading state_bytes[3] first guarantees accurate modulation on both old and new CSVs.
+    """
+    state_bytes = coord.get_str(CIRCUIT_HMUX0, "StateCompressor", "state_bytes")
+    if state_bytes:
+        parts = state_bytes.strip().split()
+        if len(parts) >= 4:
+            try:
+                return float(int(parts[3], 16))
+            except ValueError:
+                pass
+    return coord.get_float(CIRCUIT_HMUX0, "StateCompressor", "modulation")
+
+
 SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
     # =========================================================================
     # B) Outdoor Unit Sensors (08.hmux0 -> DEVICE_OUTDOOR_UNIT)
@@ -527,17 +546,6 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         suggested_display_precision=1,
     ),
     SaunierGeniaSensorEntityDescription(
-        key="compressor_speed_rpm",
-        translation_key="compressor_speed_rpm",
-        device_key=DEVICE_OUTDOOR_UNIT,
-        circuit=CIRCUIT_HMUX0,
-        message="StateCompressor",
-        field="comp_speed",
-        native_unit_of_measurement="rpm",
-        state_class=SensorStateClass.MEASUREMENT,
-        is_integer=True,
-    ),
-    SaunierGeniaSensorEntityDescription(
         key="compressor_speed_rps",
         translation_key="compressor_speed_rps",
         device_key=DEVICE_OUTDOOR_UNIT,
@@ -558,6 +566,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
+        value_fn=_get_compressor_modulation,
     ),
     SaunierGeniaSensorEntityDescription(
         key="fan1_speed",
@@ -566,9 +575,6 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         circuit=CIRCUIT_HMUX0,
         message="RunDataFan1Speed",
         field="value",
-        fallback_circuit=CIRCUIT_HMUX0,
-        fallback_message="StateCompressor",
-        fallback_field="fan_speed",
         native_unit_of_measurement="rpm",
         state_class=SensorStateClass.MEASUREMENT,
         is_integer=True,

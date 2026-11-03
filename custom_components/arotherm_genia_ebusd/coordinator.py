@@ -62,16 +62,22 @@ from .const import (
     DHW_BOOST_MAX_TIMEOUT_SECONDS,
     DOMAIN,
     ESSENTIAL_HYDRATION_MESSAGES,
+    HMUX0_CUSTOM_SIGNATURE_MESSAGES,
     HOLIDAY_DEFAULT_END_TIME,
     HOLIDAY_INDEFINITE_END_DATE,
     HOLIDAY_RESET_DATE,
     HOLIDAY_RESET_TIME,
     HYDRATION_STEP_DELAY_SECONDS,
     INITIAL_HYDRATION_WAIT_SECONDS,
+    ISSUE_MISSING_CUSTOM_CSV,
+    ISSUE_MQTTJSON_NOT_ENABLED,
+    ISSUE_NO_EBUSD_MQTT_TRAFFIC,
+    ISSUE_OUTDATED_HMUX0_CSV,
     MANUFACTURER_VAILLANT,
     SCAN_ADDRESS_TO_DEVICE_KEY,
     SCAN_TOPIC_CIRCUITS,
     SET_CONFIRMATION_DELAY_SECONDS,
+    UPSTREAM_DEFAULT_CSV_MESSAGES,
 )
 from .thermodynamics import (
     MIN_CUMULATIVE_ELECTRICAL_ENERGY_WH,
@@ -293,6 +299,9 @@ class SaunierGeniaCoordinator:
             else CIRCUIT_BASS3
         )
 
+        # Active Home Assistant Repair issues (issue_registry)
+        self._active_repair_issues: set[str] = set()
+
     # -------------------------------------------------------------------------
     # Configuration & Options Properties
     # -------------------------------------------------------------------------
@@ -446,6 +455,7 @@ class SaunierGeniaCoordinator:
             CIRCUIT_BASS3,
             CIRCUIT_BASV3,
             CIRCUIT_HMUX0,
+            "hmu",
             CIRCUIT_VWZIO,
             CIRCUIT_NETX3,
             CIRCUIT_NETX3_ALT,
@@ -564,6 +574,7 @@ class SaunierGeniaCoordinator:
 
         # Intercept scan messages for passive SW/HW and serial number detection
         if circuit_lower.startswith("scan."):
+            self._async_set_repair_issue(ISSUE_NO_EBUSD_MQTT_TRAFFIC, active=False)
             self._async_handle_scan_message(parts, msg.payload)
             return
 
@@ -624,6 +635,119 @@ class SaunierGeniaCoordinator:
             "HwcStatus",
         ):
             self._async_check_dhw_boost_restoration()
+
+        # Verify eBUSd CSV compatibility and manage Home Assistant Repair issues
+        self._async_check_csv_compatibility_on_message(
+            circuit_key, msg_lower, parsed, raw_payload
+        )
+
+    # -------------------------------------------------------------------------
+    # Home Assistant Repairs (eBUSd CSV & MQTT Configuration Verification)
+    # -------------------------------------------------------------------------
+
+    @callback
+    def _async_set_repair_issue(
+        self,
+        issue_id: str,
+        active: bool,
+        placeholders: dict[str, str] | None = None,
+    ) -> None:
+        """Create or delete a Home Assistant Repair issue in the Issue Registry."""
+        from homeassistant.helpers import issue_registry as ir
+
+        if active:
+            if issue_id in self._active_repair_issues:
+                return
+            self._active_repair_issues.add(issue_id)
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                issue_id,
+                is_fixable=False,
+                severity=ir.IssueSeverity.WARNING,
+                translation_key=issue_id,
+                translation_placeholders=placeholders,
+                learn_more_url="https://github.com/R91g/arotherm-genia-ebusd#step-1-deploy-optimized-ebusd-csv-configuration",
+            )
+        else:
+            if issue_id in self._active_repair_issues:
+                self._active_repair_issues.discard(issue_id)
+                ir.async_delete_issue(self.hass, DOMAIN, issue_id)
+
+    @callback
+    def _async_check_csv_compatibility_on_message(
+        self,
+        circuit_key: str,
+        msg_lower: str,
+        parsed: dict[str, Any],
+        raw_payload: str = "",
+    ) -> None:
+        """Inspect incoming MQTT payloads to detect MQTT/CSV configuration issues."""
+        # 0. Any message on <mqtt_prefix>/# proves the MQTT prefix is receiving traffic
+        self._async_set_repair_issue(ISSUE_NO_EBUSD_MQTT_TRAFFIC, active=False)
+
+        # 1. Detect missing --mqttjson flag when multi-field telemetry arrives as semicolon plain text
+        if (
+            circuit_key in (CIRCUIT_HMUX0, CIRCUIT_BASS3, CIRCUIT_BASV3, CIRCUIT_VWZIO)
+            and raw_payload
+        ):
+            stripped = raw_payload.strip()
+            if stripped.startswith("{"):
+                self._async_set_repair_issue(ISSUE_MQTTJSON_NOT_ENABLED, active=False)
+            elif ";" in stripped:
+                self._async_set_repair_issue(ISSUE_MQTTJSON_NOT_ENABLED, active=True)
+
+        # 2. Detect legacy vs v1.2.3+ 08.hmux0.csv via StateCompressor JSON keys
+        if circuit_key == CIRCUIT_HMUX0 and msg_lower == "statecompressor":
+            if "comp_speed" in parsed and "flow_temp" not in parsed:
+                self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=True)
+            elif "flow_temp" in parsed:
+                self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=False)
+
+        # 3. Clear 'missing_custom_csv' as soon as any custom 08.hmux0 signature message arrives
+        if circuit_key == CIRCUIT_HMUX0 and msg_lower in {
+            m.lower() for m in HMUX0_CUSTOM_SIGNATURE_MESSAGES
+        }:
+            self._async_set_repair_issue(ISSUE_MISSING_CUSTOM_CSV, active=False)
+
+        # 4. Detect default upstream ebusd.eu hmu.inc messages (when custom 08.hmux0.csv is not loaded)
+        if (
+            circuit_key in (CIRCUIT_HMUX0, "hmu")
+            and msg_lower in UPSTREAM_DEFAULT_CSV_MESSAGES
+            and not any(
+                self.has_message(CIRCUIT_HMUX0, m)
+                for m in HMUX0_CUSTOM_SIGNATURE_MESSAGES
+            )
+        ):
+            self._async_set_repair_issue(ISSUE_MISSING_CUSTOM_CSV, active=True)
+
+    @callback
+    def _async_verify_custom_csv_after_hydration(self) -> None:
+        """Check after initial hydration whether eBUSd MQTT traffic and custom CSVs are active."""
+        if not self._state:
+            self._async_set_repair_issue(
+                ISSUE_NO_EBUSD_MQTT_TRAFFIC,
+                active=True,
+                placeholders={"mqtt_prefix": self.mqtt_prefix},
+            )
+            return
+
+        self._async_set_repair_issue(ISSUE_NO_EBUSD_MQTT_TRAFFIC, active=False)
+
+        signal_raw = (self.get_str(CIRCUIT_GLOBAL, "signal") or "").lower()
+        has_bus_traffic = signal_raw in ("1", "true", "yes", "on") or any(
+            c in (CIRCUIT_BASS3, CIRCUIT_BASV3, CIRCUIT_VWZIO, "hmu")
+            for c, _ in self._state
+        )
+        if not has_bus_traffic:
+            return
+
+        has_custom_hmux0 = any(
+            self.has_message(CIRCUIT_HMUX0, m) for m in HMUX0_CUSTOM_SIGNATURE_MESSAGES
+        )
+        self._async_set_repair_issue(
+            ISSUE_MISSING_CUSTOM_CSV, active=not has_custom_hmux0
+        )
 
     # -------------------------------------------------------------------------
     # Listener Subscription & Notification
@@ -873,6 +997,7 @@ class SaunierGeniaCoordinator:
             _LOGGER.debug(
                 "All essential eBUSd messages already hydrated via retained MQTT payloads"
             )
+            self._async_verify_custom_csv_after_hydration()
             return
 
         _LOGGER.info(
@@ -897,6 +1022,7 @@ class SaunierGeniaCoordinator:
             _LOGGER.debug("Initial eBUSd hydration task cancelled")
             raise
         _LOGGER.info("Completed initial staggered eBUSd hydration queue")
+        self._async_verify_custom_csv_after_hydration()
 
     async def _async_run_fallback_poll(self, _now: datetime) -> None:
         """Periodic fallback poll executed only when has_migo_link is False."""
@@ -908,6 +1034,7 @@ class SaunierGeniaCoordinator:
         fallback_energy_messages: list[tuple[str, str]] = [
             (CIRCUIT_HMUX0, "HMUStatusCode"),
             (CIRCUIT_HMUX0, "StateCompressor"),
+            (CIRCUIT_HMUX0, "RunDataCompressorSpeed"),
             (CIRCUIT_HMUX0, "PowerStatus"),
             (CIRCUIT_HMUX0, "RunDataElectricPowerConsumption"),
             (CIRCUIT_HMUX0, "RunDataFlowRate"),

@@ -58,6 +58,24 @@
       }
     }
   },
+  "issues": {
+    "outdated_hmux0_csv": {
+      "title": "Archivo 08.hmux0.csv desactualizado en eBUSd",
+      "description": "Tu instancia de `ebusd` está utilizando una versión antigua de `vaillant/08.hmux0.csv`. Aunque el estado y la modulación del compresor ya se corrigen por software, sustituye el archivo `vaillant/08.hmux0.csv` en tu carpeta de configuración de `ebusd` por el incluido en la versión v1.2.3+ y reinicia `ebusd` para activar el sondeo activo (`r2`/`r3`) de velocidad del compresor, ventilador, caudal y estado HMU. Este aviso desaparecerá automáticamente en cuanto `ebusd` cargue el nuevo CSV."
+    },
+    "missing_custom_csv": {
+      "title": "Archivos CSV personalizados de eBUSd no detectados",
+      "description": "Tu instancia de `ebusd` tiene señal en el bus eBUS pero no está cargando los archivos CSV optimizados de `ebusd-configuration/` (parece estar usando los archivos por defecto de `ebusd.eu`). Copia `broadcast.csv` y la carpeta `vaillant/*.csv` del repositorio en el directorio de configuración de `ebusd`, verifica el parámetro `--configpath` y reinicia `ebusd`. Este aviso desaparecerá automáticamente en cuanto llegue telemetría."
+    },
+    "no_ebusd_mqtt_traffic": {
+      "title": "No se recibe tráfico MQTT en el prefijo '{mqtt_prefix}'",
+      "description": "Home Assistant no ha recibido ningún mensaje de `ebusd` bajo el prefijo MQTT configurado (`{mqtt_prefix}/#`). Comprueba que: (1) el prefijo MQTT coincide con la configuración de `ebusd` (`--mqtttopic=ebusd/%circuit/%name`), y (2) el add-on o servicio `ebusd` está en marcha y conectado al broker MQTT. Este aviso desaparecerá automáticamente en cuanto llegue el primer mensaje."
+    },
+    "mqttjson_not_enabled": {
+      "title": "El parámetro --mqttjson no está activado en eBUSd",
+      "description": "Tu instancia de `ebusd` está publicando valores en texto plano separados por punto y coma en lugar de objetos JSON. Añade `--mqttjson` a los argumentos de arranque de `ebusd` y reinícialo para que los mensajes multicampo (estado del compresor, programaciones horarias, fechas y potencia en vivo) puedan decodificarse correctamente. Este aviso desaparecerá automáticamente al recibir mensajes en formato JSON."
+    }
+  },
   "entity": {
     "climate": {
       "zone_1_climate": {
@@ -400,9 +418,6 @@
       },
       "building_cpump_power": {
         "name": "Potencia de la bomba del circuito"
-      },
-      "compressor_speed_rpm": {
-        "name": "Velocidad del compresor (RPM)"
       },
       "compressor_speed_rps": {
         "name": "Frecuencia de giro del compresor (RPS)"

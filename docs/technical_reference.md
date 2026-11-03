@@ -24,7 +24,7 @@ A standard single-zone or multi-zone monobloc installation consists of the follo
 | Master Addr | Slave Addr | Physical Hardware | Manufacturer Device ID | Active Configuration | Functional Role in System |
 | :---: | :---: | :--- | :--- | :--- | :--- |
 | **`03`** | **`08`** | Monobloc Outdoor Heat Pump Unit | `MF=Vaillant;ID=HMUX0` | `08.hmux0.csv` | Variable-speed inverter compressor, ECM evaporator fan, electronic expansion valve (EEV), 4-way reversing valve, hydraulic circuit pressure sensor, refrigerant thermodynamic probes, water-side heat meter. |
-| **`10`** | **`15`** | Wall-Mounted Climate Controller | `MF=Vaillant;ID=BASS3`<br>*(MiPro Sense / sensoCOMFORT)* | `15.bass3.csv` | Master system regulator, heating curve math, room ambient sensor, weekly schedule matrix (timers), DHW setpoints, holiday mode, installer configuration. |
+| **`10`** | **`15`** | Wall-Mounted Climate Controller | `MF=Vaillant;ID=BASS3` / `ID=BASV3`<br>*(MiPro Sense / sensoCOMFORT)* | `15.bass3.csv`<br>`15.basv3.csv` | Master system regulator, heating curve math, room ambient sensor, weekly schedule matrix (timers), DHW setpoints, holiday mode, installer configuration. |
 | **`71`** | **`76`** | Indoor Hydraulic Station / Tower | `MF=Vaillant;ID=VWZIO`<br>*(HPIM 7 / VWZ MEH 97/7)* | `76.vwzio.csv` | 3-way DHW diverter valve, secondary circulation pump, auxiliary electric backup heater stages, flow rate telemetry. |
 | **`f1`** | **`f6`** | Wi-Fi / Ethernet Network Gateway | `MF=Vaillant;ID=NETX3`<br>*(MiGo Link / sensoNET)* | `f6.netx3.csv` | Cloud gateway, NTP network time distribution, vendor mobile application backend polling engine. |
 | **`ff`** | **`04`** | Gateway Application Interface | `MF=Vaillant;ID=NETX3` | `04.netx3.csv` | High-level diagnostic and broadcast channel used by the vendor cloud app. |
@@ -78,10 +78,10 @@ The vendor network gateway acts as a high-frequency polling master on the physic
 3. **The Schedule Polling Sweep:** Periodically (and immediately whenever a user opens the official smartphone app), `f1` queries `b5 55 a4` (slot count) followed by `b5 55 a5` across circuits `00`, `01`, `02`, and `03` to synchronize weekly time programs.
 4. **Broadcast Time Synchronization:** Broadcasts real-time UTC/local clock timestamps over the bus to keep all slave microcontrollers synchronized.
 
-### 2.2 The Master Climate Regulator (`10` / `BASS3`)
+### 2.2 The Master Climate Regulator (`10` / `BASS3` / `BASV3`)
 The central controller manages thermodynamics, safety envelopes, and daily archiving:
 1. **The Continuous Modulation Loop (10–30 s):** Sends command `uw_10 00` (`SetMode`) to the hydraulic module (`76`) and outdoor unit (`08`). This telegram contains the active system mode (`0=auto`, `1=off`, `2=heat`, `3=water`), the flow temperature target (`flowtempdesired`, encoded as `D1C`), the DHW target (`hwctempdesired`), and secondary circuit pump flags.
-2. **Hydraulic Telemetry Reading (10–15 s):** Polls `b5 11 01` (`Status01`) from `76` and `08`, collecting flow, return, storage, outdoor temperatures, and pump status bytes (`0=off`, `1=on`, `2=overrun`, `4=hwc`).
+2. **Hydraulic Telemetry Reading (10–15 s) & Compressor State (60 s):** Polls `b5 11 01` (`Status01`) from `76` and `08` every 10–15 s, collecting flow, return, storage, outdoor temperatures, and pump status bytes (`0=off`, `1=on`, `2=overrun`, `4=hwc`), and polls `b5 11 00` (`StateCompressor`) from `08` every 60 s for compressor operating state and modulation percentage.
 3. **The Midnight EEPROM Rollover (`00:00:01` Daily):** At exactly one second past midnight, `10` emits command `b5 16 11` to inspect the EEPROM slot table, rotates the daily historical energy registers in `08` and `76`, writes the end-of-day total, and advances the 16-bit date stamp.
 
 ### 2.3 The Monobloc Heat Pump (`03` / `HMUX0`)
@@ -91,10 +91,10 @@ The outdoor inverter unit continuously processes internal safety and thermodynam
 
 ### 2.4 eBUSd & Home Assistant Pacing Strategy
 Because `f1` and `10` already poll the bus heavily, an uncoordinated third-party integration querying hundreds of entities would immediately choke the bus. We designed a **four-tiered pacing strategy**:
-- **Level 1 (`@poll(1)`):** Reserved strictly for **Real-Time Electric Power** (`RunDataElectricPowerConsumption` on `08.hmux0`). Rotates every ~10 seconds.
-- **Level 2 (`@poll(3)`):** Reserved for **Water Circuit Pressure** (`WaterPressure`). Rotates every ~30 seconds.
-- **Level 3 (`@poll(9)`):** Cumulative slow registers, outdoor temperature, and setpoints (~3.5 minutes per rotation).
-- **Passive Listening (`u`):** All 140 weekly schedule entities (`*_Timer*`), EEPROM energy history counters, and `PowerStatus` registers have **zero active polling overhead**. They are captured passively from the queries that `f1` and `10` already emit on the bus.
+- **Level 1 (`r1` / `@poll(1)`):** Reserved strictly for **Real-Time Electric Power** (`RunDataElectricPowerConsumption` on `08.hmux0`). Rotates every ~10 seconds.
+- **Level 2 (`r2` / `r3`):** Reserved for **Core Live Dynamics** (`RunDataCompressorSpeed`, `RunDataFlowRate`, `HMUStatusCode`, `RunDataFlowTemp`, `RunDataReturnTemp` on `r2`; `WaterPressure`, `RunDataFan1Speed`, and `RunDataBuildingCPumpPower` on `r3`). Ensures 1–3 minute refresh intervals even when the cloud gateway (`f1`) only polls fan speed or flow rate once per hour.
+- **Level 3 (`r9` / `@poll(9)`):** Cumulative slow registers, outdoor temperature, and setpoints (~3.5 minutes per rotation).
+- **Passive Listening (`u`):** All 140 weekly schedule entities (`*_Timer*`), `StateCompressor` (`b5 11 00`), EEPROM energy history counters, and `PowerStatus` registers have **zero active polling overhead**. They are captured passively from the queries that `f1` and `10` already emit on the bus.
 
 ---
 
@@ -166,7 +166,18 @@ Polled every 60 seconds by `f1`:
 
 ## 4. Compressor Dynamics, Modulation & Enthalpy Metering
 
-### 4.1 Compressor Utilisation Divisor (`CompressorUtil`)
+### 4.1 `StateCompressor` (`b5 11 00`) 9-Byte Frame Decoding
+Every 60 seconds, the system controller (`10`) queries `b5 11 00` (`StateCompressor`) on the outdoor unit (`08`), which responds with a 9-byte payload `[b0, b1, b2, b3, b4, b5, b6, b7, b8]`. Cross-referencing live telemetry across Standby, Prerun, Heating, DHW, Cooling, and Overrun revealed the exact structure of every byte:
+
+| Byte Offset | CSV Field | Data Type | Physical Meaning & Verified Behavior |
+| :---: | :--- | :---: | :--- |
+| **`0..1`** (`b0, b1`) | `flow_temp` | `DATA2c` (`°C`) | **Flow temperature in $1/16\ ^\circ\text{C}$** ($\text{Raw} / 16 = \text{RunDataFlowTemp}$). E.g., raw `598` equals $37.375\ ^\circ\text{C}$. *(Previously misidentified as 16-bit RPM, which caused non-zero values of `330–650` even in standby).* |
+| **`2`** (`b2`) | `ign` | `IGN:1` | Internal status byte (`0x0e`..`0x10` / decimal `14`..`16`). |
+| **`3`** (`b3`) | `modulation` | `UCH` (`%`) | **True Compressor Modulation (`0–102 %`)**. Reads `0%` in standby, prerun, and overrun, and `25%..102%` during active compressor operation. *(Grouping `b2..b3` as a 16-bit `UIN` previously shifted `b3` into the high byte: $16 + 256 \times b_3$).* |
+| **`4`** (`b4`) | `mode_flags` | `UCH` | **Operating mode & diverter valve bitmask**: `0` = standby, `1..4` = heating, `21..24` = DHW, `31` = overrun, `100..104` = cooling. |
+| **`5..8`** (`b5..b8`) | `state_bytes` | `HEX:4` | **Hardware Compressor State & Mirrored Modulation**:<br>• **`b5` (1st byte):** `0x00` = standby, `0x08` = circulation pump prerun/overrun (compressor **OFF**), `0x09` = **compressor ON** (Heating, DHW, or Cooling).<br>• **`b6..b7`:** `00 00`.<br>• **`b8` (4th byte):** Exact hexadecimal mirror of `b3` (`0x00` when off; `0x19`..`0x66` = `25%..102%` when running). |
+
+### 4.2 Compressor Utilisation Divisor (`CompressorUtil`)
 In diagnostic register block `b5 09 540200`, compressor modulation percentage is reported via data type `0x38` (decimal 56). Empirical testing across multiple units (Genia Air Max ES 15, aroTHERM plus VWL 35/6, aroTHERM plus VWL 55/8.1) proved that this register requires a **divisor of 16**:
 
 $$\text{Compressor Utilisation (\%)} = \frac{\text{Raw Reading}}{16}$$
@@ -179,7 +190,7 @@ At the minimum operating frequency ($f_{\text{floor}} \approx 19\text{ rps}$), u
 $$\frac{649}{16} = \mathbf{40.56\%}$$
 Matching real-time machine displays exactly.
 
-### 4.2 Water-Side Heat Meter (`HmuHeatOutput`, `0D5E`)
+### 4.3 Water-Side Heat Meter (`HmuHeatOutput`, `0D5E`)
 Register `0D5E` decodes as an internal enthalpy heat meter in Watts (`W`). Independent validation against calibrated flow meters and precision flow/return temperature sensors ($P = Q \times \Delta T \times 1.163$):
 - Calculated physical heat output: **3,710 W**
 - Register `0D5E` readout: **3,680.65 W**
@@ -187,7 +198,7 @@ Register `0D5E` decodes as an internal enthalpy heat meter in Watts (`W`). Indep
 
 This proves `0D5E` provides a laboratory-grade thermal power measurement on the water side of the plate heat exchanger.
 
-### 4.3 Refrigeration Loop Telemetry Block (`08.hmux0`)
+### 4.4 Refrigeration Loop Telemetry Block (`08.hmux0`)
 The following sub-registers under `b5 09 540200` provide low-level refrigeration cycle diagnostics:
 - **`09C5`:** Primary circulation pump PWM modulation and power.
 - **`0A28`:** Electronic Expansion Valve (EEV) absolute step position (0 to 500 steps).
