@@ -44,3 +44,12 @@ This directory contains **reverse-engineered and collision-free** eBUS message d
 1. Copy `broadcast.csv` to `/etc/ebusd/en/broadcast.csv`.
 2. Copy `vaillant/*.csv` to `/etc/ebusd/en/vaillant/`.
 3. Restart the service: `sudo systemctl restart ebusd` (or `docker compose restart ebusd`).
+
+---
+
+## License & Attribution
+
+For full licensing details and legal notices, see [`LICENSE.md`](LICENSE.md).
+
+- **GPL-3.0 Licensed Files:** Baseline templates and message definitions derived or adapted from [john30/ebusd-configuration](https://github.com/john30/ebusd-configuration) (including `broadcast.csv`) are licensed under the **GNU General Public License v3.0 (GPL-3.0)**, Copyright (c) John30 and eBUSd contributors.
+- **Dual-Licensed Files (MIT & GPL-3.0):** Original reverse-engineered message definitions developed specifically for this project (`08.hmux0.csv`, `15.bass3.csv`, `15.basv3.csv`, `76.vwzio.csv`, `04.netx3.csv`, `f6.netx3.csv`) are dual-licensed under both the **MIT License** and **GPL-3.0** to allow seamless upstream contributions to the eBUSd project.
