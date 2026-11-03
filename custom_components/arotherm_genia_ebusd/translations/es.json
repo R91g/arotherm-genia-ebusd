@@ -68,7 +68,7 @@
       "description": "Tu instancia de `ebusd` tiene señal en el bus eBUS pero no está cargando los archivos CSV optimizados de `ebusd-configuration/` (parece estar usando los archivos por defecto de `ebusd.eu`). Copia `broadcast.csv` y la carpeta `vaillant/*.csv` del repositorio en el directorio de configuración de `ebusd`, verifica el parámetro `--configpath` y reinicia `ebusd`. Este aviso desaparecerá automáticamente en cuanto llegue telemetría."
     },
     "no_ebusd_mqtt_traffic": {
-      "title": "No se recibe tráfico MQTT en el prefijo '{mqtt_prefix}'",
+      "title": "No se recibe tráfico MQTT en el prefijo {mqtt_prefix}",
       "description": "Home Assistant no ha recibido ningún mensaje de `ebusd` bajo el prefijo MQTT configurado (`{mqtt_prefix}/#`). Comprueba que: (1) el prefijo MQTT coincide con la configuración de `ebusd` (`--mqtttopic=ebusd/%circuit/%name`), y (2) el add-on o servicio `ebusd` está en marcha y conectado al broker MQTT. Este aviso desaparecerá automáticamente en cuanto llegue el primer mensaje."
     },
     "mqttjson_not_enabled": {

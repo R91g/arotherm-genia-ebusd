@@ -19,14 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-### Third-Party Licenses & eBUS Configuration Files
-
-The Home Assistant integration component (`custom_components/arotherm_genia_ebusd/`) and tests are licensed under the MIT License above.
-
-Files in the `ebusd-configuration/` directory contain message templates and configuration files for the `ebusd` daemon:
-- Baseline templates and message definitions derived or adapted from [john30/ebusd-configuration](https://github.com/john30/ebusd-configuration) (including `broadcast.csv`) are licensed under the **GNU General Public License v3.0 (GPL-3.0)**, Copyright (c) John30 and eBUSd contributors.
-- Original reverse-engineered message definitions developed specifically for this project (`08.hmux0.csv`, `15.bass3.csv`, `15.basv3.csv`, `76.vwzio.csv`, `04.netx3.csv`, `f6.netx3.csv`) are dual-licensed under both the **MIT License** and **GPL-3.0** to allow seamless upstream contributions to the eBUSd project. Detailed licensing is provided in [`ebusd-configuration/LICENSE.md`](ebusd-configuration/LICENSE.md).
-

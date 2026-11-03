@@ -68,7 +68,7 @@
       "description": "Your `ebusd` instance is connected to the eBUS but is not loading the required CSV definitions from `ebusd-configuration/` (it appears to be using default `ebusd.eu` files). Please copy `broadcast.csv` and `vaillant/*.csv` from this repository into your `ebusd` configuration directory, configure `--configpath`, and restart `ebusd`. This repair notice will clear automatically as soon as telemetry arrives."
     },
     "no_ebusd_mqtt_traffic": {
-      "title": "No MQTT traffic received on prefix '{mqtt_prefix}'",
+      "title": "No MQTT traffic received on prefix {mqtt_prefix}",
       "description": "Home Assistant has not received any messages from `ebusd` under the configured MQTT topic prefix `{mqtt_prefix}/#`. Please verify that: (1) the MQTT topic prefix matches your `ebusd` configuration (`--mqtttopic=ebusd/%circuit/%name`), and (2) the `ebusd` add-on or service is running and connected to your MQTT broker. This repair notice will clear automatically as soon as the first message arrives."
     },
     "mqttjson_not_enabled": {
