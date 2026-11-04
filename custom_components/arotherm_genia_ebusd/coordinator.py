@@ -79,6 +79,7 @@ from .const import (
     ISSUE_OUTDATED_CONTROLLER_CSV,
     ISSUE_OUTDATED_HMUX0_CSV,
     MANUFACTURER_VAILLANT,
+    MESSAGE_ALIASES,
     OUTDOOR_CIRCUITS,
     SCAN_ADDRESS_TO_DEVICE_KEY,
     SCAN_TOPIC_CIRCUITS,
@@ -113,6 +114,11 @@ _OUTDOOR_THERMO_TRIGGER_NAMES: tuple[str, ...] = (
     "prenergythermalhc",
     "prenergythermalhwc",
     "prenergythermalcool",
+    "yieldhc",
+    "yieldhwc",
+    "yieldcooling",
+    "totalenergyusage",
+    "flowpressure",
 )
 
 # Inputs in outdoor units (hmux0/hmu) and vwzio that trigger recalculation of thermodynamic & energy sensors
@@ -630,6 +636,24 @@ class SaunierGeniaCoordinator:
         # Notify subscribers for this (circuit, message)
         self._async_notify_message_listeners(circuit_key, message_name)
 
+        # Check if this message name has a canonical alias (e.g. flowtemp -> RunDataFlowTemp)
+        canonical_alias = MESSAGE_ALIASES.get(msg_lower)
+        alias_parsed: dict[str, Any] | None = None
+        if canonical_alias and canonical_alias != message_name:
+            alias_parsed = dict(parsed)
+            if msg_lower == "powerconsumptionhmu":
+                val = parsed.get("value", next(iter(parsed.values()), None))
+                if val is not None:
+                    try:
+                        alias_parsed["power"] = float(val) * 1000.0
+                    except (ValueError, TypeError):
+                        pass
+            self._canonical_names[(circuit_key, canonical_alias.lower())] = (
+                canonical_alias
+            )
+            self._state[(circuit_key, canonical_alias)] = alias_parsed
+            self._async_notify_message_listeners(circuit_key, canonical_alias)
+
         # Dynamic aliasing for outdoor unit circuits (hmux0 <-> hmu)
         if circuit_key in OUTDOOR_CIRCUITS:
             self._active_outdoor_circuit = circuit_key
@@ -638,6 +662,18 @@ class SaunierGeniaCoordinator:
                     self._canonical_names[(alt_circuit, msg_lower)] = message_name
                     self._state[(alt_circuit, message_name)] = parsed
                     self._async_notify_message_listeners(alt_circuit, message_name)
+                    if (
+                        canonical_alias
+                        and canonical_alias != message_name
+                        and alias_parsed
+                    ):
+                        self._canonical_names[
+                            (alt_circuit, canonical_alias.lower())
+                        ] = canonical_alias
+                        self._state[(alt_circuit, canonical_alias)] = alias_parsed
+                        self._async_notify_message_listeners(
+                            alt_circuit, canonical_alias
+                        )
 
         # Dynamic aliasing for climate controller circuits (bass3 <-> basv3 <-> ctlv2 <-> ctlv3)
         if circuit_key in CONTROLLER_CIRCUITS:
@@ -647,6 +683,18 @@ class SaunierGeniaCoordinator:
                     self._canonical_names[(alt_circuit, msg_lower)] = message_name
                     self._state[(alt_circuit, message_name)] = parsed
                     self._async_notify_message_listeners(alt_circuit, message_name)
+                    if (
+                        canonical_alias
+                        and canonical_alias != message_name
+                        and alias_parsed
+                    ):
+                        self._canonical_names[
+                            (alt_circuit, canonical_alias.lower())
+                        ] = canonical_alias
+                        self._state[(alt_circuit, canonical_alias)] = alias_parsed
+                        self._async_notify_message_listeners(
+                            alt_circuit, canonical_alias
+                        )
 
         # Trigger thermodynamic calculations if relevant outdoor unit or hydraulic module telemetry changed
         if (circuit_key, msg_lower) in THERMO_TRIGGER_MESSAGES:

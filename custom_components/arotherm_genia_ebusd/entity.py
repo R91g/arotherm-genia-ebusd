@@ -9,6 +9,9 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 
 from .const import (
+    CIRCUIT_BASV3,
+    CIRCUIT_CTLV2,
+    CIRCUIT_CTLV3,
     DEVICE_CLIMATE_CONTROLLER,
     DEVICE_HYDRAULIC_INTERFACE,
     DEVICE_OUTDOOR_UNIT,
@@ -77,11 +80,13 @@ def build_device_info(
             if is_vaillant
             else "MiPro Sense (Controlador de Clima)"
         )
-        controller_model = (
-            "sensoCOMFORT VRC 720/3 (BASS3)"
-            if is_vaillant
-            else "MiPro Sense SRC 720/3 (BASS3)"
-        )
+        active_circuit = getattr(coordinator, "active_controller_circuit", None)
+        if active_circuit in (CIRCUIT_CTLV2, CIRCUIT_CTLV3):
+            controller_model = f"sensoCOMFORT VRC 720 ({active_circuit.upper()})"
+        elif is_vaillant or active_circuit == CIRCUIT_BASV3:
+            controller_model = "sensoCOMFORT VRC 720/3 (BASV3)"
+        else:
+            controller_model = "MiPro Sense SRC 720/3 (BASS3)"
         info_kwargs: dict[str, Any] = {
             "identifiers": {(DOMAIN, f"{entry_id}_{DEVICE_CLIMATE_CONTROLLER}")},
             "name": controller_name,

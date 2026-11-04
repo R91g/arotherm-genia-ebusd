@@ -938,6 +938,62 @@ class TestCoordinatorLogic(unittest.TestCase):
 
         asyncio.run(run_write_tests())
 
+    def test_traditional_ebusd_message_name_normalization(self) -> None:
+        """Test normalization of traditional eBUSd message names (flowtemp, BuildingCircuitFlow, etc.)."""
+        hass = MagicMock()
+        entry = MagicMock()
+        entry.entry_id = "test_norm"
+        entry.data = {CONF_MANUFACTURER: MANUFACTURER_VAILLANT}
+
+        coord = SaunierGeniaCoordinator(hass, entry)
+
+        def push_mqtt(topic: str, payload: str) -> None:
+            msg = MagicMock()
+            msg.topic = topic
+            msg.payload = payload
+            coord._async_on_mqtt_message(msg)
+
+        # 1. flowtemp -> RunDataFlowTemp
+        push_mqtt("ebusd/hmu/flowtemp", '{"temp": {"value": 38.5}}')
+        self.assertEqual(
+            coord.get_float(CIRCUIT_HMUX0, "RunDataFlowTemp", "temp"), 38.5
+        )
+        self.assertEqual(coord.get_float(CIRCUIT_HMU, "RunDataFlowTemp", "temp"), 38.5)
+
+        # 2. BuildingCircuitFlow -> RunDataFlowRate
+        push_mqtt("ebusd/hmu/BuildingCircuitFlow", '{"flow_rate": {"value": 850}}')
+        self.assertEqual(
+            coord.get_float(CIRCUIT_HMUX0, "RunDataFlowRate", "flow_rate"), 850
+        )
+        self.assertEqual(
+            coord.get_float(CIRCUIT_HMU, "RunDataFlowRate", "flow_rate"), 850
+        )
+
+        # 3. RunDataStatuscode -> HMUStatusCode
+        push_mqtt(
+            "ebusd/hmu/RunDataStatuscode",
+            '{"status": {"value": "heat_compressor_active"}}',
+        )
+        self.assertEqual(
+            coord.get_str(CIRCUIT_HMUX0, "HMUStatusCode", "status"),
+            "heat_compressor_active",
+        )
+        self.assertEqual(
+            coord.get_str(CIRCUIT_HMU, "HMUStatusCode", "status"),
+            "heat_compressor_active",
+        )
+
+        # 4. PowerConsumptionHmu (kW) -> RunDataElectricPowerConsumption (W)
+        push_mqtt("ebusd/hmu/PowerConsumptionHmu", '{"value": {"value": 1.45}}')
+        self.assertEqual(
+            coord.get_float(CIRCUIT_HMUX0, "RunDataElectricPowerConsumption", "power"),
+            1450.0,
+        )
+        self.assertEqual(
+            coord.get_float(CIRCUIT_HMU, "RunDataElectricPowerConsumption", "power"),
+            1450.0,
+        )
+
     def test_repair_issues_outdated_and_missing_csv_detection(self) -> None:
         """Test automatic Home Assistant Repair issue creation and clearing for CSV compatibility."""
         import sys

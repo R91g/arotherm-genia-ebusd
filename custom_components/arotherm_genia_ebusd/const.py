@@ -170,6 +170,15 @@ CIRCUIT_NETX3_ALT = "f6"
 CIRCUIT_BROADCAST = "broadcast"
 CIRCUIT_GLOBAL = "global"
 
+# Cross-circuit and traditional eBUSd message name normalization aliases
+MESSAGE_ALIASES: dict[str, str] = {
+    "flowtemp": "RunDataFlowTemp",
+    "buildingcircuitflow": "RunDataFlowRate",
+    "waterthroughput": "RunDataFlowRate",
+    "rundatastatuscode": "HMUStatusCode",
+    "powerconsumptionhmu": "RunDataElectricPowerConsumption",
+}
+
 # eBUS Scan address mapping for passive hardware & software version detection
 SCAN_ADDRESS_TO_DEVICE_KEY: dict[str, str] = {
     "08": DEVICE_OUTDOOR_UNIT,
