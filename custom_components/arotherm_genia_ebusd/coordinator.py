@@ -836,7 +836,7 @@ class SaunierGeniaCoordinator:
             self.has_message(c, m)
             for c in OUTDOOR_CIRCUITS
             for m in HMUX0_CUSTOM_SIGNATURE_MESSAGES
-        ) or any(c in OUTDOOR_CIRCUITS for c, _ in self._state)
+        )
         has_controller = any(c in CONTROLLER_CIRCUITS for c, _ in self._state)
         has_vwzio = any(c == CIRCUIT_VWZIO for c, _ in self._state)
         return has_custom_outdoor and has_controller and has_vwzio

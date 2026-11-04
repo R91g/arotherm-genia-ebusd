@@ -1098,6 +1098,20 @@ class TestCoordinatorLogic(unittest.TestCase):
             hass, DOMAIN, ISSUE_MISSING_CUSTOM_CSV
         )
 
+        # 2c. Also works for aroTHERM HMU00 (HW5103) and CTLV2
+        coord._state.clear()
+        coord._canonical_names.clear()
+        coord._active_repair_issues.clear()
+        push_mqtt("ebusd/global/signal", "true")
+        coord._async_verify_custom_csv_after_hydration()
+        self.assertIn(ISSUE_MISSING_CUSTOM_CSV, coord._active_repair_issues)
+
+        # Ingestion of custom 08.hmu.HW5103, 15.ctlv2, and 76.vwzio clears missing_custom_csv
+        push_mqtt("ebusd/hmu/RunDataFlowTemp", '{"value": {"value": 36.5}}')
+        push_mqtt("ebusd/ctlv2/Z1DayTemp", '{"value": {"value": 21.0}}')
+        push_mqtt("ebusd/vwzio/Status01", '{"temp1": {"value": 36.0}}')
+        self.assertNotIn(ISSUE_MISSING_CUSTOM_CSV, coord._active_repair_issues)
+
         # 3. No MQTT traffic on configured prefix after hydration raises no_ebusd_mqtt_traffic
         coord._state.clear()
         coord._canonical_names.clear()
