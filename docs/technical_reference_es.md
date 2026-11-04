@@ -171,7 +171,7 @@ Cada 60 segundos, la centralita (`10`) consulta el registro `b5 11 00` (`StateCo
 
 | Posición de Byte | Campo en CSV | Tipo de Dato | Magnitud Física y Comportamiento Verificado |
 | :---: | :--- | :---: | :--- |
-| **`0..1`** (`b0, b1`) | `flow_temp` | `DATA2c` (`°C`) | **Temperatura de impulsión en $1/16\ ^\circ\text{C}$** ($\text{Raw} / 16 = \text{RunDataFlowTemp}$). P. ej., un valor raw de `598` equivale a $37,375\ ^\circ\text{C}$. *(Anteriormente identificado erróneamente como RPM de 16 bits, razón por la cual marcaba `330–650` incluso en reposo).* |
+| **`0..1`** (`b0, b1`) | `flow_temp` | `D2C` (`°C`) | **Temperatura de impulsión en $1/16\ ^\circ\text{C}$** ($\text{Raw} / 16 = \text{RunDataFlowTemp}$). P. ej., un valor raw de `598` equivale a $37,375\ ^\circ\text{C}$. *(Anteriormente identificado erróneamente como RPM de 16 bits, razón por la cual marcaba `330–650` incluso en reposo).* |
 | **`2`** (`b2`) | `ign` | `IGN:1` | Byte de estado interno (`0x0e`..`0x10` / decimal `14`..`16`). |
 | **`3`** (`b3`) | `modulation` | `UCH` (`%`) | **Modulación Real del Compresor (`0–102 %`)**. Marca `0 %` en reposo, preventilación y post-circulación, y `25 %..102 %` con el compresor en marcha. *(Agrupar `b2..b3` como `UIN` de 16 bits desplazaba antes `b3` al byte alto: $16 + 256 \times b_3$).* |
 | **`4`** (`b4`) | `mode_flags` | `UCH` | **Máscara de modo operativo y válvula desviadora**: `0` = reposo, `1..4` = calefacción, `21..24` = ACS, `31` = post-circulación, `100..104` = refrigeración. |
@@ -200,13 +200,15 @@ Esto confirma que `0D5E` actúa como un contador de calor con grado de precisió
 
 ### 4.4 Telemetría del Circuito Frigorífico R290 (`08.hmux0`)
 Los sub-registros bajo `b5 09 540200` exponen la termodinámica del gas refrigerante:
-- **`09C5`:** Modulación PWM y potencia de la bomba circuladora primaria.
-- **`0A28`:** Posición absoluta de pasos de la Válvula de Expansión Electrónica EEV (0 a 500 pasos).
-- **`0A47`:** Velocidad del ventilador 1 del evaporador (rpm).
-- **`0A30`:** Velocidad del ventilador 2 (rpm, en modelos de doble ventilador).
-- **`10D1`:** Temperatura de saturación del evaporador ($1/16\ ^\circ\text{C}$).
-- **`10D7`:** Recalentamiento útil (*superheat*) en la aspiración ($1/16\text{ K}$): coincide con `RunDataCompressorInletTemp` menos `10D1`.
-- **`10DB`:** Temperatura de líquido a la salida del condensador ($1/16\ ^\circ\text{C}$).
+- **`09C5` (`540200c509`):** Modulación PWM y potencia de la bomba circuladora primaria (`EXP`, `%`).
+- **`0A28` (`540200280a`):** Posición absoluta de pasos de la Válvula de Expansión Electrónica EEV (0 a 500 pasos).
+- **`0A47` (`540200470a`):** Velocidad del ventilador 1 del evaporador (rpm).
+- **`0A30` (`540200300a`):** Velocidad del ventilador 2 (rpm, en modelos de doble ventilador).
+- **`0B09` (`540200090b`):** Caudal volumétrico de agua en tiempo real (`RunDataFlowRate`, `UIN`, `l/h`) medido por el caudalímetro vórtex primario (`0 l/h` en reposo, `850–1.900 l/h` en carga; alimenta directamente el cálculo interno de potencia térmica `0D5E`).
+- **`0B68` (`540200680b`):** Caudal nominal/de diseño parametrizado en placa (`RunDataNominalFlowRate`, `UIN`, `l/h`, constante en `900 l/h`).
+- **`10D1` (`540200d110`):** Temperatura de saturación del evaporador ($1/16\ ^\circ\text{C}$).
+- **`10D7` (`540200d710`):** Recalentamiento útil (*superheat*) en la aspiración ($1/16\text{ K}$): coincide con `RunDataCompressorInletTemp` menos `10D1`.
+- **`10DB` (`540200db10`):** Temperatura de líquido a la salida del condensador ($1/16\ ^\circ\text{C}$).
 
 ---
 

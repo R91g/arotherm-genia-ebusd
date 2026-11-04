@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.4] - Unreleased
+
+> [!IMPORTANT]
+> **Action Required:** Please update `ebusd-configuration/vaillant/08.hmux0.csv` in your `ebusd` configuration folder and restart `ebusd` to fix the `StateCompressor` `D2C` data type, enable the real-time vortex water flow sensor (`RunDataFlowRate` `540200090b`), and apply the optimized bus polling priorities.
+
+### Fixed
+- **`StateCompressor` `D2C` Data Type Fix (`08.hmux0.csv` — [#2](https://github.com/R91g/arotherm-genia-ebusd/issues/2)):**
+  - Replaced invalid `DATA2c` type token with the standard eBUSd type `D2C` in `StateCompressor` (`b511,00` in `ebusd-configuration/vaillant/08.hmux0.csv:32`), resolving the `[main error] error readingconfigfiles ... vaillant/08.hmux0.csv: ERR: invalid part type in line 32` error on `ebusd` startup.
+  - Added automated schema test `test_ebusd_csv_field_types` in `tests/test_schema_integrity.py` to validate every field data type across all `.csv` files against official eBUSd type specifications.
+- **Real-Time Primary Circuit Volumetric Water Flow Sensor (`RunDataFlowRate` `540200090b`):**
+  - Updated `RunDataFlowRate` (`ebusd-configuration/vaillant/08.hmux0.csv:53`) from the static nominal/design flow parameter `540200680b` (which permanently reported `900 l/h`) to the live primary circuit vortex flow sensor register `b509 540200090b` (`UIN`, `l/h`), reporting `0 l/h` in standby and `850–2,500+ l/h` dynamically during heating, cooling, and DHW operation.
+  - Retained `540200680b` as a passive (`u`) definition (`RunDataNominalFlowRate`) so `ebusd` continues decoding passive gateway reads without logging unknown telegrams.
+- **HACS & Home Assistant Hassfest CI Validation:**
+  - Restored root `LICENSE` to standard MIT text for GitHub SPDX license detection while documenting `ebusd-configuration/` GPL-3.0 attribution in `ebusd-configuration/LICENSE.md`.
+  - Removed single quotes around the `{mqtt_prefix}` placeholder in `strings.json`, `translations/en.json`, and `translations/es.json` to comply with Hassfest translation placeholder checks.
+
+### Changed
+- **Empirical eBUS Polling Optimization (`08.hmux0.csv`):**
+  - Audited 1.26M bus telegrams (`telegrams.db`) to optimize active `ebusd` polling (`0x31`) alongside passive master traffic from `MiPro Sense` (`0x10`) and `MiGo Link` (`0xf1`):
+    - Kept active polling (`r1..r9`) on registers never queried passively (`RunDataElectricPowerConsumption` `r1`, `RunDataFlowTemp` `r2`, `RunDataReturnTemp` `r2`, `RunDataHighPressure` `r3`, and refrigerant temperatures `r9`) and configured `RunDataFlowRate` (`540200090b`) as `r2` (~3.5 min refresh) for accurate live thermal power and COP calculation.
+    - Reverted `HMUStatusCode` (`b503 0003`, passively queried every 2.5 min by `0xf1`), `RunDataCompressorSpeed` (`5402000d0a`, every 9.8 min by `0xf1`), `RunDataBuildingCPumpPower` (`540200c509`, every 9.8 min by `0xf1`), and `RunDataFan1Speed` (`540200470a`, every 60 min by `0xf1`) to passive `u`, reducing multi-master bus collisions while maintaining active `/get` polling for standalone installations via `has_migo_link: false` and startup hydration (`ESSENTIAL_HYDRATION_MESSAGES`).
+
+---
+
 ## [1.2.3] - 2026-11-03
 
 > [!IMPORTANT]
@@ -21,7 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **9-Byte `StateCompressor` (`b5 11 00`) Decoding, Compressor State & Modulation Fix:**
-  - Fixed `binary_sensor.compressor_active` (`Compressor running`) remaining permanently `On` in standby because `StateCompressor` bytes `0..1` (`comp_speed` in earlier CSVs) actually encode `flow_temp` in $1/16\ ^\circ\text{C}$ (`DATA2c`).
+  - Fixed `binary_sensor.compressor_active` (`Compressor running`) remaining permanently `On` in standby because `StateCompressor` bytes `0..1` (`comp_speed` in earlier CSVs) actually encode `flow_temp` in $1/16\ ^\circ\text{C}$ (`D2C`).
   - Fixed `sensor.compressor_modulation` (`Compressor modulation`) staying stuck at `4.0%` during full-power heating and jumping to `31.0%` during pump overrun because byte `4` encodes a mode/valve bitmask (`0` standby, `4` heating, `24` DHW, `31` overrun, `104` cooling), whereas **true compressor modulation (`0–102%`)** resides in byte `3` and is mirrored in byte `8` (4th byte of `state_bytes`).
   - Implemented backward-compatible `state_bytes` decoding in Python (`_check_compressor_active` reading byte `5`: `0x09` = active, `0x00`/`0x08` = off; `_get_compressor_modulation` reading byte `8` with fallback to `modulation`), ensuring accurate state and modulation even before updating `08.hmux0.csv`.
   - Removed redundant `compressor_speed_rpm` entity (and added automatic Entity Registry cleanup in `DEPRECATED_UNIQUE_ID_SUFFIXES`), standardizing on the true rotational speed sensor `compressor_speed_rps` (`RunDataCompressorSpeed`, `r/s`).

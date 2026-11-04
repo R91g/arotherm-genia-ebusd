@@ -171,7 +171,7 @@ Every 60 seconds, the system controller (`10`) queries `b5 11 00` (`StateCompres
 
 | Byte Offset | CSV Field | Data Type | Physical Meaning & Verified Behavior |
 | :---: | :--- | :---: | :--- |
-| **`0..1`** (`b0, b1`) | `flow_temp` | `DATA2c` (`°C`) | **Flow temperature in $1/16\ ^\circ\text{C}$** ($\text{Raw} / 16 = \text{RunDataFlowTemp}$). E.g., raw `598` equals $37.375\ ^\circ\text{C}$. *(Previously misidentified as 16-bit RPM, which caused non-zero values of `330–650` even in standby).* |
+| **`0..1`** (`b0, b1`) | `flow_temp` | `D2C` (`°C`) | **Flow temperature in $1/16\ ^\circ\text{C}$** ($\text{Raw} / 16 = \text{RunDataFlowTemp}$). E.g., raw `598` equals $37.375\ ^\circ\text{C}$. *(Previously misidentified as 16-bit RPM, which caused non-zero values of `330–650` even in standby).* |
 | **`2`** (`b2`) | `ign` | `IGN:1` | Internal status byte (`0x0e`..`0x10` / decimal `14`..`16`). |
 | **`3`** (`b3`) | `modulation` | `UCH` (`%`) | **True Compressor Modulation (`0–102 %`)**. Reads `0%` in standby, prerun, and overrun, and `25%..102%` during active compressor operation. *(Grouping `b2..b3` as a 16-bit `UIN` previously shifted `b3` into the high byte: $16 + 256 \times b_3$).* |
 | **`4`** (`b4`) | `mode_flags` | `UCH` | **Operating mode & diverter valve bitmask**: `0` = standby, `1..4` = heating, `21..24` = DHW, `31` = overrun, `100..104` = cooling. |
@@ -200,13 +200,15 @@ This proves `0D5E` provides a laboratory-grade thermal power measurement on the 
 
 ### 4.4 Refrigeration Loop Telemetry Block (`08.hmux0`)
 The following sub-registers under `b5 09 540200` provide low-level refrigeration cycle diagnostics:
-- **`09C5`:** Primary circulation pump PWM modulation and power.
-- **`0A28`:** Electronic Expansion Valve (EEV) absolute step position (0 to 500 steps).
-- **`0A47`:** ECM Evaporator Fan 1 speed (rpm).
-- **`0A30`:** ECM Evaporator Fan 2 speed (rpm, on twin-fan chassis).
-- **`10D1`:** Evaporator saturation temperature ($1/16\ ^\circ\text{C}$).
-- **`10D7`:** Current suction line superheat ($1/16\text{ K}$): verifies directly against `RunDataCompressorInletTemp` minus `10D1`.
-- **`10DB`:** Condenser liquid outlet temperature ($1/16\ ^\circ\text{C}$).
+- **`09C5` (`540200c509`):** Primary circulation pump PWM modulation and power (`EXP`, `%`).
+- **`0A28` (`540200280a`):** Electronic Expansion Valve (EEV) absolute step position (0 to 500 steps).
+- **`0A47` (`540200470a`):** ECM Evaporator Fan 1 speed (rpm).
+- **`0A30` (`540200300a`):** ECM Evaporator Fan 2 speed (rpm, on twin-fan chassis).
+- **`0B09` (`540200090b`):** Real-time volumetric water flow rate (`RunDataFlowRate`, `UIN`, `l/h`) from the primary circuit vortex sensor (`0 l/h` in standby, `850–1,900 l/h` under load; directly feeds internal heat meter `0D5E`).
+- **`0B68` (`540200680b`):** Nominal/design building circuit flow rate constant (`RunDataNominalFlowRate`, `UIN`, `l/h`, typically fixed at `900 l/h`).
+- **`10D1` (`540200d110`):** Evaporator saturation temperature ($1/16\ ^\circ\text{C}$).
+- **`10D7` (`540200d710`):** Current suction line superheat ($1/16\text{ K}$): verifies directly against `RunDataCompressorInletTemp` minus `10D1`.
+- **`10DB` (`540200db10`):** Condenser liquid outlet temperature ($1/16\ ^\circ\text{C}$).
 
 ---
 

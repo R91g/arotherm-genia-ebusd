@@ -1,5 +1,7 @@
 """Unit tests for schema integrity, manifest, translations, and services validation."""
 
+import csv
+import glob
 import json
 import os
 import re
@@ -245,6 +247,68 @@ class TestSchemaIntegrity(unittest.TestCase):
         self.assertIn("zone_1_climate", icons["entity"]["climate"])
         self.assertIn("z1_op_mode", icons["entity"]["select"])
         self.assertIn("dhw_boost_switch", icons["entity"]["switch"])
+
+    def test_ebusd_csv_field_types(self) -> None:
+        """Verify that all eBUSd CSV definitions contain strictly valid eBUSd data types."""
+        ebusd_cfg_dir = os.path.join(self.root_dir, "ebusd-configuration")
+        csv_files = glob.glob(
+            os.path.join(ebusd_cfg_dir, "**", "*.csv"), recursive=True
+        )
+        self.assertGreater(len(csv_files), 0, "No CSV configuration files found")
+
+        # Official ebusd field type prefixes (Wiki 4.1 Data-types)
+        valid_prefixes = (
+            "HEX",
+            "IGN",
+            "UCH",
+            "SCH",
+            "UIN",
+            "SIN",
+            "ULG",
+            "SLG",
+            "FLT",
+            "EXP",
+            "D1C",
+            "D1B",
+            "D2C",
+            "D2B",
+            "HTM",
+            "BDA",
+            "BTI",
+            "VTI",
+            "VTM",
+            "DAY",
+            "BI",
+            "STR",
+            "TTH",
+            "PIN",
+            "HDA",
+            "HTI",
+        )
+
+        for csv_path in csv_files:
+            rel_path = os.path.relpath(csv_path, self.root_dir)
+            with open(csv_path, "r", encoding="utf-8", errors="replace") as fp:
+                for line_no, raw_line in enumerate(fp, start=1):
+                    line = raw_line.strip()
+                    if not line or line.startswith(("#", "*")):
+                        continue
+                    parts = next(iter(csv.reader([line])))
+                    # In ebusd CSV files, fields are formatted in groups of 6:
+                    # name (idx 9), part (idx 10), type (idx 11), divisor (idx 12), unit (idx 13), comment (idx 14)
+                    for idx in range(9, len(parts), 6):
+                        if idx + 2 < len(parts):
+                            fname = parts[idx].strip()
+                            ftype = parts[idx + 2].strip()
+                            if ftype and fname != "*name":
+                                base_type = ftype.split(":")[0].upper()
+                                self.assertTrue(
+                                    any(
+                                        base_type.startswith(vp)
+                                        for vp in valid_prefixes
+                                    ),
+                                    f"Invalid ebusd field type '{ftype}' for field '{fname}' in {rel_path}:{line_no}",
+                                )
 
 
 if __name__ == "__main__":

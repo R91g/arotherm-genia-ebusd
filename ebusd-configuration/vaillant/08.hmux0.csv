@@ -29,7 +29,7 @@ u,,,PrEnergyEnvYieldCool,total cooling environmental energy yield,,,b516,1000fff
 
 
 # Compressor and fan modulation state (Controller 10 -> 08)
-u,,,StateCompressor,compressor state and modulation,,,b511,00,flow_temp,,DATA2c,,°C,"flow temperature",ign,,IGN:1,,,,modulation,,UCH,,%,"compressor modulation",mode_flags,,UCH,,,"operating mode flags",state_bytes,,HEX:4,,,"state bytes"
+u,,,StateCompressor,compressor state and modulation,,,b511,00,flow_temp,,D2C,,°C,"flow temperature",ign,,IGN:1,,,,modulation,,UCH,,%,"compressor modulation",mode_flags,,UCH,,,"operating mode flags",state_bytes,,HEX:4,,,"state bytes"
 
 # Refrigerant circuit temperatures and pump status (Controller 10 -> 08)
 u,,,CircuitTemps,refrigerant circuit temperatures,,,b511,0101,flow_temp,,D1C,,°C,"heat pump flow temperature",return_temp,,D1C,,°C,"heat pump return temperature",discharge_temp,,D1C,,°C,"compressor discharge temperature",evaporator_temp,,D1C,,°C,"evaporator temperature",ign,,IGN:1,,,,pump_pwm,,UCH,,%,"outdoor pump PWM modulation",ign_2,,IGN:3,,,
@@ -37,9 +37,9 @@ u,,,CircuitTemps,refrigerant circuit temperatures,,,b511,0101,flow_temp,,D1C,,°
 # ==============================================================================
 # 2. RUN DATA DIAGNOSTIC SENSORS (b509 - PASSIVE u AND ACTIVE r)
 # ==============================================================================
-r2,,,RunDataCompressorSpeed,,,,b509,5402000d0a,ign,,IGN:4,,,,value,,EXP,,rps,
+u,,,RunDataCompressorSpeed,,,,b509,5402000d0a,ign,,IGN:4,,,,value,,EXP,,rps,
 u,,,RunDataEEVPositionAbs,(EEV Position in different scale?),,,b509,540200280a,ign,,IGN:4,,,,value,,UIN,,,
-r3,,,RunDataFan1Speed,,,,b509,540200470a,ign,,IGN:4,,,,value,,EXP,,rpm,
+u,,,RunDataFan1Speed,,,,b509,540200470a,ign,,IGN:4,,,,value,,EXP,,rpm,
 u,,,RunDataFan2Speed,,,,b509,540200490a,ign,,IGN:4,,,,value,,EXP,,rpm,
 u,,,RunDataUnsupported530d,unsupported status register on HMUX0,,,b509,540200530d,data,,HEX:4,,,HMU Status code (use HMUStatusCode b503 0003)
 r1,,,RunDataElectricPowerConsumption,,,,b509,5402005b0d,ign,,IGN:4,,,,power,,EXP,,W,current electrical power consumption (Watt)
@@ -50,7 +50,8 @@ r9,,,RunDataEEVOutletTemp,,,,b509,540200ac08,ign,,IGN:4,,,,value,,EXP,,°C,tempe
 u,,,RunDataCondenserOutTemp,,,,b509,540200b608,ign,,IGN:4,,,,value,,EXP,,°C,condenser outlet temperature
 r2,,,RunDataFlowTemp,,,,b509,540200fc08,ign,,IGN:4,,,,value,,EXP,,°C,"current flow temp, accurate to 2 decimal places"
 r2,,,RunDataReturnTemp,,,,b509,5402000609,ign,,IGN:4,,,,value,,EXP,,°C,"current return temp, accurate to 2 decimal places"
-r2,,,RunDataFlowRate,building circuit water flow rate,,,b509,540200680b,ign,,IGN:4,,,,value,,UIN,,l/h,"building circuit volumetric water flow rate"
+r2,,,RunDataFlowRate,building circuit water flow rate,,,b509,540200090b,ign,,IGN:4,,,,value,,UIN,,l/h,"building circuit volumetric water flow rate"
+u,,,RunDataNominalFlowRate,nominal building circuit water flow rate,,,b509,540200680b,ign,,IGN:4,,,,value,,UIN,,l/h,"nominal building circuit volumetric water flow rate"
 u,,,RunStatsHMUHours,,,,b509,540200b80b,ign,,IGN:4,,,,value,,UIN,,h,hours
 u,,,RunStatsHcHours,,,,b509,540200b90b,ign,,IGN:4,,,,value,,UIN,,h,hours
 u,,,RunStatsHwcHours,,,,b509,540200bc0b,ign,,IGN:4,,,,value,,UIN,,h,total runtime of Hwc mode
@@ -59,7 +60,7 @@ u,,,RunStatsHwcStarts,,,,b509,540200c10b,ign,,IGN:4,,,,value,,UIN,,,total starts
 u,,,RunStatsCompressorHours,,,,b509,540200c20b,ign,,IGN:4,,,,value,,UIN,,h,hours
 u,,,RunStatsCompressorStarts,,,,b509,540200c30b,ign,,IGN:4,,,,value,,UIN,,,start count
 u,,,RunStatsBuildingPumpHours,,,,b509,540200c40b,ign,,IGN:4,,,,value,,UIN,,h,hours
-r3,,,RunDataBuildingCPumpPower,,,,b509,540200c509,ign,,IGN:4,,,,value,,EXP,,%,
+u,,,RunDataBuildingCPumpPower,,,,b509,540200c509,ign,,IGN:4,,,,value,,EXP,,%,
 u,,,RunStatsBuildingCPumpStarts,,,,b509,540200c50b,ign,,IGN:4,,,,value,,UIN,,,total starts of building circuit pump
 u,,,RunStats4PortValveHours,,,,b509,540200c80b,ign,,IGN:4,,,,value,,UIN,,h,hours
 u,,,RunStats4PortValveSwitches,,,,b509,540200c90b,ign,,IGN:4,,,,value,,UIN,,,start count
@@ -84,7 +85,7 @@ u,,,Status02,operating mode/maximum temp/current temp,,,b511,02,hwcmode,,UCH,0=d
 u,,,Status,Status,,,b511,03,temp,,D2C,,°C,temperature,press,,FLT,,bar,pressure,press_1,,FLT,,bar,pressure,hcmode,,UCH,0=off;1=cooling;3=heat;4=water,,boiler mode,hex,,HEX:1,,,
 u,,,Currenterror,Current errors,,,b503,0001,error,,UIN,,,error number,error_1,,UIN,,,error number,error_2,,UIN,,,error number,error_3,,UIN,,,error number,error_4,,UIN,,,error number
 u,,,Errorhistory,Error_History,,,b503,0101,index,m,UCH,,,,status,,UCH,,,Status,time,,VTM,,,time,date,,HDA:3,,,date,error,,UIN,,,error number
-r2,,,HMUStatusCode,outdoor unit status code,,,b503,0003,status,,UIN,34=frost_protect;100=standby;101=heat_compressor_shutdown;102=heat_compressor_blocked;103=heat_prerun;104=heat_compressor_active;107=heat_overrun;111=cool_compressor_shutdown;112=cool_compressor_blocked;113=cool_prerun;114=cool_compressor_active;117=cool_overrun;125=heat_immersion_heater_active;132=hwc_compressor_blocked;133=hwc_prerun;134=hwc_compressor_active;135=hwc_immersion_heater_active;137=hwc_overrun;141=heat_immersion_heater_shutdown;142=heat_immersion_heater_blocked;151=hwc_immersion_heater_shutdown;152=hwc_immersion_heater_blocked;202=air_purging_program_active;240=compressor_oil_heating_active;252=fan1_blocked;255=fan1_airinlet_too_high;256=fan1_airinlet_too_low;260=fan2_blocked;275=building_circuit_flow_too_low;277=building_circuit_pump_fault;280=frequency_converter_fault_compressor;281=frequency_converter_fault_mains_voltage;282=frequency_converter_fault_overheating;283=deicing_time_too_long;284=deicing_flow_temp_too_low;285=compressor_outlet_temp_too_high;286=hot_gas_temp_switch_open;287=fan1_wind;288=fan2_wind;289=current_limt_active;302=high_pressure_switch_open;303=compressor_outlet_temp_too_high_1;304=evaporation_temp_too_low;305=condensation_temp_too_low;306=evaporation_temp_too_high;308=condensation_temp_too_high;312=building_circuit_return_temp_too_low;314=building_circuit_return_temp_too_high;351=immersion_heater_flow_temp_too_high;516=deicing_active;575=frequency_converter_fault;581=connection_fault_frequency_converter;590=four_port_valve_position_fault,,outdoor unit status,data,,HEX:8,,,
+u,,,HMUStatusCode,outdoor unit status code,,,b503,0003,status,,UIN,34=frost_protect;100=standby;101=heat_compressor_shutdown;102=heat_compressor_blocked;103=heat_prerun;104=heat_compressor_active;107=heat_overrun;111=cool_compressor_shutdown;112=cool_compressor_blocked;113=cool_prerun;114=cool_compressor_active;117=cool_overrun;125=heat_immersion_heater_active;132=hwc_compressor_blocked;133=hwc_prerun;134=hwc_compressor_active;135=hwc_immersion_heater_active;137=hwc_overrun;141=heat_immersion_heater_shutdown;142=heat_immersion_heater_blocked;151=hwc_immersion_heater_shutdown;152=hwc_immersion_heater_blocked;202=air_purging_program_active;240=compressor_oil_heating_active;252=fan1_blocked;255=fan1_airinlet_too_high;256=fan1_airinlet_too_low;260=fan2_blocked;275=building_circuit_flow_too_low;277=building_circuit_pump_fault;280=frequency_converter_fault_compressor;281=frequency_converter_fault_mains_voltage;282=frequency_converter_fault_overheating;283=deicing_time_too_long;284=deicing_flow_temp_too_low;285=compressor_outlet_temp_too_high;286=hot_gas_temp_switch_open;287=fan1_wind;288=fan2_wind;289=current_limt_active;302=high_pressure_switch_open;303=compressor_outlet_temp_too_high_1;304=evaporation_temp_too_low;305=condensation_temp_too_low;306=evaporation_temp_too_high;308=condensation_temp_too_high;312=building_circuit_return_temp_too_low;314=building_circuit_return_temp_too_high;351=immersion_heater_flow_temp_too_high;516=deicing_active;575=frequency_converter_fault;581=connection_fault_frequency_converter;590=four_port_valve_position_fault,,outdoor unit status,data,,HEX:8,,,
 u,,,ErrorMemorySlot,error memory slot,,,b503,00,slot,m,UCH,,,,error,,UIN,,,error number,data,,HEX:8,,,
 u,,,CompressorAvailability,compressor availability status,,,b507,09,request,m,UCH,,,,status,,UIN,,,availability code
 u,,,DiagFeatureSupport,diagnostic feature support,,,b51a,05000c,feature_id,m,HEX:1,,,,status,,UIN,,,feature support status
