@@ -1511,6 +1511,26 @@ class SaunierGeniaCoordinator:
         except (ValueError, TypeError, OverflowError):
             return "Inactivo"
 
+    def _format_bass3_date(
+        self, circuit: str, message: str, sentinel_year: int
+    ) -> str | None:
+        """Format a bass3 date field as DD/MM/20YY, or None if sentinel."""
+        msg = self.get_message(circuit, message)
+        if not msg:
+            return None
+        day = msg.get("day")
+        month = msg.get("month")
+        year = msg.get("year")
+        if (
+            not isinstance(day, int)
+            or not isinstance(month, int)
+            or not isinstance(year, int)
+        ):
+            return None
+        if year == sentinel_year:
+            return None
+        return f"{day:02d}/{month:02d}/20{year:02d}"
+
     def get_holiday_remaining_attributes(self) -> dict[str, Any]:
         """Return structured extra attributes for holiday duration remaining."""
         val = self.get_holiday_remaining_days()
@@ -1522,6 +1542,10 @@ class SaunierGeniaCoordinator:
             else (0 if val == "Inactivo" else None),
             "is_active": is_active,
             "is_open_ended": is_open_ended,
+            "start_date": self._format_bass3_date(
+                CIRCUIT_BASS3, "HolidayStartDate", 15
+            ),
+            "end_date": self._format_bass3_date(CIRCUIT_BASS3, "HolidayEndDate", 15),
         }
 
     def get_cooling_remaining_days(self) -> int | str:
@@ -1580,6 +1604,10 @@ class SaunierGeniaCoordinator:
             else (0 if val == "Inactivo" else None),
             "is_active": is_active,
             "is_open_ended": is_open_ended,
+            "start_date": self._format_bass3_date(
+                CIRCUIT_BASS3, "CoolingStartDate", 19
+            ),
+            "end_date": self._format_bass3_date(CIRCUIT_BASS3, "CoolingEndDate", 19),
         }
 
     async def async_cancel_holiday_mode(self) -> None:

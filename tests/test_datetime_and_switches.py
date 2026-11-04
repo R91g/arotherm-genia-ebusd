@@ -130,7 +130,7 @@ class TestDateTimeAndSwitches(unittest.TestCase):
         """Test Holiday Start DateTime reads bus data and writes DD;MM;YY + HH;MM;SS."""
         entity = SaunierGeniaHolidayStartDateTime(self.coord)
 
-        # 1. When bus has reset sentinel (year=15) and no buffer, returns 2015-01-01 00:00:00
+        # 1. When bus has reset sentinel (year=15) and no buffer, returns None (Desconocido)
         self.coord._state[("bass3", "holidaystartdate")] = {
             "day": 1,
             "month": 1,
@@ -141,11 +141,7 @@ class TestDateTimeAndSwitches(unittest.TestCase):
             "minutes": 0,
             "seconds": 0,
         }
-        sentinel_val = entity.native_value
-        self.assertIsNotNone(sentinel_val)
-        self.assertEqual(sentinel_val.year, 2015)
-        self.assertEqual(sentinel_val.month, 1)
-        self.assertEqual(sentinel_val.day, 1)
+        self.assertIsNone(entity.native_value)
 
         # 1b. When bus has reset sentinel (year=15) and preselected buffer is set, returns buffer
         self.coord.preselected_holiday_start_datetime = datetime(2026, 12, 24, 9, 0, 0)
@@ -209,7 +205,7 @@ class TestDateTimeAndSwitches(unittest.TestCase):
         start_entity = SaunierGeniaCoolingStartDateTime(self.coord)
         end_entity = SaunierGeniaCoolingEndDateTime(self.coord)
 
-        # Closed epoch 2019
+        # Closed epoch 2019 → None (Desconocido)
         self.coord._state[("bass3", "coolingstartdate")] = {
             "day": 1,
             "month": 1,
@@ -220,8 +216,33 @@ class TestDateTimeAndSwitches(unittest.TestCase):
             "month": 1,
             "year": 19,
         }
-        self.assertEqual(start_entity.native_value.year, 2019)
-        self.assertEqual(end_entity.native_value.year, 2019)
+        self.assertIsNone(start_entity.native_value)
+        self.assertIsNone(end_entity.native_value)
+
+        # Active dates show normally
+        self.coord._state[("bass3", "coolingstartdate")] = {
+            "day": 15,
+            "month": 6,
+            "year": 26,
+        }
+        self.coord._state[("bass3", "coolingenddate")] = {
+            "day": 31,
+            "month": 8,
+            "year": 26,
+        }
+        self.assertIsNotNone(start_entity.native_value)
+        self.assertEqual(start_entity.native_value.year, 2026)
+        self.assertIsNotNone(end_entity.native_value)
+        self.assertEqual(end_entity.native_value.year, 2026)
+
+        # Year 99 (indefinite) shows normally
+        self.coord._state[("bass3", "coolingenddate")] = {
+            "day": 1,
+            "month": 1,
+            "year": 99,
+        }
+        self.assertIsNotNone(end_entity.native_value)
+        self.assertEqual(end_entity.native_value.year, 2099)
 
         # Write custom dates
         asyncio.run(start_entity.async_set_value(datetime(2026, 6, 15, 0, 0, 0)))
@@ -236,17 +257,43 @@ class TestDateTimeAndSwitches(unittest.TestCase):
         """Test Holiday Mode switch activation, cancellation, and attributes."""
         sw = SaunierGeniaHolidayModeSwitch(self.coord)
 
-        # Initially off
+        # Initially off (sentinel dates)
         self.coord._state[("bass3", "z1status")] = {"value": "auto"}
         self.coord._state[("bass3", "hwcstatus")] = {"value": "auto"}
+        self.coord._state[("bass3", "holidaystartdate")] = {
+            "day": 1,
+            "month": 1,
+            "year": 15,
+        }
+        self.coord._state[("bass3", "holidayenddate")] = {
+            "day": 1,
+            "month": 1,
+            "year": 15,
+        }
         self.assertFalse(sw.is_on)
+        attrs = sw.extra_state_attributes
+        # Sentinel year 15 → dates hidden (None)
+        self.assertIsNone(attrs["holiday_start_date"])
+        self.assertIsNone(attrs["holiday_end_date"])
 
-        # Turns on when controller reports holidayaway
+        # Turns on when controller reports holidayaway with real dates
         self.coord._state[("bass3", "z1status")] = {"value": "holidayaway"}
+        self.coord._state[("bass3", "holidaystartdate")] = {
+            "day": 5,
+            "month": 11,
+            "year": 26,
+        }
+        self.coord._state[("bass3", "holidayenddate")] = {
+            "day": 10,
+            "month": 11,
+            "year": 26,
+        }
         self.assertTrue(sw.is_on)
         attrs = sw.extra_state_attributes
         self.assertTrue(attrs["holiday_ongoing"])
         self.assertEqual(attrs["holiday_remaining_days"], 5)
+        self.assertEqual(attrs["holiday_start_date"], "05/11/2026")
+        self.assertEqual(attrs["holiday_end_date"], "10/11/2026")
 
         # Switching turn_on activates holiday mode
         asyncio.run(sw.async_turn_on())

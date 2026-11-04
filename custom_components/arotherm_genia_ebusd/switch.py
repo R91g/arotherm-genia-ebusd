@@ -250,13 +250,33 @@ class SaunierGeniaHolidayModeSwitch(SaunierGeniaEntity, SwitchEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return holiday diagnostic attributes."""
+        """Return holiday diagnostic attributes including start/end dates."""
+        start_msg = self.coordinator.get_message(CIRCUIT_BASS3, "HolidayStartDate")
+        end_msg = self.coordinator.get_message(CIRCUIT_BASS3, "HolidayEndDate")
         return {
             "holiday_ongoing": bool(self.is_on),
             "holiday_temp": self.coordinator.get_float(
                 CIRCUIT_BASS3, "HolidayTemp", "value"
             ),
             "holiday_remaining_days": self.coordinator.get_holiday_remaining_days(),
+            "holiday_start_date": (
+                f"{start_msg.get('day'):02d}/{start_msg.get('month'):02d}/20{start_msg.get('year'):02d}"
+                if start_msg
+                and all(
+                    isinstance(start_msg.get(k), int) for k in ("day", "month", "year")
+                )
+                and start_msg.get("year") != 15
+                else None
+            ),
+            "holiday_end_date": (
+                f"{end_msg.get('day'):02d}/{end_msg.get('month'):02d}/20{end_msg.get('year'):02d}"
+                if end_msg
+                and all(
+                    isinstance(end_msg.get(k), int) for k in ("day", "month", "year")
+                )
+                and end_msg.get("year") != 15
+                else None
+            ),
         }
 
     async def async_turn_on(self, **kwargs: Any) -> None:

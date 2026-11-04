@@ -55,7 +55,12 @@ class SaunierGeniaHolidayStartDateTime(SaunierGeniaEntity, DateTimeEntity):
 
     @property
     def native_value(self) -> datetime | None:
-        """Return the current holiday start datetime or preselected buffer."""
+        """Return the current holiday start datetime or preselected buffer.
+
+        Returns None when the bus holds the inactive sentinel (year == 15) and
+        no preselected buffer exists, so Home Assistant shows 'Desconocido'.
+        Year == 99 (open-ended) is shown normally.
+        """
         date_msg = self.coordinator.get_message(CIRCUIT_BASS3, "HolidayStartDate")
         time_msg = self.coordinator.get_message(CIRCUIT_BASS3, "HolidayStartTime")
 
@@ -68,10 +73,8 @@ class SaunierGeniaHolidayStartDateTime(SaunierGeniaEntity, DateTimeEntity):
                 and isinstance(month, int)
                 and isinstance(year, int)
             ):
-                if (
-                    year == 15
-                    and self.coordinator.preselected_holiday_start_datetime is not None
-                ):
+                if year == 15:
+                    # Inactive sentinel – return preselected buffer or None
                     return self.coordinator.preselected_holiday_start_datetime
                 h = time_msg.get("hours", 0) if time_msg else 0
                 m = time_msg.get("minutes", 0) if time_msg else 0
@@ -124,7 +127,12 @@ class SaunierGeniaHolidayEndDateTime(SaunierGeniaEntity, DateTimeEntity):
 
     @property
     def native_value(self) -> datetime | None:
-        """Return the current holiday end datetime or preselected buffer."""
+        """Return the current holiday end datetime or preselected buffer.
+
+        Returns None when the bus holds the inactive sentinel (year == 15) and
+        no preselected buffer exists, so Home Assistant shows 'Desconocido'.
+        Year == 99 (open-ended) is shown normally.
+        """
         date_msg = self.coordinator.get_message(CIRCUIT_BASS3, "HolidayEndDate")
         time_msg = self.coordinator.get_message(CIRCUIT_BASS3, "HolidayEndTime")
 
@@ -137,10 +145,8 @@ class SaunierGeniaHolidayEndDateTime(SaunierGeniaEntity, DateTimeEntity):
                 and isinstance(month, int)
                 and isinstance(year, int)
             ):
-                if (
-                    year == 15
-                    and self.coordinator.preselected_holiday_end_datetime is not None
-                ):
+                if year == 15:
+                    # Inactive sentinel – return preselected buffer or None
                     return self.coordinator.preselected_holiday_end_datetime
                 h = time_msg.get("hours", 23) if time_msg else 23
                 m = time_msg.get("minutes", 59) if time_msg else 59
@@ -191,7 +197,11 @@ class SaunierGeniaCoolingStartDateTime(SaunierGeniaEntity, DateTimeEntity):
 
     @property
     def native_value(self) -> datetime | None:
-        """Return the cooling start date (defaulting to 2019-01-01 when closed)."""
+        """Return the cooling start date.
+
+        Returns None when the bus holds the inactive sentinel (year == 19),
+        so Home Assistant shows 'Desconocido'. Year == 99 is shown normally.
+        """
         date_msg = self.coordinator.get_message(CIRCUIT_BASS3, "CoolingStartDate")
         if date_msg:
             day = date_msg.get("day")
@@ -202,6 +212,8 @@ class SaunierGeniaCoolingStartDateTime(SaunierGeniaEntity, DateTimeEntity):
                 and isinstance(month, int)
                 and isinstance(year, int)
             ):
+                if year == 19:
+                    return None
                 try:
                     tz = dt_util.get_default_time_zone()
                     return datetime(2000 + year, month, day, 0, 0, 0, tzinfo=tz)
@@ -239,7 +251,12 @@ class SaunierGeniaCoolingEndDateTime(SaunierGeniaEntity, DateTimeEntity):
 
     @property
     def native_value(self) -> datetime | None:
-        """Return the cooling end date (2019 when closed, 2099 when indefinite)."""
+        """Return the cooling end date.
+
+        Returns None when the bus holds the inactive sentinel (year == 19),
+        so Home Assistant shows 'Desconocido'. Year == 99 (indefinite) is
+        shown normally.
+        """
         date_msg = self.coordinator.get_message(CIRCUIT_BASS3, "CoolingEndDate")
         if date_msg:
             day = date_msg.get("day")
@@ -250,6 +267,8 @@ class SaunierGeniaCoolingEndDateTime(SaunierGeniaEntity, DateTimeEntity):
                 and isinstance(month, int)
                 and isinstance(year, int)
             ):
+                if year == 19:
+                    return None
                 try:
                     tz = dt_util.get_default_time_zone()
                     return datetime(2000 + year, month, day, 0, 0, 0, tzinfo=tz)
