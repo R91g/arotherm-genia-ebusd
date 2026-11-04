@@ -50,7 +50,7 @@ r9,,,RunDataEEVOutletTemp,,,,b509,540200ac08,ign,,IGN:4,,,,value,,EXP,,°C,tempe
 u,,,RunDataCondenserOutTemp,,,,b509,540200b608,ign,,IGN:4,,,,value,,EXP,,°C,condenser outlet temperature
 r2,,,RunDataFlowTemp,,,,b509,540200fc08,ign,,IGN:4,,,,value,,EXP,,°C,"current flow temp, accurate to 2 decimal places"
 r2,,,RunDataReturnTemp,,,,b509,5402000609,ign,,IGN:4,,,,value,,EXP,,°C,"current return temp, accurate to 2 decimal places"
-r2,,,RunDataFlowRate,building circuit water flow rate,,,b509,540200090b,ign,,IGN:4,,,,value,,UIN,,l/h,"building circuit volumetric water flow rate"
+r2,,,RunDataFlowRate,building circuit water flow rate,,,b509,540200090b,ign,,IGN:4,,,,flow_rate,,UIN,,l/h,"building circuit volumetric water flow rate"
 u,,,RunDataNominalFlowRate,nominal building circuit water flow rate,,,b509,540200680b,ign,,IGN:4,,,,value,,UIN,,l/h,"nominal building circuit volumetric water flow rate"
 u,,,RunStatsHMUHours,,,,b509,540200b80b,ign,,IGN:4,,,,value,,UIN,,h,hours
 u,,,RunStatsHcHours,,,,b509,540200b90b,ign,,IGN:4,,,,value,,UIN,,h,hours

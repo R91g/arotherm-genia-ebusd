@@ -891,6 +891,16 @@ class TestCoordinatorLogic(unittest.TestCase):
         push_mqtt("ebusd/hmux0/Status01", '{"temp1": {"value": 37.0}}')
         self.assertNotIn(ISSUE_MQTTJSON_NOT_ENABLED, coord._active_repair_issues)
 
+        # 5. Legacy RunDataFlowRate (value=900 from 540200680b) raises outdated_hmux0_csv,
+        #    and v1.2.4+ RunDataFlowRate (flow_rate from 540200090b) clears it while preserving get_int("value")
+        push_mqtt("ebusd/hmux0/RunDataFlowRate", '{"value": {"value": 900}}')
+        self.assertIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
+        self.assertEqual(coord.get_int("hmux0", "RunDataFlowRate", "value"), 900)
+
+        push_mqtt("ebusd/hmux0/RunDataFlowRate", '{"flow_rate": {"value": 1450}}')
+        self.assertNotIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
+        self.assertEqual(coord.get_int("hmux0", "RunDataFlowRate", "value"), 1450)
+
 
 if __name__ == "__main__":
     unittest.main()

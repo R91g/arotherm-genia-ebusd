@@ -697,12 +697,34 @@ class SaunierGeniaCoordinator:
             elif ";" in stripped:
                 self._async_set_repair_issue(ISSUE_MQTTJSON_NOT_ENABLED, active=True)
 
-        # 2. Detect legacy vs v1.2.3+ 08.hmux0.csv via StateCompressor JSON keys
+        # 2. Detect legacy vs v1.2.4+ 08.hmux0.csv via StateCompressor & RunDataFlowRate
         if circuit_key == CIRCUIT_HMUX0 and msg_lower == "statecompressor":
             if "comp_speed" in parsed and "flow_temp" not in parsed:
                 self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=True)
             elif "flow_temp" in parsed:
-                self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=False)
+                flow_msg = self.get_message(CIRCUIT_HMUX0, "RunDataFlowRate") or {}
+                has_legacy_flow = (
+                    "value" in flow_msg
+                    and "flow_rate" not in flow_msg
+                    and flow_msg.get("value") in (900, 900.0, "900")
+                )
+                if not has_legacy_flow:
+                    self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=False)
+
+        if circuit_key == CIRCUIT_HMUX0 and msg_lower == "rundataflowrate":
+            if "flow_rate" in parsed:
+                sc_msg = self.get_message(CIRCUIT_HMUX0, "StateCompressor") or {}
+                if "comp_speed" not in sc_msg:
+                    self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=False)
+            elif "value" in parsed and "flow_rate" not in parsed:
+                if parsed.get("value") in (900, 900.0, "900"):
+                    self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=True)
+                else:
+                    sc_msg = self.get_message(CIRCUIT_HMUX0, "StateCompressor") or {}
+                    if "comp_speed" not in sc_msg:
+                        self._async_set_repair_issue(
+                            ISSUE_OUTDATED_HMUX0_CSV, active=False
+                        )
 
         # 3. Clear 'missing_custom_csv' as soon as any custom 08.hmux0 signature message arrives
         if circuit_key == CIRCUIT_HMUX0 and msg_lower in {
@@ -816,9 +838,10 @@ class SaunierGeniaCoordinator:
         if field in msg_data and msg_data[field] is not None:
             return msg_data[field]
 
-        # 2. Fallback to 'value' (standard single-field name in 15.bass3.csv & 08.hmux0.csv)
-        if "value" in msg_data and msg_data["value"] is not None:
-            return msg_data["value"]
+        # 2. Fallback to 'value' or 'flow_rate' (standard single-field names in 15.bass3.csv & 08.hmux0.csv)
+        for single_alias in ("value", "flow_rate"):
+            if single_alias in msg_data and msg_data[single_alias] is not None:
+                return msg_data[single_alias]
 
         # 3. Specific multi-field alias mappings between specification and CSVs
         if field in ("temp1", "flow_temp", "temp"):

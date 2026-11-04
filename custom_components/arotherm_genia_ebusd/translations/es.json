@@ -61,7 +61,7 @@
   "issues": {
     "outdated_hmux0_csv": {
       "title": "Archivo 08.hmux0.csv desactualizado en eBUSd",
-      "description": "Tu instancia de `ebusd` está utilizando una versión antigua de `vaillant/08.hmux0.csv`. Aunque el estado y la modulación del compresor ya se corrigen por software, sustituye el archivo `vaillant/08.hmux0.csv` en tu carpeta de configuración de `ebusd` por el incluido en la versión v1.2.3+ y reinicia `ebusd` para activar el sondeo activo (`r2`/`r3`) de velocidad del compresor, ventilador, caudal y estado HMU. Este aviso desaparecerá automáticamente en cuanto `ebusd` cargue el nuevo CSV."
+      "description": "Tu instancia de `ebusd` está utilizando una versión antigua de `vaillant/08.hmux0.csv` (con el caudal fijo en 900 l/h o la definición antigua de `StateCompressor`). Sustituye el archivo `vaillant/08.hmux0.csv` en tu carpeta de configuración de `ebusd` por el incluido en la versión v1.2.4+ y reinicia `ebusd` para activar el caudalímetro vórtex en tiempo real (`540200090b`), el tipo `D2C` en `StateCompressor` y las prioridades de sondeo optimizadas. Este aviso desaparecerá automáticamente en cuanto `ebusd` cargue el nuevo CSV."
     },
     "missing_custom_csv": {
       "title": "Archivos CSV personalizados de eBUSd no detectados",

@@ -61,7 +61,7 @@
   "issues": {
     "outdated_hmux0_csv": {
       "title": "Outdated 08.hmux0.csv file in eBUSd",
-      "description": "Your `ebusd` instance is using an older version of `vaillant/08.hmux0.csv`. While compressor state and modulation are decoded in software, please copy the updated `ebusd-configuration/vaillant/08.hmux0.csv` (v1.2.3+) into your `ebusd` configuration folder and restart `ebusd` to enable active `r2`/`r3` polling for compressor speed, fan speed, flow rate, and status code. This repair notice will clear automatically once `ebusd` reloads the updated CSV."
+      "description": "Your `ebusd` instance is using an older version of `vaillant/08.hmux0.csv` (reporting a static 900 l/h flow rate or legacy `StateCompressor` fields). Please copy the updated `ebusd-configuration/vaillant/08.hmux0.csv` (v1.2.4+) into your `ebusd` configuration folder and restart `ebusd` to enable the real-time vortex water flow sensor (`540200090b`), the `D2C` fix in `StateCompressor`, and optimized polling priorities. This repair notice will clear automatically once `ebusd` reloads the updated CSV."
     },
     "missing_custom_csv": {
       "title": "Custom eBUSd CSV files not loaded",
