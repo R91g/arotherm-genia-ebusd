@@ -697,17 +697,13 @@ class SaunierGeniaCoordinator:
             elif ";" in stripped:
                 self._async_set_repair_issue(ISSUE_MQTTJSON_NOT_ENABLED, active=True)
 
-        # 2. Detect legacy vs v1.2.4+ 08.hmux0.csv via StateCompressor & RunDataFlowRate
+        # 2. Detect legacy vs v1.2.4+ 08.hmux0.csv via StateCompressor & RunDataFlowRate JSON keys
         if circuit_key == CIRCUIT_HMUX0 and msg_lower == "statecompressor":
             if "comp_speed" in parsed and "flow_temp" not in parsed:
                 self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=True)
             elif "flow_temp" in parsed:
                 flow_msg = self.get_message(CIRCUIT_HMUX0, "RunDataFlowRate") or {}
-                has_legacy_flow = (
-                    "value" in flow_msg
-                    and "flow_rate" not in flow_msg
-                    and flow_msg.get("value") in (900, 900.0, "900")
-                )
+                has_legacy_flow = "value" in flow_msg and "flow_rate" not in flow_msg
                 if not has_legacy_flow:
                     self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=False)
 
@@ -716,15 +712,17 @@ class SaunierGeniaCoordinator:
                 sc_msg = self.get_message(CIRCUIT_HMUX0, "StateCompressor") or {}
                 if "comp_speed" not in sc_msg:
                     self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=False)
-            elif "value" in parsed and "flow_rate" not in parsed:
-                if parsed.get("value") in (900, 900.0, "900"):
-                    self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=True)
-                else:
-                    sc_msg = self.get_message(CIRCUIT_HMUX0, "StateCompressor") or {}
-                    if "comp_speed" not in sc_msg:
-                        self._async_set_repair_issue(
-                            ISSUE_OUTDATED_HMUX0_CSV, active=False
-                        )
+            elif (
+                "value" in parsed
+                and "flow_rate" not in parsed
+                and raw_payload.strip().startswith("{")
+            ):
+                self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=True)
+
+        if circuit_key == CIRCUIT_HMUX0 and msg_lower == "rundatanominalflowrate":
+            sc_msg = self.get_message(CIRCUIT_HMUX0, "StateCompressor") or {}
+            if "comp_speed" not in sc_msg:
+                self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=False)
 
         # 3. Clear 'missing_custom_csv' as soon as any custom 08.hmux0 signature message arrives
         if circuit_key == CIRCUIT_HMUX0 and msg_lower in {

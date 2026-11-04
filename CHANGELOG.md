@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added automated schema test `test_ebusd_csv_field_types` in `tests/test_schema_integrity.py` to validate every field data type across all `.csv` files against official eBUSd type specifications.
 - **Real-Time Primary Circuit Volumetric Water Flow Sensor (`RunDataFlowRate` `540200090b`):**
   - Updated `RunDataFlowRate` (`ebusd-configuration/vaillant/08.hmux0.csv:53`) from the static nominal/design flow parameter `540200680b` (which permanently reported `900 l/h`) to the live primary circuit vortex flow sensor register `b509 540200090b` (`flow_rate`, `UIN`, `l/h`), reporting `0 l/h` in standby and `850–2,500+ l/h` dynamically during heating, cooling, and DHW operation.
-  - Extended the `outdated_hmux0_csv` Home Assistant Repair check to automatically detect legacy `RunDataFlowRate` payloads (`value: 900` from `540200680b`) and clear the warning once the v1.2.4+ `08.hmux0.csv` (`flow_rate` from `540200090b`) is loaded.
+  - Extended the `outdated_hmux0_csv` Home Assistant Repair check to automatically detect pre-v1.2.4 `RunDataFlowRate` payloads (via the legacy `value` JSON key vs `flow_rate`, independent of the nominal flow number) and clear the warning once the v1.2.4+ `08.hmux0.csv` (`flow_rate` or `RunDataNominalFlowRate`) is loaded.
   - Retained `540200680b` as a passive (`u`) definition (`RunDataNominalFlowRate`) so `ebusd` continues decoding passive gateway reads without logging unknown telegrams.
 - **HACS & Home Assistant Hassfest CI Validation:**
   - Restored root `LICENSE` to standard MIT text for GitHub SPDX license detection while documenting `ebusd-configuration/` GPL-3.0 attribution in `ebusd-configuration/LICENSE.md`.
