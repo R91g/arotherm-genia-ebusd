@@ -724,10 +724,17 @@ class SaunierGeniaCoordinator:
             if "comp_speed" not in sc_msg:
                 self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=False)
 
-        # 3. Clear 'missing_custom_csv' as soon as any custom 08.hmux0 signature message arrives
-        if circuit_key == CIRCUIT_HMUX0 and msg_lower in {
-            m.lower() for m in HMUX0_CUSTOM_SIGNATURE_MESSAGES
-        }:
+        # 3. Clear 'missing_custom_csv' once all required custom CSV circuits (08.hmux0, 15.bass3/basv3, 76.vwzio) report telemetry
+        if (
+            circuit_key
+            in (
+                CIRCUIT_HMUX0,
+                CIRCUIT_BASS3,
+                CIRCUIT_BASV3,
+                CIRCUIT_VWZIO,
+            )
+            and self._has_all_required_csv_circuits()
+        ):
             self._async_set_repair_issue(ISSUE_MISSING_CUSTOM_CSV, active=False)
 
         # 4. Detect default upstream ebusd.eu hmu.inc messages (when custom 08.hmux0.csv is not loaded)
@@ -741,9 +748,20 @@ class SaunierGeniaCoordinator:
         ):
             self._async_set_repair_issue(ISSUE_MISSING_CUSTOM_CSV, active=True)
 
+    def _has_all_required_csv_circuits(self) -> bool:
+        """Return True if 08.hmux0, 15.bass3/basv3, and 76.vwzio have all reported telemetry."""
+        has_custom_hmux0 = any(
+            self.has_message(CIRCUIT_HMUX0, m) for m in HMUX0_CUSTOM_SIGNATURE_MESSAGES
+        )
+        has_controller = any(
+            c in (CIRCUIT_BASS3, CIRCUIT_BASV3) for c, _ in self._state
+        )
+        has_vwzio = any(c == CIRCUIT_VWZIO for c, _ in self._state)
+        return has_custom_hmux0 and has_controller and has_vwzio
+
     @callback
     def _async_verify_custom_csv_after_hydration(self) -> None:
-        """Check after initial hydration whether eBUSd MQTT traffic and custom CSVs are active."""
+        """Check after initial hydration whether eBUSd MQTT traffic and all custom CSVs are active."""
         if not self._state:
             self._async_set_repair_issue(
                 ISSUE_NO_EBUSD_MQTT_TRAFFIC,
@@ -756,17 +774,15 @@ class SaunierGeniaCoordinator:
 
         signal_raw = (self.get_str(CIRCUIT_GLOBAL, "signal") or "").lower()
         has_bus_traffic = signal_raw in ("1", "true", "yes", "on") or any(
-            c in (CIRCUIT_BASS3, CIRCUIT_BASV3, CIRCUIT_VWZIO, "hmu")
+            c in (CIRCUIT_HMUX0, CIRCUIT_BASS3, CIRCUIT_BASV3, CIRCUIT_VWZIO, "hmu")
             for c, _ in self._state
         )
         if not has_bus_traffic:
             return
 
-        has_custom_hmux0 = any(
-            self.has_message(CIRCUIT_HMUX0, m) for m in HMUX0_CUSTOM_SIGNATURE_MESSAGES
-        )
         self._async_set_repair_issue(
-            ISSUE_MISSING_CUSTOM_CSV, active=not has_custom_hmux0
+            ISSUE_MISSING_CUSTOM_CSV,
+            active=not self._has_all_required_csv_circuits(),
         )
 
     # -------------------------------------------------------------------------

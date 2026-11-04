@@ -64,8 +64,8 @@
       "description": "Tu instancia de `ebusd` está utilizando una versión antigua de `vaillant/08.hmux0.csv` (con el caudal fijo en 900 l/h o la definición antigua de `StateCompressor`). Sustituye el archivo `vaillant/08.hmux0.csv` en tu carpeta de configuración de `ebusd` por el incluido en la versión v1.2.4+ y reinicia `ebusd` para activar el caudalímetro vórtex en tiempo real (`540200090b`), el tipo `D2C` en `StateCompressor` y las prioridades de sondeo optimizadas. Este aviso desaparecerá automáticamente en cuanto `ebusd` cargue el nuevo CSV."
     },
     "missing_custom_csv": {
-      "title": "Archivos CSV personalizados de eBUSd no detectados",
-      "description": "Tu instancia de `ebusd` tiene señal en el bus eBUS pero no está cargando los archivos CSV optimizados de `ebusd-configuration/` (parece estar usando los archivos por defecto de `ebusd.eu`). Copia `broadcast.csv` y la carpeta `vaillant/*.csv` del repositorio en el directorio de configuración de `ebusd`, verifica el parámetro `--configpath` y reinicia `ebusd`. Este aviso desaparecerá automáticamente en cuanto llegue telemetría."
+      "title": "Archivos CSV no cargados o escaneo incompleto en eBUSd",
+      "description": "Tu instancia de `ebusd` recibe señal del bus eBUS, pero uno o varios circuitos CSV necesarios (`08.hmux0.csv`, `15.bass3.csv`/`15.basv3.csv` o `76.vwzio.csv`) no se han cargado correctamente o han sufrido un timeout durante el escaneo inicial (`scan config ERR: read timeout`). Verifica que `broadcast.csv` y `vaillant/*.csv` de `ebusd-configuration/` estén en tu carpeta `--configpath` y reinicia `ebusd`. Este aviso desaparecerá automáticamente en cuanto los tres circuitos reporten telemetría."
     },
     "no_ebusd_mqtt_traffic": {
       "title": "No se recibe tráfico MQTT en el prefijo {mqtt_prefix}",

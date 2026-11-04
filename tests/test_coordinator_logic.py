@@ -848,7 +848,9 @@ class TestCoordinatorLogic(unittest.TestCase):
             hass, DOMAIN, ISSUE_OUTDATED_HMUX0_CSV
         )
 
-        # 2. Missing custom CSV detection: upstream default hmu message or post-hydration with bus signal
+        # 2. Missing custom CSV / incomplete scan detection:
+        #    If any of the 3 required circuits (08.hmux0, 15.bass3/basv3, 76.vwzio) fails to load after hydration,
+        #    missing_custom_csv remains active until all 3 report telemetry.
         coord._state.clear()
         coord._canonical_names.clear()
         ir_mod.async_create_issue.reset_mock()
@@ -859,8 +861,13 @@ class TestCoordinatorLogic(unittest.TestCase):
         self.assertIn(ISSUE_MISSING_CUSTOM_CSV, coord._active_repair_issues)
         ir_mod.async_create_issue.assert_called_once()
 
-        # Receiving any custom 08.hmux0 signature message clears missing_custom_csv automatically
+        # Only 08.hmux0 and 15.bass3 loaded (e.g. scan config 76 timed out) -> still active
         push_mqtt("ebusd/hmux0/RunDataFlowTemp", '{"value": {"value": 35.5}}')
+        push_mqtt("ebusd/bass3/Z1DayTemp", '{"value": {"value": 21.0}}')
+        self.assertIn(ISSUE_MISSING_CUSTOM_CSV, coord._active_repair_issues)
+
+        # Once 76.vwzio also reports telemetry, missing_custom_csv clears automatically
+        push_mqtt("ebusd/vwzio/Status01", '{"temp1": {"value": 35.5}}')
         self.assertNotIn(ISSUE_MISSING_CUSTOM_CSV, coord._active_repair_issues)
         ir_mod.async_delete_issue.assert_called_with(
             hass, DOMAIN, ISSUE_MISSING_CUSTOM_CSV
