@@ -580,18 +580,6 @@
       "hydraulic_scheme": {
         "name": "Código de esquema hidráulico"
       },
-      "cooling_start_date": {
-        "name": "Fecha de inicio temporada de frío"
-      },
-      "cooling_end_date": {
-        "name": "Fecha de fin temporada de frío"
-      },
-      "holiday_start_date": {
-        "name": "Fecha de inicio del modo ausencia"
-      },
-      "holiday_end_date": {
-        "name": "Fecha de fin del modo ausencia"
-      },
       "holiday_duration_remaining": {
         "name": "Días restantes de ausencia"
       },
@@ -615,9 +603,6 @@
       },
       "bass3_energy_hwc_total": {
         "name": "Consumo ACS total (BASS3)"
-      },
-      "yield_total": {
-        "name": "Rendimiento ambiental acumulado (YieldTotal)"
       },
       "solar_yield_total": {
         "name": "Rendimiento solar térmico acumulado"

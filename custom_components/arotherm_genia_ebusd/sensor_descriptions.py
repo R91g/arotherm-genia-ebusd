@@ -89,23 +89,6 @@ class SaunierGeniaSensorEntityDescription(SensorEntityDescription):
     requires_wireless_unit: bool = False
 
 
-def _format_bass3_date(coord: SaunierGeniaCoordinator, message: str) -> str | None:
-    """Format CoolingStartDate / CoolingEndDate (day;month;year) into a readable string."""
-    msg = coord.get_message(CIRCUIT_BASS3, message)
-    if not msg:
-        return None
-    day = msg.get("day")
-    month = msg.get("month")
-    year = msg.get("year")
-    if day is not None and month is not None and year is not None:
-        try:
-            return f"{int(day):02d};{int(month):02d};{int(year):02d}"
-        except (ValueError, TypeError):
-            pass
-    val = msg.get("value")
-    return str(val) if val is not None else None
-
-
 def _get_vwzio_error(coord: SaunierGeniaCoordinator) -> str | None:
     """Format vwzio Currenterror (error..error_4), returning 'OK' when all slots are '-' or 0."""
     msg = coord.get_message(CIRCUIT_VWZIO, "Currenterror")
@@ -775,6 +758,9 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         circuit=CIRCUIT_HMUX0,
         message="RunStatsHcStarts",
         field="value",
+        fallback_circuit=CIRCUIT_VWZIO,
+        fallback_message="RunStatsHcStarts",
+        fallback_field="value",
         state_class=SensorStateClass.TOTAL_INCREASING,
         is_integer=True,
     ),
@@ -1070,44 +1056,6 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(
-        key="cooling_start_date",
-        translation_key="cooling_start_date",
-        device_key=DEVICE_CLIMATE_CONTROLLER,
-        circuit=CIRCUIT_BASS3,
-        message="CoolingStartDate",
-        field="day;month;year",
-        value_fn=lambda coord: _format_bass3_date(coord, "CoolingStartDate"),
-    ),
-    SaunierGeniaSensorEntityDescription(
-        key="cooling_end_date",
-        translation_key="cooling_end_date",
-        device_key=DEVICE_CLIMATE_CONTROLLER,
-        circuit=CIRCUIT_BASS3,
-        message="CoolingEndDate",
-        field="day;month;year",
-        value_fn=lambda coord: _format_bass3_date(coord, "CoolingEndDate"),
-    ),
-    SaunierGeniaSensorEntityDescription(
-        key="holiday_start_date",
-        translation_key="holiday_start_date",
-        device_key=DEVICE_CLIMATE_CONTROLLER,
-        circuit=CIRCUIT_BASS3,
-        message="HolidayStartDate",
-        field="day;month;year",
-        value_fn=lambda coord: _format_bass3_date(coord, "HolidayStartDate"),
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-    SaunierGeniaSensorEntityDescription(
-        key="holiday_end_date",
-        translation_key="holiday_end_date",
-        device_key=DEVICE_CLIMATE_CONTROLLER,
-        circuit=CIRCUIT_BASS3,
-        message="HolidayEndDate",
-        field="day;month;year",
-        value_fn=lambda coord: _format_bass3_date(coord, "HolidayEndDate"),
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-    SaunierGeniaSensorEntityDescription(
         key="holiday_duration_remaining",
         translation_key="holiday_duration_remaining",
         device_key=DEVICE_CLIMATE_CONTROLLER,
@@ -1197,18 +1145,6 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         device_key=DEVICE_CLIMATE_CONTROLLER,
         circuit=CIRCUIT_BASS3,
         message="PrEnergySumHwc",
-        field="value",
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        is_integer=True,
-    ),
-    SaunierGeniaSensorEntityDescription(
-        key="yield_total",
-        translation_key="yield_total",
-        device_key=DEVICE_CLIMATE_CONTROLLER,
-        circuit=CIRCUIT_BASS3,
-        message="YieldTotal",
         field="value",
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,

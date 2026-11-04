@@ -226,7 +226,7 @@ ACTIVE_READ_CONFIRMATION_MESSAGES: frozenset[tuple[str, str]] = frozenset(
         (CIRCUIT_BASS3.lower(), "MaxCylinderChargeTime"),
         (CIRCUIT_BASS3.lower(), "MaxRoomHumidity"),
         (CIRCUIT_BASS3.lower(), "PumpAdditionalTime"),
-        (CIRCUIT_BASS3.lower(), "Z1HolidayTemp"),
+        (CIRCUIT_BASS3.lower(), "HolidayTemp"),
         (CIRCUIT_BASS3.lower(), "Z1ValveStatus"),
     }
 )
@@ -1483,10 +1483,6 @@ class SaunierGeniaCoordinator:
         start_msg = self.get_message(CIRCUIT_BASS3, "HolidayStartDate")
         end_msg = self.get_message(CIRCUIT_BASS3, "HolidayEndDate")
 
-        start_year = start_msg.get("year") if start_msg else None
-        if z1_status != "holidayaway" or start_year == 15:
-            return "Inactivo"
-
         if not end_msg:
             return "Inactivo"
 
@@ -1494,6 +1490,13 @@ class SaunierGeniaCoordinator:
         month = end_msg.get("month")
         year = end_msg.get("year")
         if day is None or month is None or year is None or year == 15:
+            return "Inactivo"
+
+        start_year = start_msg.get("year") if start_msg else None
+        if start_year == 15:
+            return "Inactivo"
+
+        if z1_status and z1_status != "holidayaway" and start_year is None:
             return "Inactivo"
 
         if year == 99:
@@ -1582,6 +1585,8 @@ class SaunierGeniaCoordinator:
     async def async_cancel_holiday_mode(self) -> None:
         """Cancel Holiday / Away Mode and restore central controller to automatic operation."""
         _LOGGER.info("Cancelling Holiday / Away Mode and restoring auto operation")
+        self._preselected_holiday_start_datetime = None
+        self._preselected_holiday_end_datetime = None
         # Step 1: Reset start date to sentinel 2015
         await self.async_write_parameter(
             CIRCUIT_BASS3, "HolidayStartDate", HOLIDAY_RESET_DATE

@@ -55,7 +55,7 @@ u,,,RunDataNominalFlowRate,nominal building circuit water flow rate,,,b509,54020
 u,,,RunStatsHMUHours,,,,b509,540200b80b,ign,,IGN:4,,,,value,,UIN,,h,hours
 u,,,RunStatsHcHours,,,,b509,540200b90b,ign,,IGN:4,,,,value,,UIN,,h,hours
 u,,,RunStatsHwcHours,,,,b509,540200bc0b,ign,,IGN:4,,,,value,,UIN,,h,total runtime of Hwc mode
-u,,,RunStatsHcStarts,,,,b509,540200c00b,ign,,IGN:4,,,,value,,UIN,,,total starts of heating mode
+r,,,RunStatsHcStarts,,,,b509,540200c00b,ign,,IGN:4,,,,value,,UIN,,,total starts of heating mode
 u,,,RunStatsHwcStarts,,,,b509,540200c10b,ign,,IGN:4,,,,value,,UIN,,,total starts of Hwc mode
 u,,,RunStatsCompressorHours,,,,b509,540200c20b,ign,,IGN:4,,,,value,,UIN,,h,hours
 u,,,RunStatsCompressorStarts,,,,b509,540200c30b,ign,,IGN:4,,,,value,,UIN,,,start count

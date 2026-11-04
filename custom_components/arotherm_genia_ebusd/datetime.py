@@ -67,8 +67,12 @@ class SaunierGeniaHolidayStartDateTime(SaunierGeniaEntity, DateTimeEntity):
                 isinstance(day, int)
                 and isinstance(month, int)
                 and isinstance(year, int)
-                and year != 15  # 2015 is reset sentinel
             ):
+                if (
+                    year == 15
+                    and self.coordinator.preselected_holiday_start_datetime is not None
+                ):
+                    return self.coordinator.preselected_holiday_start_datetime
                 h = time_msg.get("hours", 0) if time_msg else 0
                 m = time_msg.get("minutes", 0) if time_msg else 0
                 s = time_msg.get("seconds", 0) if time_msg else 0
@@ -132,8 +136,12 @@ class SaunierGeniaHolidayEndDateTime(SaunierGeniaEntity, DateTimeEntity):
                 isinstance(day, int)
                 and isinstance(month, int)
                 and isinstance(year, int)
-                and year != 15  # 2015 is reset sentinel
             ):
+                if (
+                    year == 15
+                    and self.coordinator.preselected_holiday_end_datetime is not None
+                ):
+                    return self.coordinator.preselected_holiday_end_datetime
                 h = time_msg.get("hours", 23) if time_msg else 23
                 m = time_msg.get("minutes", 59) if time_msg else 59
                 s = time_msg.get("seconds", 59) if time_msg else 59

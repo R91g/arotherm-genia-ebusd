@@ -233,11 +233,17 @@ class SaunierGeniaHolidayModeSwitch(SaunierGeniaEntity, SwitchEntity):
 
     @property
     def is_on(self) -> bool | None:
-        """Return True if controller is in holiday away status."""
+        """Return True if controller is in holiday away status or has active holiday dates."""
         z1_status = self.coordinator.get_str(CIRCUIT_BASS3, "Z1Status", "value")
         hwc_status = self.coordinator.get_str(CIRCUIT_BASS3, "HwcStatus", "value")
-        if z1_status is None and hwc_status is None:
+        end_year = self.coordinator.get_int(CIRCUIT_BASS3, "HolidayEndDate", "year")
+        start_year = self.coordinator.get_int(CIRCUIT_BASS3, "HolidayStartDate", "year")
+        if z1_status is None and hwc_status is None and end_year is None:
             return None
+        if start_year == 15 or end_year == 15:
+            return False
+        if end_year is not None and end_year != 15:
+            return self.coordinator.get_holiday_remaining_days() != "Inactivo"
         return (z1_status is not None and z1_status.lower() == "holidayaway") or (
             hwc_status is not None and hwc_status.lower() == "holidayaway"
         )

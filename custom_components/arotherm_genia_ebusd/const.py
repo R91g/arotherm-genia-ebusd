@@ -225,6 +225,11 @@ DEPRECATED_UNIQUE_ID_SUFFIXES: tuple[str, ...] = (
     "binary_hmux0_energyyieldprecision_status",
     "hmux0_statecompressor_comp_speed",
     "binary_hmux0_statecompressor_comp_speed",
+    "bass3_coolingstartdate_day;month;year",
+    "bass3_coolingenddate_day;month;year",
+    "bass3_holidaystartdate_day;month;year",
+    "bass3_holidayenddate_day;month;year",
+    "bass3_yieldtotal_value",
 )
 
 # Timing & Hydration Constants
@@ -297,9 +302,16 @@ TIMER_CIRCUIT_PREFIXES: dict[str, str] = {
 # Purely passive ('u') messages (temperatures, modes, runstats) are populated
 # automatically via retained MQTT topics and periodic master broadcasts (f1 / 10).
 ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
-    # Climate Controller (15.bass3) - Actively readable setpoints, offsets & energy counters (r9)
+    # Climate Controller (15.bass3) - Actively readable setpoints, offsets & energy counters (r / r9)
     (CIRCUIT_BASS3, "Z1NightTemp"),
     (CIRCUIT_BASS3, "Z1QuickVetoTemp"),
+    (CIRCUIT_BASS3, "HolidayTemp"),
+    (CIRCUIT_BASS3, "HolidayStartDate"),
+    (CIRCUIT_BASS3, "HolidayStartTime"),
+    (CIRCUIT_BASS3, "HolidayEndDate"),
+    (CIRCUIT_BASS3, "HolidayEndTime"),
+    (CIRCUIT_BASS3, "CoolingStartDate"),
+    (CIRCUIT_BASS3, "CoolingEndDate"),
     (CIRCUIT_BASS3, "CoolingReleaseStatus"),
     (CIRCUIT_BASS3, "HwcSFMode"),
     (CIRCUIT_BASS3, "HwcFlowTemp"),
@@ -345,6 +357,7 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_HMUX0, "RunDataCompressorInletTemp"),
     (CIRCUIT_HMUX0, "RunDataCompressorOutletTemp"),
     (CIRCUIT_HMUX0, "RunDataEEVOutletTemp"),
+    (CIRCUIT_HMUX0, "RunStatsHcStarts"),
     (CIRCUIT_HMUX0, "PrEnergyElectricHc"),
     (CIRCUIT_HMUX0, "PrEnergyElectricHwc"),
     (CIRCUIT_HMUX0, "PrEnergyElectricCool"),

@@ -580,18 +580,6 @@
       "hydraulic_scheme": {
         "name": "System Hydraulic Scheme Code"
       },
-      "cooling_start_date": {
-        "name": "Cooling Season Start Date"
-      },
-      "cooling_end_date": {
-        "name": "Cooling Season End Date"
-      },
-      "holiday_start_date": {
-        "name": "Holiday Mode Start Date"
-      },
-      "holiday_end_date": {
-        "name": "Holiday Mode End Date"
-      },
       "holiday_duration_remaining": {
         "name": "Holiday Duration Remaining"
       },
@@ -615,9 +603,6 @@
       },
       "bass3_energy_hwc_total": {
         "name": "Total DHW Energy Consumed (BASS3)"
-      },
-      "yield_total": {
-        "name": "Total Environmental Yield (YieldTotal)"
       },
       "solar_yield_total": {
         "name": "Total Solar Thermal Yield"

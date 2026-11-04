@@ -370,9 +370,6 @@
       "circulation_weekly_schedule_summary": {
         "default": "mdi:calendar-clock"
       },
-      "yield_total": {
-        "default": "mdi:chart-line"
-      },
       "solar_yield_total": {
         "default": "mdi:solar-power"
       },

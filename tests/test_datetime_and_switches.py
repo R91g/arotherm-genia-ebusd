@@ -130,7 +130,7 @@ class TestDateTimeAndSwitches(unittest.TestCase):
         """Test Holiday Start DateTime reads bus data and writes DD;MM;YY + HH;MM;SS."""
         entity = SaunierGeniaHolidayStartDateTime(self.coord)
 
-        # 1. When bus has reset sentinel (year=15), returns None (or buffer)
+        # 1. When bus has reset sentinel (year=15) and no buffer, returns 2015-01-01 00:00:00
         self.coord._state[("bass3", "holidaystartdate")] = {
             "day": 1,
             "month": 1,
@@ -141,7 +141,16 @@ class TestDateTimeAndSwitches(unittest.TestCase):
             "minutes": 0,
             "seconds": 0,
         }
-        self.assertIsNone(entity.native_value)
+        sentinel_val = entity.native_value
+        self.assertIsNotNone(sentinel_val)
+        self.assertEqual(sentinel_val.year, 2015)
+        self.assertEqual(sentinel_val.month, 1)
+        self.assertEqual(sentinel_val.day, 1)
+
+        # 1b. When bus has reset sentinel (year=15) and preselected buffer is set, returns buffer
+        self.coord.preselected_holiday_start_datetime = datetime(2026, 12, 24, 9, 0, 0)
+        self.assertEqual(entity.native_value, datetime(2026, 12, 24, 9, 0, 0))
+        self.coord.preselected_holiday_start_datetime = None
 
         # 2. When bus has active holiday start date (e.g. 30/10/26 10:33:38)
         self.coord._state[("bass3", "holidaystartdate")] = {
