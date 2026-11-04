@@ -838,6 +838,8 @@ class TestCoordinatorLogic(unittest.TestCase):
             '{"MF": "Vaillant", "ID": "CTLV2", "SW": "0514", "HW": "1104"}',
         )
         self.assertEqual(coord.active_controller_circuit, CIRCUIT_CTLV2)
+        dev_info_ctlv2 = build_device_info(coord, DEVICE_CLIMATE_CONTROLLER)
+        self.assertEqual(dev_info_ctlv2["model"], "sensoCOMFORT VRC 720 (CTLV2)")
 
         # Ingestion on ctlv2 aliases across all controller circuits
         callback_called = False
@@ -857,6 +859,15 @@ class TestCoordinatorLogic(unittest.TestCase):
         # 2. Passive detection via scan.15 for CTLV3 (Wim's setup)
         push_mqtt("ebusd/scan.15", "Vaillant;CTLV3;0618;1104")
         self.assertEqual(coord.active_controller_circuit, CIRCUIT_CTLV3)
+        dev_info_ctlv3 = build_device_info(coord, DEVICE_CLIMATE_CONTROLLER)
+        self.assertEqual(dev_info_ctlv3["model"], "sensoCOMFORT VRC 720 (CTLV3)")
+
+        # Ingestion on ctlv3 aliases across all controller circuits
+        push_mqtt("ebusd/ctlv3/Z1NightTemp", '{"temp": {"value": 18.5}}')
+        self.assertEqual(coord.get_float(CIRCUIT_BASS3, "Z1NightTemp", "temp"), 18.5)
+        self.assertEqual(coord.get_float(CIRCUIT_CTLV2, "Z1NightTemp", "temp"), 18.5)
+        self.assertEqual(coord.get_float(CIRCUIT_BASV3, "Z1NightTemp", "temp"), 18.5)
+        self.assertEqual(coord.get_float(CIRCUIT_CTLV3, "Z1NightTemp", "temp"), 18.5)
 
         # Parameter write and get routing to ctlv3
         async def run_write_tests() -> None:
@@ -1073,6 +1084,43 @@ class TestCoordinatorLogic(unittest.TestCase):
         )
         self.assertNotIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
 
+        # Also works on ctlv2 and ctlv3
+        ir_mod.async_create_issue.reset_mock()
+        ir_mod.async_delete_issue.reset_mock()
+        push_mqtt(
+            "ebusd/ctlv2/Z1HolidayTemp",
+            '{"value": {"value": 15.0}}',
+        )
+        self.assertIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+        ir_mod.async_create_issue.assert_called_once()
+
+        push_mqtt(
+            "ebusd/ctlv2/HolidayTemp",
+            '{"value": {"value": 15.0}}',
+        )
+        self.assertNotIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+        ir_mod.async_delete_issue.assert_called_with(
+            hass, DOMAIN, ISSUE_OUTDATED_CONTROLLER_CSV
+        )
+
+        ir_mod.async_create_issue.reset_mock()
+        ir_mod.async_delete_issue.reset_mock()
+        push_mqtt(
+            "ebusd/ctlv3/Z1HolidayTemp",
+            '{"value": {"value": 15.0}}',
+        )
+        self.assertIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+        ir_mod.async_create_issue.assert_called_once()
+
+        push_mqtt(
+            "ebusd/ctlv3/HolidayTemp",
+            '{"value": {"value": 15.0}}',
+        )
+        self.assertNotIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+        ir_mod.async_delete_issue.assert_called_with(
+            hass, DOMAIN, ISSUE_OUTDATED_CONTROLLER_CSV
+        )
+
         # 2. Missing custom CSV / incomplete scan detection:
         #    If any of the 3 required circuits (08.hmux0, 15.bass3/basv3, 76.vwzio) fails to load after hydration,
         #    missing_custom_csv remains active until all 3 report telemetry.
@@ -1109,6 +1157,20 @@ class TestCoordinatorLogic(unittest.TestCase):
         # Ingestion of custom 08.hmu.HW5103, 15.ctlv2, and 76.vwzio clears missing_custom_csv
         push_mqtt("ebusd/hmu/RunDataFlowTemp", '{"value": {"value": 36.5}}')
         push_mqtt("ebusd/ctlv2/Z1DayTemp", '{"value": {"value": 21.0}}')
+        push_mqtt("ebusd/vwzio/Status01", '{"temp1": {"value": 36.0}}')
+        self.assertNotIn(ISSUE_MISSING_CUSTOM_CSV, coord._active_repair_issues)
+
+        # 2d. Also works for aroTHERM HMU00 (HW5103) and CTLV3
+        coord._state.clear()
+        coord._canonical_names.clear()
+        coord._active_repair_issues.clear()
+        push_mqtt("ebusd/global/signal", "true")
+        coord._async_verify_custom_csv_after_hydration()
+        self.assertIn(ISSUE_MISSING_CUSTOM_CSV, coord._active_repair_issues)
+
+        # Ingestion of custom 08.hmu.HW5103, 15.ctlv3, and 76.vwzio clears missing_custom_csv
+        push_mqtt("ebusd/hmu/RunDataFlowTemp", '{"value": {"value": 36.5}}')
+        push_mqtt("ebusd/ctlv3/Z1DayTemp", '{"value": {"value": 21.0}}')
         push_mqtt("ebusd/vwzio/Status01", '{"temp1": {"value": 36.0}}')
         self.assertNotIn(ISSUE_MISSING_CUSTOM_CSV, coord._active_repair_issues)
 
