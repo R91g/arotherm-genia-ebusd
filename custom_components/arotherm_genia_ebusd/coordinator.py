@@ -72,6 +72,7 @@ from .const import (
     ISSUE_MISSING_CUSTOM_CSV,
     ISSUE_MQTTJSON_NOT_ENABLED,
     ISSUE_NO_EBUSD_MQTT_TRAFFIC,
+    ISSUE_OUTDATED_CONTROLLER_CSV,
     ISSUE_OUTDATED_HMUX0_CSV,
     MANUFACTURER_VAILLANT,
     SCAN_ADDRESS_TO_DEVICE_KEY,
@@ -723,6 +724,29 @@ class SaunierGeniaCoordinator:
             sc_msg = self.get_message(CIRCUIT_HMUX0, "StateCompressor") or {}
             if "comp_speed" not in sc_msg:
                 self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=False)
+
+        # 2b. Detect legacy vs v1.2.4+ 15.bass3.csv / 15.basv3.csv via Z1HolidayTemp vs HolidayTemp / HolidayStartDate
+        if circuit_key in CONTROLLER_CIRCUITS:
+            if msg_lower == "z1holidaytemp":
+                self._async_set_repair_issue(ISSUE_OUTDATED_CONTROLLER_CSV, active=True)
+            elif msg_lower == "holidaytemp":
+                for c in CONTROLLER_CIRCUITS:
+                    self._state.pop((c, "Z1HolidayTemp"), None)
+                    self._state.pop((c, "z1holidaytemp"), None)
+                self._async_set_repair_issue(
+                    ISSUE_OUTDATED_CONTROLLER_CSV, active=False
+                )
+            elif (
+                msg_lower == "holidaystartdate"
+                and isinstance(parsed, dict)
+                and "year" in parsed
+                and not any(
+                    self.has_message(c, "Z1HolidayTemp") for c in CONTROLLER_CIRCUITS
+                )
+            ):
+                self._async_set_repair_issue(
+                    ISSUE_OUTDATED_CONTROLLER_CSV, active=False
+                )
 
         # 3. Clear 'missing_custom_csv' once all required custom CSV circuits (08.hmux0, 15.bass3/basv3, 76.vwzio) report telemetry
         if (

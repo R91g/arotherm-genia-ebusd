@@ -63,6 +63,10 @@
       "title": "Outdated 08.hmux0.csv file in eBUSd",
       "description": "Your `ebusd` instance is using an older version of `vaillant/08.hmux0.csv` (reporting a static 900 l/h flow rate or legacy `StateCompressor` fields). Please copy the updated `ebusd-configuration/vaillant/08.hmux0.csv` (v1.2.4+) into your `ebusd` configuration folder and restart `ebusd` to enable the real-time vortex water flow sensor (`540200090b`), the `D2C` fix in `StateCompressor`, and optimized polling priorities. This repair notice will clear automatically once `ebusd` reloads the updated CSV."
     },
+    "outdated_controller_csv": {
+      "title": "Outdated 15.bass3.csv / 15.basv3.csv file in eBUSd",
+      "description": "Your `ebusd` instance is using an older version of `vaillant/15.bass3.csv` or `vaillant/15.basv3.csv` (reporting legacy `Z1HolidayTemp` instead of Zone 1 mapped Holiday Mode registers). Please copy the updated `ebusd-configuration/vaillant/15.bass3.csv` and `ebusd-configuration/vaillant/15.basv3.csv` (v1.2.4+) into your `ebusd` configuration folder and restart `ebusd` to enable real-time Holiday Mode synchronization and active cooling season parameters. This repair notice will clear automatically once `ebusd` reloads the updated CSV."
+    },
     "missing_custom_csv": {
       "title": "Custom eBUSd CSV files not loaded or incomplete scan",
       "description": "Your `ebusd` instance has active eBUS signal, but one or more required CSV circuits (`08.hmux0.csv`, `15.bass3.csv`/`15.basv3.csv`, or `76.vwzio.csv`) did not load or timed out during initial scan (`scan config ERR: read timeout`). Please verify that `broadcast.csv` and `vaillant/*.csv` from `ebusd-configuration/` are copied into your `ebusd` `--configpath` directory and restart `ebusd`. This repair notice will clear automatically once all three circuits report telemetry."

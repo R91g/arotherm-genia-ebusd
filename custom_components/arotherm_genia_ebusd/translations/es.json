@@ -63,6 +63,10 @@
       "title": "Archivo 08.hmux0.csv desactualizado en eBUSd",
       "description": "Tu instancia de `ebusd` está utilizando una versión antigua de `vaillant/08.hmux0.csv` (con el caudal fijo en 900 l/h o la definición antigua de `StateCompressor`). Sustituye el archivo `vaillant/08.hmux0.csv` en tu carpeta de configuración de `ebusd` por el incluido en la versión v1.2.4+ y reinicia `ebusd` para activar el caudalímetro vórtex en tiempo real (`540200090b`), el tipo `D2C` en `StateCompressor` y las prioridades de sondeo optimizadas. Este aviso desaparecerá automáticamente en cuanto `ebusd` cargue el nuevo CSV."
     },
+    "outdated_controller_csv": {
+      "title": "Archivo 15.bass3.csv / 15.basv3.csv desactualizado en eBUSd",
+      "description": "Tu instancia de `ebusd` está utilizando una versión antigua de `vaillant/15.bass3.csv` o `vaillant/15.basv3.csv` (utiliza el registro heredado `Z1HolidayTemp` en lugar de los registros de Modo Ausencia mapeados a Zona 1). Copia los archivos actualizados `ebusd-configuration/vaillant/15.bass3.csv` y `ebusd-configuration/vaillant/15.basv3.csv` (v1.2.4+) en la carpeta de configuración de `ebusd` y reinicia `ebusd` para activar la sincronización en tiempo real del Modo Ausencia y los parámetros de temporada de frío. Este aviso desaparecerá automáticamente en cuanto `ebusd` cargue los archivos actualizados."
+    },
     "missing_custom_csv": {
       "title": "Archivos CSV no cargados o escaneo incompleto en eBUSd",
       "description": "Tu instancia de `ebusd` recibe señal del bus eBUS, pero uno o varios circuitos CSV necesarios (`08.hmux0.csv`, `15.bass3.csv`/`15.basv3.csv` o `76.vwzio.csv`) no se han cargado correctamente o han sufrido un timeout durante el escaneo inicial (`scan config ERR: read timeout`). Verifica que `broadcast.csv` y `vaillant/*.csv` de `ebusd-configuration/` estén en tu carpeta `--configpath` y reinicia `ebusd`. Este aviso desaparecerá automáticamente en cuanto los tres circuitos reporten telemetría."

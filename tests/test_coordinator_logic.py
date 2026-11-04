@@ -44,6 +44,7 @@ from custom_components.arotherm_genia_ebusd.const import (
     ISSUE_MISSING_CUSTOM_CSV,
     ISSUE_MQTTJSON_NOT_ENABLED,
     ISSUE_NO_EBUSD_MQTT_TRAFFIC,
+    ISSUE_OUTDATED_CONTROLLER_CSV,
     ISSUE_OUTDATED_HMUX0_CSV,
     MANUFACTURER_SAUNIER_DUVAL,
     MANUFACTURER_VAILLANT,
@@ -847,6 +848,47 @@ class TestCoordinatorLogic(unittest.TestCase):
         ir_mod.async_delete_issue.assert_called_with(
             hass, DOMAIN, ISSUE_OUTDATED_HMUX0_CSV
         )
+
+        # 1b. Legacy 15.bass3.csv / 15.basv3.csv (with 'Z1HolidayTemp') raises outdated_controller_csv
+        ir_mod.async_create_issue.reset_mock()
+        ir_mod.async_delete_issue.reset_mock()
+        push_mqtt(
+            "ebusd/bass3/Z1HolidayTemp",
+            '{"value": {"value": 15.0}}',
+        )
+        self.assertIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+        ir_mod.async_create_issue.assert_called_once()
+
+        # Upgrading 15.bass3.csv ('HolidayTemp' present) automatically deletes outdated_controller_csv
+        push_mqtt(
+            "ebusd/bass3/HolidayTemp",
+            '{"value": {"value": 15.0}}',
+        )
+        self.assertNotIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+        ir_mod.async_delete_issue.assert_called_with(
+            hass, DOMAIN, ISSUE_OUTDATED_CONTROLLER_CSV
+        )
+
+        # Also works on basv3 (sensoCOMFORT)
+        ir_mod.async_create_issue.reset_mock()
+        ir_mod.async_delete_issue.reset_mock()
+        push_mqtt(
+            "ebusd/basv3/Z1HolidayTemp",
+            '{"value": {"value": 15.0}}',
+        )
+        self.assertIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+        ir_mod.async_create_issue.assert_called_once()
+
+        # HolidayStartDate with valid fields on v1.2.4+ also clears outdated_controller_csv
+        # Note: clear Z1HolidayTemp across all aliased circuits to simulate ebusd restarting with updated CSV
+        for c in (CIRCUIT_BASS3, CIRCUIT_BASV3):
+            coord._state.pop((c, "Z1HolidayTemp"), None)
+            coord._canonical_names.pop((c, "z1holidaytemp"), None)
+        push_mqtt(
+            "ebusd/basv3/HolidayStartDate",
+            '{"day": {"value": 1}, "month": {"value": 1}, "year": {"value": 15}}',
+        )
+        self.assertNotIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
 
         # 2. Missing custom CSV / incomplete scan detection:
         #    If any of the 3 required circuits (08.hmux0, 15.bass3/basv3, 76.vwzio) fails to load after hydration,
