@@ -49,6 +49,7 @@ class TestSchemaIntegrity(unittest.TestCase):
         required_keys = [
             "domain",
             "name",
+            "categories",
             "codeowners",
             "config_flow",
             "documentation",
@@ -59,6 +60,11 @@ class TestSchemaIntegrity(unittest.TestCase):
         for key in required_keys:
             self.assertIn(key, manifest, f"Missing key in manifest.json: {key}")
 
+        # Hassfest key ordering: domain, name, then alphabetical
+        keys = list(manifest.keys())
+        self.assertEqual(keys[:2], ["domain", "name"])
+        self.assertEqual(keys[2:], sorted(keys[2:]))
+
         self.assertEqual(manifest["domain"], DOMAIN)
         self.assertEqual(manifest["domain"], "arotherm_genia_ebusd")
         self.assertTrue(manifest["config_flow"])
@@ -66,6 +72,8 @@ class TestSchemaIntegrity(unittest.TestCase):
             manifest["iot_class"],
             ["local_push", "local_polling", "cloud_push", "cloud_polling"],
         )
+        self.assertTrue(isinstance(manifest["categories"], list))
+        self.assertTrue(1 <= len(manifest["categories"]) <= 3)
         self.assertTrue(isinstance(manifest["codeowners"], list))
         self.assertGreater(len(manifest["codeowners"]), 0)
 
