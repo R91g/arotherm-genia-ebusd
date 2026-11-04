@@ -35,7 +35,12 @@ from custom_components.arotherm_genia_ebusd.const import (
     CALC_SYSTEM_TOTAL_ENERGY,
     CIRCUIT_BASS3,
     CIRCUIT_BASV3,
+    CIRCUIT_CTLV2,
+    CIRCUIT_CTLV3,
+    CIRCUIT_HMU,
+    CIRCUIT_HMUX0,
     CONF_MANUFACTURER,
+    CONTROLLER_CIRCUITS,
     DEVICE_CLIMATE_CONTROLLER,
     DEVICE_HYDRAULIC_INTERFACE,
     DEVICE_OUTDOOR_UNIT,
@@ -811,6 +816,128 @@ class TestCoordinatorLogic(unittest.TestCase):
 
         asyncio.run(run_write_tests())
 
+    def test_controller_circuit_aliasing_ctlv2_and_ctlv3(self) -> None:
+        """Test bidirectional aliasing, scan detection, and routing for CTLV2 and CTLV3."""
+        hass = MagicMock()
+        entry = MagicMock()
+        entry.entry_id = "test_ctlv"
+        entry.data = {CONF_MANUFACTURER: MANUFACTURER_VAILLANT}
+
+        coord = SaunierGeniaCoordinator(hass, entry)
+        self.assertEqual(coord.active_controller_circuit, CIRCUIT_BASV3)
+
+        def push_mqtt(topic: str, payload: str) -> None:
+            msg = MagicMock()
+            msg.topic = topic
+            msg.payload = payload
+            coord._async_on_mqtt_message(msg)
+
+        # 1. Passive detection via scan.15 for CTLV2 (Falk's setup)
+        push_mqtt(
+            "ebusd/scan.15",
+            '{"MF": "Vaillant", "ID": "CTLV2", "SW": "0514", "HW": "1104"}',
+        )
+        self.assertEqual(coord.active_controller_circuit, CIRCUIT_CTLV2)
+
+        # Ingestion on ctlv2 aliases across all controller circuits
+        callback_called = False
+
+        def on_room_temp_updated() -> None:
+            nonlocal callback_called
+            callback_called = True
+
+        coord.async_add_listener(CIRCUIT_BASS3, "Z1RoomTemp", on_room_temp_updated)
+        push_mqtt("ebusd/ctlv2/Z1RoomTemp", '{"temp": {"value": 20.8}}')
+        self.assertTrue(callback_called)
+        self.assertEqual(coord.get_float(CIRCUIT_BASS3, "Z1RoomTemp", "temp"), 20.8)
+        self.assertEqual(coord.get_float(CIRCUIT_CTLV2, "Z1RoomTemp", "temp"), 20.8)
+        self.assertEqual(coord.get_float(CIRCUIT_BASV3, "Z1RoomTemp", "temp"), 20.8)
+        self.assertEqual(coord.get_float(CIRCUIT_CTLV3, "Z1RoomTemp", "temp"), 20.8)
+
+        # 2. Passive detection via scan.15 for CTLV3 (Wim's setup)
+        push_mqtt("ebusd/scan.15", "Vaillant;CTLV3;0618;1104")
+        self.assertEqual(coord.active_controller_circuit, CIRCUIT_CTLV3)
+
+        # Parameter write and get routing to ctlv3
+        async def run_write_tests() -> None:
+            with patch(
+                "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                new=AsyncMock(),
+            ) as mock_pub:
+                await coord.async_write_parameter(CIRCUIT_BASS3, "Z1DayTemp", 21.5)
+                mock_pub.assert_called_with(
+                    hass, "ebusd/ctlv3/Z1DayTemp/set", "21.5", qos=0, retain=False
+                )
+                self.assertEqual(
+                    coord.get_float(CIRCUIT_BASS3, "Z1DayTemp", "temp"), 21.5
+                )
+                self.assertEqual(
+                    coord.get_float(CIRCUIT_CTLV3, "Z1DayTemp", "temp"), 21.5
+                )
+
+                await coord.async_request_get(CIRCUIT_BASS3, "Z1NightTemp")
+                mock_pub.assert_called_with(
+                    hass, "ebusd/ctlv3/Z1NightTemp/get", "", qos=0, retain=False
+                )
+
+        asyncio.run(run_write_tests())
+
+    def test_outdoor_circuit_aliasing_hmux0_and_hmu(self) -> None:
+        """Test bidirectional aliasing, scan detection, and routing for HMU00 (HW=5103)."""
+        hass = MagicMock()
+        entry = MagicMock()
+        entry.entry_id = "test_hmu"
+        entry.data = {CONF_MANUFACTURER: MANUFACTURER_VAILLANT}
+
+        coord = SaunierGeniaCoordinator(hass, entry)
+        self.assertEqual(coord.active_outdoor_circuit, CIRCUIT_HMUX0)
+
+        def push_mqtt(topic: str, payload: str) -> None:
+            msg = MagicMock()
+            msg.topic = topic
+            msg.payload = payload
+            coord._async_on_mqtt_message(msg)
+
+        # 1. Passive detection via scan.08 for HMU00 / HW=5103
+        push_mqtt(
+            "ebusd/scan.08",
+            '{"MF": "Vaillant", "ID": "HMU00", "SW": "0902", "HW": "5103"}',
+        )
+        self.assertEqual(coord.active_outdoor_circuit, CIRCUIT_HMU)
+
+        # Ingestion on hmu aliases to hmux0
+        callback_called = False
+
+        def on_flow_temp_updated() -> None:
+            nonlocal callback_called
+            callback_called = True
+
+        coord.async_add_listener(CIRCUIT_HMUX0, "RunDataFlowTemp", on_flow_temp_updated)
+        push_mqtt("ebusd/hmu/RunDataFlowTemp", '{"value": {"value": 36.2}}')
+        self.assertTrue(callback_called)
+        self.assertEqual(
+            coord.get_float(CIRCUIT_HMUX0, "RunDataFlowTemp", "value"), 36.2
+        )
+        self.assertEqual(coord.get_float(CIRCUIT_HMU, "RunDataFlowTemp", "value"), 36.2)
+
+        # Ingestion of HW5103 FlowPressure
+        push_mqtt("ebusd/hmu/FlowPressure", '{"value": {"value": 1.85}}')
+        self.assertEqual(coord.get_float(CIRCUIT_HMUX0, "FlowPressure", "value"), 1.85)
+        self.assertEqual(coord.get_float(CIRCUIT_HMU, "FlowPressure", "value"), 1.85)
+
+        # Parameter write and get routing to hmu
+        async def run_write_tests() -> None:
+            with patch(
+                "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                new=AsyncMock(),
+            ) as mock_pub:
+                await coord.async_request_get(CIRCUIT_HMUX0, "FlowPressure")
+                mock_pub.assert_called_with(
+                    hass, "ebusd/hmu/FlowPressure/get", "", qos=0, retain=False
+                )
+
+        asyncio.run(run_write_tests())
+
     def test_repair_issues_outdated_and_missing_csv_detection(self) -> None:
         """Test automatic Home Assistant Repair issue creation and clearing for CSV compatibility."""
         import sys
@@ -881,7 +1008,7 @@ class TestCoordinatorLogic(unittest.TestCase):
 
         # HolidayStartDate with valid fields on v1.2.4+ also clears outdated_controller_csv
         # Note: clear Z1HolidayTemp across all aliased circuits to simulate ebusd restarting with updated CSV
-        for c in (CIRCUIT_BASS3, CIRCUIT_BASV3):
+        for c in CONTROLLER_CIRCUITS:
             coord._state.pop((c, "Z1HolidayTemp"), None)
             coord._canonical_names.pop((c, "z1holidaytemp"), None)
         push_mqtt(

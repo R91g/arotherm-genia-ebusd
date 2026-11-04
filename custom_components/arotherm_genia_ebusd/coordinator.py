@@ -30,7 +30,10 @@ from .const import (
     CIRCUIT_BASS3,
     CIRCUIT_BASV3,
     CIRCUIT_BROADCAST,
+    CIRCUIT_CTLV2,
+    CIRCUIT_CTLV3,
     CIRCUIT_GLOBAL,
+    CIRCUIT_HMU,
     CIRCUIT_HMUX0,
     CIRCUIT_NETX3,
     CIRCUIT_NETX3_ALT,
@@ -62,6 +65,7 @@ from .const import (
     DHW_BOOST_MAX_TIMEOUT_SECONDS,
     DOMAIN,
     ESSENTIAL_HYDRATION_MESSAGES,
+    HMU_HW5103_HYDRATION_MESSAGES,
     HMUX0_CUSTOM_SIGNATURE_MESSAGES,
     HOLIDAY_DEFAULT_END_TIME,
     HOLIDAY_INDEFINITE_END_DATE,
@@ -75,6 +79,7 @@ from .const import (
     ISSUE_OUTDATED_CONTROLLER_CSV,
     ISSUE_OUTDATED_HMUX0_CSV,
     MANUFACTURER_VAILLANT,
+    OUTDOOR_CIRCUITS,
     SCAN_ADDRESS_TO_DEVICE_KEY,
     SCAN_TOPIC_CIRCUITS,
     SET_CONFIRMATION_DELAY_SECONDS,
@@ -93,23 +98,27 @@ from .thermodynamics import (
 
 _LOGGER = logging.getLogger(__name__)
 
-# Inputs in hmux0 and vwzio that trigger recalculation of thermodynamic & energy sensors
+_OUTDOOR_THERMO_TRIGGER_NAMES: tuple[str, ...] = (
+    "rundataflowtemp",
+    "rundatareturntemp",
+    "status01",
+    "rundataflowrate",
+    "rundataelectricpowerconsumption",
+    "powerstatus",
+    "energyyieldprecision",
+    "hmustatuscode",
+    "prenergyelectrichc",
+    "prenergyelectrichwc",
+    "prenergyelectriccool",
+    "prenergythermalhc",
+    "prenergythermalhwc",
+    "prenergythermalcool",
+)
+
+# Inputs in outdoor units (hmux0/hmu) and vwzio that trigger recalculation of thermodynamic & energy sensors
 THERMO_TRIGGER_MESSAGES: frozenset[tuple[str, str]] = frozenset(
-    {
-        (CIRCUIT_HMUX0, "rundataflowtemp"),
-        (CIRCUIT_HMUX0, "rundatareturntemp"),
-        (CIRCUIT_HMUX0, "status01"),
-        (CIRCUIT_HMUX0, "rundataflowrate"),
-        (CIRCUIT_HMUX0, "rundataelectricpowerconsumption"),
-        (CIRCUIT_HMUX0, "powerstatus"),
-        (CIRCUIT_HMUX0, "energyyieldprecision"),
-        (CIRCUIT_HMUX0, "hmustatuscode"),
-        (CIRCUIT_HMUX0, "prenergyelectrichc"),
-        (CIRCUIT_HMUX0, "prenergyelectrichwc"),
-        (CIRCUIT_HMUX0, "prenergyelectriccool"),
-        (CIRCUIT_HMUX0, "prenergythermalhc"),
-        (CIRCUIT_HMUX0, "prenergythermalhwc"),
-        (CIRCUIT_HMUX0, "prenergythermalcool"),
+    {(c, msg) for c in OUTDOOR_CIRCUITS for msg in _OUTDOOR_THERMO_TRIGGER_NAMES}
+    | {
         (CIRCUIT_VWZIO, "powerstatus"),
         (CIRCUIT_VWZIO, "prenergyelectrichc"),
         (CIRCUIT_VWZIO, "prenergyelectrichwc"),
@@ -300,6 +309,9 @@ class SaunierGeniaCoordinator:
             else CIRCUIT_BASS3
         )
 
+        # Active outdoor unit circuit name ('hmux0' or 'hmu')
+        self._active_outdoor_circuit: str = CIRCUIT_HMUX0
+
         # Active Home Assistant Repair issues (issue_registry)
         self._active_repair_issues: set[str] = set()
 
@@ -330,8 +342,13 @@ class SaunierGeniaCoordinator:
 
     @property
     def active_controller_circuit(self) -> str:
-        """Return active eBUS circuit name for the system controller ('basv3' or 'bass3')."""
+        """Return active eBUS circuit name for the system controller ('bass3', 'basv3', 'ctlv2', 'ctlv3')."""
         return self._active_controller_circuit
+
+    @property
+    def active_outdoor_circuit(self) -> str:
+        """Return active eBUS circuit name for the outdoor heat pump ('hmux0' or 'hmu')."""
+        return self._active_outdoor_circuit
 
     @property
     def has_wireless_room_unit(self) -> bool:
@@ -453,10 +470,8 @@ class SaunierGeniaCoordinator:
         """Subscribe to ebusd MQTT topics and schedule initial hydration."""
         prefix = self.mqtt_prefix
         circuits_to_subscribe = [
-            CIRCUIT_BASS3,
-            CIRCUIT_BASV3,
-            CIRCUIT_HMUX0,
-            "hmu",
+            *CONTROLLER_CIRCUITS,
+            *OUTDOOR_CIRCUITS,
             CIRCUIT_VWZIO,
             CIRCUIT_NETX3,
             CIRCUIT_NETX3_ALT,
@@ -615,15 +630,23 @@ class SaunierGeniaCoordinator:
         # Notify subscribers for this (circuit, message)
         self._async_notify_message_listeners(circuit_key, message_name)
 
-        # Dynamic aliasing for climate controller circuits (bass3 <-> basv3)
+        # Dynamic aliasing for outdoor unit circuits (hmux0 <-> hmu)
+        if circuit_key in OUTDOOR_CIRCUITS:
+            self._active_outdoor_circuit = circuit_key
+            for alt_circuit in OUTDOOR_CIRCUITS:
+                if alt_circuit != circuit_key:
+                    self._canonical_names[(alt_circuit, msg_lower)] = message_name
+                    self._state[(alt_circuit, message_name)] = parsed
+                    self._async_notify_message_listeners(alt_circuit, message_name)
+
+        # Dynamic aliasing for climate controller circuits (bass3 <-> basv3 <-> ctlv2 <-> ctlv3)
         if circuit_key in CONTROLLER_CIRCUITS:
             self._active_controller_circuit = circuit_key
-            alt_circuit = (
-                CIRCUIT_BASS3 if circuit_key == CIRCUIT_BASV3 else CIRCUIT_BASV3
-            )
-            self._canonical_names[(alt_circuit, msg_lower)] = message_name
-            self._state[(alt_circuit, message_name)] = parsed
-            self._async_notify_message_listeners(alt_circuit, message_name)
+            for alt_circuit in CONTROLLER_CIRCUITS:
+                if alt_circuit != circuit_key:
+                    self._canonical_names[(alt_circuit, msg_lower)] = message_name
+                    self._state[(alt_circuit, message_name)] = parsed
+                    self._async_notify_message_listeners(alt_circuit, message_name)
 
         # Trigger thermodynamic calculations if relevant outdoor unit or hydraulic module telemetry changed
         if (circuit_key, msg_lower) in THERMO_TRIGGER_MESSAGES:
@@ -689,7 +712,7 @@ class SaunierGeniaCoordinator:
 
         # 1. Detect missing --mqttjson flag when multi-field telemetry arrives as semicolon plain text
         if (
-            circuit_key in (CIRCUIT_HMUX0, CIRCUIT_BASS3, CIRCUIT_BASV3, CIRCUIT_VWZIO)
+            circuit_key in (*OUTDOOR_CIRCUITS, *CONTROLLER_CIRCUITS, CIRCUIT_VWZIO)
             and raw_payload
         ):
             stripped = raw_payload.strip()
@@ -729,59 +752,46 @@ class SaunierGeniaCoordinator:
         if circuit_key in CONTROLLER_CIRCUITS:
             if msg_lower == "z1holidaytemp":
                 self._async_set_repair_issue(ISSUE_OUTDATED_CONTROLLER_CSV, active=True)
-            elif msg_lower == "holidaytemp":
+            elif msg_lower == "holidaytemp" or (
+                msg_lower == "holidaystartdate"
+                and isinstance(parsed, dict)
+                and "year" in parsed
+            ):
                 for c in CONTROLLER_CIRCUITS:
                     self._state.pop((c, "Z1HolidayTemp"), None)
                     self._state.pop((c, "z1holidaytemp"), None)
                 self._async_set_repair_issue(
                     ISSUE_OUTDATED_CONTROLLER_CSV, active=False
                 )
-            elif (
-                msg_lower == "holidaystartdate"
-                and isinstance(parsed, dict)
-                and "year" in parsed
-                and not any(
-                    self.has_message(c, "Z1HolidayTemp") for c in CONTROLLER_CIRCUITS
-                )
-            ):
-                self._async_set_repair_issue(
-                    ISSUE_OUTDATED_CONTROLLER_CSV, active=False
-                )
 
-        # 3. Clear 'missing_custom_csv' once all required custom CSV circuits (08.hmux0, 15.bass3/basv3, 76.vwzio) report telemetry
+        # 3. Clear 'missing_custom_csv' once all required custom CSV circuits report telemetry
         if (
-            circuit_key
-            in (
-                CIRCUIT_HMUX0,
-                CIRCUIT_BASS3,
-                CIRCUIT_BASV3,
-                CIRCUIT_VWZIO,
-            )
+            circuit_key in (*OUTDOOR_CIRCUITS, *CONTROLLER_CIRCUITS, CIRCUIT_VWZIO)
             and self._has_all_required_csv_circuits()
         ):
             self._async_set_repair_issue(ISSUE_MISSING_CUSTOM_CSV, active=False)
 
-        # 4. Detect default upstream ebusd.eu hmu.inc messages (when custom 08.hmux0.csv is not loaded)
+        # 4. Detect default upstream ebusd.eu hmu.inc messages (when custom CSV is not loaded)
         if (
-            circuit_key in (CIRCUIT_HMUX0, "hmu")
+            circuit_key in OUTDOOR_CIRCUITS
             and msg_lower in UPSTREAM_DEFAULT_CSV_MESSAGES
             and not any(
-                self.has_message(CIRCUIT_HMUX0, m)
+                self.has_message(circuit_key, m)
                 for m in HMUX0_CUSTOM_SIGNATURE_MESSAGES
             )
         ):
             self._async_set_repair_issue(ISSUE_MISSING_CUSTOM_CSV, active=True)
 
     def _has_all_required_csv_circuits(self) -> bool:
-        """Return True if 08.hmux0, 15.bass3/basv3, and 76.vwzio have all reported telemetry."""
-        has_custom_hmux0 = any(
-            self.has_message(CIRCUIT_HMUX0, m) for m in HMUX0_CUSTOM_SIGNATURE_MESSAGES
-        )
-        has_controller = any(
-            c in (CIRCUIT_BASS3, CIRCUIT_BASV3) for c, _ in self._state
-        )
+        """Return True if outdoor unit, controller, and vwzio have all reported telemetry."""
+        has_custom_outdoor = any(
+            self.has_message(c, m)
+            for c in OUTDOOR_CIRCUITS
+            for m in HMUX0_CUSTOM_SIGNATURE_MESSAGES
+        ) or any(c in OUTDOOR_CIRCUITS for c, _ in self._state)
+        has_controller = any(c in CONTROLLER_CIRCUITS for c, _ in self._state)
         has_vwzio = any(c == CIRCUIT_VWZIO for c, _ in self._state)
-        return has_custom_hmux0 and has_controller and has_vwzio
+        return has_custom_outdoor and has_controller and has_vwzio
 
     @callback
     def _async_verify_custom_csv_after_hydration(self) -> None:
@@ -798,7 +808,7 @@ class SaunierGeniaCoordinator:
 
         signal_raw = (self.get_str(CIRCUIT_GLOBAL, "signal") or "").lower()
         has_bus_traffic = signal_raw in ("1", "true", "yes", "on") or any(
-            c in (CIRCUIT_HMUX0, CIRCUIT_BASS3, CIRCUIT_BASV3, CIRCUIT_VWZIO, "hmu")
+            c in OUTDOOR_CIRCUITS or c in CONTROLLER_CIRCUITS or c == CIRCUIT_VWZIO
             for c, _ in self._state
         )
         if not has_bus_traffic:
@@ -956,11 +966,13 @@ class SaunierGeniaCoordinator:
 
     async def async_request_get(self, circuit: str, message: str) -> None:
         """Publish an empty payload to <mqtt_prefix>/<circuit>/<message>/get."""
-        target_circuit = (
-            self._active_controller_circuit
-            if circuit.lower() in CONTROLLER_CIRCUITS
-            else circuit
-        )
+        circuit_lower = circuit.lower()
+        if circuit_lower in CONTROLLER_CIRCUITS:
+            target_circuit = self._active_controller_circuit
+        elif circuit_lower in OUTDOOR_CIRCUITS:
+            target_circuit = self._active_outdoor_circuit
+        else:
+            target_circuit = circuit
         topic = f"{self.mqtt_prefix}/{target_circuit}/{message}/get"
         await mqtt.async_publish(self.hass, topic, "", qos=0, retain=False)
 
@@ -971,8 +983,15 @@ class SaunierGeniaCoordinator:
         value: Any,
     ) -> None:
         """Publish a write command to <mqtt_prefix>/<circuit>/<message>/set and schedule confirmation /get."""
-        is_controller = circuit.lower() in CONTROLLER_CIRCUITS
-        target_circuit = self._active_controller_circuit if is_controller else circuit
+        circuit_lower = circuit.lower()
+        is_controller = circuit_lower in CONTROLLER_CIRCUITS
+        is_outdoor = circuit_lower in OUTDOOR_CIRCUITS
+        if is_controller:
+            target_circuit = self._active_controller_circuit
+        elif is_outdoor:
+            target_circuit = self._active_outdoor_circuit
+        else:
+            target_circuit = circuit
         topic = f"{self.mqtt_prefix}/{target_circuit}/{message}/set"
         payload = str(value)
         _LOGGER.debug("Publishing eBUSd write: %s -> '%s'", topic, payload)
@@ -983,11 +1002,15 @@ class SaunierGeniaCoordinator:
         self._apply_optimistic_update(circuit, message, value)
         self._async_notify_message_listeners(circuit, message)
         if is_controller:
-            alt_circuit = (
-                CIRCUIT_BASS3 if circuit.lower() == CIRCUIT_BASV3 else CIRCUIT_BASV3
-            )
-            self._apply_optimistic_update(alt_circuit, message, value)
-            self._async_notify_message_listeners(alt_circuit, message)
+            for alt_circuit in CONTROLLER_CIRCUITS:
+                if alt_circuit != circuit_lower:
+                    self._apply_optimistic_update(alt_circuit, message, value)
+                    self._async_notify_message_listeners(alt_circuit, message)
+        elif is_outdoor:
+            for alt_circuit in OUTDOOR_CIRCUITS:
+                if alt_circuit != circuit_lower:
+                    self._apply_optimistic_update(alt_circuit, message, value)
+                    self._async_notify_message_listeners(alt_circuit, message)
 
         await mqtt.async_publish(self.hass, topic, payload, qos=0, retain=False)
 
@@ -1049,6 +1072,10 @@ class SaunierGeniaCoordinator:
             for circuit, message in ESSENTIAL_HYDRATION_MESSAGES
             if not self.has_message(circuit, message)
         ]
+        if self._active_outdoor_circuit == CIRCUIT_HMU:
+            for circuit, message in HMU_HW5103_HYDRATION_MESSAGES:
+                if not self.has_message(circuit, message):
+                    missing.append((circuit, message))
         if self.has_wireless_room_unit and not self.has_message(
             CIRCUIT_NETX3, "RoomTempDial"
         ):
@@ -1708,6 +1735,24 @@ class SaunierGeniaCoordinator:
                 f"{val_str} {parsed.get('id', '')} {parsed.get('ID', '')}"
             ).upper()
             if (
+                "CTLV3" in payload_upper
+                and self._active_controller_circuit != CIRCUIT_CTLV3
+            ):
+                _LOGGER.info(
+                    "Detected Vaillant sensoCOMFORT (CTLV3) on eBUS address 15; setting controller circuit to %s",
+                    CIRCUIT_CTLV3,
+                )
+                self._active_controller_circuit = CIRCUIT_CTLV3
+            elif (
+                "CTLV2" in payload_upper
+                and self._active_controller_circuit != CIRCUIT_CTLV2
+            ):
+                _LOGGER.info(
+                    "Detected Vaillant sensoCOMFORT (CTLV2) on eBUS address 15; setting controller circuit to %s",
+                    CIRCUIT_CTLV2,
+                )
+                self._active_controller_circuit = CIRCUIT_CTLV2
+            elif (
                 "BASV" in payload_upper
                 and self._active_controller_circuit != CIRCUIT_BASV3
             ):
@@ -1725,6 +1770,31 @@ class SaunierGeniaCoordinator:
                     CIRCUIT_BASS3,
                 )
                 self._active_controller_circuit = CIRCUIT_BASS3
+
+        # Passive detection of active outdoor unit circuit from address 08 scan
+        if addr == "08":
+            payload_upper = (
+                f"{val_str} {parsed.get('id', '')} {parsed.get('ID', '')}"
+            ).upper()
+            if (
+                ("HMU00" in payload_upper or "HMU" in payload_upper)
+                and "HMUX" not in payload_upper
+                and self._active_outdoor_circuit != CIRCUIT_HMU
+            ):
+                _LOGGER.info(
+                    "Detected Vaillant aroTHERM HMU00 on eBUS address 08; setting outdoor circuit to %s",
+                    CIRCUIT_HMU,
+                )
+                self._active_outdoor_circuit = CIRCUIT_HMU
+            elif (
+                "HMUX" in payload_upper
+                and self._active_outdoor_circuit != CIRCUIT_HMUX0
+            ):
+                _LOGGER.info(
+                    "Detected Saunier Duval / Vaillant HMUX0 on eBUS address 08; setting outdoor circuit to %s",
+                    CIRCUIT_HMUX0,
+                )
+                self._active_outdoor_circuit = CIRCUIT_HMUX0
 
         detected_sw: str | None = None
         detected_hw: str | None = None

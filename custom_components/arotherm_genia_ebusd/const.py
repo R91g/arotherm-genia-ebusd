@@ -152,9 +152,18 @@ DEVICE_WIRELESS_THERMOSTAT = "wireless_thermostat"
 
 # eBUS Circuits
 CIRCUIT_HMUX0 = "hmux0"
+CIRCUIT_HMU = "hmu"
+OUTDOOR_CIRCUITS: tuple[str, ...] = (CIRCUIT_HMUX0, CIRCUIT_HMU)
 CIRCUIT_BASS3 = "bass3"
 CIRCUIT_BASV3 = "basv3"
-CONTROLLER_CIRCUITS: tuple[str, ...] = (CIRCUIT_BASS3, CIRCUIT_BASV3)
+CIRCUIT_CTLV2 = "ctlv2"
+CIRCUIT_CTLV3 = "ctlv3"
+CONTROLLER_CIRCUITS: tuple[str, ...] = (
+    CIRCUIT_BASS3,
+    CIRCUIT_BASV3,
+    CIRCUIT_CTLV2,
+    CIRCUIT_CTLV3,
+)
 CIRCUIT_VWZIO = "vwzio"
 CIRCUIT_NETX3 = "04"
 CIRCUIT_NETX3_ALT = "f6"
@@ -376,6 +385,16 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_VWZIO, "PrEnergyElectricHwc"),
     (CIRCUIT_VWZIO, "PrEnergyThermalHc"),
     (CIRCUIT_VWZIO, "PrEnergyThermalHwc"),
+]
+
+# Additional eBUSd messages for Vaillant HMU00 (HW=5103) outdoor units
+HMU_HW5103_HYDRATION_MESSAGES: list[tuple[str, str]] = [
+    (CIRCUIT_HMU, "FlowPressure"),
+    (CIRCUIT_HMU, "YieldHc"),
+    (CIRCUIT_HMU, "YieldHwc"),
+    (CIRCUIT_HMU, "YieldCooling"),
+    (CIRCUIT_HMU, "TotalEnergyUsage"),
+    (CIRCUIT_HMU, "EnergyIntegral"),
 ]
 
 # All 52 HMUStatusCode values (plus normalized aliases)
