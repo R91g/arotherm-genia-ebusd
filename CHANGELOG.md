@@ -7,12 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.2.4] - Unreleased
+## [1.2.4] - 2026-11-04
 
 > [!IMPORTANT]
 > **Action Required:** Please update `ebusd-configuration/vaillant/08.hmux0.csv`, `ebusd-configuration/vaillant/15.bass3.csv`, and `ebusd-configuration/vaillant/15.basv3.csv` in your `ebusd` configuration folder and restart `ebusd`. This release fixes the `StateCompressor` `D2C` data type, activates real-time primary circuit water flow tracking (`RunDataFlowRate` `540200090b`), maps Holiday Mode reading to Zone 1 registers, and enables active startup hydration for heating starts and cooling season parameters.
 
 ### Fixed
+- **Code Quality, Privacy & Diagnostics Hardening:**
+  - Added automatic redaction of sensitive device identifiers (`serial_number`, `serial`, `mac`) in `diagnostics.py` for both configuration entries and raw `bus_state` to safeguard user privacy when sharing diagnostics on GitHub.
+  - Added explicit `strict=False` parameter to `zip()` layout unpacking in `coordinator.py` for enhanced payload parsing safety (`B905`).
+  - Normalized ambiguous Unicode dash characters in `datetime.py` comments (`RUF003`).
 - **`StateCompressor` `D2C` Data Type Fix (`08.hmux0.csv` — [#2](https://github.com/R91g/arotherm-genia-ebusd/issues/2)):**
   - Replaced invalid `DATA2c` type token with the standard eBUSd type `D2C` in `StateCompressor` (`b511,00` in `ebusd-configuration/vaillant/08.hmux0.csv:32`), resolving the `[main error] error readingconfigfiles ... vaillant/08.hmux0.csv: ERR: invalid part type in line 32` error on `ebusd` startup.
   - Added automated schema test `test_ebusd_csv_field_types` in `tests/test_schema_integrity.py` to validate every field data type across all `.csv` files against official eBUSd type specifications.

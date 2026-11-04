@@ -1028,7 +1028,7 @@ class SaunierGeniaCoordinator:
             parts = [_coerce_scalar(part) for part in value.split(";")]
             layout = _multi_field_layout(canonical, current)
             if layout:
-                current.update(zip(layout, parts))
+                current.update(zip(layout, parts, strict=False))
             else:
                 current["value"] = value.strip()
         else:
