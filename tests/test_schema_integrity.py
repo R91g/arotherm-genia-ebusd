@@ -341,6 +341,41 @@ class TestSchemaIntegrity(unittest.TestCase):
                 f"CSV file '{rel_path}' must begin with the header definition on line 1, found: {first_line!r}",
             )
 
+    def test_ebusd_csv_no_duplicate_ids(self) -> None:
+        """Verify that no eBUSd CSV definition contains duplicate (type, pbsb, id) entries.
+
+        Duplicate IDs cause the ebusd parser to abort reading the CSV file with
+        'ERR: duplicate entry, duplicate ID', leaving subsequent registers unloaded.
+        """
+        ebusd_cfg_dir = os.path.join(self.root_dir, "ebusd-configuration")
+        csv_files = glob.glob(
+            os.path.join(ebusd_cfg_dir, "**", "*.csv"), recursive=True
+        )
+        self.assertGreater(len(csv_files), 0, "No CSV configuration files found")
+
+        for csv_path in csv_files:
+            rel_path = os.path.relpath(csv_path, self.root_dir)
+            seen_entries: dict[tuple[str, str, str, str, str], int] = {}
+            with open(csv_path, "r", encoding="utf-8", errors="replace") as fp:
+                for line_no, raw_line in enumerate(fp, start=1):
+                    line = raw_line.strip()
+                    if not line or line.startswith(("#", "*")):
+                        continue
+                    parts = next(csv.reader([line]))
+                    if len(parts) >= 9:
+                        cmd_type = parts[0].strip()
+                        circuit = parts[1].strip()
+                        level = parts[2].strip()
+                        pbsb = parts[7].strip()
+                        msg_id = parts[8].strip()
+                        key = (cmd_type, circuit, level, pbsb, msg_id)
+                        self.assertNotIn(
+                            key,
+                            seen_entries,
+                            f"Duplicate ID in {rel_path}:{line_no} matching line {seen_entries.get(key)}: {key}",
+                        )
+                        seen_entries[key] = line_no
+
 
 if __name__ == "__main__":
     unittest.main()

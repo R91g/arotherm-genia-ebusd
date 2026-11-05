@@ -34,6 +34,7 @@ from .const import (
     CIRCUIT_CTLV3,
     CIRCUIT_GLOBAL,
     CIRCUIT_HMU,
+    CIRCUIT_HMU00,
     CIRCUIT_HMUX0,
     CIRCUIT_NETX3,
     CIRCUIT_NETX3_ALT,
@@ -1449,10 +1450,18 @@ class SaunierGeniaCoordinator:
 
         # 3. Live Instantaneous COP / EER
         elec_power = self.get_float(
-            CIRCUIT_HMUX0, "RunDataElectricPowerConsumption", "power"
+            self._active_outdoor_circuit, "RunDataElectricPowerConsumption", "power"
         )
         if elec_power is None:
-            elec_power = self.get_float(CIRCUIT_HMUX0, "PowerStatus", "power")
+            elec_power = self.get_float(
+                self._active_outdoor_circuit, "PowerStatus", "power"
+            )
+        if elec_power is None and self._active_outdoor_circuit != CIRCUIT_HMUX0:
+            elec_power = self.get_float(
+                CIRCUIT_HMUX0, "RunDataElectricPowerConsumption", "power"
+            )
+            if elec_power is None:
+                elec_power = self.get_float(CIRCUIT_HMUX0, "PowerStatus", "power")
         live_cop, is_active = calculate_live_cop(
             thermal_power, elec_power, hmu_status, frozenset(ACTIVE_COMPRESSOR_STATUSES)
         )
@@ -1462,10 +1471,21 @@ class SaunierGeniaCoordinator:
             self._set_calculated(CALC_LIVE_COP, live_cop)
 
         # 4. Per-Mode & Combined System Cumulative Electrical Energy (Wh)
-        hmux0_elec_hc = self.get_float(CIRCUIT_HMUX0, "PrEnergyElectricHc", "energy")
-        hmux0_elec_hwc = self.get_float(CIRCUIT_HMUX0, "PrEnergyElectricHwc", "energy")
-        hmux0_elec_cool = self.get_float(
-            CIRCUIT_HMUX0, "PrEnergyElectricCool", "energy"
+        is_split_hmu = self._active_outdoor_circuit in (CIRCUIT_HMU, CIRCUIT_HMU00)
+        hmux0_elec_hc = (
+            0.0
+            if is_split_hmu
+            else self.get_float(CIRCUIT_HMUX0, "PrEnergyElectricHc", "energy")
+        )
+        hmux0_elec_hwc = (
+            0.0
+            if is_split_hmu
+            else self.get_float(CIRCUIT_HMUX0, "PrEnergyElectricHwc", "energy")
+        )
+        hmux0_elec_cool = (
+            0.0
+            if is_split_hmu
+            else self.get_float(CIRCUIT_HMUX0, "PrEnergyElectricCool", "energy")
         )
         vwzio_elec_hc = self.get_float(CIRCUIT_VWZIO, "PrEnergyElectricHc", "energy")
         vwzio_elec_hwc = self.get_float(CIRCUIT_VWZIO, "PrEnergyElectricHwc", "energy")
@@ -1485,10 +1505,20 @@ class SaunierGeniaCoordinator:
             self._set_calculated(CALC_SYSTEM_TOTAL_ENERGY, system_total_wh)
 
         # 5. Verified Cumulative Mode & Global Efficiency (COP / EER)
-        hmux0_therm_hc = self.get_float(CIRCUIT_HMUX0, "PrEnergyThermalHc", "energy")
-        hmux0_therm_hwc = self.get_float(CIRCUIT_HMUX0, "PrEnergyThermalHwc", "energy")
-        hmux0_therm_cool = self.get_float(
-            CIRCUIT_HMUX0, "PrEnergyThermalCool", "energy"
+        hmux0_therm_hc = (
+            0.0
+            if is_split_hmu
+            else self.get_float(CIRCUIT_HMUX0, "PrEnergyThermalHc", "energy")
+        )
+        hmux0_therm_hwc = (
+            0.0
+            if is_split_hmu
+            else self.get_float(CIRCUIT_HMUX0, "PrEnergyThermalHwc", "energy")
+        )
+        hmux0_therm_cool = (
+            0.0
+            if is_split_hmu
+            else self.get_float(CIRCUIT_HMUX0, "PrEnergyThermalCool", "energy")
         )
         vwzio_therm_hc = self.get_float(CIRCUIT_VWZIO, "PrEnergyThermalHc", "energy")
         vwzio_therm_hwc = self.get_float(CIRCUIT_VWZIO, "PrEnergyThermalHwc", "energy")

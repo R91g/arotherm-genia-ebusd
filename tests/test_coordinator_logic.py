@@ -457,6 +457,67 @@ class TestCoordinatorLogic(unittest.TestCase):
         )
         self.assertFalse(_check_energy_integration(coord))
 
+    def test_split_hmu_cumulative_energy_and_efficiency(self) -> None:
+        """Verify Split units (HMU00 / CIRCUIT_HMU) calculate cumulative energy and COP from 76.vwzio."""
+        entry = MagicMock()
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {}
+        coord = SaunierGeniaCoordinator(MagicMock(), entry)
+
+        def push_mqtt(topic: str, payload: str) -> None:
+            msg = MagicMock()
+            msg.topic = topic
+            msg.payload = payload
+            coord._async_on_mqtt_message(msg)
+
+        # 1. Simulate Split HMU00 detection on address 08 (aroTHERM Split)
+        push_mqtt("ebusd/scan.08/id", "hmu00")
+        self.assertEqual(coord._active_outdoor_circuit, CIRCUIT_HMU)
+
+        # 2. Before vwzio hydration, totals and COPs must remain None
+        self.assertIsNone(coord.get_float(CALC_CIRCUIT, CALC_HEATING_TOTAL_ENERGY))
+        self.assertIsNone(coord.get_float(CALC_CIRCUIT, CALC_DHW_TOTAL_ENERGY))
+        self.assertIsNone(coord.get_float(CALC_CIRCUIT, CALC_SYSTEM_TOTAL_ENERGY))
+        self.assertIsNone(coord.get_float(CALC_CIRCUIT, CALC_HC_COP))
+        self.assertIsNone(coord.get_float(CALC_CIRCUIT, CALC_HWC_COP))
+        self.assertIsNone(coord.get_float(CALC_CIRCUIT, CALC_GLOBAL_EFFICIENCY))
+
+        # 3. Push vwzio energy counters (all metering on Split systems happens on 76.vwzio)
+        push_mqtt("ebusd/vwzio/PrEnergyElectricHc", '{"energy": {"value": 25000.0}}')
+        push_mqtt("ebusd/vwzio/PrEnergyElectricHwc", '{"energy": {"value": 5000.0}}')
+        push_mqtt("ebusd/vwzio/PrEnergyThermalHc", '{"energy": {"value": 100000.0}}')
+        push_mqtt("ebusd/vwzio/PrEnergyThermalHwc", '{"energy": {"value": 15000.0}}')
+
+        # 4. Verify calculations evaluate cleanly from vwzio without waiting for non-existent HMU registers
+        self.assertEqual(
+            coord.get_float(CALC_CIRCUIT, CALC_HEATING_TOTAL_ENERGY), 25000.0
+        )
+        self.assertEqual(coord.get_float(CALC_CIRCUIT, CALC_DHW_TOTAL_ENERGY), 5000.0)
+        self.assertEqual(
+            coord.get_float(CALC_CIRCUIT, CALC_SYSTEM_TOTAL_ENERGY), 30000.0
+        )
+        # Heating COP: 100000 / 25000 = 4.0
+        self.assertEqual(coord.get_float(CALC_CIRCUIT, CALC_HC_COP), 4.0)
+        # Hot Water COP: 15000 / 5000 = 3.0
+        self.assertEqual(coord.get_float(CALC_CIRCUIT, CALC_HWC_COP), 3.0)
+        # Global efficiency: 115000 / 30000 = 3.83
+        self.assertEqual(coord.get_float(CALC_CIRCUIT, CALC_GLOBAL_EFFICIENCY), 3.83)
+
+        # 5. Live COP on HMU via PowerStatus
+        push_mqtt("ebusd/hmu/RunDataFlowTemp", '{"value": {"value": 35.0}}')
+        push_mqtt("ebusd/hmu/RunDataReturnTemp", '{"value": {"value": 30.0}}')
+        push_mqtt("ebusd/hmu/RunDataFlowRate", '{"value": {"value": 1200}}')
+        push_mqtt(
+            "ebusd/hmu/HMUStatusCode",
+            '{"status": {"value": "heat_compressor_active"}}',
+        )
+        push_mqtt(
+            "ebusd/hmu/PowerStatus",
+            '{"status": {"value": "heating"}, "power": {"value": 1500.0}}',
+        )
+        # Thermal power = 1200 * 5.0 * 1.163 = 6978.0 W; Live COP = 6978 / 1500 = 4.65
+        self.assertEqual(coord.get_float(CALC_CIRCUIT, CALC_LIVE_COP), 4.65)
+
     def test_deprecated_entity_registry_cleanup(self) -> None:
         """Test automatic cleanup of obsolete b5 16 unique_ids on setup."""
         import sys
