@@ -16,6 +16,7 @@ from homeassistant.helpers import entity_registry as er
 
 from .const import (
     CIRCUIT_BASS3,
+    DAY_SHORT_KEYS,
     DEFAULT_HOLIDAY_TEMP,
     DEPRECATED_UNIQUE_ID_SUFFIXES,
     DEVICE_OUTDOOR_UNIT,
@@ -162,6 +163,61 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return unload_ok
 
 
+def _get_active_slot_count(
+    coordinator: SaunierGeniaCoordinator, prefix: str, day_name: str
+) -> int | None:
+    """Return the number of active slots for a day from <prefix>_Slots, or None."""
+    slots_msg = coordinator.get_message(CIRCUIT_BASS3, f"{prefix}_Slots") or {}
+    raw = slots_msg.get(DAY_SHORT_KEYS[day_name])
+    try:
+        count = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return count if 0 <= count <= 3 else None
+
+
+def _collect_upper_slots(
+    coordinator: SaunierGeniaCoordinator,
+    prefix: str,
+    day_name: str,
+    slot: int,
+    active_count: int | None,
+) -> list[tuple[int, str]]:
+    """Snapshot payloads of active slots above `slot` so they can be restored."""
+    if active_count is None or active_count <= slot:
+        return []
+    upper: list[tuple[int, str]] = []
+    for upper_slot in range(slot + 1, active_count + 1):
+        suffix = "" if upper_slot == 1 else f"_Slot{upper_slot}"
+        msg = coordinator.get_message(CIRCUIT_BASS3, f"{prefix}_{day_name}{suffix}")
+        fields = (
+            [msg.get(k) for k in ("from_hour", "from_min", "to_hour", "to_min")]
+            if msg
+            else []
+        )
+        if not fields or any(v is None for v in fields):
+            raise HomeAssistantError(
+                f"Cannot safely modify slot {slot} on {day_name}: current data of "
+                f"slot {upper_slot} is unknown, rewriting would erase it. "
+                "Wait for the schedule to be read from the bus and retry."
+            )
+        try:
+            hh1, mm1, hh2, mm2 = (int(v) for v in fields)
+        except (TypeError, ValueError) as err:
+            raise HomeAssistantError(
+                f"Invalid stored data for slot {upper_slot} on {day_name}."
+            ) from err
+        upper.append((upper_slot, f"{hh1};{mm1};{hh2};{mm2}"))
+    return upper
+
+
+def upper_slots_to_writes(
+    prefix: str, day_name: str, upper_slots: list[tuple[int, str]]
+) -> list[tuple[str, str]]:
+    """Convert snapshotted upper slots into ordered (message, payload) writes."""
+    return [(f"{prefix}_{day_name}_Slot{n}", data) for n, data in upper_slots]
+
+
 def _async_register_services(hass: HomeAssistant) -> None:
     """Register custom domain services for weekly schedule timers and forced DHW boost."""
     if not hass.services.has_service(DOMAIN, SERVICE_SET_WEEKLY_TIMER):
@@ -193,16 +249,46 @@ def _async_register_services(hass: HomeAssistant) -> None:
                 target_days = [day_selection]
 
             for coordinator in coordinators.values():
-                for idx, day_name in enumerate(target_days):
-                    message = f"{prefix}_{day_name}{slot_suffix}"
-                    await coordinator.async_write_parameter(
-                        CIRCUIT_BASS3, message, payload
+                # Validate every target day BEFORE writing anything, so a rejected
+                # request never leaves the schedule half-modified.
+                plans: list[tuple[str, list[tuple[int, str]]]] = []
+                for day_name in target_days:
+                    active_count = _get_active_slot_count(coordinator, prefix, day_name)
+                    if active_count is not None and slot > active_count + 1:
+                        raise HomeAssistantError(
+                            f"Cannot write slot {slot} on {day_name}: only "
+                            f"{active_count} slot(s) are currently active. "
+                            f"Fill slot {active_count + 1} first."
+                        )
+                    plans.append(
+                        (
+                            day_name,
+                            _collect_upper_slots(
+                                coordinator, prefix, day_name, slot, active_count
+                            ),
+                        )
                     )
-                    # Physical eBUS bus runs at 2400 baud (~240 bytes/s) with hardware collision
-                    # arbitration. Consecutive multi-message writes require pacing (~600 ms)
-                    # to prevent bus arbitration collisions with MiPro Sense or buffer overflows.
-                    if idx < len(target_days) - 1:
-                        await asyncio.sleep(0.6)
+
+                # Physical eBUS bus runs at 2400 baud (~240 bytes/s) with hardware collision
+                # arbitration. Consecutive writes require pacing (~600 ms) to prevent
+                # bus arbitration collisions with MiPro Sense or buffer overflows.
+                first_write = True
+                for day_name, upper_slots in plans:
+                    # The b5 55 write command carries a hardcoded total_slots byte equal to
+                    # the slot index, so writing slot N truncates the day to N slots.
+                    # Rewrite the previously active upper slots (ascending) with their
+                    # current data afterwards to restore the correct total_slots.
+                    writes: list[tuple[str, str]] = [
+                        (f"{prefix}_{day_name}{slot_suffix}", payload),
+                        *upper_slots_to_writes(prefix, day_name, upper_slots),
+                    ]
+                    for message, msg_payload in writes:
+                        if not first_write:
+                            await asyncio.sleep(0.6)
+                        first_write = False
+                        await coordinator.async_write_parameter(
+                            CIRCUIT_BASS3, message, msg_payload
+                        )
 
         hass.services.async_register(
             DOMAIN,
