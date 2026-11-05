@@ -26,6 +26,7 @@ from custom_components.arotherm_genia_ebusd.binary_sensor import (
 from custom_components.arotherm_genia_ebusd.const import (
     CALC_CIRCUIT,
     CALC_COOL_EER,
+    CALC_DELTA_T,
     CALC_DHW_TOTAL_ENERGY,
     CALC_GLOBAL_EFFICIENCY,
     CALC_HC_COP,
@@ -33,6 +34,7 @@ from custom_components.arotherm_genia_ebusd.const import (
     CALC_HWC_COP,
     CALC_LIVE_COP,
     CALC_SYSTEM_TOTAL_ENERGY,
+    CALC_THERMAL_POWER,
     CIRCUIT_BASS3,
     CIRCUIT_BASV3,
     CIRCUIT_CTLV2,
@@ -1004,6 +1006,76 @@ class TestCoordinatorLogic(unittest.TestCase):
             coord.get_float(CIRCUIT_HMU, "RunDataElectricPowerConsumption", "power"),
             1450.0,
         )
+
+    def test_message_aliases_trigger_thermodynamics_recalculation(self) -> None:
+        """Test that traditional eBUSd aliases trigger thermodynamic calculations immediately."""
+        hass = MagicMock()
+        entry = MagicMock()
+        entry.entry_id = "test_alias_triggers"
+        entry.data = {CONF_MANUFACTURER: MANUFACTURER_VAILLANT}
+
+        coord = SaunierGeniaCoordinator(hass, entry)
+
+        def push_mqtt(topic: str, payload: str) -> None:
+            msg = MagicMock()
+            msg.topic = topic
+            msg.payload = payload
+            coord._async_on_mqtt_message(msg)
+
+        with patch.object(
+            coord,
+            "_async_recalculate_thermodynamics",
+            wraps=coord._async_recalculate_thermodynamics,
+        ) as mock_recalc:
+            # 1. Unrelated message must NOT trigger recalculation
+            push_mqtt("ebusd/hmu/DateTime", '{"dcfstate": {"value": "valid"}}')
+            mock_recalc.assert_not_called()
+
+            # 2. Canonical message triggers recalculation exactly once
+            push_mqtt("ebusd/hmu/RunDataReturnTemp", '{"value": {"value": 30.0}}')
+            self.assertEqual(mock_recalc.call_count, 1)
+
+            # 3. All 5 traditional aliases must each trigger recalculation exactly once
+            # Alias 1: flowtemp -> RunDataFlowTemp
+            push_mqtt("ebusd/hmu/flowtemp", '{"temp": {"value": 35.0}}')
+            self.assertEqual(mock_recalc.call_count, 2)
+
+            # Alias 2: buildingcircuitflow -> RunDataFlowRate
+            push_mqtt("ebusd/hmu/buildingcircuitflow", '{"flow_rate": {"value": 1000}}')
+            self.assertEqual(mock_recalc.call_count, 3)
+
+            # Alias 3: waterthroughput -> RunDataFlowRate
+            push_mqtt("ebusd/hmu/waterthroughput", '{"flow_rate": {"value": 1000}}')
+            self.assertEqual(mock_recalc.call_count, 4)
+
+            # Alias 4: rundatastatuscode -> HMUStatusCode
+            push_mqtt(
+                "ebusd/hmu/rundatastatuscode",
+                '{"status": {"value": "heat_compressor_active"}}',
+            )
+            self.assertEqual(mock_recalc.call_count, 5)
+
+            # Thermal power is now calculated: 1000 l/h * (35.0 - 30.0 K) * 1.163 = 5815.0 W
+            self.assertEqual(coord.get_float(CALC_CIRCUIT, CALC_DELTA_T), 5.0)
+            self.assertEqual(coord.get_float(CALC_CIRCUIT, CALC_THERMAL_POWER), 5815.0)
+            # Live COP is still None because electric power consumption is not set yet
+            self.assertIsNone(coord.get_float(CALC_CIRCUIT, CALC_LIVE_COP))
+
+            # Alias 5: PowerConsumptionHmu -> RunDataElectricPowerConsumption (kW to W conversion)
+            push_mqtt("ebusd/hmu/PowerConsumptionHmu", '{"value": {"value": 1.45}}')
+            self.assertEqual(mock_recalc.call_count, 6)
+
+            # 4. Full end-to-end verification:
+            # Power converted: 1.45 kW -> 1450.0 W
+            self.assertEqual(
+                coord.get_float(
+                    CIRCUIT_HMUX0, "RunDataElectricPowerConsumption", "power"
+                ),
+                1450.0,
+            )
+            # Live COP calculated immediately on PowerConsumptionHmu arrival:
+            # 5815.0 W / 1450.0 W = 4.0103 -> 4.01
+            self.assertEqual(coord.get_float(CALC_CIRCUIT, CALC_LIVE_COP), 4.01)
 
     def test_repair_issues_outdated_and_missing_csv_detection(self) -> None:
         """Test automatic Home Assistant Repair issue creation and clearing for CSV compatibility."""

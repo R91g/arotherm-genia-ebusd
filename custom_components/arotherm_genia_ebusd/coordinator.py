@@ -709,7 +709,11 @@ class SaunierGeniaCoordinator:
                         )
 
         # Trigger thermodynamic calculations if relevant outdoor unit or hydraulic module telemetry changed
-        if (circuit_key, msg_lower) in THERMO_TRIGGER_MESSAGES:
+        canonical_msg_lower = canonical_alias.lower() if canonical_alias else msg_lower
+        if (circuit_key, msg_lower) in THERMO_TRIGGER_MESSAGES or (
+            circuit_key,
+            canonical_msg_lower,
+        ) in THERMO_TRIGGER_MESSAGES:
             self._async_recalculate_thermodynamics()
 
         # Check DHW boost restoration conditions when bass3/basv3 HwcSFMode or HwcStorageTemp updates
