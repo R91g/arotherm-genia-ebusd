@@ -12,6 +12,7 @@ from .const import (
     CIRCUIT_BASV3,
     CIRCUIT_CTLV2,
     CIRCUIT_CTLV3,
+    CIRCUIT_GLOBAL,
     DEVICE_CLIMATE_CONTROLLER,
     DEVICE_HYDRAULIC_INTERFACE,
     DEVICE_OUTDOOR_UNIT,
@@ -156,6 +157,7 @@ class SaunierGeniaEntity(Entity):
 
     _attr_has_entity_name = True
     _attr_should_poll = False
+    _gate_availability_on_ebus: bool = False
 
     def __init__(
         self,
@@ -174,10 +176,24 @@ class SaunierGeniaEntity(Entity):
         self._attr_device_info = build_device_info(coordinator, device_key)
         self._subscriptions = subscriptions
 
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        if self._gate_availability_on_ebus and not self.coordinator.is_ebus_operational:
+            return False
+        return super().available
+
     async def async_added_to_hass(self) -> None:
         """Subscribe to relevant (circuit, message) updates when added to Home Assistant."""
         await super().async_added_to_hass()
-        for circuit, message in self._subscriptions:
+        all_subs = list(self._subscriptions)
+        if self._gate_availability_on_ebus:
+            if (CIRCUIT_GLOBAL, "running") not in all_subs:
+                all_subs.append((CIRCUIT_GLOBAL, "running"))
+            if (CIRCUIT_GLOBAL, "signal") not in all_subs:
+                all_subs.append((CIRCUIT_GLOBAL, "signal"))
+
+        for circuit, message in all_subs:
             self.async_on_remove(
                 self.coordinator.async_add_listener(
                     circuit, message, self._handle_coordinator_update

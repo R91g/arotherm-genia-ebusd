@@ -46,6 +46,13 @@ for mod_name in MOCKED_MODULES:
         sys.modules[mod_name] = mock
 
 
+class HomeAssistantError(Exception):
+    """Base error for Home Assistant."""
+
+
+sys.modules["homeassistant.exceptions"].HomeAssistantError = HomeAssistantError
+
+
 class MockEntity:
     """Mock base class for Home Assistant entities."""
 

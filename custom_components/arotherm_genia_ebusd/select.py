@@ -84,6 +84,7 @@ class SaunierGeniaSelect(SaunierGeniaEntity, SelectEntity):
     """Representation of a Saunier Duval eBUSd Select entity."""
 
     entity_description: SaunierGeniaSelectEntityDescription
+    _gate_availability_on_ebus = True
 
     def __init__(
         self,

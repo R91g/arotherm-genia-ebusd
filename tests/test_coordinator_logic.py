@@ -3,6 +3,7 @@
 import asyncio
 import os
 import sys
+import time
 import unittest
 from datetime import datetime, timedelta
 from typing import Any
@@ -18,6 +19,7 @@ sys.path.insert(
 
 from custom_components.arotherm_genia_ebusd.__init__ import (
     _async_cleanup_deprecated_entities,
+    _async_register_services,
 )
 from custom_components.arotherm_genia_ebusd.binary_sensor import (
     _check_compressor_active,
@@ -50,6 +52,7 @@ from custom_components.arotherm_genia_ebusd.const import (
     DEVICE_OUTDOOR_UNIT,
     DEVICE_WIRELESS_THERMOSTAT,
     DOMAIN,
+    EBUSD_TRAFFIC_TIMEOUT_SECONDS,
     HMU_HW5103_HYDRATION_MESSAGES,
     HMUX0_EXCLUSIVE_MESSAGES,
     ISSUE_MISSING_CUSTOM_CSV,
@@ -60,6 +63,10 @@ from custom_components.arotherm_genia_ebusd.const import (
     MANUFACTURER_SAUNIER_DUVAL,
     MANUFACTURER_VAILLANT,
     OUTDOOR_CIRCUITS,
+    SERVICE_CANCEL_HOLIDAY_MODE,
+    SERVICE_FORCE_DHW_BOOST,
+    SERVICE_SET_HOLIDAY_MODE,
+    SERVICE_SET_WEEKLY_TIMER,
 )
 from custom_components.arotherm_genia_ebusd.coordinator import (
     DATE_WRITE_FIELDS,
@@ -1483,6 +1490,87 @@ class TestCoordinatorLogic(unittest.TestCase):
         coord._state[("global", "running")] = {"value": "yes"}
         self.assertTrue(coord.is_ebus_operational)
         self.assertTrue(_check_ebusd_running(coord))
+
+        # 7. Metadata-only state (e.g. ebusd/global/version = 26.1) without positive signal -> not operational
+        coord_meta = SaunierGeniaCoordinator(MagicMock(), entry)
+        coord_meta._state[("global", "version")] = {"value": "26.1"}
+        self.assertFalse(coord_meta.is_ebus_operational)
+
+        # 8. Communication silence timeout (> EBUSD_TRAFFIC_TIMEOUT_SECONDS) -> not operational
+        coord._state.clear()
+        coord._state[("hmux0", "status01")] = {"temp1": 35.0}
+        coord._last_telemetry_time = time.monotonic() - (
+            EBUSD_TRAFFIC_TIMEOUT_SECONDS + 5
+        )
+        self.assertFalse(coord.is_ebus_operational)
+
+        # 9. Watchdog notification triggers listeners on running/signal
+        listener_called = False
+
+        def _dummy_listener() -> None:
+            nonlocal listener_called
+            listener_called = True
+
+        coord.async_add_listener("global", "running", _dummy_listener)
+        coord._async_check_watchdog(datetime.now())
+        self.assertTrue(listener_called)
+
+        # 10. Receiving fresh message restores last_telemetry_time and operational status
+        msg_payload = '{"temp1": {"value": 36.0}}'
+        mqtt_msg = MagicMock(topic="ebusd/hmux0/Status01", payload=msg_payload)
+        coord._async_on_mqtt_message(mqtt_msg)
+        self.assertIsNotNone(coord._last_telemetry_time)
+        self.assertGreater(
+            coord._last_telemetry_time,  # type: ignore[operator]
+            time.monotonic() - 2,
+        )
+        self.assertTrue(coord.is_ebus_operational)
+
+    def test_services_guarded_by_is_ebus_operational(self) -> None:
+        """Verify that domain services reject execution when is_ebus_operational is False."""
+        from homeassistant.exceptions import HomeAssistantError
+
+        hass = MagicMock()
+        registered_services: dict[str, Any] = {}
+
+        def mock_register(
+            domain: str, service_name: str, handler: Any, schema: Any = None
+        ) -> None:
+            registered_services[service_name] = handler
+
+        hass.services.has_service.return_value = False
+        hass.services.async_register.side_effect = mock_register
+
+        entry = MagicMock()
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {}
+        coord = SaunierGeniaCoordinator(hass, entry)
+        # Empty state -> is_ebus_operational is False
+        self.assertFalse(coord.is_ebus_operational)
+        hass.data = {DOMAIN: {"entry_id": coord}}
+
+        _async_register_services(hass)
+
+        call = MagicMock()
+        call.data = {
+            "circuit_type": "heating",
+            "day": "Monday",
+            "slot": 1,
+            "start_time": "08:00",
+            "end_time": "12:00",
+        }
+
+        with self.assertRaises(HomeAssistantError):
+            asyncio.run(registered_services[SERVICE_SET_WEEKLY_TIMER](call))
+
+        with self.assertRaises(HomeAssistantError):
+            asyncio.run(registered_services[SERVICE_FORCE_DHW_BOOST](call))
+
+        with self.assertRaises(HomeAssistantError):
+            asyncio.run(registered_services[SERVICE_SET_HOLIDAY_MODE](call))
+
+        with self.assertRaises(HomeAssistantError):
+            asyncio.run(registered_services[SERVICE_CANCEL_HOLIDAY_MODE](call))
 
 
 if __name__ == "__main__":

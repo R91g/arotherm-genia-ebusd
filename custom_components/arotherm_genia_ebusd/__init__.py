@@ -251,6 +251,10 @@ def _async_register_services(hass: HomeAssistant) -> None:
                 target_days = [day_selection]
 
             for coordinator in coordinators.values():
+                if not coordinator.is_ebus_operational:
+                    raise HomeAssistantError(
+                        "Cannot execute service: eBUS communication is not operational."
+                    )
                 # Validate every target day BEFORE writing anything, so a rejected
                 # request never leaves the schedule half-modified.
                 plans: list[tuple[str, list[tuple[int, str]]]] = []
@@ -309,6 +313,10 @@ def _async_register_services(hass: HomeAssistant) -> None:
 
             boost_temp: float | None = call.data.get("boost_temp")
             for coordinator in coordinators.values():
+                if not coordinator.is_ebus_operational:
+                    raise HomeAssistantError(
+                        "Cannot execute service: eBUS communication is not operational."
+                    )
                 await coordinator.async_trigger_dhw_boost(
                     override_boost_temp=boost_temp
                 )
@@ -335,6 +343,10 @@ def _async_register_services(hass: HomeAssistant) -> None:
             end_time: str | None = call.data.get("end_time")
 
             for coordinator in coordinators.values():
+                if not coordinator.is_ebus_operational:
+                    raise HomeAssistantError(
+                        "Cannot execute service: eBUS communication is not operational."
+                    )
                 await coordinator.async_activate_holiday_mode(
                     temp=temp,
                     start_date=start_date,
@@ -359,6 +371,10 @@ def _async_register_services(hass: HomeAssistant) -> None:
                 raise HomeAssistantError(f"No configured instances of {DOMAIN} found.")
 
             for coordinator in coordinators.values():
+                if not coordinator.is_ebus_operational:
+                    raise HomeAssistantError(
+                        "Cannot execute service: eBUS communication is not operational."
+                    )
                 await coordinator.async_cancel_holiday_mode()
 
         hass.services.async_register(

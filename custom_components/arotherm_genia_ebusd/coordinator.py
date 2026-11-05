@@ -64,6 +64,7 @@ from .const import (
     DHW_BOOST_HYST_MARGIN,
     DHW_BOOST_MAX_TIMEOUT_SECONDS,
     DOMAIN,
+    EBUSD_TRAFFIC_TIMEOUT_SECONDS,
     ESSENTIAL_HYDRATION_MESSAGES,
     HMU_HW5103_HYDRATION_MESSAGES,
     HMUX0_CUSTOM_SIGNATURE_MESSAGES,
@@ -328,6 +329,10 @@ class SaunierGeniaCoordinator:
         # Active Home Assistant Repair issues (issue_registry)
         self._active_repair_issues: set[str] = set()
 
+        # Silence watchdog and last telemetry timestamp
+        self._last_telemetry_time: float | None = None
+        self._watchdog_unsub: CALLBACK_TYPE | None = None
+
     # -------------------------------------------------------------------------
     # Configuration & Options Properties
     # -------------------------------------------------------------------------
@@ -397,17 +402,51 @@ class SaunierGeniaCoordinator:
     def is_ebus_operational(self) -> bool:
         """Return True if eBUS communication is operational.
 
-        1. If no MQTT state has been received yet, return False.
-        2. If ebusd publishes 'global/signal' and it is explicitly false/0/off/no, return False.
-        3. If ebusd publishes 'global/running' and it is explicitly false/0/off/no, return False.
-        4. Otherwise, return True.
+        1. If ebusd publishes 'global/signal' or 'global/running' and it is explicitly false/0/off/no, return False.
+        2. If no telemetry has been received yet (_state is empty), return False.
+        3. If communication silence timeout (EBUSD_TRAFFIC_TIMEOUT_SECONDS) is exceeded, return False.
+        4. If state contains no telemetry from actual heating/heat pump circuits (only metadata like version), return False.
+        5. Otherwise, return True.
         """
-        if not self._state:
-            return False
-
         for circuit_msg in ("signal", "running"):
             val = self.get_str(CIRCUIT_GLOBAL, circuit_msg)
             if val is not None and val.lower() in ("false", "0", "no", "off"):
+                return False
+
+        if not self._state:
+            return False
+
+        if (
+            self._last_telemetry_time is not None
+            and (time.monotonic() - self._last_telemetry_time)
+            > EBUSD_TRAFFIC_TIMEOUT_SECONDS
+        ):
+            return False
+
+        # Require actual equipment telemetry or explicit positive signal from ebusd
+        has_equipment_telemetry = any(
+            c in OUTDOOR_CIRCUITS
+            or c in CONTROLLER_CIRCUITS
+            or c
+            in (
+                CIRCUIT_VWZIO,
+                CIRCUIT_NETX3,
+                CIRCUIT_NETX3_ALT,
+                CIRCUIT_BROADCAST,
+            )
+            for c, _ in self._state
+        )
+        if not has_equipment_telemetry:
+            running_val = self.get_str(CIRCUIT_GLOBAL, "running")
+            signal_val = self.get_str(CIRCUIT_GLOBAL, "signal")
+            has_positive_daemon = (
+                running_val is not None
+                and running_val.lower() in ("true", "1", "yes", "on")
+            ) or (
+                signal_val is not None
+                and signal_val.lower() in ("true", "1", "yes", "on")
+            )
+            if not has_positive_daemon:
                 return False
 
         return True
@@ -545,6 +584,23 @@ class SaunierGeniaCoordinator:
         # Configure fallback polling timer ONLY if has_migo_link is False
         self.async_update_options()
 
+        # Periodic watchdog to detect communication silence / ebusd disconnect
+        self._watchdog_unsub = async_track_time_interval(
+            self.hass,
+            self._async_check_watchdog,
+            timedelta(seconds=60),
+        )
+
+    @callback
+    def _async_check_watchdog(self, _now: datetime) -> None:
+        """Periodic watchdog checking for communication silence timeout."""
+        if self._last_telemetry_time is None:
+            return
+        elapsed = time.monotonic() - self._last_telemetry_time
+        if elapsed > EBUSD_TRAFFIC_TIMEOUT_SECONDS:
+            self._async_notify_message_listeners(CIRCUIT_GLOBAL, "running")
+            self._async_notify_message_listeners(CIRCUIT_GLOBAL, "signal")
+
     @callback
     def async_update_options(self) -> None:
         """Reconfigure runtime timers when OptionsFlow is updated."""
@@ -582,6 +638,10 @@ class SaunierGeniaCoordinator:
             self._dhw_boost_timeout_unsub()
             self._dhw_boost_timeout_unsub = None
 
+        if self._watchdog_unsub is not None:
+            self._watchdog_unsub()
+            self._watchdog_unsub = None
+
         for unsub in self._pending_get_unsubs.values():
             unsub()
         self._pending_get_unsubs.clear()
@@ -604,6 +664,8 @@ class SaunierGeniaCoordinator:
         prefix_with_slash = f"{self.mqtt_prefix}/"
         if not topic.startswith(prefix_with_slash):
             return
+
+        self._last_telemetry_time = time.monotonic()
 
         rel_topic = topic[len(prefix_with_slash) :]
         parts = rel_topic.split("/")

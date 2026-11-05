@@ -445,6 +445,9 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_VWZIO, "PrEnergyThermalHwc"),
 ]
 
+# Communication silence timeout before marking eBUS as non-operational (seconds)
+EBUSD_TRAFFIC_TIMEOUT_SECONDS: int = 600
+
 # Messages exclusive to Monobloc units (08.hmux0.csv b516 EEPROM table) that do not exist on Split (08.hmu.HW5103.csv)
 HMUX0_EXCLUSIVE_MESSAGES: frozenset[str] = frozenset(
     {

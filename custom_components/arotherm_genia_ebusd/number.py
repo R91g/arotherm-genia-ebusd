@@ -357,6 +357,7 @@ class SaunierGeniaNumber(SaunierGeniaEntity, NumberEntity):
 
     entity_description: SaunierGeniaNumberEntityDescription
     _attr_mode = NumberMode.BOX
+    _gate_availability_on_ebus = True
 
     def __init__(
         self,

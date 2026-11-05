@@ -86,6 +86,8 @@ async def async_setup_entry(
 class SaunierGeniaDhwBoostSwitch(SaunierGeniaEntity, SwitchEntity):
     """Switch for One-Time DHW Boost (ACS Puntual) with Smart Forced Hysteresis Bypass."""
 
+    _gate_availability_on_ebus = True
+
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the DHW Boost switch."""
         super().__init__(
@@ -128,6 +130,8 @@ class SaunierGeniaDhwBoostSwitch(SaunierGeniaEntity, SwitchEntity):
 
 class SaunierGeniaCoolingSeasonSwitch(SaunierGeniaEntity, SwitchEntity):
     """Switch for Cooling Season Authorization (Lock 1: CoolingStartDate / CoolingEndDate)."""
+
+    _gate_availability_on_ebus = True
 
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the Cooling Season Authorization (Lock 1) switch."""
@@ -215,6 +219,8 @@ class SaunierGeniaCoolingSeasonSwitch(SaunierGeniaEntity, SwitchEntity):
 class SaunierGeniaHolidayModeSwitch(SaunierGeniaEntity, SwitchEntity):
     """Switch for Away / Holiday Mode (Modo Ausencia)."""
 
+    _gate_availability_on_ebus = True
+
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the Holiday Mode switch."""
         super().__init__(
@@ -292,6 +298,7 @@ class SaunierGeniaStandardSwitch(SaunierGeniaEntity, SwitchEntity):
     """Standard single-register switch entity for MiPro Sense parameters."""
 
     entity_description: SaunierGeniaSwitchEntityDescription
+    _gate_availability_on_ebus = True
 
     def __init__(
         self,
