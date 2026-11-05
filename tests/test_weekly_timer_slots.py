@@ -1,6 +1,7 @@
 """Unit tests for multi-slot weekly timer safety logic and CSV coverage."""
 
 import asyncio
+import json
 import os
 import re
 import sys
@@ -430,6 +431,159 @@ class TestWeeklyTimerSlots(unittest.TestCase):
             (CSV_DIR / "15.bass3.csv").read_bytes(),
             (CSV_DIR / "15.basv3.csv").read_bytes(),
         )
+
+    def test_csv_defines_all_passive_migo_slots(self) -> None:
+        """Verify all 21 passive MiGo Link schedule write definitions exist in all controller CSVs."""
+        for fname in CONTROLLER_CSVS:
+            text = (CSV_DIR / fname).read_text(encoding="utf-8")
+            for day_idx, day in enumerate(WEEKDAYS_LIST):
+                for slot_num in (1, 2, 3):
+                    slot_idx = slot_num - 1
+                    suffix = "" if slot_num == 1 else f"_Slot{slot_num}"
+                    name = f"Z1Timer_{day}{suffix}_Passive"
+                    expected_id = f"a60000{day_idx:02x}{slot_idx:02x}"
+                    pattern = (
+                        rf"^u,,,{re.escape(name)},[^,]*,,,b555,{expected_id},"
+                        rf"total_slots,m,UCH,,,,from_hour,m,UCH,,,,from_min,m,UCH,,,,"
+                        rf"to_hour,m,UCH,,,,to_min,m,UCH,,,,temp,m,UIN,10,°C,"
+                    )
+                    self.assertTrue(
+                        bool(re.search(pattern, text, flags=re.MULTILINE)),
+                        f"{fname}: missing or invalid definition for {name} with ID {expected_id}",
+                    )
+
+    def test_migolink_captured_schedule_telegrams(self) -> None:
+        """Verify regression matching and coordinator handling for the 4 MiGo Link captured telegrams.
+
+        Empirical hardware captures from live bus (MiGo Link f1 -> 15 controller):
+        1. Thursday Slot 1: f115b5550ca60000 03 00 01 0000 1600 c800 / 0100 (00:00 - 22:00, Total 1, 20.0 °C)
+        2. Friday Slot 1:   f115b5550ca60000 04 00 02 0600 1600 c800 / 0100 (06:00 - 22:00, Total 2, 20.0 °C)
+        3. Friday Slot 2:   f115b5550ca60000 04 01 02 1700 1800 c800 / 0100 (23:00 - 24:00, Total 2, 20.0 °C)
+        4. Saturday Slot 1: f115b5550ca60000 05 00 01 0000 1800 c800 / 0100 (00:00 - 24:00, Total 1, 20.0 °C)
+        """
+        captured_frames = [
+            {
+                "raw": "f115b5550ca6000003000100001600c800",
+                "passive_msg": "Z1Timer_Thursday_Passive",
+                "canonical_msg": "Z1Timer_Thursday",
+                "day_name": "Thursday",
+                "expected": {
+                    "total_slots": 1,
+                    "from_hour": 0,
+                    "from_min": 0,
+                    "to_hour": 22,
+                    "to_min": 0,
+                    "temp": 20.0,
+                },
+                "expected_active_slots": 1,
+            },
+            {
+                "raw": "f115b5550ca6000004000206001600c800",
+                "passive_msg": "Z1Timer_Friday_Passive",
+                "canonical_msg": "Z1Timer_Friday",
+                "day_name": "Friday",
+                "expected": {
+                    "total_slots": 2,
+                    "from_hour": 6,
+                    "from_min": 0,
+                    "to_hour": 22,
+                    "to_min": 0,
+                    "temp": 20.0,
+                },
+                "expected_active_slots": 2,
+            },
+            {
+                "raw": "f115b5550ca6000004010217001800c800",
+                "passive_msg": "Z1Timer_Friday_Slot2_Passive",
+                "canonical_msg": "Z1Timer_Friday_Slot2",
+                "day_name": "Friday",
+                "expected": {
+                    "total_slots": 2,
+                    "from_hour": 23,
+                    "from_min": 0,
+                    "to_hour": 24,
+                    "to_min": 0,
+                    "temp": 20.0,
+                },
+                "expected_active_slots": 2,
+            },
+            {
+                "raw": "f115b5550ca6000005000100001800c800",
+                "passive_msg": "Z1Timer_Saturday_Passive",
+                "canonical_msg": "Z1Timer_Saturday",
+                "day_name": "Saturday",
+                "expected": {
+                    "total_slots": 1,
+                    "from_hour": 0,
+                    "from_min": 0,
+                    "to_hour": 24,
+                    "to_min": 0,
+                    "temp": 20.0,
+                },
+                "expected_active_slots": 1,
+            },
+        ]
+
+        # 1. Verify byte extraction against the 4 captured frames
+        for frame in captured_frames:
+            raw_hex = frame["raw"]
+            data_bytes = bytes.fromhex(raw_hex)
+            # Prefix: QQ(f1), ZZ(15), PB(b5), SB(55), NN(0c)
+            self.assertEqual(data_bytes[:5], bytes.fromhex("f115b5550c"))
+            # Command ID: a6 00 00 [day] [slot]
+            cmd_id = data_bytes[5:10].hex()
+            self.assertTrue(cmd_id.startswith("a60000"))
+            # Master data fields
+            total_slots = data_bytes[10]
+            from_hour = data_bytes[11]
+            from_min = data_bytes[12]
+            to_hour = data_bytes[13]
+            to_min = data_bytes[14]
+            temp_raw = int.from_bytes(data_bytes[15:17], "little")
+            temp = temp_raw / 10.0
+
+            exp = frame["expected"]
+            self.assertEqual(total_slots, exp["total_slots"])
+            self.assertEqual(from_hour, exp["from_hour"])
+            self.assertEqual(from_min, exp["from_min"])
+            self.assertEqual(to_hour, exp["to_hour"])
+            self.assertEqual(to_min, exp["to_min"])
+            self.assertEqual(temp, exp["temp"])
+
+        # 2. Verify coordinator handling via _async_on_mqtt_message
+        hass = MagicMock()
+        coord = SaunierGeniaCoordinator(hass, MagicMock(data={"mqtt_prefix": "ebusd"}))
+
+        # Deliver each frame via MQTT to coordinator as ebusd would publish it
+        for frame in captured_frames:
+            passive_msg = frame["passive_msg"]
+            exp = frame["expected"]
+            # ebusd publishes JSON payload when decoding the telegram
+            mqtt_payload = json.dumps(
+                {
+                    "total_slots": {"value": exp["total_slots"]},
+                    "from_hour": {"value": exp["from_hour"]},
+                    "from_min": {"value": exp["from_min"]},
+                    "to_hour": {"value": exp["to_hour"]},
+                    "to_min": {"value": exp["to_min"]},
+                    "temp": {"value": exp["temp"]},
+                }
+            )
+            msg = MagicMock()
+            msg.topic = f"ebusd/bass3/{passive_msg}"
+            msg.payload = mqtt_payload
+            coord._async_on_mqtt_message(msg)
+
+            canonical_msg = frame["canonical_msg"]
+            # State must be mapped to the canonical timer message
+            state_val = coord.get_message(CIRCUIT_BASS3, canonical_msg)
+            self.assertIsNotNone(state_val)
+            self.assertEqual(state_val["from_hour"], exp["from_hour"])
+            self.assertEqual(state_val["to_hour"], exp["to_hour"])
+
+            # Active slots must be updated immediately in Z1Timer_Slots
+            active_slots = _get_active_slot_count(coord, "Z1Timer", frame["day_name"])
+            self.assertEqual(active_slots, frame["expected_active_slots"])
 
 
 if __name__ == "__main__":

@@ -739,6 +739,18 @@ class SaunierGeniaCoordinator:
             self._state[(circuit_key, canonical_alias)] = alias_parsed
             self._async_notify_message_listeners(circuit_key, canonical_alias)
 
+            # If passive schedule update carried total_slots, keep active slots in sync
+            if "total_slots" in parsed and "_" in canonical_alias:
+                try:
+                    parts_msg = canonical_alias.split("_")
+                    t_prefix = parts_msg[0]
+                    t_day = parts_msg[1]
+                    if t_day in DAY_SHORT_KEYS:
+                        t_count = int(parsed["total_slots"])
+                        self.async_set_optimistic_active_slots(t_prefix, t_day, t_count)
+                except (ValueError, TypeError, IndexError):
+                    pass
+
         # Dynamic aliasing for outdoor unit circuits (hmux0 <-> hmu)
         if circuit_key in OUTDOOR_CIRCUITS:
             old_outdoor = self._active_outdoor_circuit

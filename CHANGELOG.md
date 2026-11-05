@@ -28,8 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `binary_sensor.ebusd_running` (`EntityCategory.DIAGNOSTIC`, device class `running`).
   - Added 7 diagnostic telemetry sensors attached to the root gateway device (`DEVICE_OUTDOOR_UNIT`): `ebusd_uptime` (seconds), `ebusd_version` (daemon version), `ebusd_scan_status` (address scan status), `ebusd_symbol_rate` (physical bus baud occupancy), `ebusd_reconnects` (adapter reconnect count), `ebusd_masters` (active bus masters), and `ebusd_arbitration_latency` (bus collision/arbitration latency in ms).
   - Added complete icon and translation mappings across `icons.json`, `strings.json`, `translations/en.json`, and `translations/es.json`.
-- **Weekly Timer Multi-Slot Support (Slots 2 & 3):**
+- **Weekly Timer Multi-Slot Support (Slots 2 & 3) & Passive MiGo Link Eavesdropping:**
   - Added 112 new slot lines per file across all 4 supported controller configurations (`15.bass3.csv`, `15.basv3.csv`, `15.ctlv2.csv`, `15.ctlv3.csv`) defining `_Slot2` and `_Slot3` for all 7 days of the week and all 4 circuits (`Z1Timer`, `HwcTimer`, `CoolingTimer`, `CirculationTimer`).
+  - Added 21 passive update definitions (`u`) per controller CSV for eavesdropping official MiGo Link app schedule writes (`b555 a60000[day][slot]`), decoding `total_slots`, time intervals, and target temperatures in real time without waiting for polling.
+  - Implemented automatic coordinator canonical aliasing and optimistic `total_slots` synchronization (`Z1Timer_Slots`) for passive writes.
+  - Added regression test suite based on 4 empirical hardware telegrams captured directly from a physical installation running MiGo Link and MiPro Sense.
   - Implemented pre-validation and cascading ascending re-writes in `_async_handle_set_weekly_timer` to safely preserve upper slots and the hardware-managed `total_slots` byte.
 
 ### Fixed

@@ -228,6 +228,20 @@ MESSAGE_ALIASES: dict[str, str] = {
     "powerconsumptionhmu": "RunDataElectricPowerConsumption",
 }
 
+# Weekly timer passive update aliases for eavesdropping MiGo Link / gateway writes
+for _day in (
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+):
+    MESSAGE_ALIASES[f"z1timer_{_day.lower()}_passive"] = f"Z1Timer_{_day}"
+    MESSAGE_ALIASES[f"z1timer_{_day.lower()}_slot2_passive"] = f"Z1Timer_{_day}_Slot2"
+    MESSAGE_ALIASES[f"z1timer_{_day.lower()}_slot3_passive"] = f"Z1Timer_{_day}_Slot3"
+
 # eBUS Scan address mapping for passive hardware & software version detection
 SCAN_ADDRESS_TO_DEVICE_KEY: dict[str, str] = {
     "08": DEVICE_OUTDOOR_UNIT,
