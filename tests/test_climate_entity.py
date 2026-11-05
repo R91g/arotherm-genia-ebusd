@@ -19,7 +19,10 @@ from custom_components.arotherm_genia_ebusd.climate import (
     SEASON_HEATING,
     SaunierGeniaZone1Climate,
 )
-from custom_components.arotherm_genia_ebusd.const import CIRCUIT_BASS3
+from custom_components.arotherm_genia_ebusd.const import (
+    CIRCUIT_BASS3,
+    CIRCUIT_BROADCAST,
+)
 
 
 class MockCoordinatorForClimate:
@@ -33,6 +36,9 @@ class MockCoordinatorForClimate:
         self.outdoor_model = "GeniaAir Max ES 15"
         self.indoor_model = "HPIM 7 230V"
         self.has_wireless_room_unit = True
+        self.auto_cooling_lock_bypass = True
+        self.custom_cooling_start_date: str | None = None
+        self.custom_cooling_end_date: str | None = None
 
     def get_message(self, circuit: str, message: str) -> dict[str, Any] | None:
         return self._state.get((circuit.lower(), message.lower()))
@@ -48,6 +54,15 @@ class MockCoordinatorForClimate:
         if msg and field in msg:
             try:
                 return float(msg[field])
+            except (ValueError, TypeError):
+                return None
+        return None
+
+    def get_int(self, circuit: str, message: str, field: str = "value") -> int | None:
+        msg = self.get_message(circuit, message)
+        if msg and field in msg:
+            try:
+                return int(msg[field])
             except (ValueError, TypeError):
                 return None
         return None
@@ -112,6 +127,47 @@ class TestClimateEntity(unittest.TestCase):
         self.assertIn((CIRCUIT_BASS3, "Z1OpMode", "night"), self.coordinator.writes)
         self.assertNotIn(
             (CIRCUIT_BASS3, "Z1OpModeCooling", "night"), self.coordinator.writes
+        )
+
+    def test_auto_mode_transitions_to_cooling_when_hot_outside(self) -> None:
+        """Verify setting HVACMode.AUTO with high outside temp activates cooling even if previous was heating."""
+        self.climate._active_season = SEASON_HEATING
+        self.coordinator._state[(CIRCUIT_BROADCAST.lower(), "outsidetemp")] = {
+            "temp": 28.5
+        }
+
+        asyncio.run(self.climate.async_set_hvac_mode(HVACMode.AUTO))
+
+        self.assertEqual(self.climate._active_season, SEASON_COOLING)
+        self.assertIn((CIRCUIT_BASS3, "Z1OpMode", "off"), self.coordinator.writes)
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1OpModeCooling", "auto"), self.coordinator.writes
+        )
+
+    def test_auto_mode_transitions_to_heating_when_cold_outside(self) -> None:
+        """Verify setting HVACMode.AUTO with low outside temp activates heating even if previous was cooling."""
+        self.climate._active_season = SEASON_COOLING
+        self.coordinator._state[(CIRCUIT_BROADCAST.lower(), "outsidetemp")] = {
+            "temp": 12.0
+        }
+
+        asyncio.run(self.climate.async_set_hvac_mode(HVACMode.AUTO))
+
+        self.assertEqual(self.climate._active_season, SEASON_HEATING)
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1OpModeCooling", "off"), self.coordinator.writes
+        )
+        self.assertIn((CIRCUIT_BASS3, "Z1OpMode", "auto"), self.coordinator.writes)
+
+    def test_auto_mode_preserves_previous_season_when_outside_temp_none(self) -> None:
+        """Verify setting HVACMode.AUTO without outside temp sensor falls back to previous season."""
+        self.climate._active_season = SEASON_COOLING
+        # No outside temp in coordinator
+        asyncio.run(self.climate.async_set_hvac_mode(HVACMode.AUTO))
+
+        self.assertEqual(self.climate._active_season, SEASON_COOLING)
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1OpModeCooling", "auto"), self.coordinator.writes
         )
 
 

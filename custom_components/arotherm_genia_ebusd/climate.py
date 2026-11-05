@@ -582,11 +582,10 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
                     CIRCUIT_BASS3, "DisplayedOutsideTemp", "value"
                 )
 
-            use_heating = (
-                outside_temp is None
-                or outside_temp < 20.0
-                or previous_season != SEASON_COOLING
-            )
+            if outside_temp is not None:
+                use_heating = outside_temp < 20.0
+            else:
+                use_heating = previous_season != SEASON_COOLING
             if use_heating:
                 if previous_season == SEASON_COOLING and day_temp_valid:
                     self._saved_cooling_target = current_day_temp
