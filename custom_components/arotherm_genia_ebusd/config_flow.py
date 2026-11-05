@@ -249,9 +249,19 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
         default_outdoor = entry.data.get(CONF_OUTDOOR_MODEL)
+        if default_outdoor and default_outdoor.endswith(" (Legacy)"):
+            stripped = default_outdoor.replace(" (Legacy)", "")
+            if stripped in outdoor_models:
+                default_outdoor = stripped
         if default_outdoor not in outdoor_models:
             default_outdoor = outdoor_models[0]
+
         default_indoor = entry.data.get(CONF_INDOOR_MODEL)
+        if (
+            default_indoor == "Módulo Hidráulico HE 9-7 W"
+            and "Hydraulic Module HE 9-7 W" in indoor_models
+        ):
+            default_indoor = "Hydraulic Module HE 9-7 W"
         if default_indoor not in indoor_models:
             default_indoor = indoor_models[0]
 
