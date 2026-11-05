@@ -41,6 +41,8 @@ from custom_components.arotherm_genia_ebusd.const import (
     CIRCUIT_CTLV3,
     CIRCUIT_HMU,
     CIRCUIT_HMUX0,
+    CIRCUIT_VWZIO,
+    CONF_HAS_MIGO_LINK,
     CONF_MANUFACTURER,
     CONTROLLER_CIRCUITS,
     DEVICE_CLIMATE_CONTROLLER,
@@ -48,6 +50,8 @@ from custom_components.arotherm_genia_ebusd.const import (
     DEVICE_OUTDOOR_UNIT,
     DEVICE_WIRELESS_THERMOSTAT,
     DOMAIN,
+    HMU_HW5103_HYDRATION_MESSAGES,
+    HMUX0_EXCLUSIVE_MESSAGES,
     ISSUE_MISSING_CUSTOM_CSV,
     ISSUE_MQTTJSON_NOT_ENABLED,
     ISSUE_NO_EBUSD_MQTT_TRAFFIC,
@@ -55,6 +59,7 @@ from custom_components.arotherm_genia_ebusd.const import (
     ISSUE_OUTDATED_HMUX0_CSV,
     MANUFACTURER_SAUNIER_DUVAL,
     MANUFACTURER_VAILLANT,
+    OUTDOOR_CIRCUITS,
 )
 from custom_components.arotherm_genia_ebusd.coordinator import (
     DATE_WRITE_FIELDS,
@@ -950,6 +955,158 @@ class TestCoordinatorLogic(unittest.TestCase):
                 )
 
         asyncio.run(run_write_tests())
+
+    def test_hmu_and_hmux0_initial_hydration_queues(self) -> None:
+        """Test that initial hydration filters incompatible b516 messages for HMU and keeps them for HMUX0."""
+        hass = MagicMock()
+        hass.async_create_background_task.side_effect = lambda coro, name=None: (
+            coro.close()
+        )
+        entry = MagicMock()
+        entry.entry_id = "test_hydration"
+        entry.data = {CONF_MANUFACTURER: MANUFACTURER_VAILLANT}
+
+        # 1. HMUX0 default queue
+        coord_hmux0 = SaunierGeniaCoordinator(hass, entry)
+        self.assertEqual(coord_hmux0.active_outdoor_circuit, CIRCUIT_HMUX0)
+
+        with patch.object(coord_hmux0, "_async_run_hydration_queue") as mock_run_hmux0:
+            coord_hmux0._async_start_initial_hydration(datetime.now())
+            mock_run_hmux0.assert_called_once()
+            hmux0_queue = mock_run_hmux0.call_args[0][0]
+
+            # HMUX0 queue must include all 9 exclusive b516 messages
+            for exclusive_msg in HMUX0_EXCLUSIVE_MESSAGES:
+                self.assertIn(
+                    (CIRCUIT_HMUX0, exclusive_msg),
+                    hmux0_queue,
+                    f"HMUX0 queue must contain {exclusive_msg}",
+                )
+            # HMUX0 queue must preserve vwzio messages
+            self.assertIn((CIRCUIT_VWZIO, "PrEnergyElectricHc"), hmux0_queue)
+
+        # 2. HMU queue
+        coord_hmu = SaunierGeniaCoordinator(hass, entry)
+        # Simulate active HMU detection
+        coord_hmu._active_outdoor_circuit = CIRCUIT_HMU
+
+        with patch.object(coord_hmu, "_async_run_hydration_queue") as mock_run_hmu:
+            coord_hmu._async_start_initial_hydration(datetime.now())
+            mock_run_hmu.assert_called_once()
+            hmu_queue = mock_run_hmu.call_args[0][0]
+
+            # HMU queue must NOT contain any HMUX0 exclusive b516 messages
+            for c, m in hmu_queue:
+                if c in OUTDOOR_CIRCUITS:
+                    self.assertNotIn(
+                        m,
+                        HMUX0_EXCLUSIVE_MESSAGES,
+                        f"HMU queue must not contain incompatible message {m}",
+                    )
+            # HMU queue must contain all HMU_HW5103_HYDRATION_MESSAGES
+            for hmu_msg in HMU_HW5103_HYDRATION_MESSAGES:
+                self.assertIn(hmu_msg, hmu_queue)
+
+            # HMU queue must strictly preserve vwzio messages
+            self.assertIn((CIRCUIT_VWZIO, "PrEnergyElectricHc"), hmu_queue)
+            self.assertIn((CIRCUIT_VWZIO, "PrEnergyThermalHc"), hmu_queue)
+
+    def test_late_hmu_detection_updates_pending_hydration(self) -> None:
+        """Test that late HMU detection purges incompatible messages and appends HMU messages."""
+        hass = MagicMock()
+        hass.async_create_background_task.side_effect = lambda coro, name=None: (
+            coro.close()
+        )
+        entry = MagicMock()
+        entry.entry_id = "test_late_hmu"
+        entry.data = {CONF_MANUFACTURER: MANUFACTURER_VAILLANT}
+
+        coord = SaunierGeniaCoordinator(hass, entry)
+        self.assertEqual(coord.active_outdoor_circuit, CIRCUIT_HMUX0)
+
+        # Pre-fill pending hydration queue as if HMUX0 initial hydration were running
+        coord._pending_hydration = [
+            (CIRCUIT_HMUX0, "RunDataFlowTemp"),
+            (CIRCUIT_HMUX0, "PrEnergyElectricHc"),
+            (CIRCUIT_HMUX0, "RunStatsHcStarts"),
+            (CIRCUIT_VWZIO, "PrEnergyElectricHc"),
+        ]
+        mock_task = MagicMock()
+        mock_task.done.return_value = False
+        coord._hydration_task = mock_task
+
+        # Late detection occurs via scan.08 packet
+        msg = MagicMock()
+        msg.topic = "ebusd/scan.08"
+        msg.payload = '{"MF": "Vaillant", "ID": "HMU00", "SW": "0902", "HW": "5103"}'
+        coord._async_on_mqtt_message(msg)
+
+        self.assertEqual(coord.active_outdoor_circuit, CIRCUIT_HMU)
+
+        # Incompatible outdoor messages must be purged from pending queue
+        self.assertNotIn(
+            (CIRCUIT_HMUX0, "PrEnergyElectricHc"), coord._pending_hydration
+        )
+        self.assertNotIn((CIRCUIT_HMU, "PrEnergyElectricHc"), coord._pending_hydration)
+        self.assertNotIn((CIRCUIT_HMUX0, "RunStatsHcStarts"), coord._pending_hydration)
+        self.assertNotIn((CIRCUIT_HMU, "RunStatsHcStarts"), coord._pending_hydration)
+
+        # Common RunDataFlowTemp and vwzio PrEnergyElectricHc must be preserved
+        self.assertIn((CIRCUIT_HMUX0, "RunDataFlowTemp"), coord._pending_hydration)
+        self.assertIn((CIRCUIT_VWZIO, "PrEnergyElectricHc"), coord._pending_hydration)
+
+        # HMU specific messages must have been appended
+        for hmu_msg in HMU_HW5103_HYDRATION_MESSAGES:
+            self.assertIn(hmu_msg, coord._pending_hydration)
+
+    def test_fallback_poll_queues_for_hmu_and_hmux0(self) -> None:
+        """Test periodic fallback poll queue construction for HMU vs HMUX0."""
+        hass = MagicMock()
+        hass.async_create_background_task.side_effect = lambda coro, name=None: (
+            coro.close()
+        )
+        entry = MagicMock()
+        entry.entry_id = "test_fallback_poll"
+        entry.data = {CONF_HAS_MIGO_LINK: False}
+        entry.options = {}
+
+        # 1. Fallback poll on HMUX0
+        coord_hmux0 = SaunierGeniaCoordinator(hass, entry)
+        coord_hmux0._active_outdoor_circuit = CIRCUIT_HMUX0
+
+        with patch.object(
+            coord_hmux0, "_async_force_poll_queue", return_value=None
+        ) as mock_poll_hmux0:
+            asyncio.run(coord_hmux0._async_run_fallback_poll(datetime.now()))
+            mock_poll_hmux0.assert_called_once()
+            hmux0_poll_queue = mock_poll_hmux0.call_args[0][0]
+
+            self.assertIn((CIRCUIT_HMUX0, "PrEnergyElectricHc"), hmux0_poll_queue)
+            self.assertIn((CIRCUIT_VWZIO, "PrEnergyElectricHc"), hmux0_poll_queue)
+            self.assertNotIn((CIRCUIT_HMU, "YieldHc"), hmux0_poll_queue)
+
+        # 2. Fallback poll on HMU
+        coord_hmu = SaunierGeniaCoordinator(hass, entry)
+        coord_hmu._active_outdoor_circuit = CIRCUIT_HMU
+
+        with patch.object(
+            coord_hmu, "_async_force_poll_queue", return_value=None
+        ) as mock_poll_hmu:
+            asyncio.run(coord_hmu._async_run_fallback_poll(datetime.now()))
+            mock_poll_hmu.assert_called_once()
+            hmu_poll_queue = mock_poll_hmu.call_args[0][0]
+
+            # Incompatible b516 messages must NOT be polled on hmu
+            self.assertNotIn((CIRCUIT_HMU, "PrEnergyElectricHc"), hmu_poll_queue)
+            self.assertNotIn((CIRCUIT_HMUX0, "PrEnergyElectricHc"), hmu_poll_queue)
+
+            # HMU energy messages must be polled
+            self.assertIn((CIRCUIT_HMU, "YieldHc"), hmu_poll_queue)
+            self.assertIn((CIRCUIT_HMU, "FlowPressure"), hmu_poll_queue)
+
+            # vwzio energy messages must be preserved
+            self.assertIn((CIRCUIT_VWZIO, "PrEnergyElectricHc"), hmu_poll_queue)
+            self.assertIn((CIRCUIT_VWZIO, "PrEnergyThermalHc"), hmu_poll_queue)
 
     def test_traditional_ebusd_message_name_normalization(self) -> None:
         """Test normalization of traditional eBUSd message names (flowtemp, BuildingCircuitFlow, etc.)."""

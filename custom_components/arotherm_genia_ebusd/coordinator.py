@@ -67,6 +67,7 @@ from .const import (
     ESSENTIAL_HYDRATION_MESSAGES,
     HMU_HW5103_HYDRATION_MESSAGES,
     HMUX0_CUSTOM_SIGNATURE_MESSAGES,
+    HMUX0_EXCLUSIVE_MESSAGES,
     HOLIDAY_DEFAULT_END_TIME,
     HOLIDAY_INDEFINITE_END_DATE,
     HOLIDAY_RESET_DATE,
@@ -317,6 +318,12 @@ class SaunierGeniaCoordinator:
 
         # Active outdoor unit circuit name ('hmux0' or 'hmu')
         self._active_outdoor_circuit: str = CIRCUIT_HMUX0
+
+        # Initial hydration state tracking
+        self._initial_hydration_started: bool = False
+
+        # Pending hydration queue for dynamic re-evaluation on circuit change
+        self._pending_hydration: list[tuple[str, str]] = []
 
         # Active Home Assistant Repair issues (issue_registry)
         self._active_repair_issues: set[str] = set()
@@ -668,7 +675,10 @@ class SaunierGeniaCoordinator:
 
         # Dynamic aliasing for outdoor unit circuits (hmux0 <-> hmu)
         if circuit_key in OUTDOOR_CIRCUITS:
+            old_outdoor = self._active_outdoor_circuit
             self._active_outdoor_circuit = circuit_key
+            if old_outdoor != circuit_key:
+                self._async_on_outdoor_circuit_changed(circuit_key)
             for alt_circuit in OUTDOOR_CIRCUITS:
                 if alt_circuit != circuit_key:
                     self._canonical_names[(alt_circuit, msg_lower)] = message_name
@@ -1128,18 +1138,55 @@ class SaunierGeniaCoordinator:
         self._state[(circuit_key, canonical)] = current
 
     @callback
+    def _async_on_outdoor_circuit_changed(self, new_circuit: str) -> None:
+        """Handle outdoor circuit transition (e.g. late HMU detection)."""
+        if new_circuit == CIRCUIT_HMU:
+            # 1. Purge incompatible Monobloc b516 messages from pending queue
+            self._pending_hydration = [
+                (c, m)
+                for (c, m) in self._pending_hydration
+                if not (c in OUTDOOR_CIRCUITS and m in HMUX0_EXCLUSIVE_MESSAGES)
+            ]
+            # 2. Find missing HMU specific messages
+            missing_hmu = [
+                (c, m)
+                for (c, m) in HMU_HW5103_HYDRATION_MESSAGES
+                if not self.has_message(c, m) and (c, m) not in self._pending_hydration
+            ]
+            if missing_hmu:
+                if self._hydration_task is not None and not self._hydration_task.done():
+                    # Append missing HMU messages to currently running queue
+                    self._pending_hydration.extend(missing_hmu)
+                elif self._initial_hydration_started:
+                    # Initial hydration already ran and finished; start a new queue for HMU
+                    self._hydration_task = self.hass.async_create_background_task(
+                        self._async_run_hydration_queue(missing_hmu),
+                        name=f"{self.entry.domain}_hmu_late_hydration",
+                    )
+
+    @callback
     def _async_start_initial_hydration(self, _now: datetime) -> None:
         """Start background task to hydrate missing messages after retained wait."""
         self._hydration_timer_unsub = None
-        missing: list[tuple[str, str]] = [
-            (circuit, message)
-            for circuit, message in ESSENTIAL_HYDRATION_MESSAGES
-            if not self.has_message(circuit, message)
-        ]
+        self._initial_hydration_started = True
         if self._active_outdoor_circuit == CIRCUIT_HMU:
+            missing: list[tuple[str, str]] = [
+                (circuit, message)
+                for circuit, message in ESSENTIAL_HYDRATION_MESSAGES
+                if not (
+                    circuit in OUTDOOR_CIRCUITS and message in HMUX0_EXCLUSIVE_MESSAGES
+                )
+                and not self.has_message(circuit, message)
+            ]
             for circuit, message in HMU_HW5103_HYDRATION_MESSAGES:
                 if not self.has_message(circuit, message):
                     missing.append((circuit, message))
+        else:
+            missing = [
+                (circuit, message)
+                for circuit, message in ESSENTIAL_HYDRATION_MESSAGES
+                if not self.has_message(circuit, message)
+            ]
         if self.has_wireless_room_unit and not self.has_message(
             CIRCUIT_NETX3, "RoomTempDial"
         ):
@@ -1164,15 +1211,25 @@ class SaunierGeniaCoordinator:
 
     async def _async_run_hydration_queue(self, messages: list[tuple[str, str]]) -> None:
         """Publish /get sequentially with 0.8s spacing to avoid eBUS collisions."""
+        self._pending_hydration = list(messages)
         try:
-            for circuit, message in messages:
+            while self._pending_hydration:
+                circuit, message = self._pending_hydration.pop(0)
                 if self.has_message(circuit, message):
+                    continue
+                if (
+                    self._active_outdoor_circuit == CIRCUIT_HMU
+                    and circuit in OUTDOOR_CIRCUITS
+                    and message in HMUX0_EXCLUSIVE_MESSAGES
+                ):
                     continue
                 await self.async_request_get(circuit, message)
                 await asyncio.sleep(HYDRATION_STEP_DELAY_SECONDS)
         except asyncio.CancelledError:
             _LOGGER.debug("Initial eBUSd hydration task cancelled")
             raise
+        finally:
+            self._pending_hydration.clear()
         _LOGGER.info("Completed initial staggered eBUSd hydration queue")
         self._async_verify_custom_csv_after_hydration()
 
@@ -1182,30 +1239,53 @@ class SaunierGeniaCoordinator:
             return
         if self._hydration_task is not None and not self._hydration_task.done():
             return
-        # Poll core operational messages + live telemetry & b5 16 energy counters with gentle spacing
-        fallback_energy_messages: list[tuple[str, str]] = [
-            (CIRCUIT_HMUX0, "HMUStatusCode"),
-            (CIRCUIT_HMUX0, "StateCompressor"),
-            (CIRCUIT_HMUX0, "RunDataCompressorSpeed"),
-            (CIRCUIT_HMUX0, "PowerStatus"),
-            (CIRCUIT_HMUX0, "RunDataElectricPowerConsumption"),
-            (CIRCUIT_HMUX0, "RunDataFlowRate"),
-            (CIRCUIT_HMUX0, "RunDataFlowTemp"),
-            (CIRCUIT_HMUX0, "RunDataReturnTemp"),
-            (CIRCUIT_HMUX0, "PrEnergyElectricHc"),
-            (CIRCUIT_HMUX0, "PrEnergyElectricHwc"),
-            (CIRCUIT_HMUX0, "PrEnergyElectricCool"),
-            (CIRCUIT_HMUX0, "PrEnergyThermalHc"),
-            (CIRCUIT_HMUX0, "PrEnergyThermalHwc"),
-            (CIRCUIT_HMUX0, "PrEnergyThermalCool"),
-            (CIRCUIT_HMUX0, "PrEnergyEnvYieldHc"),
-            (CIRCUIT_HMUX0, "PrEnergyEnvYieldHwc"),
-            (CIRCUIT_VWZIO, "PowerStatus"),
-            (CIRCUIT_VWZIO, "PrEnergyElectricHc"),
-            (CIRCUIT_VWZIO, "PrEnergyElectricHwc"),
-            (CIRCUIT_VWZIO, "PrEnergyThermalHc"),
-            (CIRCUIT_VWZIO, "PrEnergyThermalHwc"),
-        ]
+        # Poll core operational messages + live telemetry & energy counters with gentle spacing
+        if self._active_outdoor_circuit == CIRCUIT_HMU:
+            fallback_energy_messages: list[tuple[str, str]] = [
+                (CIRCUIT_HMU, "HMUStatusCode"),
+                (CIRCUIT_HMU, "StateCompressor"),
+                (CIRCUIT_HMU, "RunDataCompressorSpeed"),
+                (CIRCUIT_HMU, "PowerStatus"),
+                (CIRCUIT_HMU, "RunDataElectricPowerConsumption"),
+                (CIRCUIT_HMU, "RunDataFlowRate"),
+                (CIRCUIT_HMU, "RunDataFlowTemp"),
+                (CIRCUIT_HMU, "RunDataReturnTemp"),
+                (CIRCUIT_HMU, "YieldHc"),
+                (CIRCUIT_HMU, "YieldHwc"),
+                (CIRCUIT_HMU, "YieldCooling"),
+                (CIRCUIT_HMU, "TotalEnergyUsage"),
+                (CIRCUIT_HMU, "FlowPressure"),
+                (CIRCUIT_HMU, "EnergyIntegral"),
+                (CIRCUIT_VWZIO, "PowerStatus"),
+                (CIRCUIT_VWZIO, "PrEnergyElectricHc"),
+                (CIRCUIT_VWZIO, "PrEnergyElectricHwc"),
+                (CIRCUIT_VWZIO, "PrEnergyThermalHc"),
+                (CIRCUIT_VWZIO, "PrEnergyThermalHwc"),
+            ]
+        else:
+            fallback_energy_messages = [
+                (CIRCUIT_HMUX0, "HMUStatusCode"),
+                (CIRCUIT_HMUX0, "StateCompressor"),
+                (CIRCUIT_HMUX0, "RunDataCompressorSpeed"),
+                (CIRCUIT_HMUX0, "PowerStatus"),
+                (CIRCUIT_HMUX0, "RunDataElectricPowerConsumption"),
+                (CIRCUIT_HMUX0, "RunDataFlowRate"),
+                (CIRCUIT_HMUX0, "RunDataFlowTemp"),
+                (CIRCUIT_HMUX0, "RunDataReturnTemp"),
+                (CIRCUIT_HMUX0, "PrEnergyElectricHc"),
+                (CIRCUIT_HMUX0, "PrEnergyElectricHwc"),
+                (CIRCUIT_HMUX0, "PrEnergyElectricCool"),
+                (CIRCUIT_HMUX0, "PrEnergyThermalHc"),
+                (CIRCUIT_HMUX0, "PrEnergyThermalHwc"),
+                (CIRCUIT_HMUX0, "PrEnergyThermalCool"),
+                (CIRCUIT_HMUX0, "PrEnergyEnvYieldHc"),
+                (CIRCUIT_HMUX0, "PrEnergyEnvYieldHwc"),
+                (CIRCUIT_VWZIO, "PowerStatus"),
+                (CIRCUIT_VWZIO, "PrEnergyElectricHc"),
+                (CIRCUIT_VWZIO, "PrEnergyElectricHwc"),
+                (CIRCUIT_VWZIO, "PrEnergyThermalHc"),
+                (CIRCUIT_VWZIO, "PrEnergyThermalHwc"),
+            ]
         core_messages = list(
             dict.fromkeys(
                 [*ESSENTIAL_HYDRATION_MESSAGES[:40], *fallback_energy_messages]
@@ -1850,6 +1930,7 @@ class SaunierGeniaCoordinator:
                     CIRCUIT_HMU,
                 )
                 self._active_outdoor_circuit = CIRCUIT_HMU
+                self._async_on_outdoor_circuit_changed(CIRCUIT_HMU)
             elif (
                 "HMUX" in payload_upper
                 and self._active_outdoor_circuit != CIRCUIT_HMUX0
@@ -1859,6 +1940,7 @@ class SaunierGeniaCoordinator:
                     CIRCUIT_HMUX0,
                 )
                 self._active_outdoor_circuit = CIRCUIT_HMUX0
+                self._async_on_outdoor_circuit_changed(CIRCUIT_HMUX0)
 
         detected_sw: str | None = None
         detected_hw: str | None = None

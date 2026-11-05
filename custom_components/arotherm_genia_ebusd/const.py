@@ -445,6 +445,21 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_VWZIO, "PrEnergyThermalHwc"),
 ]
 
+# Messages exclusive to Monobloc units (08.hmux0.csv b516 EEPROM table) that do not exist on Split (08.hmu.HW5103.csv)
+HMUX0_EXCLUSIVE_MESSAGES: frozenset[str] = frozenset(
+    {
+        "RunStatsHcStarts",
+        "PrEnergyElectricHc",
+        "PrEnergyElectricHwc",
+        "PrEnergyElectricCool",
+        "PrEnergyThermalHc",
+        "PrEnergyThermalHwc",
+        "PrEnergyThermalCool",
+        "PrEnergyEnvYieldHc",
+        "PrEnergyEnvYieldHwc",
+    }
+)
+
 # Additional eBUSd messages for Vaillant HMU00 (HW=5103) outdoor units
 HMU_HW5103_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_HMU, "FlowPressure"),
