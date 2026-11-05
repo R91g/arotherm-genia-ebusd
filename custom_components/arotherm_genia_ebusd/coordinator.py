@@ -48,6 +48,7 @@ from .const import (
     CONF_MQTT_PREFIX,
     CONF_OUTDOOR_MODEL,
     CONTROLLER_CIRCUITS,
+    DAY_SHORT_KEYS,
     DEFAULT_AUTO_COOLING_LOCK_BYPASS,
     DEFAULT_CYLINDER_HYST,
     DEFAULT_DEVICE_VERSIONS,
@@ -332,6 +333,9 @@ class SaunierGeniaCoordinator:
         # Silence watchdog and last telemetry timestamp
         self._last_telemetry_time: float | None = None
         self._watchdog_unsub: CALLBACK_TYPE | None = None
+
+        # Lock to serialize multi-slot weekly timer operations and prevent bus collisions
+        self.timer_write_lock: asyncio.Lock = asyncio.Lock()
 
     # -------------------------------------------------------------------------
     # Configuration & Options Properties
@@ -1198,6 +1202,37 @@ class SaunierGeniaCoordinator:
                 current["value"] = scalar
 
         self._state[(circuit_key, canonical)] = current
+
+    @callback
+    def async_set_optimistic_active_slots(
+        self, prefix: str, day_name: str, count: int
+    ) -> None:
+        """Update optimistic active slot count for a day across all controller circuits."""
+        short_day = DAY_SHORT_KEYS.get(day_name)
+        if not short_day:
+            return
+        msg_name = f"{prefix}_Slots"
+        for circuit in CONTROLLER_CIRCUITS:
+            state_key = (circuit, msg_name)
+            existing = dict(self._state.get(state_key, {}))
+            existing[short_day] = count
+            self._state[state_key] = existing
+            self._async_notify_message_listeners(circuit, msg_name)
+
+    @callback
+    def async_invalidate_active_slots(self, prefix: str, day_name: str) -> None:
+        """Invalidate cached active slot count for a day across all controller circuits on write failure."""
+        short_day = DAY_SHORT_KEYS.get(day_name)
+        if not short_day:
+            return
+        msg_name = f"{prefix}_Slots"
+        for circuit in CONTROLLER_CIRCUITS:
+            state_key = (circuit, msg_name)
+            if state_key in self._state:
+                existing = dict(self._state[state_key])
+                existing.pop(short_day, None)
+                self._state[state_key] = existing
+                self._async_notify_message_listeners(circuit, msg_name)
 
     @callback
     def _async_on_outdoor_circuit_changed(self, new_circuit: str) -> None:
