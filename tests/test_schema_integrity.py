@@ -318,6 +318,29 @@ class TestSchemaIntegrity(unittest.TestCase):
                                     f"Invalid ebusd field type '{ftype}' for field '{fname}' in {rel_path}:{line_no}",
                                 )
 
+    def test_ebusd_csv_first_line_header(self) -> None:
+        """Verify that all eBUSd CSV files start immediately with the header definition on line 1.
+
+        ebusd daemon requires line 1 to be the column header; comments before line 1
+        prevent the parser from properly detecting the column format and loading messages.
+        """
+        ebusd_cfg_dir = os.path.join(self.root_dir, "ebusd-configuration")
+        csv_files = glob.glob(
+            os.path.join(ebusd_cfg_dir, "**", "*.csv"), recursive=True
+        )
+        self.assertGreater(len(csv_files), 0, "No CSV configuration files found")
+        expected_header = "type,circuit,level,name,comment,qq,zz,pbsb,id,*name,part,type,divisor/values,unit,comment"
+
+        for csv_path in csv_files:
+            rel_path = os.path.relpath(csv_path, self.root_dir)
+            with open(csv_path, "r", encoding="utf-8") as fp:
+                first_line = fp.readline().strip()
+            self.assertEqual(
+                first_line,
+                expected_header,
+                f"CSV file '{rel_path}' must begin with the header definition on line 1, found: {first_line!r}",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
