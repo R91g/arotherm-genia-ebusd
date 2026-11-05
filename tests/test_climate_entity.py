@@ -40,6 +40,16 @@ class MockCoordinatorForClimate:
         self.custom_cooling_start_date: str | None = None
         self.custom_cooling_end_date: str | None = None
 
+    @property
+    def is_ebus_operational(self) -> bool:
+        if not self._state:
+            return False
+        for circuit_msg in ("signal", "running"):
+            val = self.get_str("global", circuit_msg)
+            if val is not None and val.lower() in ("false", "0", "no", "off"):
+                return False
+        return True
+
     def get_message(self, circuit: str, message: str) -> dict[str, Any] | None:
         return self._state.get((circuit.lower(), message.lower()))
 
@@ -169,6 +179,39 @@ class TestClimateEntity(unittest.TestCase):
         self.assertIn(
             (CIRCUIT_BASS3, "Z1OpModeCooling", "auto"), self.coordinator.writes
         )
+
+    def test_climate_and_water_heater_availability(self) -> None:
+        """Verify climate and DHW entities availability gates on is_ebus_operational."""
+        from custom_components.arotherm_genia_ebusd.water_heater import (
+            SaunierGeniaWaterHeater,
+        )
+
+        water_heater = SaunierGeniaWaterHeater(self.coordinator)
+
+        # 1. Unhydrated -> both unavailable
+        self.coordinator._state = {}
+        self.assertFalse(self.climate.available)
+        self.assertFalse(water_heater.available)
+
+        # 2. Hydrated normal -> both available
+        self.coordinator._state[("bass3", "z1opmode")] = {"value": "auto"}
+        self.assertTrue(self.climate.available)
+        self.assertTrue(water_heater.available)
+
+        # 3. ebusd global/signal is false -> both unavailable
+        self.coordinator._state[("global", "signal")] = {"value": "false"}
+        self.assertFalse(self.climate.available)
+        self.assertFalse(water_heater.available)
+
+        # 4. signal recovers -> both available
+        self.coordinator._state[("global", "signal")] = {"value": "true"}
+        self.assertTrue(self.climate.available)
+        self.assertTrue(water_heater.available)
+
+        # 5. ebusd global/running is off -> both unavailable
+        self.coordinator._state[("global", "running")] = {"value": "off"}
+        self.assertFalse(self.climate.available)
+        self.assertFalse(water_heater.available)
 
 
 if __name__ == "__main__":

@@ -11,6 +11,7 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntityDescription,
 )
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -142,6 +143,13 @@ def _check_ebusd_signal(coord: SaunierGeniaCoordinator) -> bool | None:
     return val.lower() in ("true", "1", "on", "yes")
 
 
+def _check_ebusd_running(coord: SaunierGeniaCoordinator) -> bool | None:
+    val = coord.get_str(CIRCUIT_GLOBAL, "running", "value")
+    if val is None:
+        return None
+    return val.lower() in ("true", "1", "on", "yes")
+
+
 BINARY_SENSOR_DESCRIPTIONS: tuple[SaunierGeniaBinarySensorEntityDescription, ...] = (
     SaunierGeniaBinarySensorEntityDescription(
         key="compressor_active",
@@ -221,7 +229,19 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[SaunierGeniaBinarySensorEntityDescription, ...
         message="signal",
         field="value",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_on_fn=_check_ebusd_signal,
+    ),
+    SaunierGeniaBinarySensorEntityDescription(
+        key="ebusd_running",
+        translation_key="ebusd_running",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_GLOBAL,
+        message="running",
+        field="value",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        is_on_fn=_check_ebusd_running,
     ),
 )
 

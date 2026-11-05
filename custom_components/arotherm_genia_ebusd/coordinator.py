@@ -387,6 +387,25 @@ class SaunierGeniaCoordinator:
         )
 
     @property
+    def is_ebus_operational(self) -> bool:
+        """Return True if eBUS communication is operational.
+
+        1. If no MQTT state has been received yet, return False.
+        2. If ebusd publishes 'global/signal' and it is explicitly false/0/off/no, return False.
+        3. If ebusd publishes 'global/running' and it is explicitly false/0/off/no, return False.
+        4. Otherwise, return True.
+        """
+        if not self._state:
+            return False
+
+        for circuit_msg in ("signal", "running"):
+            val = self.get_str(CIRCUIT_GLOBAL, circuit_msg)
+            if val is not None and val.lower() in ("false", "0", "no", "off"):
+                return False
+
+        return True
+
+    @property
     def fallback_poll_interval(self) -> int:
         """Return fallback poll interval in seconds when has_migo_link is False."""
         return int(

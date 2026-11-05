@@ -186,6 +186,13 @@
           "on": "mdi:network-outline",
           "off": "mdi:network-off-outline"
         }
+      },
+      "ebusd_running": {
+        "default": "mdi:server-network",
+        "state": {
+          "on": "mdi:server-network",
+          "off": "mdi:server-network-off"
+        }
       }
     },
     "sensor": {
@@ -396,6 +403,27 @@
       },
       "energy_env_yield_hwc": {
         "default": "mdi:leaf"
+      },
+      "ebusd_uptime": {
+        "default": "mdi:timer-outline"
+      },
+      "ebusd_version": {
+        "default": "mdi:tag-outline"
+      },
+      "ebusd_scan_status": {
+        "default": "mdi:radar"
+      },
+      "ebusd_symbol_rate": {
+        "default": "mdi:speedometer"
+      },
+      "ebusd_reconnects": {
+        "default": "mdi:sync-alert"
+      },
+      "ebusd_masters": {
+        "default": "mdi:devices"
+      },
+      "ebusd_arbitration_latency": {
+        "default": "mdi:clock-fast"
       }
     },
     "number": {

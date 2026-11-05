@@ -295,6 +295,9 @@
       },
       "ebusd_signal": {
         "name": "Señal del bus eBUS"
+      },
+      "ebusd_running": {
+        "name": "Estado del servicio ebusd"
       }
     },
     "sensor": {
@@ -668,6 +671,27 @@
       },
       "circulation_weekly_schedule_summary": {
         "name": "Programación semanal Recirculación"
+      },
+      "ebusd_uptime": {
+        "name": "Tiempo activo de ebusd"
+      },
+      "ebusd_version": {
+        "name": "Versión del servicio ebusd"
+      },
+      "ebusd_scan_status": {
+        "name": "Estado de escaneo ebusd"
+      },
+      "ebusd_symbol_rate": {
+        "name": "Tasa de símbolos físicos eBUS"
+      },
+      "ebusd_reconnects": {
+        "name": "Contador de reconexiones del adaptador eBUS"
+      },
+      "ebusd_masters": {
+        "name": "Dispositivos maestros eBUS detectados"
+      },
+      "ebusd_arbitration_latency": {
+        "name": "Latencia de arbitraje eBUS"
       }
     }
   }

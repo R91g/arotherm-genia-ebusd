@@ -1214,6 +1214,47 @@ class TestCoordinatorLogic(unittest.TestCase):
         push_mqtt("ebusd/hmux0/RunDataNominalFlowRate", '{"value": {"value": 900}}')
         self.assertNotIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
 
+    def test_is_ebus_operational_and_running_binary_sensor(self) -> None:
+        """Test is_ebus_operational gate and _check_ebusd_running binary sensor."""
+        from custom_components.arotherm_genia_ebusd.binary_sensor import (
+            _check_ebusd_running,
+            _check_ebusd_signal,
+        )
+
+        entry = MagicMock()
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {}
+        coord = SaunierGeniaCoordinator(MagicMock(), entry)
+
+        # 1. Unhydrated state -> not operational
+        self.assertFalse(coord.is_ebus_operational)
+        self.assertIsNone(_check_ebusd_signal(coord))
+        self.assertIsNone(_check_ebusd_running(coord))
+
+        # 2. Normal telemetry without global signal/running -> operational (optimistic)
+        coord._state[("hmux0", "status01")] = {"temp1": 35.0}
+        self.assertTrue(coord.is_ebus_operational)
+
+        # 3. ebusd/global/signal=false -> not operational
+        coord._state[("global", "signal")] = {"value": "false"}
+        self.assertFalse(coord.is_ebus_operational)
+        self.assertFalse(_check_ebusd_signal(coord))
+
+        # 4. signal recovers to true -> operational
+        coord._state[("global", "signal")] = {"value": "true"}
+        self.assertTrue(coord.is_ebus_operational)
+        self.assertTrue(_check_ebusd_signal(coord))
+
+        # 5. ebusd/global/running=off -> not operational
+        coord._state[("global", "running")] = {"value": "off"}
+        self.assertFalse(coord.is_ebus_operational)
+        self.assertFalse(_check_ebusd_running(coord))
+
+        # 6. running recovers to yes -> operational
+        coord._state[("global", "running")] = {"value": "yes"}
+        self.assertTrue(coord.is_ebus_operational)
+        self.assertTrue(_check_ebusd_running(coord))
+
 
 if __name__ == "__main__":
     unittest.main()

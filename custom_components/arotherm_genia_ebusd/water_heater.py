@@ -15,6 +15,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     CIRCUIT_BASS3,
+    CIRCUIT_GLOBAL,
     DEFAULT_CYLINDER_HYST,
     DEVICE_CLIMATE_CONTROLLER,
     DOMAIN,
@@ -84,6 +85,8 @@ class SaunierGeniaWaterHeater(SaunierGeniaEntity, WaterHeaterEntity):
             (CIRCUIT_BASS3, "HwcFlowTemp"),
             (CIRCUIT_BASS3, "CylinderChargeHyst"),
             (CIRCUIT_BASS3, "SystemOperatingState"),
+            (CIRCUIT_GLOBAL, "signal"),
+            (CIRCUIT_GLOBAL, "running"),
         ]
         super().__init__(
             coordinator=coordinator,
@@ -92,6 +95,11 @@ class SaunierGeniaWaterHeater(SaunierGeniaEntity, WaterHeaterEntity):
             subscriptions=subscriptions,
             unique_id_suffix="water_heater_dhw",
         )
+
+    @property
+    def available(self) -> bool:
+        """Return True if DHW entity is operational on eBUS."""
+        return self.coordinator.is_ebus_operational
 
     @property
     def current_temperature(self) -> float | None:

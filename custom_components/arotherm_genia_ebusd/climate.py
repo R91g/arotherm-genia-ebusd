@@ -21,6 +21,7 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from .const import (
     CIRCUIT_BASS3,
     CIRCUIT_BROADCAST,
+    CIRCUIT_GLOBAL,
     CIRCUIT_HMUX0,
     CIRCUIT_NETX3,
     CIRCUIT_NETX3_ALT,
@@ -121,6 +122,8 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             (CIRCUIT_NETX3, "RoomTempDial"),
             (CIRCUIT_NETX3_ALT, "RoomTempDial"),
             (CIRCUIT_BROADCAST, "Outsidetemp"),
+            (CIRCUIT_GLOBAL, "signal"),
+            (CIRCUIT_GLOBAL, "running"),
         ]
 
         super().__init__(
@@ -228,6 +231,11 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             self._transition_in_progress = False
             self._async_refresh_derived_state()
             self.async_write_ha_state()
+
+    @property
+    def available(self) -> bool:
+        """Return True if climate entity is operational on eBUS."""
+        return self.coordinator.is_ebus_operational
 
     @property
     def min_temp(self) -> float:

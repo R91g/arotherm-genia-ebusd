@@ -295,6 +295,9 @@
       },
       "ebusd_signal": {
         "name": "eBUS Signal"
+      },
+      "ebusd_running": {
+        "name": "ebusd Daemon Status"
       }
     },
     "sensor": {
@@ -668,6 +671,27 @@
       },
       "circulation_weekly_schedule_summary": {
         "name": "Circulation Pump Weekly Schedule"
+      },
+      "ebusd_uptime": {
+        "name": "ebusd Uptime"
+      },
+      "ebusd_version": {
+        "name": "ebusd Daemon Version"
+      },
+      "ebusd_scan_status": {
+        "name": "ebusd Scan Status"
+      },
+      "ebusd_symbol_rate": {
+        "name": "eBUS Physical Symbol Rate"
+      },
+      "ebusd_reconnects": {
+        "name": "eBUS Adapter Reconnect Count"
+      },
+      "ebusd_masters": {
+        "name": "eBUS Master Devices Detected"
+      },
+      "ebusd_arbitration_latency": {
+        "name": "eBUS Arbitration Latency"
       }
     }
   }
