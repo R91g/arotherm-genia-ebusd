@@ -33,8 +33,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Implemented pre-validation and cascading ascending re-writes in `_async_handle_set_weekly_timer` to safely preserve upper slots and the hardware-managed `total_slots` byte.
 
 ### Fixed
-- **Operational Availability Lock:**
-  - Implemented `coordinator.is_ebus_operational`: gates interactive control entities (`climate.zone_1_climate` and `water_heater.dhw_water_heater`) so they report unavailable when `ebusd/global/signal` or `ebusd/global/running` indicates bus disconnection or prior to initial MQTT hydration, while keeping historical telemetry and graphs alive across all 120+ sensors.
+- **Weekly Timer Multi-Slot Safety, Non-Overlap & Mutex Lock (R2):**
+  - Added strict chronological order and non-overlap pre-validation (`_validate_daily_schedule`) for all daily slots, allowing contiguous setpoints while rejecting overlapping intervals or reversed order.
+  - Added support for midnight normalization: parses `24:00` and end `00:00` as `1440` minutes (`24;0` on eBUS wire) while rejecting start `24:00`, `00:00 - 00:00`, or intervals crossing midnight.
+  - Added unknown counter guard: rejects writes with `HomeAssistantError` if active slot count is `None`, preventing accidental truncation of physical slots 2 and 3.
+  - Wrapped weekly timer operations in `coordinator.timer_write_lock` (`asyncio.Lock`) to serialize reads, validation, writes, and optimistic updates.
+  - Added coordinator methods `async_set_optimistic_active_slots` and `async_invalidate_active_slots` to maintain multi-circuit consistency across `CONTROLLER_CIRCUITS` and recover safely if mid-cascade write failures occur.
+- **Availability Guard, Silence Timeout & Domain Services (R4):**
+  - Implemented 600-second communication silence timeout (`EBUSD_TRAFFIC_TIMEOUT_SECONDS`) with a periodic watchdog task notifying listeners when ebusd or physical bus communication drops.
+  - Hardened `is_ebus_operational`: requires actual circuit telemetry or positive daemon signal, preventing daemon version metadata (`ebusd/global/version = 26.1`) alone from marking the system operational.
+  - Added availability gating to all control entities (`climate`, `water_heater`, `select`, `number`, `switch`) while preserving historical telemetry on sensors for long-term graphing.
+  - Added operational checks to domain services (`set_weekly_timer`, `force_dhw_boost`, `set_holiday_mode`, `cancel_holiday_mode`), rejecting execution when eBUS is non-operational.
+- **Thermodynamic Recalculation on Message Aliases (R5):**
+  - Evaluated `THERMO_TRIGGER_MESSAGES` against canonical message aliases (`PowerConsumptionHmu`, `flowtemp`, `buildingcircuitflow`, `waterthroughput`, `rundatastatuscode`), immediately recalculating thermal power and live COP upon incoming telemetry without waiting for subsequent messages.
+- **HMU Outdoor Unit Hydration & Late Scan Detection (R6):**
+  - Filtered Monobloc-exclusive b516 messages (`RunStatsHcStarts`, `PrEnergy*`) from `08.hmu` outdoor unit hydration queue, avoiding invalid MQTT requests while keeping `CIRCUIT_VWZIO` energy messages intact.
+  - Implemented dynamic late detection handling (`_async_on_outdoor_circuit_changed`): purges incompatible pending queries on the fly and appends HMU-specific hydration messages without duplicating tasks.
+  - Differentiated periodic fallback poll queues between `hmu` (polls `Yield*`, `FlowPressure`, `TotalEnergyUsage`) and `hmux0` (polls `PrEnergy*`).
+- **eBUS CSV Column Definitions on Line 1 (R1):**
+  - Removed initial comments in `ebusd-configuration/vaillant/08.hmu.HW5103.csv`, placing the column header definition directly on byte 0 / line 1 as required by the ebusd 26.1 C++ parser. Added schema integrity unit test `test_ebusd_csv_first_line_header`.
 - **Thermostat & Climate Symmetrical Operation:**
   - Fixed `climate.py` ECO preset in cooling season to write `Z1OpModeCooling = "night"` instead of heating mode. Added `"night"` to `COOLING_ACTIVE_MODES` for symmetrical operation between heating and cooling seasons.
   - Fixed `HVACMode.AUTO` season selection: dynamically evaluates real-time outdoor temperature (`< 20.0 °C` activates heating, `>= 20.0 °C` activates cooling), falling back to `previous_season` only if no outside temperature sensor is available.
