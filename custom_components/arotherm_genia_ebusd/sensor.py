@@ -201,7 +201,7 @@ class SaunierGeniaWeeklyScheduleSensor(SaunierGeniaEntity, SensorEntity):
         fm = msg.get("from_min")
         th = msg.get("to_hour")
         tm = msg.get("to_min")
-        if None in (fh, fm, th, tm):
+        if fh is None or fm is None or th is None or tm is None:
             return None
 
         try:

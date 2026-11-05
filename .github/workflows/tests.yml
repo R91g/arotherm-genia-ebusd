@@ -41,12 +41,15 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Ruff
-        run: pip install ruff
+      - name: Install Ruff & Pyright
+        run: pip install ruff pyright
 
       - name: Run Ruff Linter
         run: ruff check custom_components tests
 
       - name: Run Ruff Formatter Check
         run: ruff format --check custom_components tests
+
+      - name: Run Pyright Type Checker
+        run: pyright
 

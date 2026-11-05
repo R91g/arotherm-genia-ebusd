@@ -169,6 +169,8 @@ def _get_active_slot_count(
     """Return the number of active slots for a day from <prefix>_Slots, or None."""
     slots_msg = coordinator.get_message(CIRCUIT_BASS3, f"{prefix}_Slots") or {}
     raw = slots_msg.get(DAY_SHORT_KEYS[day_name])
+    if raw is None:
+        return None
     try:
         count = int(raw)
     except (TypeError, ValueError):
@@ -202,7 +204,7 @@ def _collect_upper_slots(
                 "Wait for the schedule to be read from the bus and retry."
             )
         try:
-            hh1, mm1, hh2, mm2 = (int(v) for v in fields)
+            hh1, mm1, hh2, mm2 = (int(v) for v in fields if v is not None)
         except (TypeError, ValueError) as err:
             raise HomeAssistantError(
                 f"Invalid stored data for slot {upper_slot} on {day_name}."

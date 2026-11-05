@@ -61,6 +61,25 @@ class TestCodeQuality(unittest.TestCase):
             ),
         )
 
+    def test_pyright_type_check(self) -> None:
+        """Ensure pyright static type check passes without any violations."""
+        check_pyright = subprocess.run(
+            [sys.executable, "-m", "pyright", "--version"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if check_pyright.returncode != 0 and not shutil.which("pyright"):
+            raise unittest.SkipTest("Pyright is not installed in this environment.")
+
+        cmd = [sys.executable, "-m", "pyright"]
+        result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+        self.assertEqual(
+            result.returncode,
+            0,
+            f"Pyright found type violations:\n{result.stdout}\n{result.stderr}",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

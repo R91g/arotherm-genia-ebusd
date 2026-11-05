@@ -493,9 +493,17 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
 
         if hvac_mode == HVACMode.OFF:
             # Save active season target before shutting down
-            if previous_season == SEASON_COOLING and day_temp_valid:
+            if (
+                previous_season == SEASON_COOLING
+                and current_day_temp is not None
+                and day_temp_valid
+            ):
                 self._saved_cooling_target = current_day_temp
-            elif previous_season == SEASON_HEATING and day_temp_valid:
+            elif (
+                previous_season == SEASON_HEATING
+                and current_day_temp is not None
+                and day_temp_valid
+            ):
                 self._saved_heating_target = current_day_temp
 
             await self.coordinator.async_write_parameter(
@@ -519,7 +527,11 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
 
         if hvac_mode == HVACMode.HEAT:
             # If transitioning from cooling, remember cooling setpoint
-            if previous_season == SEASON_COOLING and day_temp_valid:
+            if (
+                previous_season == SEASON_COOLING
+                and current_day_temp is not None
+                and day_temp_valid
+            ):
                 self._saved_cooling_target = current_day_temp
             heating_target = self._saved_heating_target
 
@@ -548,7 +560,11 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
 
         if hvac_mode == HVACMode.COOL:
             # If transitioning from heating, remember heating setpoint
-            if previous_season == SEASON_HEATING and day_temp_valid:
+            if (
+                previous_season == SEASON_HEATING
+                and current_day_temp is not None
+                and day_temp_valid
+            ):
                 self._saved_heating_target = current_day_temp
             cooling_target = self._saved_cooling_target
 
@@ -595,7 +611,11 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             else:
                 use_heating = previous_season != SEASON_COOLING
             if use_heating:
-                if previous_season == SEASON_COOLING and day_temp_valid:
+                if (
+                    previous_season == SEASON_COOLING
+                    and current_day_temp is not None
+                    and day_temp_valid
+                ):
                     self._saved_cooling_target = current_day_temp
                 heating_target = self._saved_heating_target
 
@@ -613,7 +633,11 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
                     CIRCUIT_BASS3, "Z1DayTemp", heating_target
                 )
             else:
-                if previous_season == SEASON_HEATING and day_temp_valid:
+                if (
+                    previous_season == SEASON_HEATING
+                    and current_day_temp is not None
+                    and day_temp_valid
+                ):
                     self._saved_heating_target = current_day_temp
                 cooling_target = self._saved_cooling_target
 

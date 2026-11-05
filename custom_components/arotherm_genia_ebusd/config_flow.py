@@ -54,7 +54,7 @@ from .const import (
 )
 
 
-class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):
+class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):  # pyright: ignore[reportCallIssue, reportGeneralTypeIssues]
     """Handle a config flow for Saunier Duval & Vaillant Heat Pumps (eBUSd)."""
 
     VERSION = 1
