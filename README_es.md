@@ -5,7 +5,7 @@
 # aroTHERM & GeniaAir (eBUS) — Integración para Home Assistant
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge)](https://hacs.xyz/)
-[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.4%2B-41BDF5.svg?style=for-the-badge)](https://www.home-assistant.io/)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.12%2B-41BDF5.svg?style=for-the-badge)](https://www.home-assistant.io/)
 [![IoT Class](https://img.shields.io/badge/IoT%20Class-local__push-00B050.svg?style=for-the-badge)](https://www.home-assistant.io/blog/2016/02/12/classifying-the-internet-of-things/)
 [![Protocol](https://img.shields.io/badge/Protocol-eBUS%20%2F%20MQTT%20JSON-FF8C00.svg?style=for-the-badge)](https://github.com/john30/ebusd)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://github.com/R91g/arotherm-genia-ebusd/blob/main/LICENSE)
@@ -155,7 +155,7 @@ Consumo Eléctrico Total (Wh)    = Calefacción_Total_Wh + ACS_Total_Wh + Refrig
 
 1. **Adaptador Físico eBUS:** Conectado en paralelo a los bornes de 2 hilos del bus eBUS (`+`/`-`, sin polaridad) de la máquina exterior, módulo hidráulico o mando mural — por ejemplo, [eBUS Adapter Shield v5 / C6](https://adapter.ebusd.eu/) (Ethernet, Wi-Fi o USB).
 2. **Demonio `ebusd` (`v23.2` o superior):** Ejecutándose como **Add-on eBUSd en Home Assistant** o como servicio Linux / contenedor Docker, conectado a tu broker MQTT con el flag **`--mqttjson`** activado.
-3. **Home Assistant (`2024.4.0` o superior):** Con la **[integración oficial MQTT](https://www.home-assistant.io/integrations/mqtt/)** configurada y conectada al mismo broker MQTT que `ebusd`.
+3. **Home Assistant (`2024.12.0` o superior):** Con la **[integración oficial MQTT](https://www.home-assistant.io/integrations/mqtt/)** configurada y conectada al mismo broker MQTT que `ebusd`.
 
 ### Esquema de Cableado Físico y Coexistencia eBUS
 

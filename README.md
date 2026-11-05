@@ -5,7 +5,7 @@
 # aroTHERM & GeniaAir (eBUS) — Home Assistant Integration
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge)](https://hacs.xyz/)
-[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.4%2B-41BDF5.svg?style=for-the-badge)](https://www.home-assistant.io/)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.12%2B-41BDF5.svg?style=for-the-badge)](https://www.home-assistant.io/)
 [![IoT Class](https://img.shields.io/badge/IoT%20Class-local__push-00B050.svg?style=for-the-badge)](https://www.home-assistant.io/blog/2016/02/12/classifying-the-internet-of-things/)
 [![Protocol](https://img.shields.io/badge/Protocol-eBUS%20%2F%20MQTT%20JSON-FF8C00.svg?style=for-the-badge)](https://github.com/john30/ebusd)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://github.com/R91g/arotherm-genia-ebusd/blob/main/LICENSE)
@@ -155,7 +155,7 @@ Total System Energy (Wh)     = Heating_Total_Wh + DHW_Total_Wh + Cooling_Total_W
 
 1. **Physical eBUS Adapter:** Connected in parallel to the 2-wire eBUS terminals (`+`/`-`, polarity-insensitive) of your heat pump / hydraulic module / wall controller — for example, the [eBUS Adapter Shield v5 / C6](https://adapter.ebusd.eu/) (Ethernet, Wi-Fi, or USB).
 2. **`ebusd` Daemon (`v23.2` or newer):** Running either as the **Home Assistant eBUSd Add-on** or as a standalone Linux service / Docker container, connected to your MQTT broker with **`--mqttjson`** enabled.
-3. **Home Assistant (`2024.4.0` or newer):** With the core **[MQTT integration](https://www.home-assistant.io/integrations/mqtt/)** installed and connected to the same MQTT broker as `ebusd`.
+3. **Home Assistant (`2024.12.0` or newer):** With the core **[MQTT integration](https://www.home-assistant.io/integrations/mqtt/)** installed and connected to the same MQTT broker as `ebusd`.
 
 ### Physical Wiring & Coexistence Architecture
 
