@@ -91,6 +91,14 @@ class TestSensorRegistry(unittest.TestCase):
         self.assertIsNone(desc.fallback_message)
         self.assertEqual(desc.unique_id_suffix, "04_roomtargettemp_temp")
 
+    def test_primary_flow_rate_field_alignment_and_unique_id(self) -> None:
+        """Primary flow rate aligns with modern 08.hmux0.csv while preserving legacy unique_id."""
+        desc = next(d for d in SENSOR_DESCRIPTIONS if d.key == "primary_flow_rate")
+        self.assertEqual(desc.message, "RunDataFlowRate")
+        self.assertEqual(desc.field, "flow_rate")
+        self.assertEqual(desc.fallback_field, "value")
+        self.assertEqual(desc.unique_id_suffix, "hmux0_rundataflowrate_value")
+
     def test_binary_sensors_validity(self) -> None:
         """Verify binary sensors have valid circuits and unique ID suffixes."""
         self.assertGreaterEqual(len(BINARY_SENSOR_DESCRIPTIONS), 8)
@@ -207,7 +215,8 @@ class TestSensorRegistry(unittest.TestCase):
         self.assertEqual(expected_sensor_tkeys, sensor_keys_strings)
 
         active_uids = {
-            f"{d.circuit.lower()}_{d.message.lower()}_{d.field.lower()}"
+            d.unique_id_suffix
+            or f"{d.circuit.lower()}_{d.message.lower()}_{d.field.lower()}"
             for d in SENSOR_DESCRIPTIONS
         } | {
             f"binary_{d.circuit.lower()}_{d.message.lower()}_{d.field.lower()}"

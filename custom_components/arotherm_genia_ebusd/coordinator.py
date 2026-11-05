@@ -1256,7 +1256,7 @@ class SaunierGeniaCoordinator:
 
         # 2. Instantaneous Thermal Power (W)
         hmu_status = self.get_str(CIRCUIT_HMUX0, "HMUStatusCode", "status") or ""
-        flow_rate = self.get_float(CIRCUIT_HMUX0, "RunDataFlowRate", "value")
+        flow_rate = self.get_float(CIRCUIT_HMUX0, "RunDataFlowRate", "flow_rate")
         thermal_power = calculate_thermal_power(flow_rate, delta_t, hmu_status)
         if thermal_power is not None:
             self._set_calculated(CALC_THERMAL_POWER, thermal_power)
