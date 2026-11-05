@@ -11,10 +11,14 @@ from custom_components.arotherm_genia_ebusd.const import (
     DEFAULT_MANUFACTURER,
     DEFAULT_OUTDOOR_MODEL_SAUNIER,
     DEFAULT_OUTDOOR_MODEL_VAILLANT,
+    INDOOR_MODEL_SPECS,
+    INDOOR_MODELS,
     INDOOR_MODELS_BY_MANUFACTURER,
     MANUFACTURER_SAUNIER_DUVAL,
     MANUFACTURER_VAILLANT,
     MANUFACTURERS,
+    OUTDOOR_MODEL_SPECS,
+    OUTDOOR_MODELS,
     OUTDOOR_MODELS_BY_MANUFACTURER,
 )
 
@@ -36,6 +40,8 @@ class TestManufacturerTopology(unittest.TestCase):
         self.assertIn("GeniaAir Max ES 15", saunier_models)
         self.assertIn("GeniaAir Max 4", saunier_models)
         self.assertIn("aroTHERM plus ES VWL 155/7.1 A 230V", vaillant_models)
+        self.assertIn("aroTHERM pro VWL 55/7.1 A 230V", vaillant_models)
+        self.assertIn("aroTHERM plus VWL 75/8.1 A 230V", vaillant_models)
         self.assertIn("aroTHERM plus VWL 35/6 A 230V", vaillant_models)
         self.assertEqual(DEFAULT_OUTDOOR_MODEL_SAUNIER, "GeniaAir Max ES 15")
         self.assertEqual(
@@ -50,6 +56,13 @@ class TestManufacturerTopology(unittest.TestCase):
         self.assertIn("HPIM 7 230V", saunier_indoor)
         self.assertIn("VWZ MEH 97/7", vaillant_indoor)
         self.assertIn("uniTOWER VIH QW 190/7", vaillant_indoor)
+
+    def test_all_models_have_specs(self) -> None:
+        """Verify all listed outdoor and indoor models have specifications defined."""
+        for model in OUTDOOR_MODELS:
+            self.assertIn(model, OUTDOOR_MODEL_SPECS)
+        for model in INDOOR_MODELS:
+            self.assertIn(model, INDOOR_MODEL_SPECS)
 
 
 if __name__ == "__main__":

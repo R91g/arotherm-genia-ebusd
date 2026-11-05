@@ -47,16 +47,34 @@ OUTDOOR_MODELS_SAUNIER: list[str] = [
 ]
 
 OUTDOOR_MODELS_VAILLANT: list[str] = [
+    # aroTHERM plus ES (Spain / International /7.1 A)
     "aroTHERM plus ES VWL 55/7.1 A 230V",
     "aroTHERM plus ES VWL 85/7.1 A 230V",
     "aroTHERM plus ES VWL 125/7.1 A 230V",
     "aroTHERM plus ES VWL 125/7.1 A 400V",
     "aroTHERM plus ES VWL 155/7.1 A 230V",
     "aroTHERM plus ES VWL 155/7.1 A 400V",
+    # aroTHERM pro (UK /7.1 A)
+    "aroTHERM pro VWL 55/7.1 A 230V",
+    "aroTHERM pro VWL 85/7.1 A 230V",
+    "aroTHERM pro VWL 125/7.1 A 230V",
+    "aroTHERM pro VWL 125/7.1 A 400V",
+    "aroTHERM pro VWL 155/7.1 A 230V",
+    "aroTHERM pro VWL 155/7.1 A 400V",
+    # aroTHERM plus /8.1 A (v2)
+    "aroTHERM plus VWL 35/8.1 A 230V",
+    "aroTHERM plus VWL 55/8.1 A 230V",
+    "aroTHERM plus VWL 75/8.1 A 230V",
+    "aroTHERM plus VWL 105/8.1 A 230V",
+    "aroTHERM plus VWL 105/8.1 A 400V",
+    "aroTHERM plus VWL 125/8.1 A 230V",
+    "aroTHERM plus VWL 125/8.1 A 400V",
+    # aroTHERM plus /6 A (2020)
     "aroTHERM plus VWL 35/6 A 230V",
     "aroTHERM plus VWL 55/6 A 230V",
     "aroTHERM plus VWL 75/6 A 230V",
     "aroTHERM plus VWL 105/6 A 230V",
+    "aroTHERM plus VWL 125/6 A 230V",
     "aroTHERM plus VWL 125/6 A",
 ]
 
@@ -83,17 +101,36 @@ OUTDOOR_MODEL_SPECS: dict[str, str] = {
     "GeniaAir Max 8 (Legacy)": "GeniaAir Max 8 (HA 8-5/2 230V R290)",
     "GeniaAir Max 11 (Legacy)": "GeniaAir Max 11 (HA 11-5/2 230V R290)",
     "GeniaAir Max 15 (Legacy)": "GeniaAir Max 15 (HA 15-5/2 230V R290)",
+    # aroTHERM plus ES /7.1 A
     "aroTHERM plus ES VWL 55/7.1 A 230V": "aroTHERM plus ES VWL 55/7.1 A 230V S3 (R290)",
     "aroTHERM plus ES VWL 85/7.1 A 230V": "aroTHERM plus ES VWL 85/7.1 A 230V S3 (R290)",
     "aroTHERM plus ES VWL 125/7.1 A 230V": "aroTHERM plus ES VWL 125/7.1 A 230V S3 (R290)",
     "aroTHERM plus ES VWL 125/7.1 A 400V": "aroTHERM plus ES VWL 125/7.1 A 400V S3 (R290)",
     "aroTHERM plus ES VWL 155/7.1 A 230V": "aroTHERM plus ES VWL 155/7.1 A 230V S3 (R290)",
     "aroTHERM plus ES VWL 155/7.1 A 400V": "aroTHERM plus ES VWL 155/7.1 A 400V S3 (R290)",
+    # aroTHERM pro /7.1 A
+    "aroTHERM pro VWL 55/7.1 A 230V": "aroTHERM pro VWL 55/7.1 A 230V S3 (R290)",
+    "aroTHERM pro VWL 85/7.1 A 230V": "aroTHERM pro VWL 85/7.1 A 230V S3 (R290)",
+    "aroTHERM pro VWL 125/7.1 A 230V": "aroTHERM pro VWL 125/7.1 A 230V S3 (R290)",
+    "aroTHERM pro VWL 125/7.1 A 400V": "aroTHERM pro VWL 125/7.1 A 400V S3 (R290)",
+    "aroTHERM pro VWL 155/7.1 A 230V": "aroTHERM pro VWL 155/7.1 A 230V S3 (R290)",
+    "aroTHERM pro VWL 155/7.1 A 400V": "aroTHERM pro VWL 155/7.1 A 400V S3 (R290)",
+    # aroTHERM plus /8.1 A (v2)
+    "aroTHERM plus VWL 35/8.1 A 230V": "aroTHERM plus VWL 35/8.1 A 230V S3 (R290)",
+    "aroTHERM plus VWL 55/8.1 A 230V": "aroTHERM plus VWL 55/8.1 A 230V S3 (R290)",
+    "aroTHERM plus VWL 75/8.1 A 230V": "aroTHERM plus VWL 75/8.1 A 230V S3 (R290)",
+    "aroTHERM plus VWL 105/8.1 A 230V": "aroTHERM plus VWL 105/8.1 A 230V S3 (R290)",
+    "aroTHERM plus VWL 105/8.1 A 400V": "aroTHERM plus VWL 105/8.1 A 400V S3 (R290)",
+    "aroTHERM plus VWL 125/8.1 A 230V": "aroTHERM plus VWL 125/8.1 A 230V S3 (R290)",
+    "aroTHERM plus VWL 125/8.1 A 400V": "aroTHERM plus VWL 125/8.1 A 400V S3 (R290)",
+    # aroTHERM plus /6 A
     "aroTHERM plus VWL 35/6 A 230V": "aroTHERM plus VWL 35/6 A 230V S3 (R290)",
     "aroTHERM plus VWL 55/6 A 230V": "aroTHERM plus VWL 55/6 A 230V S3 (R290)",
     "aroTHERM plus VWL 75/6 A 230V": "aroTHERM plus VWL 75/6 A 230V S3 (R290)",
     "aroTHERM plus VWL 105/6 A 230V": "aroTHERM plus VWL 105/6 A 230V S3 (R290)",
+    "aroTHERM plus VWL 125/6 A 230V": "aroTHERM plus VWL 125/6 A 230V S3 (R290)",
     "aroTHERM plus VWL 125/6 A": "aroTHERM plus VWL 125/6 A S3 (R290)",
+    # Legacy strings
     "aroTHERM plus VWL 35/6 A 230V (Legacy)": "aroTHERM plus VWL 35/6 A 230V S3 (R290)",
     "aroTHERM plus VWL 55/6 A 230V (Legacy)": "aroTHERM plus VWL 55/6 A 230V S3 (R290)",
     "aroTHERM plus VWL 75/6 A 230V (Legacy)": "aroTHERM plus VWL 75/6 A 230V S3 (R290)",
