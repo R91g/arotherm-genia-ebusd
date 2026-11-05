@@ -68,6 +68,12 @@ r,,,EnergyIntegral,current energy integral,,,b51a,05ff3221,ign,,IGN:3,,,,value,,
 r,,,CompressorBlocktime,compressor block time,,,b51a,05ff321e,ign,,IGN:3,,,,value,,UIN,,min,
 [id_sw>=902]r,,,FlowPressure,water circuit pressure,,,b51a,05ff323d,ign,,IGN:3,,,,value,,D2C,4,bar,
 
+# Compressor runtime, statistics and silent mode (b51a)
+r,,,CompressorSilentOperationLevel,compressor silent operation level,,,b51a,05ff3428,ign,,IGN:3,,,,value,,UCH,,%,"compressor silent operation level"
+w,,,CompressorSilentOperationLevel,compressor silent operation level,,,b51a,06ff3428,value,,UCH,,%,"compressor silent operation level"
+r,,,CompressorHours,compressor operating hours,,,b51a,05ff3400,ign,,IGN:3,,,,value,,UIN,,h,hours
+r,,,CompressorStarts,compressor start count,,,b51a,05ff3401,ign,,IGN:3,,,,value,,UIN,,,start count
+
 # ==============================================================================
 # 3. DIAGNOSTICS, SENSORS & RUNTIME STATISTICS (b509)
 # ==============================================================================
