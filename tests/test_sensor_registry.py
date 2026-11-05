@@ -72,7 +72,7 @@ class TestSensorRegistry(unittest.TestCase):
             c = desc.circuit.lower()
             m = desc.message.lower()
             f = desc.field.lower()
-            uid = f"{c}_{m}_{f}"
+            uid = desc.unique_id_suffix or f"{c}_{m}_{f}"
             uids.append(uid)
 
         # Check for duplicate unique_id suffixes among standard sensors
@@ -81,6 +81,15 @@ class TestSensorRegistry(unittest.TestCase):
         self.assertEqual(
             duplicates, {}, f"Duplicate sensor unique_ids found: {duplicates}"
         )
+
+    def test_wireless_room_target_is_stable_mirror_of_z1daytemp(self) -> None:
+        """The thermostat target sensor mirrors Z1DayTemp and keeps its legacy unique_id."""
+        desc = next(
+            d for d in SENSOR_DESCRIPTIONS if d.key == "wireless_room_target_temp"
+        )
+        self.assertEqual(desc.message, "Z1DayTemp")
+        self.assertIsNone(desc.fallback_message)
+        self.assertEqual(desc.unique_id_suffix, "04_roomtargettemp_temp")
 
     def test_binary_sensors_validity(self) -> None:
         """Verify binary sensors have valid circuits and unique ID suffixes."""

@@ -87,6 +87,8 @@ class SaunierGeniaSensorEntityDescription(SensorEntityDescription):
     value_fn: Callable[[SaunierGeniaCoordinator], Any] | None = None
     attr_fn: Callable[[SaunierGeniaCoordinator], dict[str, Any]] | None = None
     requires_wireless_unit: bool = False
+    # Optional override to keep a stable unique_id when the data source changes
+    unique_id_suffix: str | None = None
 
 
 def _get_vwzio_error(coord: SaunierGeniaCoordinator) -> str | None:
@@ -1289,12 +1291,14 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         key="wireless_room_target_temp",
         translation_key="wireless_room_target_temp",
         device_key=DEVICE_WIRELESS_THERMOSTAT,
-        circuit=CIRCUIT_NETX3,
-        message="RoomTargetTemp",
-        field="temp",
-        fallback_circuit=CIRCUIT_BASS3,
-        fallback_message="Z1DayTemp",
-        fallback_field="value",
+        # The NETX3 thermostat does not publish its own target on the bus
+        # (04.netx3.csv / f6.netx3.csv only define RoomTempDial). This sensor
+        # mirrors the climate controller's Zone 1 day setpoint (Z1DayTemp).
+        circuit=CIRCUIT_BASS3,
+        message="Z1DayTemp",
+        field="value",
+        # Preserve the historical unique_id (was circuit 04 / RoomTargetTemp / temp)
+        unique_id_suffix="04_roomtargettemp_temp",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,

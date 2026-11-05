@@ -98,7 +98,7 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
         c = description.circuit.lower()
         m = description.message.lower()
         f = description.field.lower()
-        unique_id_suffix = f"{c}_{m}_{f}"
+        unique_id_suffix = description.unique_id_suffix or f"{c}_{m}_{f}"
 
         super().__init__(
             coordinator=coordinator,
