@@ -114,7 +114,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     outdoor_device = dev_reg.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, outdoor_id)},
-        name=f"{outdoor_model} (Unidad Exterior)",
+        name=f"{outdoor_model} (Outdoor Unit)",
         manufacturer=coordinator.manufacturer,
         model=OUTDOOR_MODEL_SPECS.get(outdoor_model, outdoor_model),
         sw_version=coordinator.get_device_sw_version(DEVICE_OUTDOOR_UNIT),

@@ -34,9 +34,9 @@ class TestManufacturerTopology(unittest.TestCase):
         vaillant_models = OUTDOOR_MODELS_BY_MANUFACTURER[MANUFACTURER_VAILLANT]
 
         self.assertIn("GeniaAir Max ES 15", saunier_models)
-        self.assertIn("GeniaAir Max 4 (Legacy)", saunier_models)
+        self.assertIn("GeniaAir Max 4", saunier_models)
         self.assertIn("aroTHERM plus ES VWL 155/7.1 A 230V", vaillant_models)
-        self.assertIn("aroTHERM plus VWL 35/6 A 230V (Legacy)", vaillant_models)
+        self.assertIn("aroTHERM plus VWL 35/6 A 230V", vaillant_models)
         self.assertEqual(DEFAULT_OUTDOOR_MODEL_SAUNIER, "GeniaAir Max ES 15")
         self.assertEqual(
             DEFAULT_OUTDOOR_MODEL_VAILLANT, "aroTHERM plus ES VWL 155/7.1 A 230V"

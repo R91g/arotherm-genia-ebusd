@@ -39,11 +39,11 @@ OUTDOOR_MODELS_SAUNIER: list[str] = [
     "GeniaAir Max ES 12",
     "GeniaAir Max ES 15",
     "GeniaAir Iso ES",
-    "GeniaAir Max 4 (Legacy)",
-    "GeniaAir Max 6 (Legacy)",
-    "GeniaAir Max 8 (Legacy)",
-    "GeniaAir Max 11 (Legacy)",
-    "GeniaAir Max 15 (Legacy)",
+    "GeniaAir Max 4",
+    "GeniaAir Max 6",
+    "GeniaAir Max 8",
+    "GeniaAir Max 11",
+    "GeniaAir Max 15",
 ]
 
 OUTDOOR_MODELS_VAILLANT: list[str] = [
@@ -53,11 +53,11 @@ OUTDOOR_MODELS_VAILLANT: list[str] = [
     "aroTHERM plus ES VWL 125/7.1 A 400V",
     "aroTHERM plus ES VWL 155/7.1 A 230V",
     "aroTHERM plus ES VWL 155/7.1 A 400V",
-    "aroTHERM plus VWL 35/6 A 230V (Legacy)",
-    "aroTHERM plus VWL 55/6 A 230V (Legacy)",
-    "aroTHERM plus VWL 75/6 A 230V (Legacy)",
-    "aroTHERM plus VWL 105/6 A 230V (Legacy)",
-    "aroTHERM plus VWL 125/6 A (Legacy)",
+    "aroTHERM plus VWL 35/6 A 230V",
+    "aroTHERM plus VWL 55/6 A 230V",
+    "aroTHERM plus VWL 75/6 A 230V",
+    "aroTHERM plus VWL 105/6 A 230V",
+    "aroTHERM plus VWL 125/6 A",
 ]
 
 OUTDOOR_MODELS: list[str] = OUTDOOR_MODELS_SAUNIER + OUTDOOR_MODELS_VAILLANT
@@ -73,6 +73,11 @@ OUTDOOR_MODEL_SPECS: dict[str, str] = {
     "GeniaAir Max ES 12": "GeniaAir Max ES 12 (HA 12-7.1 O 230V B3)",
     "GeniaAir Max ES 15": "GeniaAir Max ES 15 (HA 15-7.1 O 230V B3)",
     "GeniaAir Iso ES": "GeniaAir Iso ES (HA 7.1 O 230V)",
+    "GeniaAir Max 4": "GeniaAir Max 4 (HA 4-5/2 230V R290)",
+    "GeniaAir Max 6": "GeniaAir Max 6 (HA 6-5/2 230V R290)",
+    "GeniaAir Max 8": "GeniaAir Max 8 (HA 8-5/2 230V R290)",
+    "GeniaAir Max 11": "GeniaAir Max 11 (HA 11-5/2 230V R290)",
+    "GeniaAir Max 15": "GeniaAir Max 15 (HA 15-5/2 230V R290)",
     "GeniaAir Max 4 (Legacy)": "GeniaAir Max 4 (HA 4-5/2 230V R290)",
     "GeniaAir Max 6 (Legacy)": "GeniaAir Max 6 (HA 6-5/2 230V R290)",
     "GeniaAir Max 8 (Legacy)": "GeniaAir Max 8 (HA 8-5/2 230V R290)",
@@ -84,6 +89,11 @@ OUTDOOR_MODEL_SPECS: dict[str, str] = {
     "aroTHERM plus ES VWL 125/7.1 A 400V": "aroTHERM plus ES VWL 125/7.1 A 400V S3 (R290)",
     "aroTHERM plus ES VWL 155/7.1 A 230V": "aroTHERM plus ES VWL 155/7.1 A 230V S3 (R290)",
     "aroTHERM plus ES VWL 155/7.1 A 400V": "aroTHERM plus ES VWL 155/7.1 A 400V S3 (R290)",
+    "aroTHERM plus VWL 35/6 A 230V": "aroTHERM plus VWL 35/6 A 230V S3 (R290)",
+    "aroTHERM plus VWL 55/6 A 230V": "aroTHERM plus VWL 55/6 A 230V S3 (R290)",
+    "aroTHERM plus VWL 75/6 A 230V": "aroTHERM plus VWL 75/6 A 230V S3 (R290)",
+    "aroTHERM plus VWL 105/6 A 230V": "aroTHERM plus VWL 105/6 A 230V S3 (R290)",
+    "aroTHERM plus VWL 125/6 A": "aroTHERM plus VWL 125/6 A S3 (R290)",
     "aroTHERM plus VWL 35/6 A 230V (Legacy)": "aroTHERM plus VWL 35/6 A 230V S3 (R290)",
     "aroTHERM plus VWL 55/6 A 230V (Legacy)": "aroTHERM plus VWL 55/6 A 230V S3 (R290)",
     "aroTHERM plus VWL 75/6 A 230V (Legacy)": "aroTHERM plus VWL 75/6 A 230V S3 (R290)",
@@ -99,7 +109,7 @@ DEFAULT_INDOOR_MODEL = DEFAULT_INDOOR_MODEL_SAUNIER
 INDOOR_MODELS_SAUNIER: list[str] = [
     "HPIM 7 230V",
     "GeniaSet FEW/FIW 200-7",
-    "Módulo Hidráulico HE 9-7 W",
+    "Hydraulic Module HE 9-7 W",
 ]
 
 INDOOR_MODELS_VAILLANT: list[str] = [
@@ -119,11 +129,12 @@ INDOOR_MODELS_BY_MANUFACTURER: dict[str, list[str]] = {
 INDOOR_MODEL_SPECS: dict[str, str] = {
     "HPIM 7 230V": "HPIM 7 230V (VWZIO 8000033994)",
     "GeniaSet FEW/FIW 200-7": "GeniaSet FEW/FIW 200-7 (VWZIO)",
-    "Módulo Hidráulico HE 9-7 W": "Módulo Hidráulico HE 9-7 W (VWZIO)",
-    "VWZ MEH 97/7": "Módulo Hidráulico Mural VWZ MEH 97/7 (VWZIO)",
-    "uniTOWER VIH QW 190/7": "Torre Hidráulica uniTOWER VIH QW 190/7 (VWZIO)",
-    "VWZ MH 97/7": "Módulo Hidráulico VWZ MH 97/7 (VWZIO)",
-    "VWZ AI 7/230V": "Interfaz de Bomba VWZ AI /7 230V (VWZIO)",
+    "Hydraulic Module HE 9-7 W": "Hydraulic Module HE 9-7 W (VWZIO)",
+    "Módulo Hidráulico HE 9-7 W": "Hydraulic Module HE 9-7 W (VWZIO)",
+    "VWZ MEH 97/7": "Wall-Hung Hydraulic Module VWZ MEH 97/7 (VWZIO)",
+    "uniTOWER VIH QW 190/7": "Hydraulic Tower uniTOWER VIH QW 190/7 (VWZIO)",
+    "VWZ MH 97/7": "Hydraulic Module VWZ MH 97/7 (VWZIO)",
+    "VWZ AI 7/230V": "Heat Pump Interface VWZ AI /7 230V (VWZIO)",
 }
 
 CONF_HAS_WIRELESS_ROOM_UNIT = "has_wireless_room_unit"

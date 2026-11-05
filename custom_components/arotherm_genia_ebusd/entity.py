@@ -66,7 +66,7 @@ def build_device_info(
         outdoor_model = coordinator.outdoor_model
         return DeviceInfo(
             identifiers={(DOMAIN, outdoor_id)},
-            name=f"{outdoor_model} (Unidad Exterior)",
+            name=f"{outdoor_model} (Outdoor Unit)",
             manufacturer=manufacturer,
             model=OUTDOOR_MODEL_SPECS.get(outdoor_model, outdoor_model),
             sw_version=sw_version,
@@ -76,9 +76,9 @@ def build_device_info(
 
     if device_key == DEVICE_CLIMATE_CONTROLLER:
         controller_name = (
-            "sensoCOMFORT (Controlador de Clima)"
+            "sensoCOMFORT (Climate Controller)"
             if is_vaillant
-            else "MiPro Sense (Controlador de Clima)"
+            else "MiPro Sense (Climate Controller)"
         )
         active_circuit = getattr(coordinator, "active_controller_circuit", None)
         if active_circuit in (CIRCUIT_CTLV2, CIRCUIT_CTLV3):
@@ -102,7 +102,7 @@ def build_device_info(
 
     if device_key == DEVICE_HYDRAULIC_INTERFACE:
         indoor_model = coordinator.indoor_model
-        display_name = f"Interfaz Hidráulica {indoor_model}"
+        display_name = f"{indoor_model} (Hydraulic Interface)"
         info_kwargs = {
             "identifiers": {(DOMAIN, f"{entry_id}_{DEVICE_HYDRAULIC_INTERFACE}")},
             "name": display_name,
@@ -118,15 +118,20 @@ def build_device_info(
 
     # DEVICE_WIRELESS_THERMOSTAT
     thermostat_name = (
-        "Termostato Inalámbrico sensoCOMFORT RF"
+        "sensoCOMFORT Wireless Thermostat RF"
         if is_vaillant
-        else "Termostato Inalámbrico MiPro Sense"
+        else "MiPro Sense Wireless Thermostat"
+    )
+    thermostat_model = (
+        "Communication Gateway NETX3 (VR 940f / VR 921)"
+        if is_vaillant
+        else "Wireless Receiver NETX3 (0020260979)"
     )
     info_kwargs = {
         "identifiers": {(DOMAIN, f"{entry_id}_{DEVICE_WIRELESS_THERMOSTAT}")},
         "name": thermostat_name,
         "manufacturer": manufacturer,
-        "model": "Receptor Radio NETX3 (0020260979)",
+        "model": thermostat_model,
         "sw_version": sw_version,
         "hw_version": hw_version,
         "serial_number": serial_number,
