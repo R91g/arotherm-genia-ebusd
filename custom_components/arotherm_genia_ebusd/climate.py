@@ -44,7 +44,7 @@ SEASON_HEATING = "heating"
 SEASON_COOLING = "cooling"
 
 # Z1OpModeCooling / Z1OpMode values that mean the season circuit is enabled
-COOLING_ACTIVE_MODES: frozenset[str] = frozenset({"auto", "day"})
+COOLING_ACTIVE_MODES: frozenset[str] = frozenset({"auto", "day", "night"})
 HEATING_ACTIVE_MODES: frozenset[str] = frozenset({"auto", "day", "night"})
 
 
@@ -291,7 +291,7 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             return PRESET_BOOST
 
         cool_mode, heat_mode = self._read_modes()
-        if heat_mode == "night":
+        if heat_mode == "night" or cool_mode == "night":
             return PRESET_ECO
         if heat_mode == "day" or cool_mode == "day":
             return PRESET_MANUAL
@@ -729,7 +729,7 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
 
         if preset_mode == PRESET_ECO:
             await self.coordinator.async_write_parameter(
-                CIRCUIT_BASS3, "Z1OpMode", "night"
+                CIRCUIT_BASS3, "Z1OpModeCooling" if in_cooling else "Z1OpMode", "night"
             )
         elif preset_mode == PRESET_MANUAL:
             await self.coordinator.async_write_parameter(
