@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.0] - Unreleased
+
+> [!IMPORTANT]
+> **Action Required:** Please update the configuration files in your `ebusd` folder (`ebusd-configuration/vaillant/`) and restart `ebusd`. This release introduces native support for **Vaillant HMU00 (HW=5103)** outdoor units and **CTLV2 / CTLV3 (sensoHOME / MiSet)** controllers, expands weekly schedule slots to 3 daily intervals, adds eBUS physical bus health diagnostics, and includes critical audit stability fixes.
+
+### Added
+- **Hardware Architecture: Vaillant HMU00 (HW5103) & aroTHERM Split Support:**
+  - Added dedicated configuration template `ebusd-configuration/vaillant/08.hmu.HW5103.csv` with support for legacy Split registers (`b5 1a`, `FlowPressure`, `YieldHc`, `YieldHwc`, `YieldCooling`, `TotalEnergyUsage`, `EnergyIntegral`).
+  - Added bidirectional circuit aliasing (`hmux0` <-> `hmu`) in the coordinator, automatically detecting hardware model from address `08` scan packets (`HW=5103` targets `hmu`).
+  - Added `CompressorSilentOperationLevel` and b51a compressor runtime/starts telemetry.
+- **Hardware Architecture: Vaillant sensoHOME & Saunier Duval MiSet Support (`CTLV2` & `CTLV3`):**
+  - Added configuration templates `ebusd-configuration/vaillant/15.ctlv2.csv` (Gen 2) and `15.ctlv3.csv` (Gen 3).
+  - Implemented bidirectional controller circuit aliasing (`bass3`/`basv3` <-> `ctlv2`/`ctlv3`) with automatic scan detection from address `15`.
+  - Extended the `missing_custom_csv` Home Assistant Repair validation to recognize and verify custom `08.hmu.HW5103.csv`, `15.ctlv2.csv`, and `15.ctlv3.csv`.
+- **Expanded Vaillant Model Catalog:**
+  - Added UK `aroTHERM pro 7.1` and `aroTHERM plus 8.1` (v2) models to `OUTDOOR_MODELS_VAILLANT` and `OUTDOOR_MODEL_SPECS`.
+  - Added graceful fallback and automatic migration of legacy model identifier strings during options and reconfigure flows.
+- **Physical eBUS Health & ebusd Daemon Diagnostics (`ebusd/global/`):**
+  - Added `binary_sensor.ebusd_running` (`EntityCategory.DIAGNOSTIC`, device class `running`).
+  - Added 7 diagnostic telemetry sensors attached to the root gateway device (`DEVICE_OUTDOOR_UNIT`): `ebusd_uptime` (seconds), `ebusd_version` (daemon version), `ebusd_scan_status` (address scan status), `ebusd_symbol_rate` (physical bus baud occupancy), `ebusd_reconnects` (adapter reconnect count), `ebusd_masters` (active bus masters), and `ebusd_arbitration_latency` (bus collision/arbitration latency in ms).
+  - Added complete icon and translation mappings across `icons.json`, `strings.json`, `translations/en.json`, and `translations/es.json`.
+- **Weekly Timer Multi-Slot Support (Slots 2 & 3):**
+  - Added 112 new slot lines per file across all 4 supported controller configurations (`15.bass3.csv`, `15.basv3.csv`, `15.ctlv2.csv`, `15.ctlv3.csv`) defining `_Slot2` and `_Slot3` for all 7 days of the week and all 4 circuits (`Z1Timer`, `HwcTimer`, `CoolingTimer`, `CirculationTimer`).
+  - Implemented pre-validation and cascading ascending re-writes in `_async_handle_set_weekly_timer` to safely preserve upper slots and the hardware-managed `total_slots` byte.
+
+### Fixed
+- **Operational Availability Lock:**
+  - Implemented `coordinator.is_ebus_operational`: gates interactive control entities (`climate.zone_1_climate` and `water_heater.dhw_water_heater`) so they report unavailable when `ebusd/global/signal` or `ebusd/global/running` indicates bus disconnection or prior to initial MQTT hydration, while keeping historical telemetry and graphs alive across all 120+ sensors.
+- **Thermostat & Climate Symmetrical Operation:**
+  - Fixed `climate.py` ECO preset in cooling season to write `Z1OpModeCooling = "night"` instead of heating mode. Added `"night"` to `COOLING_ACTIVE_MODES` for symmetrical operation between heating and cooling seasons.
+  - Fixed `HVACMode.AUTO` season selection: dynamically evaluates real-time outdoor temperature (`< 20.0 °C` activates heating, `>= 20.0 °C` activates cooling), falling back to `previous_season` only if no outside temperature sensor is available.
+  - Pointed `sensor.wireless_room_target_temp` directly to `Z1DayTemp` on `CIRCUIT_BASS3`, while preserving historical `unique_id_suffix="04_roomtargettemp_temp"` to prevent entity duplication.
+- **Sensor & CSV Field Precision:**
+  - Aligned `primary_flow_rate` with canonical `flow_rate` field from `08.hmux0.csv`, with `fallback_field="value"` for HW5103/legacy CSVs, preserving the legacy `unique_id_suffix="hmux0_rundataflowrate_value"`.
+  - Removed invalid `"off"` option from `select.hc1_auto_off_mode`, strictly restricting it to `"eco"` and `"night"`.
+  - Removed dead fallback to nonexistent `RunStatsBuildingCPumpHours`.
+  - Deduplicated MQTT scan topic subscriptions (`scan.#` covering root and subtopics).
+- **Minimum Requirements & Code Quality:**
+  - Raised minimum supported Home Assistant version from `2024.4.0` to `2024.12.0` across `hacs.json`, `README.md`, and `README_es.md` due to `self.config_entry` usage in `OptionsFlow`.
+  - Corrected sequential step numbering in `async_setup_entry` comments and aligned hydration docstrings.
+  - Resolved 20 static type warnings in `custom_components/arotherm_genia_ebusd`, added Pyright to GitHub Actions CI (`tests.yml`), and added native test `test_pyright_type_check` in `test_code_quality.py` (0 errors, 0 warnings).
+
+---
+
 ## [1.2.4] - 2026-11-04
 
 > [!IMPORTANT]
