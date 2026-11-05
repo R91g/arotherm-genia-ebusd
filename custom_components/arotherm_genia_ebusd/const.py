@@ -365,8 +365,8 @@ TIMER_CIRCUIT_PREFIXES: dict[str, str] = {
 }
 
 # Essential eBUSd messages for Initial Staggered Hydration (/get queue)
-# ONLY messages with active read priority (r / r1..r9) on the physical bus.
-# Purely passive ('u') messages (temperatures, modes, runstats) are populated
+# Prioritizes active read setpoints, energy counters, and initial startup telemetry.
+# General passive messages (temperatures, live modes, runstats) are populated
 # automatically via retained MQTT topics and periodic master broadcasts (f1 / 10).
 ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     # Climate Controller (15.bass3) - Actively readable setpoints, offsets & energy counters (r / r9)

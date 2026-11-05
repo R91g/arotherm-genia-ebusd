@@ -127,10 +127,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # 4. Forward entry setup to all supported platforms (sensor, climate, etc.)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # 4. Listen for options updates (e.g. DHW boost temp, cooling bypass toggle)
+    # 5. Listen for options updates (e.g. DHW boost temp, cooling bypass toggle)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
-    # 5. Register custom integration services (timers, DHW boost)
+    # 6. Register custom integration services (timers, DHW boost)
     _async_register_services(hass)
     return True
 

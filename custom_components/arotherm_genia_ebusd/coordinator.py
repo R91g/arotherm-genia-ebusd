@@ -512,22 +512,15 @@ class SaunierGeniaCoordinator:
             )
             self._mqtt_unsubs.append(unsub)
 
-        # Passive scan topics subscription for SW/HW and serial detection
+        # Passive scan topics subscription for SW/HW and serial detection (/# matches root and subtopics)
         for scan_circuit in SCAN_TOPIC_CIRCUITS:
-            unsub_root = await mqtt.async_subscribe(
-                self.hass,
-                f"{prefix}/{scan_circuit}",
-                self._async_on_mqtt_message,
-                qos=0,
-            )
-            self._mqtt_unsubs.append(unsub_root)
-            unsub_sub = await mqtt.async_subscribe(
+            unsub = await mqtt.async_subscribe(
                 self.hass,
                 f"{prefix}/{scan_circuit}/#",
                 self._async_on_mqtt_message,
                 qos=0,
             )
-            self._mqtt_unsubs.append(unsub_sub)
+            self._mqtt_unsubs.append(unsub)
 
         _LOGGER.debug(
             "Subscribed to ebusd MQTT topics under prefix '%s'; scheduling initial hydration in %.1fs",
