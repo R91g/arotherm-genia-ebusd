@@ -225,8 +225,7 @@
         "name": "Circuit 1 Night Lowering Mode",
         "state": {
           "eco": "Eco (Switch-off)",
-          "night": "Normal (Night setback)",
-          "off": "Off"
+          "night": "Normal (Night setback)"
         }
       },
       "hc1_room_temp_switch_on": {

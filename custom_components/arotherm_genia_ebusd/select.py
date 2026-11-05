@@ -51,7 +51,7 @@ SELECT_DESCRIPTIONS: tuple[SaunierGeniaSelectEntityDescription, ...] = (
         translation_key="hc1_auto_off_mode",
         message="Hc1AutoOffMode",
         field="value",
-        options=["eco", "night", "off"],
+        options=["eco", "night"],
         entity_category=EntityCategory.CONFIG,
     ),
     SaunierGeniaSelectEntityDescription(

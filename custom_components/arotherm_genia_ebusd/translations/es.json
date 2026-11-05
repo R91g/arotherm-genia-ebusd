@@ -225,8 +225,7 @@
         "name": "Modo de reducción nocturna Circuito 1",
         "state": {
           "eco": "Eco (Desconexión)",
-          "night": "Normal (Reducción nocturna)",
-          "off": "Apagado"
+          "night": "Normal (Reducción nocturna)"
         }
       },
       "hc1_room_temp_switch_on": {
