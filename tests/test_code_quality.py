@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -12,7 +13,8 @@ class TestCodeQuality(unittest.TestCase):
     """Verify that python files pass ruff check and ruff format --check."""
 
     def setUp(self) -> None:
-        """Skip tests if ruff is not available in the environment."""
+        """Verify ruff is available, failing in CI and skipping locally if missing."""
+        is_ci = os.environ.get("CI") == "true"
         result = subprocess.run(
             [sys.executable, "-m", "ruff", "--version"],
             check=False,
@@ -20,6 +22,11 @@ class TestCodeQuality(unittest.TestCase):
             text=True,
         )
         if result.returncode != 0 and not shutil.which("ruff"):
+            if is_ci:
+                self.fail(
+                    "Ruff is strictly required in CI environments, but it is not installed "
+                    "or executable in this runner."
+                )
             raise unittest.SkipTest("Ruff is not installed in this environment.")
 
     def test_ruff_lint(self) -> None:
@@ -63,6 +70,7 @@ class TestCodeQuality(unittest.TestCase):
 
     def test_pyright_type_check(self) -> None:
         """Ensure pyright static type check passes without any violations."""
+        is_ci = os.environ.get("CI") == "true"
         check_pyright = subprocess.run(
             [sys.executable, "-m", "pyright", "--version"],
             check=False,
@@ -70,6 +78,11 @@ class TestCodeQuality(unittest.TestCase):
             text=True,
         )
         if check_pyright.returncode != 0 and not shutil.which("pyright"):
+            if is_ci:
+                self.fail(
+                    "Pyright is strictly required in CI environments, but it is not installed "
+                    "or executable in this runner."
+                )
             raise unittest.SkipTest("Pyright is not installed in this environment.")
 
         cmd = [sys.executable, "-m", "pyright"]

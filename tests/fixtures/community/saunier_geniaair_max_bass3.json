@@ -1,0 +1,117 @@
+{
+  "domain": "arotherm_genia_ebusd",
+  "entry_id": "fixture_saunier_geniaair_max_bass3",
+  "anonymized": true,
+  "mqtt_prefix": "ebusd",
+  "manufacturer": "Saunier Duval",
+  "outdoor_model": "GeniaAir Max 15",
+  "indoor_model": "MiPro Sense",
+  "active_outdoor_circuit": "hmux0",
+  "active_controller_circuit": "bass3",
+  "is_ebus_operational": true,
+  "values": {
+    "hmux0": {
+      "Status01": {
+        "temp1": 41.5,
+        "return_temp": 37.0,
+        "pumpstate": "on"
+      },
+      "HMUStatusCode": {
+        "status": "heating"
+      },
+      "RunDataFlowTemp": {
+        "value": 41.5
+      },
+      "RunDataReturnTemp": {
+        "value": 37.0
+      },
+      "RunDataFlowRate": {
+        "flow_rate": 1250.0
+      },
+      "RunDataElectricPowerConsumption": {
+        "power": 820.0
+      },
+      "PowerStatus": {
+        "power": 820.0
+      },
+      "StateCompressor": {
+        "flow_temp": 41.5,
+        "comp_speed": 45.0,
+        "state": "on"
+      },
+      "YieldThisYear": {
+        "0": {
+          "value": 3450.0
+        }
+      },
+      "PrEnergyElectricHc": {
+        "0": {
+          "value": 1200000.0
+        }
+      },
+      "PrEnergyElectricHwc": {
+        "0": {
+          "value": 450000.0
+        }
+      },
+      "PrEnergyElectricCool": {
+        "0": {
+          "value": 250000.0
+        }
+      },
+      "Scan.08": {
+        "id": "212105001002************34N5"
+      }
+    },
+    "vwzio": {
+      "PrEnergySumHc": {
+        "0": {
+          "value": 150000.0
+        }
+      },
+      "PrEnergySumHwc": {
+        "0": {
+          "value": 50000.0
+        }
+      }
+    },
+    "bass3": {
+      "z1RoomTemp": {
+        "value": 21.2
+      },
+      "z1ActualRoomTempDesired": {
+        "value": 21.5
+      },
+      "Z1OpMode": {
+        "value": "auto"
+      },
+      "Z1OpModeCooling": {
+        "value": "off"
+      },
+      "Z1DayTemp": {
+        "value": 21.5
+      },
+      "Z1NightTemp": {
+        "value": 19.0
+      },
+      "HwcOpMode": {
+        "value": "auto"
+      },
+      "HwcTempDesired": {
+        "value": 50.0
+      },
+      "HwcStorageTemp": {
+        "value": 48.5
+      },
+      "OutsideTemp": {
+        "value": 8.5
+      },
+      "WaterPressure": {
+        "value": 1.6
+      },
+      "Scan.15": {
+        "id": "212208002001************89N1"
+      }
+    }
+  }
+}

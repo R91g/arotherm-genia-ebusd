@@ -3,16 +3,28 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import json
 import logging
 import re
+from collections.abc import Callable
+from typing import Any
 
 import voluptuous as vol
+from homeassistant.components import mqtt
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import (
+    HomeAssistant,
+    ServiceCall,
+    ServiceResponse,
+    SupportsResponse,
+    callback,
+)
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.util import dt as dt_util
 
 from .const import (
     CIRCUIT_BASS3,
@@ -24,9 +36,14 @@ from .const import (
     OUTDOOR_MODEL_SPECS,
     PLATFORMS,
     SERVICE_CANCEL_HOLIDAY_MODE,
+    SERVICE_DUMP_MQTT_VALUES,
     SERVICE_FORCE_DHW_BOOST,
+    SERVICE_READ_PARAMETER,
+    SERVICE_RECORD_TOPIC_CHANGES,
+    SERVICE_SEND_HEX_COMMAND,
     SERVICE_SET_HOLIDAY_MODE,
     SERVICE_SET_WEEKLY_TIMER,
+    SERVICE_WRITE_PARAMETER,
     TIMER_CIRCUIT_PREFIXES,
     WEEKDAYS_LIST,
 )
@@ -69,6 +86,54 @@ SET_HOLIDAY_MODE_SCHEMA = vol.Schema(
 )
 
 CANCEL_HOLIDAY_MODE_SCHEMA = vol.Schema({})
+
+DUMP_MQTT_VALUES_SCHEMA = vol.Schema(
+    {
+        vol.Optional("circuit"): cv.string,
+        vol.Optional("anonymize", default=True): cv.boolean,
+    }
+)
+
+RECORD_TOPIC_CHANGES_SCHEMA = vol.Schema(
+    {
+        vol.Optional("duration", default=30): vol.All(
+            vol.Coerce(int), vol.Range(min=5, max=120)
+        ),
+        vol.Optional("circuit"): cv.string,
+    }
+)
+
+SEND_HEX_COMMAND_SCHEMA = vol.Schema(
+    {
+        vol.Required("command"): cv.string,
+        vol.Optional("host", default="127.0.0.1"): cv.string,
+        vol.Optional("port", default=8888): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=65535)
+        ),
+        vol.Optional("timeout", default=5.0): vol.All(
+            vol.Coerce(float), vol.Range(min=1.0, max=30.0)
+        ),
+    }
+)
+
+READ_PARAMETER_SCHEMA = vol.Schema(
+    {
+        vol.Required("circuit"): cv.string,
+        vol.Required("name"): cv.string,
+        vol.Optional("force", default=False): cv.boolean,
+        vol.Optional("timeout", default=5.0): vol.All(
+            vol.Coerce(float), vol.Range(min=1.0, max=30.0)
+        ),
+    }
+)
+
+WRITE_PARAMETER_SCHEMA = vol.Schema(
+    {
+        vol.Required("circuit"): cv.string,
+        vol.Required("name"): cv.string,
+        vol.Required("value"): vol.Any(cv.string, int, float, bool),
+    }
+)
 
 
 def _parse_hhmm(time_str: str, is_end: bool = False) -> tuple[int, int]:
@@ -178,6 +243,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             hass.services.async_remove(DOMAIN, SERVICE_FORCE_DHW_BOOST)
             hass.services.async_remove(DOMAIN, SERVICE_SET_HOLIDAY_MODE)
             hass.services.async_remove(DOMAIN, SERVICE_CANCEL_HOLIDAY_MODE)
+            hass.services.async_remove(DOMAIN, SERVICE_DUMP_MQTT_VALUES)
+            hass.services.async_remove(DOMAIN, SERVICE_RECORD_TOPIC_CHANGES)
+            hass.services.async_remove(DOMAIN, SERVICE_SEND_HEX_COMMAND)
+            hass.services.async_remove(DOMAIN, SERVICE_READ_PARAMETER)
+            hass.services.async_remove(DOMAIN, SERVICE_WRITE_PARAMETER)
 
     return unload_ok
 
@@ -297,6 +367,31 @@ def _validate_daily_schedule(
                 f"slot {idx_a} ({str_start_a} - {str_end_a}) on {day_name}. "
                 "Slots must be in chronological order without overlapping."
             )
+
+
+SERIAL_PATTERN = re.compile(r"^[0-9A-Za-z]{20,32}$")
+
+
+def _anonymize_value(val: Any, key_name: str = "") -> Any:
+    """Recursively mask sensitive serial numbers and hardware identifiers."""
+    if isinstance(val, str):
+        val_stripped = val.strip()
+        if SERIAL_PATTERN.match(val_stripped):
+            if len(val_stripped) > 16:
+                return f"{val_stripped[:12]}{'*' * (len(val_stripped) - 16)}{val_stripped[-4:]}"
+            return (
+                f"{val_stripped[:4]}{'*' * (len(val_stripped) - 8)}{val_stripped[-4:]}"
+            )
+        if any(s in key_name.lower() for s in ("serial", "barcode", "ident")):
+            if len(val_stripped) > 8:
+                return f"{val_stripped[:4]}{'*' * (len(val_stripped) - 8)}{val_stripped[-4:]}"
+            return "****"
+        return val
+    if isinstance(val, dict):
+        return {k: _anonymize_value(v, str(k)) for k, v in val.items()}
+    if isinstance(val, list):
+        return [_anonymize_value(item, key_name) for item in val]
+    return val
 
 
 def _async_register_services(hass: HomeAssistant) -> None:
@@ -512,4 +607,320 @@ def _async_register_services(hass: HomeAssistant) -> None:
             SERVICE_CANCEL_HOLIDAY_MODE,
             _async_handle_cancel_holiday_mode,
             schema=CANCEL_HOLIDAY_MODE_SCHEMA,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_DUMP_MQTT_VALUES):
+
+        async def _async_handle_dump_mqtt_values(
+            call: ServiceCall,
+        ) -> ServiceResponse:
+            """Handle arotherm_genia_ebusd.dump_mqtt_values service call."""
+            coordinators: dict[str, SaunierGeniaCoordinator] = hass.data.get(DOMAIN, {})
+            if not coordinators:
+                raise HomeAssistantError(f"No configured instances of {DOMAIN} found.")
+
+            target_circuit: str | None = call.data.get("circuit")
+            anonymize: bool = bool(call.data.get("anonymize", True))
+            results: dict[str, Any] = {}
+
+            for entry_id, coordinator in coordinators.items():
+                bus_state: dict[str, dict[str, Any]] = {}
+                for (circuit, msg_name), values in coordinator._state.items():
+                    if target_circuit and target_circuit.lower() not in circuit.lower():
+                        continue
+                    payload = _anonymize_value(values) if anonymize else values
+                    bus_state.setdefault(circuit, {})[msg_name] = payload
+
+                results[entry_id] = {
+                    "domain": DOMAIN,
+                    "entry_id": entry_id,
+                    "anonymized": anonymize,
+                    "mqtt_prefix": coordinator.mqtt_prefix,
+                    "is_ebus_operational": coordinator.is_ebus_operational,
+                    "outdoor_model": coordinator.outdoor_model,
+                    "indoor_model": coordinator.indoor_model,
+                    "active_outdoor_circuit": coordinator.active_outdoor_circuit,
+                    "active_controller_circuit": coordinator.active_controller_circuit,
+                    "cached_messages_count": sum(
+                        len(msgs) for msgs in bus_state.values()
+                    ),
+                    "values": bus_state,
+                }
+
+            if len(results) == 1:
+                return next(iter(results.values()))
+            return results
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_DUMP_MQTT_VALUES,
+            _async_handle_dump_mqtt_values,
+            schema=DUMP_MQTT_VALUES_SCHEMA,
+            supports_response=SupportsResponse.ONLY,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_RECORD_TOPIC_CHANGES):
+
+        async def _async_handle_record_topic_changes(
+            call: ServiceCall,
+        ) -> ServiceResponse:
+            """Handle arotherm_genia_ebusd.record_topic_changes service call."""
+            coordinators: dict[str, SaunierGeniaCoordinator] = hass.data.get(DOMAIN, {})
+            if not coordinators:
+                raise HomeAssistantError(f"No configured instances of {DOMAIN} found.")
+
+            duration: int = int(call.data.get("duration", 30))
+            target_circuit: str | None = call.data.get("circuit")
+
+            records: list[dict[str, Any]] = []
+
+            @callback
+            def _on_record_message(msg: mqtt.ReceiveMessage) -> None:
+                topic = msg.topic
+                if target_circuit and target_circuit.lower() not in topic.lower():
+                    return
+
+                raw_payload = msg.payload
+                payload_str = (
+                    raw_payload
+                    if isinstance(raw_payload, str)
+                    else raw_payload.decode("utf-8", errors="replace")
+                )
+                try:
+                    payload_data = json.loads(payload_str)
+                except (json.JSONDecodeError, ValueError):
+                    payload_data = payload_str
+
+                records.append(
+                    {
+                        "timestamp": dt_util.utcnow().isoformat(),
+                        "topic": topic,
+                        "payload": payload_data,
+                        "retained": bool(msg.retain),
+                        "qos": msg.qos,
+                    }
+                )
+
+            prefixes = list({coord.mqtt_prefix for coord in coordinators.values()})
+            unsubs: list[Callable[[], None]] = []
+            try:
+                for prefix in prefixes:
+                    unsub = await mqtt.async_subscribe(
+                        hass, f"{prefix}/#", _on_record_message, qos=0
+                    )
+                    unsubs.append(unsub)
+                await asyncio.sleep(duration)
+            except Exception as err:
+                raise HomeAssistantError(f"Error recording MQTT topics: {err}") from err
+            finally:
+                for unsub in unsubs:
+                    unsub()
+
+            return {
+                "duration_seconds": duration,
+                "mqtt_prefixes": prefixes if len(prefixes) > 1 else prefixes[0],
+                "circuit_filter": target_circuit,
+                "message_count": len(records),
+                "records": records,
+            }
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_RECORD_TOPIC_CHANGES,
+            _async_handle_record_topic_changes,
+            schema=RECORD_TOPIC_CHANGES_SCHEMA,
+            supports_response=SupportsResponse.ONLY,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_SEND_HEX_COMMAND):
+
+        async def _async_handle_send_hex_command(
+            call: ServiceCall,
+        ) -> ServiceResponse:
+            """Handle arotherm_genia_ebusd.send_hex_command service call via TCP socket."""
+            command_raw = str(call.data["command"]).strip().replace(" ", "")
+            if not command_raw or not all(
+                c in "0123456789abcdefABCDEF" for c in command_raw
+            ):
+                raise HomeAssistantError(
+                    f"Invalid hexadecimal command '{call.data['command']}'. "
+                    "Must contain only valid hexadecimal characters."
+                )
+
+            host = str(call.data.get("host", "127.0.0.1")).strip()
+            port = int(call.data.get("port", 8888))
+            timeout = float(call.data.get("timeout", 5.0))
+
+            reader: asyncio.StreamReader | None = None
+            writer: asyncio.StreamWriter | None = None
+            try:
+                connect_coro = asyncio.open_connection(host, port)
+                reader, writer = await asyncio.wait_for(connect_coro, timeout=timeout)
+                writer.write(f"hex {command_raw}\n".encode("ascii"))
+                await writer.drain()
+
+                read_coro = reader.readline()
+                raw_response = await asyncio.wait_for(read_coro, timeout=timeout)
+                response_str = raw_response.decode("ascii", errors="replace").strip()
+            except TimeoutError as err:
+                raise HomeAssistantError(
+                    f"Timeout ({timeout}s) connecting to or reading from eBUSd daemon at {host}:{port}"
+                ) from err
+            except OSError as err:
+                raise HomeAssistantError(
+                    f"Could not connect to eBUSd TCP daemon at {host}:{port}: {err}. "
+                    "Please verify that eBUSd is reachable and that its TCP port (8888) is open."
+                ) from err
+            finally:
+                if writer is not None:
+                    writer.close()
+                    with contextlib.suppress(OSError):
+                        await writer.wait_closed()
+
+            is_error = response_str.startswith("ERR:")
+            return {
+                "command": command_raw,
+                "response": response_str,
+                "success": not is_error,
+                "host": host,
+                "port": port,
+            }
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SEND_HEX_COMMAND,
+            _async_handle_send_hex_command,
+            schema=SEND_HEX_COMMAND_SCHEMA,
+            supports_response=SupportsResponse.ONLY,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_READ_PARAMETER):
+
+        async def _async_handle_read_parameter(
+            call: ServiceCall,
+        ) -> ServiceResponse:
+            """Handle arotherm_genia_ebusd.read_parameter service call via MQTT."""
+            coordinators: dict[str, SaunierGeniaCoordinator] = hass.data.get(DOMAIN, {})
+            if not coordinators:
+                raise HomeAssistantError(f"No configured instances of {DOMAIN} found.")
+            coordinator = next(iter(coordinators.values()))
+
+            circuit = str(call.data["circuit"]).strip()
+            name = str(call.data["name"]).strip()
+            force = bool(call.data.get("force", False))
+            timeout = float(call.data.get("timeout", 5.0))
+
+            if not circuit or not name:
+                raise HomeAssistantError(
+                    "Both 'circuit' and 'name' parameters must be non-empty strings."
+                )
+
+            target_circuit = coordinator.resolve_circuit(circuit)
+
+            # Return immediately from cache if force is False and data is already cached
+            if not force:
+                cached_msg = coordinator.get_message(
+                    target_circuit, name
+                ) or coordinator.get_message(circuit, name)
+                if cached_msg is not None:
+                    return {
+                        "circuit": circuit,
+                        "target_circuit": target_circuit,
+                        "name": name,
+                        "value": cached_msg,
+                        "cached": True,
+                    }
+
+            # Set up notification event for the response
+            event = asyncio.Event()
+
+            def _on_update() -> None:
+                event.set()
+
+            unsub_target = coordinator.async_add_listener(
+                target_circuit, name, _on_update
+            )
+            unsub_circuit = (
+                coordinator.async_add_listener(circuit, name, _on_update)
+                if circuit.lower() != target_circuit.lower()
+                else None
+            )
+
+            try:
+                await coordinator.async_request_get(circuit, name)
+                try:
+                    await asyncio.wait_for(event.wait(), timeout=timeout)
+                except TimeoutError as err:
+                    raise HomeAssistantError(
+                        f"Timeout waiting for eBUSd MQTT response on '{target_circuit}/{name}' after {timeout}s"
+                    ) from err
+            finally:
+                unsub_target()
+                if unsub_circuit is not None:
+                    unsub_circuit()
+
+            value = coordinator.get_message(
+                target_circuit, name
+            ) or coordinator.get_message(circuit, name)
+            return {
+                "circuit": circuit,
+                "target_circuit": target_circuit,
+                "name": name,
+                "value": value,
+                "cached": False,
+            }
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_READ_PARAMETER,
+            _async_handle_read_parameter,
+            schema=READ_PARAMETER_SCHEMA,
+            supports_response=SupportsResponse.ONLY,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_WRITE_PARAMETER):
+
+        async def _async_handle_write_parameter(
+            call: ServiceCall,
+        ) -> ServiceResponse:
+            """Handle arotherm_genia_ebusd.write_parameter service call via MQTT."""
+            coordinators: dict[str, SaunierGeniaCoordinator] = hass.data.get(DOMAIN, {})
+            if not coordinators:
+                raise HomeAssistantError(f"No configured instances of {DOMAIN} found.")
+            coordinator = next(iter(coordinators.values()))
+
+            circuit = str(call.data["circuit"]).strip()
+            name = str(call.data["name"]).strip()
+            value = call.data["value"]
+
+            if not circuit or not name:
+                raise HomeAssistantError(
+                    "Both 'circuit' and 'name' parameters must be non-empty strings."
+                )
+
+            target_circuit = coordinator.resolve_circuit(circuit)
+            topic = f"{coordinator.mqtt_prefix}/{target_circuit}/{name}/set"
+
+            try:
+                await coordinator.async_write_parameter(circuit, name, value)
+            except Exception as err:
+                raise HomeAssistantError(
+                    f"Failed to publish write parameter to '{topic}': {err}"
+                ) from err
+
+            return {
+                "status": "success",
+                "circuit": circuit,
+                "target_circuit": target_circuit,
+                "name": name,
+                "value": str(value),
+                "topic": topic,
+            }
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_WRITE_PARAMETER,
+            _async_handle_write_parameter,
+            schema=WRITE_PARAMETER_SCHEMA,
+            supports_response=SupportsResponse.OPTIONAL,
         )

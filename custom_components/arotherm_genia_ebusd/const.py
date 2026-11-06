@@ -335,6 +335,11 @@ SERVICE_SET_WEEKLY_TIMER = "set_weekly_timer"
 SERVICE_FORCE_DHW_BOOST = "force_dhw_boost"
 SERVICE_SET_HOLIDAY_MODE = "set_holiday_mode"
 SERVICE_CANCEL_HOLIDAY_MODE = "cancel_holiday_mode"
+SERVICE_DUMP_MQTT_VALUES = "dump_mqtt_values"
+SERVICE_RECORD_TOPIC_CHANGES = "record_topic_changes"
+SERVICE_SEND_HEX_COMMAND = "send_hex_command"
+SERVICE_READ_PARAMETER = "read_parameter"
+SERVICE_WRITE_PARAMETER = "write_parameter"
 
 # Presets
 PRESET_COMFORT = "comfort"

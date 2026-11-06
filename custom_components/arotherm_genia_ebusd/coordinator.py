@@ -1117,15 +1117,26 @@ class SaunierGeniaCoordinator:
     # MQTT Publishing (/set and /get) & Hydration Queue
     # -------------------------------------------------------------------------
 
+    def resolve_circuit(self, circuit: str) -> str:
+        """Resolve a logical circuit name or alias to the active physical eBUS circuit."""
+        circuit_lower = circuit.lower()
+        if (
+            circuit_lower in CONTROLLER_CIRCUITS
+            or circuit_lower in ("15", "controller")
+            or circuit_lower.startswith("15.")
+        ):
+            return self._active_controller_circuit
+        if (
+            circuit_lower in OUTDOOR_CIRCUITS
+            or circuit_lower in ("08", "outdoor", "heatpump")
+            or circuit_lower.startswith("08.")
+        ):
+            return self._active_outdoor_circuit
+        return circuit
+
     async def async_request_get(self, circuit: str, message: str) -> None:
         """Publish an empty payload to <mqtt_prefix>/<circuit>/<message>/get."""
-        circuit_lower = circuit.lower()
-        if circuit_lower in CONTROLLER_CIRCUITS:
-            target_circuit = self._active_controller_circuit
-        elif circuit_lower in OUTDOOR_CIRCUITS:
-            target_circuit = self._active_outdoor_circuit
-        else:
-            target_circuit = circuit
+        target_circuit = self.resolve_circuit(circuit)
         topic = f"{self.mqtt_prefix}/{target_circuit}/{message}/get"
         await mqtt.async_publish(self.hass, topic, "", qos=0, retain=False)
 
@@ -1139,12 +1150,7 @@ class SaunierGeniaCoordinator:
         circuit_lower = circuit.lower()
         is_controller = circuit_lower in CONTROLLER_CIRCUITS
         is_outdoor = circuit_lower in OUTDOOR_CIRCUITS
-        if is_controller:
-            target_circuit = self._active_controller_circuit
-        elif is_outdoor:
-            target_circuit = self._active_outdoor_circuit
-        else:
-            target_circuit = circuit
+        target_circuit = self.resolve_circuit(circuit)
         topic = f"{self.mqtt_prefix}/{target_circuit}/{message}/set"
         payload = str(value)
         _LOGGER.debug("Publishing eBUSd write: %s -> '%s'", topic, payload)

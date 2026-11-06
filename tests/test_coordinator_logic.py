@@ -1595,7 +1595,12 @@ class TestCoordinatorLogic(unittest.TestCase):
         registered_services: dict[str, Any] = {}
 
         def mock_register(
-            domain: str, service_name: str, handler: Any, schema: Any = None
+            domain: str,
+            service_name: str,
+            handler: Any,
+            schema: Any = None,
+            *args: Any,
+            **kwargs: Any,
         ) -> None:
             registered_services[service_name] = handler
 

@@ -16,9 +16,14 @@ import setup_mocks  # noqa: F401
 from custom_components.arotherm_genia_ebusd.const import (
     DOMAIN,
     SERVICE_CANCEL_HOLIDAY_MODE,
+    SERVICE_DUMP_MQTT_VALUES,
     SERVICE_FORCE_DHW_BOOST,
+    SERVICE_READ_PARAMETER,
+    SERVICE_RECORD_TOPIC_CHANGES,
+    SERVICE_SEND_HEX_COMMAND,
     SERVICE_SET_HOLIDAY_MODE,
     SERVICE_SET_WEEKLY_TIMER,
+    SERVICE_WRITE_PARAMETER,
 )
 
 
@@ -154,6 +159,11 @@ class TestSchemaIntegrity(unittest.TestCase):
         self.assertIn(f"{SERVICE_FORCE_DHW_BOOST}:", content)
         self.assertIn(f"{SERVICE_SET_HOLIDAY_MODE}:", content)
         self.assertIn(f"{SERVICE_CANCEL_HOLIDAY_MODE}:", content)
+        self.assertIn(f"{SERVICE_DUMP_MQTT_VALUES}:", content)
+        self.assertIn(f"{SERVICE_RECORD_TOPIC_CHANGES}:", content)
+        self.assertIn(f"{SERVICE_SEND_HEX_COMMAND}:", content)
+        self.assertIn(f"{SERVICE_READ_PARAMETER}:", content)
+        self.assertIn(f"{SERVICE_WRITE_PARAMETER}:", content)
 
         # Check basic schema presence: name, description, fields
         self.assertIn("name:", content)

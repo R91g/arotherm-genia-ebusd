@@ -148,3 +148,179 @@ cancel_holiday_mode:
   description: >
     Cancela de forma inmediata el Modo Ausencia en el regulador MiPro Sense (15.bass3)
     y restablece el funcionamiento automático en calefacción y agua caliente sanitaria (ACS).
+
+dump_mqtt_values:
+  name: Volcar valores MQTT (Diagnóstico)
+  description: >
+    Vuelca el estado completo de la instalación y las variables MQTT recibidas de eBUSd
+    en un formato estructurado para adjuntar en issues de GitHub o soporte técnico.
+  fields:
+    circuit:
+      name: Circuito (Opcional)
+      description: >
+        Filtra el volcado por un circuito específico (ej. "08", "15", "hmu", "bass3").
+        Si se omite, se vuelcan todos los circuitos activos.
+      required: false
+      example: "08"
+      selector:
+        text:
+    anonymize:
+      name: Anonimizar números de serie (Recomendado)
+      description: >
+        Enmascara automáticamente los números de serie largos de fabricación (28 caracteres)
+        para que el volcado pueda compartirse de forma segura y privada en incidencias públicas de GitHub.
+      required: false
+      default: true
+      selector:
+        boolean:
+
+record_topic_changes:
+  name: Grabar cambios de tópicos MQTT (Diagnóstico en vivo)
+  description: >
+    Inicia una captura temporal de los mensajes MQTT que circulan bajo el prefijo de eBUSd
+    durante un intervalo de tiempo configurable, registrando tópicos, cargas útiles y marcas temporales.
+  fields:
+    duration:
+      name: Duración (segundos)
+      description: Tiempo durante el cual se grabará el tráfico MQTT (entre 5 y 120 segundos, por defecto 30).
+      required: false
+      default: 30
+      example: 30
+      selector:
+        number:
+          min: 5
+          max: 120
+          step: 1
+          unit_of_measurement: "s"
+          mode: box
+    circuit:
+      name: Filtro de circuito / tópico (Opcional)
+      description: >
+        Filtra los mensajes grabados por una subcadena en el tópico (ej. "08", "15", "hmu").
+        Si se omite, se graba todo el tráfico bajo el prefijo MQTT.
+      required: false
+      example: "08"
+      selector:
+        text:
+
+send_hex_command:
+  name: Enviar comando hexadecimal directo (Diagnóstico TCP)
+  description: >
+    Envía un comando hexadecimal en crudo al demonio eBUSd a través de su interfaz TCP
+    (puerto 8888) y devuelve los bytes de respuesta. Requiere que eBUSd esté iniciado con
+    el argumento '--enablehex'. No requiere modificar ningún archivo CSV.
+  fields:
+    command:
+      name: Comando hexadecimal
+      description: Cadena hexadecimal de bytes a enviar (los espacios son ignorados).
+      required: true
+      example: "08b51a0405ff3428"
+      selector:
+        text:
+    host:
+      name: Host / Dirección IP (Opcional)
+      description: Dirección IP o nombre de host donde se ejecuta el demonio eBUSd (por defecto 127.0.0.1).
+      required: false
+      default: "127.0.0.1"
+      example: "127.0.0.1"
+      selector:
+        text:
+    port:
+      name: Puerto TCP (Opcional)
+      description: Puerto TCP del demonio eBUSd (por defecto 8888).
+      required: false
+      default: 8888
+      example: 8888
+      selector:
+        number:
+          min: 1
+          max: 65535
+          step: 1
+          mode: box
+    timeout:
+      name: Tiempo de espera (segundos)
+      description: Tiempo máximo para conectar y esperar la respuesta del demonio (por defecto 5 segundos).
+      required: false
+      default: 5.0
+      example: 5.0
+      selector:
+        number:
+          min: 1.0
+          max: 30.0
+          step: 0.5
+          unit_of_measurement: "s"
+          mode: box
+
+read_parameter:
+  name: Leer parámetro por MQTT
+  description: >
+    Lee un registro simbólico de eBUSd a través de MQTT (publicando en '<prefijo>/<circuito>/<nombre>/get'
+    y esperando la respuesta en '<prefijo>/<circuito>/<nombre>'). Permite devolver el valor almacenado en
+    caché o forzar una lectura activa del bus físico.
+  fields:
+    circuit:
+      name: Circuito
+      description: Identificador o nombre del circuito eBUS (ej. "hmu", "08", "bass3", "ctlv2").
+      required: true
+      example: "08"
+      selector:
+        text:
+    name:
+      name: Nombre del parámetro / mensaje
+      description: >
+        Nombre simbólico del registro eBUSd tal como está definido en los archivos CSV
+        (ej. "CompressorSilentOperationLevel", "Status01", "Z1OpMode").
+      required: true
+      example: "CompressorSilentOperationLevel"
+      selector:
+        text:
+    force:
+      name: Forzar lectura física (Opcional)
+      description: Si es verdadero, fuerza una consulta activa al bus físico en lugar de devolver el valor en caché si existe.
+      required: false
+      default: false
+      selector:
+        boolean:
+    timeout:
+      name: Tiempo de espera (segundos)
+      description: Tiempo máximo para esperar la respuesta de eBUSd vía MQTT (por defecto 5 segundos).
+      required: false
+      default: 5.0
+      example: 5.0
+      selector:
+        number:
+          min: 1.0
+          max: 30.0
+          step: 0.5
+          unit_of_measurement: "s"
+          mode: box
+
+write_parameter:
+  name: Escribir parámetro por MQTT
+  description: >
+    Escribe un valor en un registro simbólico de eBUSd a través de MQTT (publicando en '<prefijo>/<circuito>/<nombre>/set').
+    Aplica una actualización optimista en el estado de Home Assistant y aprovecha el enrutamiento inteligente de circuitos.
+  fields:
+    circuit:
+      name: Circuito
+      description: Identificador o nombre del circuito eBUS (ej. "hmu", "08", "bass3", "ctlv2").
+      required: true
+      example: "08"
+      selector:
+        text:
+    name:
+      name: Nombre del parámetro / mensaje
+      description: >
+        Nombre simbólico del registro eBUSd tal como está definido en los archivos CSV
+        (ej. "CompressorSilentOperationLevel", "Z1OpMode").
+      required: true
+      example: "CompressorSilentOperationLevel"
+      selector:
+        text:
+    value:
+      name: Valor a escribir
+      description: Valor o cadena de texto que se enviará en el payload de escritura a eBUSd.
+      required: true
+      example: "50"
+      selector:
+        text:

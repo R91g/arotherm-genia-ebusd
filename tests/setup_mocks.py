@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 MOCKED_MODULES = [
     "voluptuous",
@@ -50,7 +51,24 @@ class HomeAssistantError(Exception):
     """Base error for Home Assistant."""
 
 
+class SupportsResponse(str, Enum):
+    """Mock SupportsResponse enum."""
+
+    NONE = "none"
+    OPTIONAL = "optional"
+    ONLY = "only"
+
+
 sys.modules["homeassistant.exceptions"].HomeAssistantError = HomeAssistantError
+sys.modules["homeassistant.core"].SupportsResponse = SupportsResponse
+sys.modules["homeassistant.core"].ServiceResponse = dict[str, Any] | None
+sys.modules["homeassistant.components.diagnostics"].async_redact_data = (
+    lambda data, to_redact: data
+)
+sys.modules["homeassistant.components.mqtt"].async_subscribe = AsyncMock(
+    return_value=MagicMock()
+)
+sys.modules["homeassistant.components.mqtt"].async_publish = AsyncMock()
 
 
 class MockEntity:
@@ -165,12 +183,14 @@ sys.modules[
 ].DateTimeEntityDescription = MockEntityDescription
 
 # Mock common string enums and constants
-from datetime import UTC
+from datetime import UTC, datetime
 
 sys.modules["homeassistant.util"].dt.get_default_time_zone.return_value = UTC
 sys.modules["homeassistant.util.dt"].get_default_time_zone.return_value = UTC
 sys.modules["homeassistant.util"].dt.as_local.side_effect = lambda dt: dt
 sys.modules["homeassistant.util.dt"].as_local.side_effect = lambda dt: dt
+sys.modules["homeassistant.util"].dt.utcnow.side_effect = lambda: datetime.now(UTC)
+sys.modules["homeassistant.util.dt"].utcnow.side_effect = lambda: datetime.now(UTC)
 
 sys.modules["homeassistant.const"].PERCENTAGE = "%"
 sys.modules["homeassistant.const"].UnitOfTemperature = MagicMock(CELSIUS="°C")

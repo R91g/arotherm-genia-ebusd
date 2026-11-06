@@ -36,7 +36,8 @@ Designed directly around the native eBUS protocol shared by Vaillant Group heat 
 9. [Diagnostics, Troubleshooting & FAQ](#diagnostics-troubleshooting--faq)
 10. [Technical Reference & Reverse Engineering](#technical-reference--reverse-engineering)
 11. [Development & Testing](#development--testing)
-12. [License & Disclaimer](#license--disclaimer)
+12. [Acknowledgements & Related Projects](#acknowledgements--related-projects)
+13. [License & Disclaimer](#license--disclaimer)
 
 ---
 
@@ -380,6 +381,51 @@ Immediately terminates the Away / Holiday Mode on `15.bass3` and restores automa
 action: arotherm_genia_ebusd.cancel_holiday_mode
 ```
 
+### 5. `arotherm_genia_ebusd.dump_mqtt_values`
+Dumps all cached telemetry, active circuits, hardware models, and eBUS state directly in Home Assistant Developer Tools (`SupportsResponse.ONLY`). Ideal for sharing installation snapshots when opening GitHub issues or troubleshooting communication.
+
+| Parameter | Required | Allowed Values | Description |
+| :--- | :---: | :--- | :--- |
+| `circuit` | No | String *(e.g. `"08"`, `"15"`, `"hmu"`)* | Optional substring filter to restrict the dump to specific circuits. If omitted, dumps all active circuits. |
+| `anonymize` | No | Boolean *(default: `true`)* | Automatically masks long 28-character manufacturing serial numbers so the snapshot can be safely shared publicly on GitHub. |
+
+### 6. `arotherm_genia_ebusd.record_topic_changes`
+Actively records all live MQTT traffic published under the eBUSd topic prefix for a configurable duration (`SupportsResponse.ONLY`). Captures timestamps, topics, parsed JSON payloads, and retained flags so external users can easily trace physical interactions without SSH access.
+
+| Parameter | Required | Allowed Values | Description |
+| :--- | :---: | :--- | :--- |
+| `duration` | No | `5` – `120` *(seconds, default: `30`)* | Time window to record incoming MQTT messages. |
+| `circuit` | No | String *(e.g. `"08"`, `"15"`)* | Optional substring filter to capture messages matching specific topics. |
+
+### 7. `arotherm_genia_ebusd.send_hex_command`
+Sends a raw hexadecimal command directly to the `ebusd` daemon via its TCP socket (port 8888) and returns the raw response bytes (`SupportsResponse.ONLY`). Ideal for diagnostic probing of undocumented registers without modifying CSV configuration files or requiring SSH console access. Requires that `ebusd` was started with the `--enablehex` security argument.
+
+| Parameter | Required | Allowed Values | Description |
+| :--- | :---: | :--- | :--- |
+| `command` | Yes | Hex string *(e.g. `"08b51a0405ff3428"`)* | Raw hexadecimal command sequence (spaces are automatically stripped). |
+| `host` | No | String *(default: `"127.0.0.1"`)* | IP address or hostname of the machine running `ebusd` (e.g. `core-ebusd` or an external IP). |
+| `port` | No | Integer *(default: `8888`)* | TCP command port of `ebusd`. |
+| `timeout` | No | Float *(default: `5.0`)* | Socket connection and response timeout in seconds. |
+
+### 8. `arotherm_genia_ebusd.read_parameter`
+Reads a symbolic eBUS register via MQTT (`SupportsResponse.ONLY`). Publishes an empty payload to `<prefix>/<circuit>/<name>/get` and awaits the decoded JSON response. Supports returning cached data or forcing an active bus read.
+
+| Parameter | Required | Allowed Values | Description |
+| :--- | :---: | :--- | :--- |
+| `circuit` | Yes | String *(e.g. `"08"`, `"hmu"`, `"bass3"`, `"ctlv2"`)* | eBUS circuit name or alias. |
+| `name` | Yes | String *(e.g. `"CompressorSilentOperationLevel"`, `"Status01"`)* | Symbolic message/parameter name defined in CSVs. |
+| `force` | No | Boolean *(default: `false`)* | If `true`, forces an active bus query instead of returning cached values. |
+| `timeout` | No | Float *(default: `5.0`)* | Maximum wait time in seconds for the MQTT response. |
+
+### 9. `arotherm_genia_ebusd.write_parameter`
+Writes a symbolic value to an eBUS register via MQTT (`SupportsResponse.OPTIONAL`). Publishes payload to `<prefix>/<circuit>/<name>/set`, applies immediate optimistic local UI updates, and takes advantage of smart circuit routing and confirmation hooks.
+
+| Parameter | Required | Allowed Values | Description |
+| :--- | :---: | :--- | :--- |
+| `circuit` | Yes | String *(e.g. `"08"`, `"hmu"`, `"bass3"`, `"ctlv2"`)* | eBUS circuit name or alias. |
+| `name` | Yes | String *(e.g. `"CompressorSilentOperationLevel"`, `"Z1OpMode"`)* | Symbolic message/parameter name defined in CSVs. |
+| `value` | Yes | String / Number / Boolean | Value to write to the parameter. |
+
 ---
 
 ## Home Assistant Energy Dashboard Setup
@@ -457,13 +503,23 @@ Key topics covered in the reference:
 This repository includes an offline unit test suite (requiring zero live Home Assistant runtime dependencies) and GitHub Actions workflows for **Hassfest**, **HACS Validation**, and **Ruff** linting:
 
 ```bash
-# Run all 44 unit tests (thermodynamics, config flow, unique_id registry, schema parity)
+# Run all 118 unit tests (thermodynamics, config flow, unique_id registry, diagnostic services, community fixtures, schema parity)
 python -m unittest discover tests -v
 
 # Run Ruff linter & formatting checks
 ruff check .
 ruff format --check .
 ```
+
+---
+
+## Acknowledgements & Related Projects
+
+This integration stands on the shoulders of the open-source eBUS community. Special thanks and recognition go to:
+
+- **[john30/ebusd](https://github.com/john30/ebusd) & [ebusd-configuration](https://github.com/john30/ebusd-configuration):** For John30's outstanding eBUS daemon, protocol specifications, and community reverse-engineering database that make local hardware communication possible.
+- **[signalkraft/ebusd-vaillant-component](https://github.com/signalkraft/ebusd-vaillant-component):** For inspiring the concept and design of our Home Assistant diagnostic dump and live topic recording services (`dump_mqtt_values` and `record_topic_changes`).
+- **[MarkBovee/vaillant-ebus](https://github.com/MarkBovee/vaillant-ebus):** For extensive exploration of Vaillant controller registers and valuable real-world community capture fixtures across diverse equipment families.
 
 ---
 

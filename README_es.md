@@ -36,7 +36,8 @@ Construida directamente sobre la arquitectura electrónica eBUS compartida por e
 9. [Diagnósticos, Solución de Problemas y Preguntas Frecuentes](#diagnósticos-solución-de-problemas-y-preguntas-frecuentes)
 10. [Referencia Técnica e Ingeniería Inversa](#referencia-técnica-e-ingeniería-inversa)
 11. [Desarrollo y Pruebas](#desarrollo-y-pruebas)
-12. [Licencia y Aviso Legal](#licencia-y-aviso-legal)
+12. [Agradecimientos y Proyectos de Referencia](#agradecimientos-y-proyectos-de-referencia)
+13. [Licencia y Aviso Legal](#licencia-y-aviso-legal)
 
 ---
 
@@ -380,6 +381,51 @@ Cancela inmediatamente el Modo Ausencia en `15.bass3` y restablece el funcionami
 action: arotherm_genia_ebusd.cancel_holiday_mode
 ```
 
+### 5. `arotherm_genia_ebusd.dump_mqtt_values`
+Vuelca directamente en las Herramientas para desarrolladores de Home Assistant (`SupportsResponse.ONLY`) el estado completo de la instalación, circuitos activos, modelos detectados y todas las variables eBUS recibidas. Ideal para adjuntar capturas de estado al abrir incidencias en GitHub o diagnosticar problemas de bus.
+
+| Parámetro | Requerido | Valores Permitidos | Descripción |
+| :--- | :---: | :--- | :--- |
+| `circuit` | No | Texto *(ej. `"08"`, `"15"`, `"hmu"`)* | Filtro opcional por subcadena para limitar el volcado a circuitos específicos. Si se omite, vuelca todos los circuitos activos. |
+| `anonymize` | No | Booleano *(por defecto: `true`)* | Enmascara automáticamente los números de serie largos de fabricación (28 caracteres) para compartir el volcado de forma segura y privada en incidencias públicas de GitHub. |
+
+### 6. `arotherm_genia_ebusd.record_topic_changes`
+Graba en vivo todo el tráfico MQTT publicado bajo el prefijo de eBUSd durante una ventana temporal configurable (`SupportsResponse.ONLY`). Registra marcas temporales, tópicos, datos decodificados en JSON y marcas de retención (*retained*), permitiendo trazar interacciones físicas con el regulador sin necesidad de acceder por SSH.
+
+| Parámetro | Requerido | Valores Permitidos | Descripción |
+| :--- | :---: | :--- | :--- |
+| `duration` | No | `5` – `120` *(segundos, por defecto: `30`)* | Intervalo de tiempo para grabar el tráfico MQTT entrante. |
+| `circuit` | No | Texto *(ej. `"08"`, `"15"`)* | Filtro opcional por subcadena para capturar únicamente los mensajes que coincidan con un tópico o circuito. |
+
+### 7. `arotherm_genia_ebusd.send_hex_command`
+Envía un comando hexadecimal en crudo directamente al demonio `ebusd` a través de su socket TCP (puerto 8888) y devuelve los bytes de respuesta (`SupportsResponse.ONLY`). Ideal para explorar y diagnosticar registros no documentados sin editar archivos CSV ni requerir acceso por terminal SSH. Requiere que `ebusd` se haya iniciado con el parámetro de seguridad `--enablehex`.
+
+| Parámetro | Requerido | Valores Permitidos | Descripción |
+| :--- | :---: | :--- | :--- |
+| `command` | Sí | Cadena hexadecimal *(ej. `"08b51a0405ff3428"`)* | Secuencia de bytes hexadecimales a enviar (los espacios se eliminan automáticamente). |
+| `host` | No | Texto *(por defecto: `"127.0.0.1"`)* | Dirección IP o nombre de host donde corre `ebusd` (ej. `core-ebusd` o IP externa). |
+| `port` | No | Entero *(por defecto: `8888`)* | Puerto TCP de comandos de `ebusd`. |
+| `timeout` | No | Decimal *(por defecto: `5.0`)* | Tiempo máximo de espera en segundos para conectar y recibir respuesta. |
+
+### 8. `arotherm_genia_ebusd.read_parameter`
+Lee un registro simbólico de eBUSd a través de MQTT (`SupportsResponse.ONLY`). Publica un payload vacío a `<prefijo>/<circuito>/<nombre>/get` y espera la respuesta decodificada en JSON. Permite consultar la caché local u obligar a una lectura física activa en el bus.
+
+| Parámetro | Requerido | Valores Permitidos | Descripción |
+| :--- | :---: | :--- | :--- |
+| `circuit` | Sí | Texto *(ej. `"08"`, `"hmu"`, `"bass3"`, `"ctlv2"`)* | Identificador o alias del circuito eBUS. |
+| `name` | Sí | Texto *(ej. `"CompressorSilentOperationLevel"`, `"Status01"`)* | Nombre simbólico del mensaje o parámetro definido en los CSVs. |
+| `force` | No | Booleano *(por defecto: `false`)* | Si es `true`, fuerza una consulta activa al bus en lugar de devolver el valor en caché. |
+| `timeout` | No | Decimal *(por defecto: `5.0`)* | Tiempo máximo de espera en segundos para recibir la respuesta MQTT. |
+
+### 9. `arotherm_genia_ebusd.write_parameter`
+Escribe un valor en un registro simbólico de eBUSd a través de MQTT (`SupportsResponse.OPTIONAL`). Publica el payload a `<prefijo>/<circuito>/<nombre>/set`, aplica una actualización optimista inmediata en la interfaz y aprovecha el enrutamiento inteligente de circuitos y confirmaciones.
+
+| Parámetro | Requerido | Valores Permitidos | Descripción |
+| :--- | :---: | :--- | :--- |
+| `circuit` | Sí | Texto *(ej. `"08"`, `"hmu"`, `"bass3"`, `"ctlv2"`)* | Identificador o alias del circuito eBUS. |
+| `name` | Sí | Texto *(ej. `"CompressorSilentOperationLevel"`, `"Z1OpMode"`)* | Nombre simbólico del mensaje o parámetro definido en los CSVs. |
+| `value` | Sí | Texto / Número / Booleano | Valor que se enviará en el payload de escritura a eBUSd. |
+
 ---
 
 ## Configuración en el Panel de Energía de Home Assistant
@@ -457,13 +503,23 @@ Temas clave documentados en detalle:
 Este repositorio incluye una batería de tests unitarios offline (ejecutables sin depender de una instancia activa de Home Assistant) y flujos de integración continua en GitHub Actions para **Hassfest**, **Validación HACS** y **Ruff**:
 
 ```bash
-# Ejecutar los 44 tests unitarios (termodinámica, config flow, registro unique_id, paridad de esquemas)
+# Ejecutar los 118 tests unitarios (termodinámica, config flow, registro unique_id, servicios de diagnóstico, fixtures comunitarios, paridad de esquemas)
 python -m unittest discover tests -v
 
 # Verificar estilo y formato con Ruff
 ruff check .
 ruff format --check .
 ```
+
+---
+
+## Agradecimientos y Proyectos de Referencia
+
+Esta integración se apoya en el trabajo previo de la comunidad de código abierto de eBUS. Un agradecimiento y reconocimiento especial a:
+
+- **[john30/ebusd](https://github.com/john30/ebusd) y [ebusd-configuration](https://github.com/john30/ebusd-configuration):** Por el excepcional demonio eBUSd desarrollado por John30, sus especificaciones de protocolo y la base comunitaria de ingeniería inversa que hacen posible la comunicación local con el hardware.
+- **[signalkraft/ebusd-vaillant-component](https://github.com/signalkraft/ebusd-vaillant-component):** Por inspirar el concepto y diseño de nuestros servicios de diagnóstico de volcado y captura de tráfico MQTT en vivo (`dump_mqtt_values` y `record_topic_changes`).
+- **[MarkBovee/vaillant-ebus](https://github.com/MarkBovee/vaillant-ebus):** Por su exhaustivo trabajo en la exploración de registros de reguladores Vaillant y la recopilación de capturas comunitarias de múltiples familias de equipos.
 
 ---
 

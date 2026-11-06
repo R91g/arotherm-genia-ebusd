@@ -212,8 +212,8 @@ class TestWeeklyTimerSlots(unittest.TestCase):
         hass = MagicMock()
         services: dict[str, Any] = {}
         hass.services.has_service.return_value = False
-        hass.services.async_register.side_effect = lambda d, s, h, schema=None: (
-            services.update({s: h})
+        hass.services.async_register.side_effect = (
+            lambda d, s, h, schema=None, *args, **kwargs: services.update({s: h})
         )
 
         coord = SaunierGeniaCoordinator(hass, MagicMock(data={"mqtt_prefix": "ebusd"}))
@@ -253,8 +253,8 @@ class TestWeeklyTimerSlots(unittest.TestCase):
         hass = MagicMock()
         services: dict[str, Any] = {}
         hass.services.has_service.return_value = False
-        hass.services.async_register.side_effect = lambda d, s, h, schema=None: (
-            services.update({s: h})
+        hass.services.async_register.side_effect = (
+            lambda d, s, h, schema=None, *args, **kwargs: services.update({s: h})
         )
 
         entry = MagicMock(data={"mqtt_prefix": "ebusd"})
@@ -323,8 +323,8 @@ class TestWeeklyTimerSlots(unittest.TestCase):
         hass = MagicMock()
         services: dict[str, Any] = {}
         hass.services.has_service.return_value = False
-        hass.services.async_register.side_effect = lambda d, s, h, schema=None: (
-            services.update({s: h})
+        hass.services.async_register.side_effect = (
+            lambda d, s, h, schema=None, *args, **kwargs: services.update({s: h})
         )
 
         coord = SaunierGeniaCoordinator(hass, MagicMock(data={"mqtt_prefix": "ebusd"}))
@@ -358,8 +358,8 @@ class TestWeeklyTimerSlots(unittest.TestCase):
         hass = MagicMock()
         services: dict[str, Any] = {}
         hass.services.has_service.return_value = False
-        hass.services.async_register.side_effect = lambda d, s, h, schema=None: (
-            services.update({s: h})
+        hass.services.async_register.side_effect = (
+            lambda d, s, h, schema=None, *args, **kwargs: services.update({s: h})
         )
 
         coord = SaunierGeniaCoordinator(hass, MagicMock(data={"mqtt_prefix": "ebusd"}))
