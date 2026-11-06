@@ -61,6 +61,28 @@ class MockEntity:
     _attr_unique_id: str | None = None
     _attr_translation_key: str | None = None
     _attr_device_info: Any = None
+    _attr_available: bool = True
+    _attr_mode: Any = "box"
+
+    @property
+    def unique_id(self) -> str | None:
+        """Mock unique_id property."""
+        return self._attr_unique_id
+
+    @property
+    def device_info(self) -> Any:
+        """Mock device_info property."""
+        return self._attr_device_info
+
+    @property
+    def available(self) -> bool:
+        """Mock available property."""
+        return self._attr_available
+
+    @property
+    def mode(self) -> Any:
+        """Mock mode property for number entities."""
+        return self._attr_mode
 
     async def async_added_to_hass(self) -> None:
         """Mock async_added_to_hass."""

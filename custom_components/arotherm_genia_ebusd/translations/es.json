@@ -192,6 +192,9 @@
       },
       "max_room_humidity": {
         "name": "Humedad ambiente máxima permitida"
+      },
+      "compressor_silent_operation_level": {
+        "name": "Nivel de modo silencioso del compresor"
       }
     },
     "select": {

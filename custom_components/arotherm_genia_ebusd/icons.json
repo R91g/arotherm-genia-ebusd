@@ -501,6 +501,9 @@
       },
       "hwc_max_flow_temp_desired": {
         "default": "mdi:thermometer-chevron-up"
+      },
+      "compressor_silent_operation_level": {
+        "default": "mdi:volume-mute"
       }
     }
   }

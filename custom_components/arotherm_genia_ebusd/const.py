@@ -430,6 +430,7 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     # Outdoor Unit (08.hmux0) - Active live telemetry & energy counters (r / r1..r9)
     (CIRCUIT_HMUX0, "HMUStatusCode"),
     (CIRCUIT_HMUX0, "PowerStatus"),
+    (CIRCUIT_HMUX0, "CompressorSilentOperationLevel"),
     (CIRCUIT_HMUX0, "RunDataCompressorSpeed"),
     (CIRCUIT_HMUX0, "RunDataFan1Speed"),
     (CIRCUIT_HMUX0, "RunDataFlowRate"),
@@ -485,6 +486,7 @@ HMU_HW5103_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_HMU, "YieldCooling"),
     (CIRCUIT_HMU, "TotalEnergyUsage"),
     (CIRCUIT_HMU, "EnergyIntegral"),
+    (CIRCUIT_HMU, "CompressorSilentOperationLevel"),
 ]
 
 # All 52 HMUStatusCode values (plus normalized aliases)

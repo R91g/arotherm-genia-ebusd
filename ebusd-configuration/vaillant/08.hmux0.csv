@@ -89,6 +89,8 @@ u,,,HMUStatusCode,outdoor unit status code,,,b503,0003,status,,UIN,34=frost_prot
 u,,,ErrorMemorySlot,error memory slot,,,b503,00,slot,m,UCH,,,,error,,UIN,,,error number,data,,HEX:8,,,
 u,,,CompressorAvailability,compressor availability status,,,b507,09,request,m,UCH,,,,status,,UIN,,,availability code
 u,,,DiagFeatureSupport,diagnostic feature support,,,b51a,05000c,feature_id,m,HEX:1,,,,status,,UIN,,,feature support status
+r,,,CompressorSilentOperationLevel,compressor silent operation level,,,b51a,05ff3428,ign,,IGN:3,,,,value,,UCH,,%,"compressor silent operation level"
+w,,,CompressorSilentOperationLevel,compressor silent operation level,,,b51a,06ff3428,value,,UCH,,%,"compressor silent operation level"
 u,,,Heartbeat,central regulator heartbeat,,,b513,0528,value,,UCH,,,heartbeat watchdog
 u,,,RunDataDiagnostic,diagnostic code readout,,,b509,540200cc10,ign,,IGN:4,,,,value,,HEX:2,,,
 u,,,RunDataDiag030b,diagnostic code 030b readout,,,b509,540200030b,ign,,IGN:4,,,,value,,HEX:2,,,

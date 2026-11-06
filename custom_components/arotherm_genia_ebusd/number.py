@@ -22,8 +22,10 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     CIRCUIT_BASS3,
+    CIRCUIT_HMUX0,
     DEFAULT_COMFORT_TEMP,
     DEVICE_CLIMATE_CONTROLLER,
+    DEVICE_OUTDOOR_UNIT,
     DOMAIN,
     SENTINEL_COOLING_THRESHOLD,
 )
@@ -40,6 +42,8 @@ class SaunierGeniaNumberEntityDescription(NumberEntityDescription):
     field: str = "value"
     is_integer: bool = False
     filter_cooling_sentinel: bool = False
+    device_key: str = DEVICE_CLIMATE_CONTROLLER
+    mode: NumberMode = NumberMode.BOX
 
 
 NUMBER_DESCRIPTIONS: tuple[SaunierGeniaNumberEntityDescription, ...] = (
@@ -334,6 +338,21 @@ NUMBER_DESCRIPTIONS: tuple[SaunierGeniaNumberEntityDescription, ...] = (
         entity_category=EntityCategory.CONFIG,
         is_integer=True,
     ),
+    SaunierGeniaNumberEntityDescription(
+        key="compressor_silent_operation_level",
+        translation_key="compressor_silent_operation_level",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_HMUX0,
+        message="CompressorSilentOperationLevel",
+        field="value",
+        native_min_value=40.0,
+        native_max_value=60.0,
+        native_step=1.0,
+        native_unit_of_measurement=PERCENTAGE,
+        mode=NumberMode.BOX,
+        entity_category=EntityCategory.CONFIG,
+        is_integer=True,
+    ),
 )
 
 
@@ -344,8 +363,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up Saunier Duval MiPro Sense Number entities."""
     coordinator: SaunierGeniaCoordinator = hass.data[DOMAIN][entry.entry_id]
-    # Entity Factory: Instantiate writable configuration setpoints (heating curve, bivalence points,
-    # flow temperature limits, and hysteresis) using strictly NumberMode.BOX to prevent accidental slider drags.
+    # Entity Factory: Instantiate writable configuration setpoints and outdoor unit controls.
     async_add_entities(
         SaunierGeniaNumber(coordinator, description)
         for description in NUMBER_DESCRIPTIONS
@@ -353,7 +371,7 @@ async def async_setup_entry(
 
 
 class SaunierGeniaNumber(SaunierGeniaEntity, NumberEntity):
-    """Representation of a Saunier Duval eBUSd Number control (strictly NumberMode.BOX)."""
+    """Representation of a Saunier Duval eBUSd Number control."""
 
     entity_description: SaunierGeniaNumberEntityDescription
     _attr_mode = NumberMode.BOX
@@ -372,12 +390,13 @@ class SaunierGeniaNumber(SaunierGeniaEntity, NumberEntity):
 
         super().__init__(
             coordinator=coordinator,
-            device_key=DEVICE_CLIMATE_CONTROLLER,
+            device_key=description.device_key,
             translation_key=description.translation_key or description.key,
             subscriptions=[(description.circuit, description.message)],
             unique_id_suffix=unique_id_suffix,
         )
         self.entity_description = description
+        self._attr_mode = description.mode
         self._last_valid_cooling_value: float = DEFAULT_COMFORT_TEMP
 
     @property

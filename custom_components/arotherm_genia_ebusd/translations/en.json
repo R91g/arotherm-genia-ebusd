@@ -192,6 +192,9 @@
       },
       "max_room_humidity": {
         "name": "Maximum Permitted Room Humidity"
+      },
+      "compressor_silent_operation_level": {
+        "name": "Compressor Silent Operation Level"
       }
     },
     "select": {
