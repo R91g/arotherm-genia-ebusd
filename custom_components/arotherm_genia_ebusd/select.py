@@ -37,7 +37,7 @@ SELECT_DESCRIPTIONS: tuple[SaunierGeniaSelectEntityDescription, ...] = (
         translation_key="z1_op_mode_cooling",
         message="Z1OpModeCooling",
         field="value",
-        options=["off", "auto", "day"],
+        options=["off", "auto", "day", "night"],
     ),
     SaunierGeniaSelectEntityDescription(
         key="hwc_op_mode",

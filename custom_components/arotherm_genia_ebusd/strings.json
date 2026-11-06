@@ -209,7 +209,8 @@
         "state": {
           "off": "Off",
           "auto": "Time-Controlled (Auto)",
-          "day": "Continuous Manual (Day)"
+          "day": "Continuous Manual (Day)",
+          "night": "Setback (Night / Eco)"
         }
       },
       "hwc_op_mode": {

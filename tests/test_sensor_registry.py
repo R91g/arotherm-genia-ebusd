@@ -143,6 +143,16 @@ class TestSensorRegistry(unittest.TestCase):
             uid = f"select_{desc.circuit.lower()}_{desc.message.lower()}_{desc.field.lower()}"
             uids.append(uid)
 
+        # Ensure z1_op_mode_cooling includes 'night' for ECO preset alignment
+        z1_cooling = next(
+            d for d in SELECT_DESCRIPTIONS if d.key == "z1_op_mode_cooling"
+        )
+        self.assertEqual(
+            z1_cooling.options,
+            ["off", "auto", "day", "night"],
+            "z1_op_mode_cooling must include 'night' option",
+        )
+
         counter = Counter(uids)
         duplicates = {k: v for k, v in counter.items() if v > 1}
         self.assertEqual(duplicates, {}, f"Duplicate select unique_ids: {duplicates}")

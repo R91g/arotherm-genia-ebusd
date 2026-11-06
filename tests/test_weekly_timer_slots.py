@@ -426,11 +426,15 @@ class TestWeeklyTimerSlots(unittest.TestCase):
                             w_row.group(1).endswith(f"{slot_num:02d}"), name
                         )
 
-    def test_bass3_basv3_stay_identical(self) -> None:
-        self.assertEqual(
-            (CSV_DIR / "15.bass3.csv").read_bytes(),
-            (CSV_DIR / "15.basv3.csv").read_bytes(),
-        )
+    def test_controller_csvs_stay_identical(self) -> None:
+        """Verify that all 4 controller CSV variants (BASS3, BASV3, CTLV2, CTLV3) stay byte-for-byte identical."""
+        bass3_bytes = (CSV_DIR / "15.bass3.csv").read_bytes()
+        for fname in ("15.basv3.csv", "15.ctlv2.csv", "15.ctlv3.csv"):
+            self.assertEqual(
+                (CSV_DIR / fname).read_bytes(),
+                bass3_bytes,
+                f"{fname} must be byte-for-byte identical to 15.bass3.csv",
+            )
 
     def test_csv_defines_all_passive_migo_slots(self) -> None:
         """Verify all 21 passive MiGo Link schedule write definitions exist in all controller CSVs."""

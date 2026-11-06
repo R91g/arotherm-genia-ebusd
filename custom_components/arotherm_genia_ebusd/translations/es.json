@@ -209,7 +209,8 @@
         "state": {
           "off": "Apagado",
           "auto": "Programación horaria (Auto)",
-          "day": "Manual continuo (Día)"
+          "day": "Manual continuo (Día)",
+          "night": "Reducido (Noche / Eco)"
         }
       },
       "hwc_op_mode": {
