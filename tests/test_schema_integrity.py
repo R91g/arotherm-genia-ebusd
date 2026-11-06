@@ -376,6 +376,27 @@ class TestSchemaIntegrity(unittest.TestCase):
                         )
                         seen_entries[key] = line_no
 
+    def test_hmu_csvs_stay_identical(self) -> None:
+        """Verify that 08.hmu.csv and 08.hmu.HW5103.csv stay byte-for-byte identical.
+
+        ebusd prioritizes 08.hmu.HW5103.csv when matching HW=5103. Both files
+        must stay byte-for-byte identical so that updating either file ensures parity.
+        """
+        ebusd_cfg_dir = os.path.join(self.root_dir, "ebusd-configuration", "vaillant")
+        hmu_path = os.path.join(ebusd_cfg_dir, "08.hmu.csv")
+        hmu_hw_path = os.path.join(ebusd_cfg_dir, "08.hmu.HW5103.csv")
+        self.assertTrue(os.path.exists(hmu_path), "08.hmu.csv missing")
+        self.assertTrue(os.path.exists(hmu_hw_path), "08.hmu.HW5103.csv missing")
+        with open(hmu_path, "rb") as fp:
+            hmu_bytes = fp.read()
+        with open(hmu_hw_path, "rb") as fp:
+            hmu_hw_bytes = fp.read()
+        self.assertEqual(
+            hmu_bytes,
+            hmu_hw_bytes,
+            "08.hmu.HW5103.csv must be byte-for-byte identical to 08.hmu.csv",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
