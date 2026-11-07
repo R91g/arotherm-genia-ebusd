@@ -100,6 +100,7 @@ RECORD_TOPIC_CHANGES_SCHEMA = vol.Schema(
             vol.Coerce(int), vol.Range(min=5, max=120)
         ),
         vol.Optional("circuit"): cv.string,
+        vol.Optional("anonymize", default=True): cv.boolean,
     }
 )
 
@@ -623,7 +624,7 @@ def _async_register_services(hass: HomeAssistant) -> None:
             anonymize: bool = bool(call.data.get("anonymize", True))
             results: dict[str, Any] = {}
 
-            for entry_id, coordinator in coordinators.items():
+            for idx, (entry_id, coordinator) in enumerate(coordinators.items(), 1):
                 bus_state: dict[str, dict[str, Any]] = {}
                 for (circuit, msg_name), values in coordinator._state.items():
                     if target_circuit and target_circuit.lower() not in circuit.lower():
@@ -631,9 +632,19 @@ def _async_register_services(hass: HomeAssistant) -> None:
                     payload = _anonymize_value(values) if anonymize else values
                     bus_state.setdefault(circuit, {})[msg_name] = payload
 
-                results[entry_id] = {
+                safe_entry_id = (
+                    (
+                        f"anonymized_entry_{idx}"
+                        if len(coordinators) > 1
+                        else "anonymized_entry_id"
+                    )
+                    if anonymize
+                    else entry_id
+                )
+
+                results[safe_entry_id] = {
                     "domain": DOMAIN,
-                    "entry_id": entry_id,
+                    "entry_id": safe_entry_id,
                     "anonymized": anonymize,
                     "mqtt_prefix": coordinator.mqtt_prefix,
                     "is_ebus_operational": coordinator.is_ebus_operational,
@@ -671,6 +682,7 @@ def _async_register_services(hass: HomeAssistant) -> None:
 
             duration: int = int(call.data.get("duration", 30))
             target_circuit: str | None = call.data.get("circuit")
+            anonymize: bool = bool(call.data.get("anonymize", True))
 
             records: list[dict[str, Any]] = []
 
@@ -690,6 +702,9 @@ def _async_register_services(hass: HomeAssistant) -> None:
                     payload_data = json.loads(payload_str)
                 except (json.JSONDecodeError, ValueError):
                     payload_data = payload_str
+
+                if anonymize:
+                    payload_data = _anonymize_value(payload_data, key_name=topic)
 
                 records.append(
                     {
@@ -718,6 +733,7 @@ def _async_register_services(hass: HomeAssistant) -> None:
 
             return {
                 "duration_seconds": duration,
+                "anonymized": anonymize,
                 "mqtt_prefixes": prefixes if len(prefixes) > 1 else prefixes[0],
                 "circuit_filter": target_circuit,
                 "message_count": len(records),

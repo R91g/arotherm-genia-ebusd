@@ -202,6 +202,15 @@ record_topic_changes:
       example: "08"
       selector:
         text:
+    anonymize:
+      name: Anonimizar números de serie (Recomendado)
+      description: >
+        Enmascara automáticamente los números de serie largos de fabricación (28 caracteres)
+        y datos identificativos de hardware recogidos en los mensajes MQTT.
+      required: false
+      default: true
+      selector:
+        boolean:
 
 send_hex_command:
   name: Enviar comando hexadecimal directo (Diagnóstico TCP)

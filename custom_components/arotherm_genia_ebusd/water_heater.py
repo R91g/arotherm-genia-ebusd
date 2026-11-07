@@ -125,7 +125,10 @@ class SaunierGeniaWaterHeater(SaunierGeniaEntity, WaterHeaterEntity):
             return OP_BOOST
 
         op_mode = (
-            self.coordinator.get_str(CIRCUIT_BASS3, "HwcOpMode", "value") or ""
+            self.coordinator.get_str(CIRCUIT_BASS3, "HwcOpMode", "value")
+            or hwc_status
+            or sf_mode
+            or ""
         ).lower()
         if not op_mode:
             return None

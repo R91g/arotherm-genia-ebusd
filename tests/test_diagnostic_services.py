@@ -127,7 +127,7 @@ class TestDiagnosticServices(unittest.TestCase):
         result = asyncio.run(handler(call))
         self.assertIsInstance(result, dict)
         self.assertEqual(result["domain"], DOMAIN)
-        self.assertEqual(result["entry_id"], "test_entry_1")
+        self.assertEqual(result["entry_id"], "anonymized_entry_id")
         self.assertEqual(result["mqtt_prefix"], "ebusd")
         self.assertEqual(result["outdoor_model"], "aroTHERM plus VWL 55/6")
         self.assertEqual(result["indoor_model"], "MiPro Sense")
@@ -185,10 +185,10 @@ class TestDiagnosticServices(unittest.TestCase):
         call.data = {}
 
         result = asyncio.run(handler(call))
-        self.assertIn("entry_1", result)
-        self.assertIn("entry_2", result)
-        self.assertEqual(result["entry_1"]["mqtt_prefix"], "ebusd1")
-        self.assertEqual(result["entry_2"]["mqtt_prefix"], "ebusd2")
+        self.assertIn("anonymized_entry_1", result)
+        self.assertIn("anonymized_entry_2", result)
+        self.assertEqual(result["anonymized_entry_1"]["mqtt_prefix"], "ebusd1")
+        self.assertEqual(result["anonymized_entry_2"]["mqtt_prefix"], "ebusd2")
 
     def test_dump_mqtt_values_anonymization(self) -> None:
         """Verify dump_mqtt_values anonymizes long serial numbers when anonymize=True and preserves when False."""
@@ -213,6 +213,7 @@ class TestDiagnosticServices(unittest.TestCase):
         call_anon.data = {"anonymize": True}
         res_anon = asyncio.run(handler(call_anon))
         self.assertTrue(res_anon["anonymized"])
+        self.assertEqual(res_anon["entry_id"], "anonymized_entry_id")
         masked_id = res_anon["values"]["08.hmux0"]["Scan.08"]["id"]
         self.assertNotEqual(masked_id, raw_serial)
         self.assertIn("************", masked_id)
@@ -224,6 +225,7 @@ class TestDiagnosticServices(unittest.TestCase):
         call_raw.data = {"anonymize": False}
         res_raw = asyncio.run(handler(call_raw))
         self.assertFalse(res_raw["anonymized"])
+        self.assertEqual(res_raw["entry_id"], "test_entry_anon")
         self.assertEqual(res_raw["values"]["08.hmux0"]["Scan.08"]["id"], raw_serial)
 
     def test_record_topic_changes_no_instances_raises(self) -> None:
@@ -297,6 +299,14 @@ class TestDiagnosticServices(unittest.TestCase):
                     msg3.qos = 0
                     captured_callback(msg3)
 
+                    # Deliver serial message with sensitive hardware ID
+                    msg4 = MagicMock()
+                    msg4.topic = "ebusd/08/Scan.08"
+                    msg4.payload = json.dumps({"id": "21210500100234560000001234N5"})
+                    msg4.retain = True
+                    msg4.qos = 0
+                    captured_callback(msg4)
+
                 mock_sleep.side_effect = deliver_messages
                 res = await handler(call)
                 return res
@@ -304,9 +314,10 @@ class TestDiagnosticServices(unittest.TestCase):
         result = asyncio.run(run_test())
 
         self.assertEqual(result["duration_seconds"], 10)
+        self.assertTrue(result["anonymized"])
         self.assertEqual(result["mqtt_prefixes"], "ebusd")
-        self.assertEqual(result["message_count"], 3)
-        self.assertEqual(len(result["records"]), 3)
+        self.assertEqual(result["message_count"], 4)
+        self.assertEqual(len(result["records"]), 4)
 
         self.assertEqual(result["records"][0]["topic"], "ebusd/08/YieldThisYear")
         self.assertEqual(result["records"][0]["payload"], {"value": 1200})
@@ -322,6 +333,64 @@ class TestDiagnosticServices(unittest.TestCase):
             21.5 if isinstance(result["records"][2]["payload"], float) else "21.5",
         )
 
+        self.assertEqual(result["records"][3]["topic"], "ebusd/08/Scan.08")
+        self.assertEqual(
+            result["records"][3]["payload"]["id"], "212105001002************34N5"
+        )
+
+        mock_unsub.assert_called_once()
+
+    def test_record_topic_changes_anonymize_disabled(self) -> None:
+        """Verify record_topic_changes preserves raw serial numbers when anonymize=False."""
+        entry = MagicMock(
+            entry_id="test_entry", data={"mqtt_prefix": "ebusd"}, options={}
+        )
+        coord = SaunierGeniaCoordinator(self.hass, entry)
+        self.hass.data = {DOMAIN: {entry.entry_id: coord}}
+
+        _async_register_services(self.hass)
+        handler = self.registered_services[SERVICE_RECORD_TOPIC_CHANGES]
+
+        captured_callback = None
+        mock_unsub = MagicMock()
+
+        async def fake_subscribe(
+            hass: Any, topic: str, msg_callback: Any, qos: int = 0
+        ) -> Any:
+            nonlocal captured_callback
+            captured_callback = msg_callback
+            return mock_unsub
+
+        call = MagicMock()
+        call.data = {"duration": 10, "anonymize": False}
+        raw_serial = "21210500100234560000001234N5"
+
+        async def run_test() -> dict[str, Any]:
+            with (
+                patch(
+                    "custom_components.arotherm_genia_ebusd.mqtt.async_subscribe",
+                    side_effect=fake_subscribe,
+                ),
+                patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+            ):
+
+                async def deliver_messages(duration: int) -> None:
+                    msg = MagicMock()
+                    msg.topic = "ebusd/08/Scan.08"
+                    msg.payload = json.dumps({"id": raw_serial})
+                    msg.retain = True
+                    msg.qos = 0
+                    captured_callback(msg)
+
+                mock_sleep.side_effect = deliver_messages
+                res = await handler(call)
+                return res
+
+        result = asyncio.run(run_test())
+
+        self.assertFalse(result["anonymized"])
+        self.assertEqual(result["message_count"], 1)
+        self.assertEqual(result["records"][0]["payload"]["id"], raw_serial)
         mock_unsub.assert_called_once()
 
     def test_record_topic_changes_filtered_by_circuit(self) -> None:

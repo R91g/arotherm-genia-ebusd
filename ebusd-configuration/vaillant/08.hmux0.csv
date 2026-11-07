@@ -2,6 +2,7 @@ type,circuit,level,name,comment,qq,zz,pbsb,id,*name,part,type,divisor/values,uni
 *u,
 *uw,
 *r,
+*w,
 
 # ==============================================================================
 # 1. REAL-TIME TELEMETRY AND REFRIGERATION CIRCUIT (PASSIVE u - BROADCAST/UPDATE)
