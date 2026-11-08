@@ -425,7 +425,7 @@ class TestSchemaIntegrity(unittest.TestCase):
             )
 
         # 2. Verify Unix LF line endings and valid message type tokens across all CSVs
-        valid_type_tokens = {"r", "r9", "w", "u", "uw"}
+        valid_type_tokens = {f"r{i}" for i in range(1, 10)} | {"r", "w", "u", "uw"}
         csv_files = glob.glob(
             os.path.join(ebusd_cfg_dir, "**", "*.csv"), recursive=True
         )

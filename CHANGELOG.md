@@ -60,6 +60,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Raised minimum supported Home Assistant version to `2024.12.0` and achieved 100% clean Pyright static typing and Ruff formatting across 129 unit tests.
 
 ### Changed
+- **Fast Thermodynamic Polling (`r2;u`) for ΔT & Thermal Power:**
+  - Upgraded `RunDataFlowTemp`, `RunDataReturnTemp`, and `RunDataFlowRate` from slow `r9;u` to prioritized `r2;u` in `08.hmux0.csv`, `08.hmu.csv`, and `08.hmu.HW5103.csv`.
+  - Re-evaluates flow and return temperatures every ~18 to 36 seconds, accelerating real-time ΔT and instantaneous thermal power updates while keeping the full poll cycle under 2 minutes.
+  - Converted `CompressorAvailability` in `08.hmux0.csv` to passive `u` to resolve the `prepare poll message: ERR: end of input reached` error caused by missing master input arguments during active polling.
+- **eBUSd Add-on Setup & Collision Prevention:**
+  - Updated documentation to instruct users to disable **"Seed HA MQTT integration config (only needed once)"** (`seed_mqtt_cfg: false`), preventing ebusd from injecting `mqtt-hassio.cfg` with `filter-seen = 5` which polled 160+ registers every 16 minutes, caused 2400-baud bus collisions, and created hundreds of duplicate MQTT entities.
+  - Explicitly documented the requirement to add `--mqttjson` to `commandline_options` when `seed_mqtt_cfg` is disabled (as the add-on previously auto-injected `--mqttjson` only when `seed_mqtt_cfg` was active).
+- **HACS Official Default Repository Indexing:**
+  - Updated README documentation and badges from `HACS-Custom` to `HACS-Default`. With official inclusion in the default HACS store catalog, users can install directly via standard HACS search without configuring a custom repository URL.
 - **Selective Low-Priority `r9;u` Polling & Conservative Register Naming:**
   - Assigned gentle `r9;u` background polling exclusively to registers not queried passively by `MiGo Link` (`0xf1`) across `08.hmux0.csv`, `08.hmu.csv` / `08.hmu.HW5103.csv`, and `15.*.csv`, keeping unpolled counters, COPs, and diagnostics fresh without saturating the bus.
   - Conservatively re-labeled unverified hourly diagnostic registers (`RunDataDiagxxxx`) across `08.hmux0.csv`, `08.hmu*.csv`, and `76.vwzio.csv`.

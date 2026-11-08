@@ -33,10 +33,18 @@ This directory contains **reverse-engineered and collision-free** eBUS message d
 1. Copy `broadcast.csv` → `/addon_configs/b4d7ad18_ebusd/ebusd-configuration/en/broadcast.csv`
    > **Important:** `broadcast.csv` **must** be placed in the root `en/` directory, **never** inside `en/vaillant/`.
 2. Copy `vaillant/*.csv` → `/addon_configs/b4d7ad18_ebusd/ebusd-configuration/en/vaillant/`
-3. Recommended eBUSd Add-on startup parameters:
-   ```text
-   --configpath=/config/ebusd-configuration/en --scanconfig --accesslevel=* --mqttjson --mqtttopic=ebusd/%circuit/%name --mqttvar=filter-direction=r|u|^w
-   ```
+3. In the Add-on **Configuration** tab:
+   - **Disable "Seed HA MQTT integration config (only needed once)"** toggle (`seed_mqtt_cfg: false`). This prevents eBUSd from loading the legacy `mqtt-hassio.cfg` filter which triggers bus collisions and floods Home Assistant with raw MQTT entities.
+   - In **commandline_options**, add the following arguments (one per entry):
+     ```text
+     --mqttjson
+     --configpath=/config/ebusd-configuration/en
+     --scanconfig
+     --accesslevel=*
+     --mqtttopic=ebusd/%circuit/%name
+     --mqttvar=filter-direction=r|u|^w
+     ```
+     > **Note:** Adding `--mqttjson` explicitly is mandatory when `seed_mqtt_cfg` is disabled.
 4. Restart the eBUSd add-on to load the updated CSV definitions.
 
 ### 2. Standalone Linux / Docker `ebusd`

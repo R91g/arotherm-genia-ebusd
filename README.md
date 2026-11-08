@@ -4,7 +4,7 @@
 
 # aroTHERM & GeniaAir (eBUS) — Home Assistant Integration
 
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge)](https://hacs.xyz/)
+[![HACS Default](https://img.shields.io/badge/HACS-Default-41BDF5.svg?style=for-the-badge)](https://github.com/hacs/default)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.12%2B-41BDF5.svg?style=for-the-badge)](https://www.home-assistant.io/)
 [![IoT Class](https://img.shields.io/badge/IoT%20Class-local__push-00B050.svg?style=for-the-badge)](https://www.home-assistant.io/blog/2016/02/12/classifying-the-internet-of-things/)
 [![Protocol](https://img.shields.io/badge/Protocol-eBUS%20%2F%20MQTT%20JSON-FF8C00.svg?style=for-the-badge)](https://github.com/john30/ebusd)
@@ -213,21 +213,35 @@ Copy the CSV files into your `ebusd` configuration directory preserving the exac
 #### Option A: Home Assistant eBUSd Add-on
 1. Copy `ebusd-configuration/broadcast.csv` to:
    `/addon_configs/b4d7ad18_ebusd/ebusd-configuration/en/broadcast.csv`
-2. Copy all 6 files inside `ebusd-configuration/vaillant/*.csv` to:
+2. Copy all files inside `ebusd-configuration/vaillant/*.csv` to:
    `/addon_configs/b4d7ad18_ebusd/ebusd-configuration/en/vaillant/`
-3. Configure your eBUSd Add-on startup parameters to load the local CSVs, enable JSON MQTT output, and allow write commands:
-   ```text
-   --configpath=/config/ebusd-configuration/en --scanconfig --accesslevel=* --mqttjson --mqtttopic=ebusd/%circuit/%name --mqttvar=filter-direction=r|u|^w
-   ```
-   > **What does each parameter do?**
-   > - `--configpath=/config/ebusd-configuration/en`: Loads the optimized CSV files from this repository instead of outdated defaults fetched online.
-   > - `--scanconfig`: Automatically probes the eBUS upon startup and binds circuits (`08`, `15`, `76`, `04`) to their respective CSV definitions.
-   > - `--accesslevel=*`: Mandatory to allow reading and writing installer-level parameters (heating curves, bivalence points, limits).
-   > - `--mqttjson`: Publishes messages in rich JSON format (`{"value": ...}`), required by the integration coordinator.
-   > - `--mqtttopic=ebusd/%circuit/%name`: Structures MQTT topics per circuit and message without splitting into individual fields.
-   > - `--mqttvar=filter-direction=r|u|^w`: **Mandatory to enable write operations.** The eBUSd Add-on includes `mqtt-hassio.cfg` by default with `filter-direction = r|u` (which blocks write commands to the bus). Adding this argument overrides that restriction and explicitly permits writes (`^w`) for setpoints, cooling mode, and heating curves.
-   > - *(Note: Flags like `--enablehex` are omitted as raw hex debugging is not needed by the integration. Similarly, `--pollinterval` is omitted so eBUSd adopts its standard default 5-second cycle (`--pollinterval=5`), which is the exact baseline calibrated for our CSV `r` read priorities).*
-4. Restart the **eBUSd** add-on and verify in its log that circuits `08.hmux0`, `15.bass3`, and `76.vwzio` are loaded upon bus scan.
+3. Configure your eBUSd Add-on settings (**Settings → Add-ons → eBUSd → Configuration**):
+   - **Disable "Seed HA MQTT integration config (only needed once)"** toggle (`seed_mqtt_cfg: false`).
+     > **Why MUST this setting be disabled?**
+     > When enabled (default in the add-on), it injects the bundled `mqtt-hassio.cfg` file with `filter-seen = 5`. That directive forces eBUSd to aggressively poll ~160 raw legacy registers every 16 minutes, saturating the 2400-baud physical eBUS with collisions and timeouts, and litters Home Assistant with hundreds of unmanaged/duplicate MQTT entities. Disabling it leaves message polling strictly controlled by our optimized CSV definitions (only 20 clean registers) and keeps Home Assistant clean.
+     >
+     > *(Tip: If the add-on previously ran with `seed_mqtt_cfg` enabled, delete any orphaned ebusd devices under **Settings → Devices & Services → MQTT**).*
+   - **Add the startup arguments in `commandline_options` (one per entry):**
+     ```text
+     --mqttjson
+     --configpath=/config/ebusd-configuration/en
+     --scanconfig
+     --accesslevel=*
+     --mqtttopic=ebusd/%circuit/%name
+     --mqttvar=filter-direction=r|u|^w
+     ```
+     > **CRITICAL: Explicitly include `--mqttjson`!**
+     > When `Seed HA MQTT integration config` is enabled, the add-on automatically appends `--mqttjson` behind the scenes. Once you disable that toggle, the add-on **no longer adds `--mqttjson` automatically**. Since this integration requires eBUSd to publish in JSON format, you **MUST explicitly add `--mqttjson`** to `commandline_options`.
+     >
+     > **What does each parameter do?**
+     > - `--mqttjson`: Publishes messages in rich JSON format (`{"value": ...}`), required by the integration coordinator.
+     > - `--configpath=/config/ebusd-configuration/en`: Loads the optimized CSV files from this repository instead of outdated defaults fetched online.
+     > - `--scanconfig`: Automatically probes the eBUS upon startup and binds circuits (`08`, `15`, `76`, `04`) to their respective CSV definitions.
+     > - `--accesslevel=*`: Mandatory to allow reading and writing installer-level parameters (heating curves, bivalence points, limits).
+     > - `--mqtttopic=ebusd/%circuit/%name`: Structures MQTT topics per circuit and message without splitting into individual fields.
+     > - `--mqttvar=filter-direction=r|u|^w`: **Mandatory to enable write operations.** Permits writes (`^w`) for setpoints, cooling mode, and heating curves.
+     > - *(Note: Flags like `--enablehex` are omitted as raw hex debugging is not needed by the integration. Similarly, `--pollinterval` is omitted so eBUSd adopts its standard default 5-second cycle (`--pollinterval=5`), which is the exact baseline calibrated for our CSV `r` read priorities).*
+4. Restart the **eBUSd** add-on and verify in its log that circuits `08.hmux0` (or `08.hmu`), `15.bass3` (or `15.basv3` / `15.ctlv2` / `15.ctlv3`), and `76.vwzio` are loaded upon bus scan.
 
 #### Option B: Standalone Linux / Docker `ebusd`
 1. Copy `ebusd-configuration/broadcast.csv` to `/etc/ebusd/en/broadcast.csv` (or your mapped Docker volume).
@@ -248,16 +262,15 @@ Click the button below to open this repository directly inside HACS on your Home
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=R91g&repository=arotherm-genia-ebusd&category=integration)
 
-Or add it manually in HACS:
+Or search for it directly in HACS:
 
 1. Open **HACS** in your Home Assistant sidebar.
-2. Click the **three-dot menu (`⋮`)** in the top-right corner and select **Custom repositories**.
-3. Fill in the dialog:
-   - **Repository:** `https://github.com/R91g/arotherm-genia-ebusd`
-   - **Category / Type:** Select **Integration**.
-4. Click **Add**.
-5. Close the dialog, search for **aroTHERM & GeniaAir (eBUS)** in HACS, open it, and click **Download**.
-6. **Restart Home Assistant** (**Settings → System → Restart**) so Python loads the new custom component.
+2. In the search bar at the top, search for **`aroTHERM & GeniaAir (eBUS)`** (or `arotherm_genia_ebusd`).
+3. Click on the integration card and click **Download** in the bottom-right corner.
+4. **Restart Home Assistant** (**Settings → System → Restart**) so Python loads the new custom component.
+
+> [!NOTE]
+> As **aroTHERM & GeniaAir (eBUS)** is included in the official default HACS store catalog, you **do not need** to add a custom repository URL.
 
 #### Method B: Manual Installation
 

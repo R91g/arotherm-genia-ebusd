@@ -51,9 +51,9 @@ r9;u,,,RunDataCompressorInletTemp,,,,b509,5402009808,ign,,IGN:4,,,,value,,EXP,,�
 r9;u,,,RunDataCompressorOutletTemp,,,,b509,540200a208,ign,,IGN:4,,,,value,,EXP,,째C,temperature
 r9;u,,,RunDataEEVOutletTemp,,,,b509,540200ac08,ign,,IGN:4,,,,value,,EXP,,째C,temperature
 r;u,,,RunDataCondenserOutTemp,,,,b509,540200b608,ign,,IGN:4,,,,value,,EXP,,째C,condenser outlet temperature
-r9;u,,,RunDataFlowTemp,,,,b509,540200fc08,ign,,IGN:4,,,,value,,EXP,,째C,"current flow temp, accurate to 2 decimal places"
-r9;u,,,RunDataReturnTemp,,,,b509,5402000609,ign,,IGN:4,,,,value,,EXP,,째C,"current return temp, accurate to 2 decimal places"
-r9;u,,,RunDataFlowRate,building circuit water flow rate,,,b509,540200090b,ign,,IGN:4,,,,flow_rate,,UIN,,l/h,"building circuit volumetric water flow rate"
+r2;u,,,RunDataFlowTemp,,,,b509,540200fc08,ign,,IGN:4,,,,value,,EXP,,째C,"current flow temp, accurate to 2 decimal places"
+r2;u,,,RunDataReturnTemp,,,,b509,5402000609,ign,,IGN:4,,,,value,,EXP,,째C,"current return temp, accurate to 2 decimal places"
+r2;u,,,RunDataFlowRate,building circuit water flow rate,,,b509,540200090b,ign,,IGN:4,,,,flow_rate,,UIN,,l/h,"building circuit volumetric water flow rate"
 r;u,,,RunDataNominalFlowRate,nominal building circuit water flow rate,,,b509,540200680b,ign,,IGN:4,,,,value,,UIN,,l/h,"nominal building circuit volumetric water flow rate"
 r;u,,,RunStatsHMUHours,,,,b509,540200b80b,ign,,IGN:4,,,,value,,UIN,,h,hours
 r;u,,,RunStatsHcHours,,,,b509,540200b90b,ign,,IGN:4,,,,value,,UIN,,h,hours
@@ -99,7 +99,7 @@ r;u,,,Currenterror,Current errors,,,b503,0001,error,,UIN,,,error number,error_1,
 r;u,,,Errorhistory,Error_History,,,b503,0101,index,m,UCH,,,,status,,UCH,,,Status,time,,VTM,,,time,date,,HDA:3,,,date,error,,UIN,,,error number
 r;u,,,HMUStatusCode,outdoor unit status code,,,b503,0003,status,,UIN,34=frost_protect;100=standby;101=heat_compressor_shutdown;102=heat_compressor_blocked;103=heat_prerun;104=heat_compressor_active;107=heat_overrun;111=cool_compressor_shutdown;112=cool_compressor_blocked;113=cool_prerun;114=cool_compressor_active;117=cool_overrun;125=heat_immersion_heater_active;132=hwc_compressor_blocked;133=hwc_prerun;134=hwc_compressor_active;135=hwc_immersion_heater_active;137=hwc_overrun;141=heat_immersion_heater_shutdown;142=heat_immersion_heater_blocked;151=hwc_immersion_heater_shutdown;152=hwc_immersion_heater_blocked;202=air_purging_program_active;240=compressor_oil_heating_active;252=fan1_blocked;255=fan1_airinlet_too_high;256=fan1_airinlet_too_low;260=fan2_blocked;275=building_circuit_flow_too_low;277=building_circuit_pump_fault;280=frequency_converter_fault_compressor;281=frequency_converter_fault_mains_voltage;282=frequency_converter_fault_overheating;283=deicing_time_too_long;284=deicing_flow_temp_too_low;285=compressor_outlet_temp_too_high;286=hot_gas_temp_switch_open;287=fan1_wind;288=fan2_wind;289=current_limt_active;302=high_pressure_switch_open;303=compressor_outlet_temp_too_high_1;304=evaporation_temp_too_low;305=condensation_temp_too_low;306=evaporation_temp_too_high;308=condensation_temp_too_high;312=building_circuit_return_temp_too_low;314=building_circuit_return_temp_too_high;351=immersion_heater_flow_temp_too_high;516=deicing_active;575=frequency_converter_fault;581=connection_fault_frequency_converter;590=four_port_valve_position_fault,,outdoor unit status,data,,HEX:8,,,
 r;u,,,ErrorMemorySlot,error memory slot,,,b503,00,slot,m,UCH,,,,error,,UIN,,,error number,data,,HEX:8,,,
-r;u,,,CompressorAvailability,compressor availability status,,,b507,09,request,m,UCH,,,,status,,UIN,,,availability code
+u,,,CompressorAvailability,compressor availability status,,,b507,09,request,m,UCH,,,,status,,UIN,,,availability code
 r;u,,,DiagFeatureSupport,diagnostic feature support,,,b51a,05000c,feature_id,m,HEX:1,,,,status,,UIN,,,feature support status
 r;u,,,RunDataCondensationTemp,condensation temperature,,,b51a,05ff3546,ign,,IGN:3,,,,value,,SIN,16,째C,"condensation temperature",ign_2,,IGN:5,,,
 r9;u,,,CompressorSilentOperationLevel,compressor silent operation level,,,b51a,05ff3428,ign,,IGN:3,,,,value,,UCH,,%,"compressor silent operation level"
