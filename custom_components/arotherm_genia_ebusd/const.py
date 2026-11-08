@@ -286,6 +286,10 @@ CALC_HEATING_TOTAL_ENERGY = "calculated_heating_total_energy"
 CALC_DHW_TOTAL_ENERGY = "calculated_dhw_total_energy"
 CALC_SYSTEM_TOTAL_ENERGY = "calculated_system_total_energy"
 
+# Duration sensor states
+STATE_INACTIVE = "Inactive"
+STATE_OPEN_ENDED = "Open-ended"
+
 # Deprecated unique_id suffixes automatically removed from entity_registry on setup
 DEPRECATED_UNIQUE_ID_SUFFIXES: tuple[str, ...] = (
     "calculated_calculated_daily_cop_value",

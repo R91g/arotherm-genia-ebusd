@@ -89,6 +89,8 @@ from .const import (
     SCAN_ADDRESS_TO_DEVICE_KEY,
     SCAN_TOPIC_CIRCUITS,
     SET_CONFIRMATION_DELAY_SECONDS,
+    STATE_INACTIVE,
+    STATE_OPEN_ENDED,
     UPSTREAM_DEFAULT_CSV_MESSAGES,
 )
 from .thermodynamics import (
@@ -1934,8 +1936,8 @@ class SaunierGeniaCoordinator:
         """Calculate remaining days of holiday mode.
 
         Returns:
-            - 'Inactivo': when holiday mode is off (Z1Status != 'holidayaway' or reset sentinel 2015).
-            - 'Final abierto': when holiday mode is active with indefinite / open-ended end date (year == 99).
+            - STATE_INACTIVE ('Inactive'): when holiday mode is off (Z1Status != 'holidayaway' or reset sentinel 2015).
+            - STATE_OPEN_ENDED ('Open-ended'): when holiday mode is active with indefinite / open-ended end date (year == 99).
             - int: number of days remaining (>= 0) when holiday mode is active with a defined calendar window.
         """
         z1_status = (self.get_str(CIRCUIT_BASS3, "Z1Status", "value") or "").lower()
@@ -1943,32 +1945,32 @@ class SaunierGeniaCoordinator:
         end_msg = self.get_message(CIRCUIT_BASS3, "HolidayEndDate")
 
         if not end_msg:
-            return "Inactivo"
+            return STATE_INACTIVE
 
         day = end_msg.get("day")
         month = end_msg.get("month")
         year = end_msg.get("year")
         if day is None or month is None or year is None or year == 15:
-            return "Inactivo"
+            return STATE_INACTIVE
 
         start_year = start_msg.get("year") if start_msg else None
         if start_year == 15:
-            return "Inactivo"
+            return STATE_INACTIVE
 
         if z1_status and z1_status != "holidayaway" and start_year is None:
-            return "Inactivo"
+            return STATE_INACTIVE
 
         if year == 99:
-            return "Final abierto"
+            return STATE_OPEN_ENDED
 
         try:
             target_date = datetime(2000 + int(year), int(month), int(day)).date()
             diff = (target_date - datetime.now().date()).days
             if diff < 0:
-                return "Inactivo"
+                return STATE_INACTIVE
             return diff
         except (ValueError, TypeError, OverflowError):
-            return "Inactivo"
+            return STATE_INACTIVE
 
     def _format_bass3_date(
         self, circuit: str, message: str, sentinel_year: int
@@ -1993,12 +1995,12 @@ class SaunierGeniaCoordinator:
     def get_holiday_remaining_attributes(self) -> dict[str, Any]:
         """Return structured extra attributes for holiday duration remaining."""
         val = self.get_holiday_remaining_days()
-        is_active = val != "Inactivo"
-        is_open_ended = val == "Final abierto"
+        is_active = val != STATE_INACTIVE
+        is_open_ended = val == STATE_OPEN_ENDED
         return {
             "days_remaining": val
             if isinstance(val, int)
-            else (0 if val == "Inactivo" else None),
+            else (0 if val == STATE_INACTIVE else None),
             "is_active": is_active,
             "is_open_ended": is_open_ended,
             "start_date": self._format_bass3_date(
@@ -2011,8 +2013,8 @@ class SaunierGeniaCoordinator:
         """Calculate remaining days of cooling period.
 
         Returns:
-            - 'Inactivo': when cooling is off (release status 'off', year == 19 epoch, or expired).
-            - 'Final abierto': when cooling is active with indefinite / open-ended end date (year == 99).
+            - STATE_INACTIVE ('Inactive'): when cooling is off (release status 'off', year == 19 epoch, or expired).
+            - STATE_OPEN_ENDED ('Open-ended'): when cooling is active with indefinite / open-ended end date (year == 99).
             - int: number of days remaining (>= 0) when cooling is active within a defined window.
         """
         release_status = self.get_str(CIRCUIT_BASS3, "CoolingReleaseStatus", "value")
@@ -2022,13 +2024,13 @@ class SaunierGeniaCoordinator:
         end_msg = self.get_message(CIRCUIT_BASS3, "CoolingEndDate")
 
         if not end_msg:
-            return "Inactivo"
+            return STATE_INACTIVE
 
         day = end_msg.get("day")
         month = end_msg.get("month")
         year = end_msg.get("year")
         if day is None or month is None or year is None or year == 19:
-            return "Inactivo"
+            return STATE_INACTIVE
 
         # Explicitly off in status and not year 99
         if (
@@ -2036,31 +2038,31 @@ class SaunierGeniaCoordinator:
             and release_status.lower() == "off"
             and year != 99
         ):
-            return "Inactivo"
+            return STATE_INACTIVE
         if z1_op_mode_cooling == "off" and year != 99:
-            return "Inactivo"
+            return STATE_INACTIVE
 
         if year == 99:
-            return "Final abierto"
+            return STATE_OPEN_ENDED
 
         try:
             target_date = datetime(2000 + int(year), int(month), int(day)).date()
             diff = (target_date - datetime.now().date()).days
             if diff < 0:
-                return "Inactivo"
+                return STATE_INACTIVE
             return diff
         except (ValueError, TypeError, OverflowError):
-            return "Inactivo"
+            return STATE_INACTIVE
 
     def get_cooling_remaining_attributes(self) -> dict[str, Any]:
         """Return structured extra attributes for cooling duration remaining."""
         val = self.get_cooling_remaining_days()
-        is_active = val != "Inactivo"
-        is_open_ended = val == "Final abierto"
+        is_active = val != STATE_INACTIVE
+        is_open_ended = val == STATE_OPEN_ENDED
         return {
             "days_remaining": val
             if isinstance(val, int)
-            else (0 if val == "Inactivo" else None),
+            else (0 if val == STATE_INACTIVE else None),
             "is_active": is_active,
             "is_open_ended": is_open_ended,
             "start_date": self._format_bass3_date(

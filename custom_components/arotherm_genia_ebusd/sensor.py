@@ -170,7 +170,7 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
 
     @property
     def native_unit_of_measurement(self) -> str | None:
-        """Return the unit of measurement, suppressing it for non-numeric states (e.g. Inactivo / Final abierto)."""
+        """Return the unit of measurement, suppressing it for non-numeric states (e.g. Inactive / Open-ended)."""
         val = self.native_value
         if isinstance(val, (int, float)):
             return self.entity_description.native_unit_of_measurement

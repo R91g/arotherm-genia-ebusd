@@ -1,9 +1,9 @@
 {
   "domain": "arotherm_genia_ebusd",
-  "entry_id": "fixture_saunier_geniaair_max_bass3",
+  "entry_id": "fixture_saunier_geniaair_max_heating",
   "anonymized": true,
   "mqtt_prefix": "ebusd",
-  "manufacturer": "Saunier Duval",
+  "is_ebus_operational": true,
   "outdoor_model": "GeniaAir Max ES 15",
   "indoor_model": "HPIM 7 230V",
   "active_outdoor_circuit": "hmux0",
@@ -21,7 +21,7 @@
         "value": "finished"
       },
       "uptime": {
-        "value": 2192
+        "value": 28531
       },
       "version": {
         "value": "ebusd 26.1.26.1"
@@ -43,28 +43,28 @@
         "year": 15
       },
       "Z1OpMode": {
-        "value": "off"
+        "value": "day"
       },
       "Hc1ActualFlowTempDesired": {
-        "value": 0
+        "value": 58.0749
       },
       "CoolingReleaseStatus": {
         "value": "off"
       },
       "Z1ActualRoomTempDesired": {
-        "value": 5
+        "value": 24
       },
       "Z1CoolingTempDesired": {
         "value": 99
       },
       "Hc1PumpStatus": {
-        "value": 0
+        "value": 1
       },
       "Z1ManualTemp": {
         "value": 24
       },
       "SystemOperatingState": {
-        "value": "standby"
+        "value": "heating"
       },
       "CoolingStartDate": {
         "day": 1,
@@ -200,13 +200,13 @@
         "value": "no"
       },
       "HwcStorageTemp": {
-        "value": 51
+        "value": 49
       },
       "Hc1FlowTemp": {
-        "value": 56.5
+        "value": 53
       },
       "Z1RoomTemp": {
-        "value": 19.8125
+        "value": 19.6875
       },
       "Hc1HeatCurveAdaption": {
         "value": 0
@@ -215,10 +215,10 @@
         "value": "on"
       },
       "WaterPressure": {
-        "press": 1.3
+        "press": 1.5
       },
       "DisplayedOutsideTemp": {
-        "value": 10.5664
+        "value": 15.2891
       },
       "Z1MaxFlowTempDesired": {
         "value": 67
@@ -263,7 +263,7 @@
         "value": 40
       },
       "OutsideTempAvg": {
-        "value": 12.2891
+        "value": 12.6328
       },
       "SolarYieldTotal": {
         "value": 0
@@ -284,7 +284,7 @@
         "value": -26
       },
       "Time": {
-        "value": "10:32:43"
+        "value": "19:35:45"
       },
       "CirculationTimer_Slots": {
         "mon": 1,
@@ -516,7 +516,7 @@
         "value": "Zona "
       },
       "Z1RoomHumidity": {
-        "value": 64
+        "value": 67
       }
     },
     "basv3": {
@@ -535,28 +535,28 @@
         "year": 15
       },
       "Z1OpMode": {
-        "value": "off"
+        "value": "day"
       },
       "Hc1ActualFlowTempDesired": {
-        "value": 0
+        "value": 58.0749
       },
       "CoolingReleaseStatus": {
         "value": "off"
       },
       "Z1ActualRoomTempDesired": {
-        "value": 5
+        "value": 24
       },
       "Z1CoolingTempDesired": {
         "value": 99
       },
       "Hc1PumpStatus": {
-        "value": 0
+        "value": 1
       },
       "Z1ManualTemp": {
         "value": 24
       },
       "SystemOperatingState": {
-        "value": "standby"
+        "value": "heating"
       },
       "CoolingStartDate": {
         "day": 1,
@@ -692,13 +692,13 @@
         "value": "no"
       },
       "HwcStorageTemp": {
-        "value": 51
+        "value": 49
       },
       "Hc1FlowTemp": {
-        "value": 56.5
+        "value": 53
       },
       "Z1RoomTemp": {
-        "value": 19.8125
+        "value": 19.6875
       },
       "Hc1HeatCurveAdaption": {
         "value": 0
@@ -707,10 +707,10 @@
         "value": "on"
       },
       "WaterPressure": {
-        "press": 1.3
+        "press": 1.5
       },
       "DisplayedOutsideTemp": {
-        "value": 10.5664
+        "value": 15.2891
       },
       "Z1MaxFlowTempDesired": {
         "value": 67
@@ -755,7 +755,7 @@
         "value": 40
       },
       "OutsideTempAvg": {
-        "value": 12.2891
+        "value": 12.6328
       },
       "SolarYieldTotal": {
         "value": 0
@@ -776,7 +776,7 @@
         "value": -26
       },
       "Time": {
-        "value": "10:32:43"
+        "value": "19:35:45"
       },
       "CirculationTimer_Slots": {
         "mon": 1,
@@ -1008,7 +1008,7 @@
         "value": "Zona "
       },
       "Z1RoomHumidity": {
-        "value": 64
+        "value": 67
       }
     },
     "ctlv2": {
@@ -1027,28 +1027,28 @@
         "year": 15
       },
       "Z1OpMode": {
-        "value": "off"
+        "value": "day"
       },
       "Hc1ActualFlowTempDesired": {
-        "value": 0
+        "value": 58.0749
       },
       "CoolingReleaseStatus": {
         "value": "off"
       },
       "Z1ActualRoomTempDesired": {
-        "value": 5
+        "value": 24
       },
       "Z1CoolingTempDesired": {
         "value": 99
       },
       "Hc1PumpStatus": {
-        "value": 0
+        "value": 1
       },
       "Z1ManualTemp": {
         "value": 24
       },
       "SystemOperatingState": {
-        "value": "standby"
+        "value": "heating"
       },
       "CoolingStartDate": {
         "day": 1,
@@ -1184,13 +1184,13 @@
         "value": "no"
       },
       "HwcStorageTemp": {
-        "value": 51
+        "value": 49
       },
       "Hc1FlowTemp": {
-        "value": 56.5
+        "value": 53
       },
       "Z1RoomTemp": {
-        "value": 19.8125
+        "value": 19.6875
       },
       "Hc1HeatCurveAdaption": {
         "value": 0
@@ -1199,10 +1199,10 @@
         "value": "on"
       },
       "WaterPressure": {
-        "press": 1.3
+        "press": 1.5
       },
       "DisplayedOutsideTemp": {
-        "value": 10.5664
+        "value": 15.2891
       },
       "Z1MaxFlowTempDesired": {
         "value": 67
@@ -1247,7 +1247,7 @@
         "value": 40
       },
       "OutsideTempAvg": {
-        "value": 12.2891
+        "value": 12.6328
       },
       "SolarYieldTotal": {
         "value": 0
@@ -1268,7 +1268,7 @@
         "value": -26
       },
       "Time": {
-        "value": "10:32:43"
+        "value": "19:35:45"
       },
       "CirculationTimer_Slots": {
         "mon": 1,
@@ -1500,7 +1500,7 @@
         "value": "Zona "
       },
       "Z1RoomHumidity": {
-        "value": 64
+        "value": 67
       }
     },
     "ctlv3": {
@@ -1519,28 +1519,28 @@
         "year": 15
       },
       "Z1OpMode": {
-        "value": "off"
+        "value": "day"
       },
       "Hc1ActualFlowTempDesired": {
-        "value": 0
+        "value": 58.0749
       },
       "CoolingReleaseStatus": {
         "value": "off"
       },
       "Z1ActualRoomTempDesired": {
-        "value": 5
+        "value": 24
       },
       "Z1CoolingTempDesired": {
         "value": 99
       },
       "Hc1PumpStatus": {
-        "value": 0
+        "value": 1
       },
       "Z1ManualTemp": {
         "value": 24
       },
       "SystemOperatingState": {
-        "value": "standby"
+        "value": "heating"
       },
       "CoolingStartDate": {
         "day": 1,
@@ -1676,13 +1676,13 @@
         "value": "no"
       },
       "HwcStorageTemp": {
-        "value": 51
+        "value": 49
       },
       "Hc1FlowTemp": {
-        "value": 56.5
+        "value": 53
       },
       "Z1RoomTemp": {
-        "value": 19.8125
+        "value": 19.6875
       },
       "Hc1HeatCurveAdaption": {
         "value": 0
@@ -1691,10 +1691,10 @@
         "value": "on"
       },
       "WaterPressure": {
-        "press": 1.3
+        "press": 1.5
       },
       "DisplayedOutsideTemp": {
-        "value": 10.5664
+        "value": 15.2891
       },
       "Z1MaxFlowTempDesired": {
         "value": 67
@@ -1739,7 +1739,7 @@
         "value": 40
       },
       "OutsideTempAvg": {
-        "value": 12.2891
+        "value": 12.6328
       },
       "SolarYieldTotal": {
         "value": 0
@@ -1760,7 +1760,7 @@
         "value": -26
       },
       "Time": {
-        "value": "10:32:43"
+        "value": "19:35:45"
       },
       "CirculationTimer_Slots": {
         "mon": 1,
@@ -1992,7 +1992,7 @@
         "value": "Zona "
       },
       "Z1RoomHumidity": {
-        "value": 64
+        "value": 67
       }
     },
     "hmux0": {
@@ -2000,28 +2000,28 @@
         "value": 350
       },
       "Status01": {
-        "flow_temp": 56.5,
-        "return_temp": 56.5,
-        "outside_temp": 10.566,
+        "flow_temp": 53.5,
+        "return_temp": 47,
+        "outside_temp": 15.289,
         "hwc_temp": null,
-        "storage_temp": 51,
-        "pumpstate": "off"
+        "storage_temp": 49,
+        "pumpstate": "on"
       },
       "RunStatsCompressorHours": {
         "value": 290
       },
       "SetMode": {
         "hcmode": "auto",
-        "flowtempdesired": 0,
+        "flowtempdesired": 60,
         "hwctempdesired": null,
         "hwcflowtempdesired": null,
-        "flags": "ff 07"
+        "flags": "ff 06"
       },
       "RunStatsCoolingHours": {
         "value": 0
       },
       "CompressorAvailability": {
-        "request": 0,
+        "request": 120,
         "status": 0
       },
       "Currenterror": {
@@ -2037,18 +2037,18 @@
         "data": "ff ff ff ff ff ff ff ff"
       },
       "StateCompressor": {
-        "flow_temp": 56.88,
-        "modulation": 0,
-        "mode_flags": 0,
-        "state_bytes": "00 00 00 00"
+        "flow_temp": 53.44,
+        "modulation": 117,
+        "mode_flags": 4,
+        "state_bytes": "09 00 00 75"
       },
       "HMUStatusCode": {
-        "status": "hwc_compressor_active",
+        "status": "heat_compressor_active",
         "data": "ff ff ff ff ff ff ff ff"
       },
       "PowerStatus": {
-        "status": "hwc",
-        "power": 47.1167,
+        "status": "heating",
+        "power": 3935.4,
         "fuel_power": 0
       },
       "RunStatsDeiceHours": {
@@ -2058,79 +2058,79 @@
         "value": 40
       },
       "RunDataCompressorSpeed": {
-        "value": 50
+        "value": 71.9
       },
       "RunDataFan1Speed": {
-        "value": 547
+        "value": 445
       },
       "RunStatsDeiceStarts": {
         "value": 0
       },
       "RunDataFlowRate": {
-        "flow_rate": 1502
+        "flow_rate": 1479
       },
       "RunDataBuildingCPumpPower": {
-        "value": 70.4051
+        "value": 48.108
       },
       "RunDataHighPressure": {
-        "press": 20.8
+        "press": 17.6
       },
       "RunDataFlowTemp": {
-        "value": 56.875
+        "value": 53.5
       },
       "RunDataReturnTemp": {
-        "value": 56.5
+        "value": 47.3125
       },
       "RunDataAirInletTemp": {
-        "value": 14.875
+        "value": 13.4375
       },
       "RunDataCompressorInletTemp": {
-        "value": 10.625
+        "value": 5.5
       },
       "RunDataCompressorOutletTemp": {
-        "value": 68.625
+        "value": 62.875
       },
       "RunDataEEVOutletTemp": {
-        "value": 21.3125
+        "value": 22.875
       },
       "RunStatsFan1Hours": {
-        "value": 2076
+        "value": 2084
       },
       "RunStatsHcStarts": {
         "value": 4
       },
       "PrEnergyElectricHc": {
-        "energy": 68955.2
+        "energy": 70639.9
       },
       "PrEnergyElectricHwc": {
-        "energy": 83159.3
+        "energy": 84071.2
       },
       "PrEnergyElectricCool": {
         "energy": 214000
       },
       "PrEnergyThermalHc": {
-        "energy": 186893
+        "energy": 193136
       },
       "PrEnergyThermalHwc": {
-        "energy": 290079
+        "energy": 293182
       },
       "PrEnergyThermalCool": {
         "energy": 961800
       },
       "PrEnergyEnvYieldHc": {
-        "energy": 130446
+        "energy": 135089
       },
       "PrEnergyEnvYieldHwc": {
-        "energy": 208661
+        "energy": 210881
       },
       "RunStatsFan1Starts": {
         "value": 36
       },
       "RunStatsHcHours": {
-        "value": 19
+        "value": 20
       },
       "RunStatsHMUHours": {
-        "value": 2077
+        "value": 2084
       },
       "RunStatsHwcHours": {
         "value": 31
@@ -2145,10 +2145,10 @@
         "value": 1
       },
       "RunStatsImmersionHeaterHours": {
-        "value": 383
+        "value": 384
       },
       "RunStatsImmersionHeaterStarts": {
-        "value": 240
+        "value": 242
       },
       "PrEnergySolarTotal": {
         "energy": 0
@@ -2163,7 +2163,7 @@
         "data": "02 03 09 10 09 34 09 0a 09"
       },
       "RunDataCondensationTemp": {
-        "value": 12.94
+        "value": 48.75
       },
       "RunDataEvaporatorTempDirect": {
         "value": 0
@@ -2172,13 +2172,13 @@
         "value": 0
       },
       "RunDataEvaporationTemp": {
-        "value": 12.88
+        "value": 1.56
       },
       "RunDataEconomizerTemp": {
         "value": 0
       },
       "RunDataCondensateTemp": {
-        "value": 37.81
+        "value": 23.88
       },
       "RunDataElectricPowerConsumption": {
         "power": 6
@@ -2187,10 +2187,10 @@
         "value": 0
       },
       "RunDataCondenserOutTemp": {
-        "value": 51.625
+        "value": 33.5
       },
       "RunDataEEVPositionAbs": {
-        "value": 208
+        "value": 311
       },
       "RunDataFan2Speed": {
         "value": 0
@@ -2217,34 +2217,34 @@
         "value": 0
       },
       "RunDataHeatOutput": {
-        "value": 7506.5
+        "value": 12716.7
       },
       "RunDataInverterFanLoad": {
         "value": 0
       },
       "RunDataFlowTempDesired": {
-        "value": 60
+        "value": 62.5
       },
       "RunDataDiagnostic": {
-        "value": "6f 03"
+        "value": "c0 02"
       },
       "RunDataDiag8813": {
-        "value": "86 00 ff ff ff ff ff ff ff ff"
+        "value": "68 00 ff ff ff ff ff ff ff ff"
       },
       "RunDataDiag8b13": {
         "value": "ff ff ff ff ff ff ff ff ff ff"
       },
       "RunDataDiagfd0a": {
-        "value": "b4 03"
+        "value": "5d 03"
       },
       "RunDataDiag030b": {
-        "value": "f0 00"
+        "value": "d7 00"
       },
       "PrEnergyFuelHwc": {
         "energy": 0
       },
       "RunDataSuperheat": {
-        "value": 3.75
+        "value": 2.88
       },
       "RunStatsCoolingStarts": {
         "value": 0
@@ -2253,10 +2253,10 @@
         "value": 900
       },
       "RunStatsBuildingCPumpStarts": {
-        "value": 175
+        "value": 176
       },
       "RunStatsCompressorStarts": {
-        "value": 293
+        "value": 294
       },
       "RunStatsFan2Hours": {
         "value": 0
@@ -2268,12 +2268,12 @@
         "value": 137
       },
       "RunStatsCompressorHc": {
-        "runtime": 1174,
+        "runtime": 1214,
         "cycles": 21
       },
       "RunStatsCompressorHwc": {
-        "runtime": 2037,
-        "cycles": 111
+        "runtime": 2059,
+        "cycles": 112
       },
       "RunStatsCompressorCool": {
         "runtime": 14591,
@@ -2302,16 +2302,16 @@
         "frequency": 54
       },
       "RunDataDiag3704": {
-        "value": 172
+        "value": 63
       },
       "RunDataDiag3705": {
-        "value": 749
+        "value": 603
       },
       "RunDataDiag3702": {
-        "value": 267
+        "value": 207
       },
       "RunDataDiag370b": {
-        "value": 138
+        "value": 103
       },
       "RunDataDiagf40a": {
         "value": 29
@@ -2323,16 +2323,16 @@
         "value": 30
       },
       "RunDataDiag000b": {
-        "value": 47
+        "value": 91
       },
       "RunDataDiag010b": {
-        "value": 28
+        "value": 36
       },
       "RunDataDiag354a": {
         "value": 6.88
       },
       "RunDataDiag354b": {
-        "value": 6.5
+        "value": 7
       },
       "RunDataDiag7c08": {
         "value": 23.5
@@ -2349,28 +2349,28 @@
         "value": 350
       },
       "Status01": {
-        "flow_temp": 56.5,
-        "return_temp": 56.5,
-        "outside_temp": 10.566,
+        "flow_temp": 53.5,
+        "return_temp": 47,
+        "outside_temp": 15.289,
         "hwc_temp": null,
-        "storage_temp": 51,
-        "pumpstate": "off"
+        "storage_temp": 49,
+        "pumpstate": "on"
       },
       "RunStatsCompressorHours": {
         "value": 290
       },
       "SetMode": {
         "hcmode": "auto",
-        "flowtempdesired": 0,
+        "flowtempdesired": 60,
         "hwctempdesired": null,
         "hwcflowtempdesired": null,
-        "flags": "ff 07"
+        "flags": "ff 06"
       },
       "RunStatsCoolingHours": {
         "value": 0
       },
       "CompressorAvailability": {
-        "request": 0,
+        "request": 120,
         "status": 0
       },
       "Currenterror": {
@@ -2386,18 +2386,18 @@
         "data": "ff ff ff ff ff ff ff ff"
       },
       "StateCompressor": {
-        "flow_temp": 56.88,
-        "modulation": 0,
-        "mode_flags": 0,
-        "state_bytes": "00 00 00 00"
+        "flow_temp": 53.44,
+        "modulation": 117,
+        "mode_flags": 4,
+        "state_bytes": "09 00 00 75"
       },
       "HMUStatusCode": {
-        "status": "hwc_compressor_active",
+        "status": "heat_compressor_active",
         "data": "ff ff ff ff ff ff ff ff"
       },
       "PowerStatus": {
-        "status": "hwc",
-        "power": 47.1167,
+        "status": "heating",
+        "power": 3935.4,
         "fuel_power": 0
       },
       "RunStatsDeiceHours": {
@@ -2407,79 +2407,79 @@
         "value": 40
       },
       "RunDataCompressorSpeed": {
-        "value": 50
+        "value": 71.9
       },
       "RunDataFan1Speed": {
-        "value": 547
+        "value": 445
       },
       "RunStatsDeiceStarts": {
         "value": 0
       },
       "RunDataFlowRate": {
-        "flow_rate": 1502
+        "flow_rate": 1479
       },
       "RunDataBuildingCPumpPower": {
-        "value": 70.4051
+        "value": 48.108
       },
       "RunDataHighPressure": {
-        "press": 20.8
+        "press": 17.6
       },
       "RunDataFlowTemp": {
-        "value": 56.875
+        "value": 53.5
       },
       "RunDataReturnTemp": {
-        "value": 56.5
+        "value": 47.3125
       },
       "RunDataAirInletTemp": {
-        "value": 14.875
+        "value": 13.4375
       },
       "RunDataCompressorInletTemp": {
-        "value": 10.625
+        "value": 5.5
       },
       "RunDataCompressorOutletTemp": {
-        "value": 68.625
+        "value": 62.875
       },
       "RunDataEEVOutletTemp": {
-        "value": 21.3125
+        "value": 22.875
       },
       "RunStatsFan1Hours": {
-        "value": 2076
+        "value": 2084
       },
       "RunStatsHcStarts": {
         "value": 4
       },
       "PrEnergyElectricHc": {
-        "energy": 68955.2
+        "energy": 70639.9
       },
       "PrEnergyElectricHwc": {
-        "energy": 83159.3
+        "energy": 84071.2
       },
       "PrEnergyElectricCool": {
         "energy": 214000
       },
       "PrEnergyThermalHc": {
-        "energy": 186893
+        "energy": 193136
       },
       "PrEnergyThermalHwc": {
-        "energy": 290079
+        "energy": 293182
       },
       "PrEnergyThermalCool": {
         "energy": 961800
       },
       "PrEnergyEnvYieldHc": {
-        "energy": 130446
+        "energy": 135089
       },
       "PrEnergyEnvYieldHwc": {
-        "energy": 208661
+        "energy": 210881
       },
       "RunStatsFan1Starts": {
         "value": 36
       },
       "RunStatsHcHours": {
-        "value": 19
+        "value": 20
       },
       "RunStatsHMUHours": {
-        "value": 2077
+        "value": 2084
       },
       "RunStatsHwcHours": {
         "value": 31
@@ -2494,10 +2494,10 @@
         "value": 1
       },
       "RunStatsImmersionHeaterHours": {
-        "value": 383
+        "value": 384
       },
       "RunStatsImmersionHeaterStarts": {
-        "value": 240
+        "value": 242
       },
       "PrEnergySolarTotal": {
         "energy": 0
@@ -2512,7 +2512,7 @@
         "data": "02 03 09 10 09 34 09 0a 09"
       },
       "RunDataCondensationTemp": {
-        "value": 12.94
+        "value": 48.75
       },
       "RunDataEvaporatorTempDirect": {
         "value": 0
@@ -2521,13 +2521,13 @@
         "value": 0
       },
       "RunDataEvaporationTemp": {
-        "value": 12.88
+        "value": 1.56
       },
       "RunDataEconomizerTemp": {
         "value": 0
       },
       "RunDataCondensateTemp": {
-        "value": 37.81
+        "value": 23.88
       },
       "RunDataElectricPowerConsumption": {
         "power": 6
@@ -2536,10 +2536,10 @@
         "value": 0
       },
       "RunDataCondenserOutTemp": {
-        "value": 51.625
+        "value": 33.5
       },
       "RunDataEEVPositionAbs": {
-        "value": 208
+        "value": 311
       },
       "RunDataFan2Speed": {
         "value": 0
@@ -2566,34 +2566,34 @@
         "value": 0
       },
       "RunDataHeatOutput": {
-        "value": 7506.5
+        "value": 12716.7
       },
       "RunDataInverterFanLoad": {
         "value": 0
       },
       "RunDataFlowTempDesired": {
-        "value": 60
+        "value": 62.5
       },
       "RunDataDiagnostic": {
-        "value": "6f 03"
+        "value": "c0 02"
       },
       "RunDataDiag8813": {
-        "value": "86 00 ff ff ff ff ff ff ff ff"
+        "value": "68 00 ff ff ff ff ff ff ff ff"
       },
       "RunDataDiag8b13": {
         "value": "ff ff ff ff ff ff ff ff ff ff"
       },
       "RunDataDiagfd0a": {
-        "value": "b4 03"
+        "value": "5d 03"
       },
       "RunDataDiag030b": {
-        "value": "f0 00"
+        "value": "d7 00"
       },
       "PrEnergyFuelHwc": {
         "energy": 0
       },
       "RunDataSuperheat": {
-        "value": 3.75
+        "value": 2.88
       },
       "RunStatsCoolingStarts": {
         "value": 0
@@ -2602,10 +2602,10 @@
         "value": 900
       },
       "RunStatsBuildingCPumpStarts": {
-        "value": 175
+        "value": 176
       },
       "RunStatsCompressorStarts": {
-        "value": 293
+        "value": 294
       },
       "RunStatsFan2Hours": {
         "value": 0
@@ -2617,12 +2617,12 @@
         "value": 137
       },
       "RunStatsCompressorHc": {
-        "runtime": 1174,
+        "runtime": 1214,
         "cycles": 21
       },
       "RunStatsCompressorHwc": {
-        "runtime": 2037,
-        "cycles": 111
+        "runtime": 2059,
+        "cycles": 112
       },
       "RunStatsCompressorCool": {
         "runtime": 14591,
@@ -2651,16 +2651,16 @@
         "frequency": 54
       },
       "RunDataDiag3704": {
-        "value": 172
+        "value": 63
       },
       "RunDataDiag3705": {
-        "value": 749
+        "value": 603
       },
       "RunDataDiag3702": {
-        "value": 267
+        "value": 207
       },
       "RunDataDiag370b": {
-        "value": 138
+        "value": 103
       },
       "RunDataDiagf40a": {
         "value": 29
@@ -2672,16 +2672,16 @@
         "value": 30
       },
       "RunDataDiag000b": {
-        "value": 47
+        "value": 91
       },
       "RunDataDiag010b": {
-        "value": 28
+        "value": 36
       },
       "RunDataDiag354a": {
         "value": 6.88
       },
       "RunDataDiag354b": {
-        "value": 6.5
+        "value": 7
       },
       "RunDataDiag7c08": {
         "value": 23.5
@@ -2698,28 +2698,28 @@
         "value": 350
       },
       "Status01": {
-        "flow_temp": 56.5,
-        "return_temp": 56.5,
-        "outside_temp": 10.566,
+        "flow_temp": 53.5,
+        "return_temp": 47,
+        "outside_temp": 15.289,
         "hwc_temp": null,
-        "storage_temp": 51,
-        "pumpstate": "off"
+        "storage_temp": 49,
+        "pumpstate": "on"
       },
       "RunStatsCompressorHours": {
         "value": 290
       },
       "SetMode": {
         "hcmode": "auto",
-        "flowtempdesired": 0,
+        "flowtempdesired": 60,
         "hwctempdesired": null,
         "hwcflowtempdesired": null,
-        "flags": "ff 07"
+        "flags": "ff 06"
       },
       "RunStatsCoolingHours": {
         "value": 0
       },
       "CompressorAvailability": {
-        "request": 0,
+        "request": 120,
         "status": 0
       },
       "Currenterror": {
@@ -2735,18 +2735,18 @@
         "data": "ff ff ff ff ff ff ff ff"
       },
       "StateCompressor": {
-        "flow_temp": 56.88,
-        "modulation": 0,
-        "mode_flags": 0,
-        "state_bytes": "00 00 00 00"
+        "flow_temp": 53.44,
+        "modulation": 117,
+        "mode_flags": 4,
+        "state_bytes": "09 00 00 75"
       },
       "HMUStatusCode": {
-        "status": "hwc_compressor_active",
+        "status": "heat_compressor_active",
         "data": "ff ff ff ff ff ff ff ff"
       },
       "PowerStatus": {
-        "status": "hwc",
-        "power": 47.1167,
+        "status": "heating",
+        "power": 3935.4,
         "fuel_power": 0
       },
       "RunStatsDeiceHours": {
@@ -2756,79 +2756,79 @@
         "value": 40
       },
       "RunDataCompressorSpeed": {
-        "value": 50
+        "value": 71.9
       },
       "RunDataFan1Speed": {
-        "value": 547
+        "value": 445
       },
       "RunStatsDeiceStarts": {
         "value": 0
       },
       "RunDataFlowRate": {
-        "flow_rate": 1502
+        "flow_rate": 1479
       },
       "RunDataBuildingCPumpPower": {
-        "value": 70.4051
+        "value": 48.108
       },
       "RunDataHighPressure": {
-        "press": 20.8
+        "press": 17.6
       },
       "RunDataFlowTemp": {
-        "value": 56.875
+        "value": 53.5
       },
       "RunDataReturnTemp": {
-        "value": 56.5
+        "value": 47.3125
       },
       "RunDataAirInletTemp": {
-        "value": 14.875
+        "value": 13.4375
       },
       "RunDataCompressorInletTemp": {
-        "value": 10.625
+        "value": 5.5
       },
       "RunDataCompressorOutletTemp": {
-        "value": 68.625
+        "value": 62.875
       },
       "RunDataEEVOutletTemp": {
-        "value": 21.3125
+        "value": 22.875
       },
       "RunStatsFan1Hours": {
-        "value": 2076
+        "value": 2084
       },
       "RunStatsHcStarts": {
         "value": 4
       },
       "PrEnergyElectricHc": {
-        "energy": 68955.2
+        "energy": 70639.9
       },
       "PrEnergyElectricHwc": {
-        "energy": 83159.3
+        "energy": 84071.2
       },
       "PrEnergyElectricCool": {
         "energy": 214000
       },
       "PrEnergyThermalHc": {
-        "energy": 186893
+        "energy": 193136
       },
       "PrEnergyThermalHwc": {
-        "energy": 290079
+        "energy": 293182
       },
       "PrEnergyThermalCool": {
         "energy": 961800
       },
       "PrEnergyEnvYieldHc": {
-        "energy": 130446
+        "energy": 135089
       },
       "PrEnergyEnvYieldHwc": {
-        "energy": 208661
+        "energy": 210881
       },
       "RunStatsFan1Starts": {
         "value": 36
       },
       "RunStatsHcHours": {
-        "value": 19
+        "value": 20
       },
       "RunStatsHMUHours": {
-        "value": 2077
+        "value": 2084
       },
       "RunStatsHwcHours": {
         "value": 31
@@ -2843,10 +2843,10 @@
         "value": 1
       },
       "RunStatsImmersionHeaterHours": {
-        "value": 383
+        "value": 384
       },
       "RunStatsImmersionHeaterStarts": {
-        "value": 240
+        "value": 242
       },
       "PrEnergySolarTotal": {
         "energy": 0
@@ -2861,7 +2861,7 @@
         "data": "02 03 09 10 09 34 09 0a 09"
       },
       "RunDataCondensationTemp": {
-        "value": 12.94
+        "value": 48.75
       },
       "RunDataEvaporatorTempDirect": {
         "value": 0
@@ -2870,13 +2870,13 @@
         "value": 0
       },
       "RunDataEvaporationTemp": {
-        "value": 12.88
+        "value": 1.56
       },
       "RunDataEconomizerTemp": {
         "value": 0
       },
       "RunDataCondensateTemp": {
-        "value": 37.81
+        "value": 23.88
       },
       "RunDataElectricPowerConsumption": {
         "power": 6
@@ -2885,10 +2885,10 @@
         "value": 0
       },
       "RunDataCondenserOutTemp": {
-        "value": 51.625
+        "value": 33.5
       },
       "RunDataEEVPositionAbs": {
-        "value": 208
+        "value": 311
       },
       "RunDataFan2Speed": {
         "value": 0
@@ -2915,34 +2915,34 @@
         "value": 0
       },
       "RunDataHeatOutput": {
-        "value": 7506.5
+        "value": 12716.7
       },
       "RunDataInverterFanLoad": {
         "value": 0
       },
       "RunDataFlowTempDesired": {
-        "value": 60
+        "value": 62.5
       },
       "RunDataDiagnostic": {
-        "value": "6f 03"
+        "value": "c0 02"
       },
       "RunDataDiag8813": {
-        "value": "86 00 ff ff ff ff ff ff ff ff"
+        "value": "68 00 ff ff ff ff ff ff ff ff"
       },
       "RunDataDiag8b13": {
         "value": "ff ff ff ff ff ff ff ff ff ff"
       },
       "RunDataDiagfd0a": {
-        "value": "b4 03"
+        "value": "5d 03"
       },
       "RunDataDiag030b": {
-        "value": "f0 00"
+        "value": "d7 00"
       },
       "PrEnergyFuelHwc": {
         "energy": 0
       },
       "RunDataSuperheat": {
-        "value": 3.75
+        "value": 2.88
       },
       "RunStatsCoolingStarts": {
         "value": 0
@@ -2951,10 +2951,10 @@
         "value": 900
       },
       "RunStatsBuildingCPumpStarts": {
-        "value": 175
+        "value": 176
       },
       "RunStatsCompressorStarts": {
-        "value": 293
+        "value": 294
       },
       "RunStatsFan2Hours": {
         "value": 0
@@ -2966,12 +2966,12 @@
         "value": 137
       },
       "RunStatsCompressorHc": {
-        "runtime": 1174,
+        "runtime": 1214,
         "cycles": 21
       },
       "RunStatsCompressorHwc": {
-        "runtime": 2037,
-        "cycles": 111
+        "runtime": 2059,
+        "cycles": 112
       },
       "RunStatsCompressorCool": {
         "runtime": 14591,
@@ -3000,16 +3000,16 @@
         "frequency": 54
       },
       "RunDataDiag3704": {
-        "value": 172
+        "value": 63
       },
       "RunDataDiag3705": {
-        "value": 749
+        "value": 603
       },
       "RunDataDiag3702": {
-        "value": 267
+        "value": 207
       },
       "RunDataDiag370b": {
-        "value": 138
+        "value": 103
       },
       "RunDataDiagf40a": {
         "value": 29
@@ -3021,16 +3021,16 @@
         "value": 30
       },
       "RunDataDiag000b": {
-        "value": 47
+        "value": 91
       },
       "RunDataDiag010b": {
-        "value": 28
+        "value": 36
       },
       "RunDataDiag354a": {
         "value": 6.88
       },
       "RunDataDiag354b": {
-        "value": 6.5
+        "value": 7
       },
       "RunDataDiag7c08": {
         "value": 23.5
@@ -3057,14 +3057,14 @@
       },
       "Status01": {
         "flow_temp": null,
-        "return_temp": 56.5,
-        "outside_temp": 10.566,
+        "return_temp": 47,
+        "outside_temp": 15.289,
         "hwc_temp": null,
-        "storage_temp": 51,
+        "storage_temp": 49,
         "pumpstate": "off"
       },
       "SecondaryCircuitStatus": {
-        "status": "36 03 00 00 80 0d ff"
+        "status": "1a 03 00 00 80 0d ff"
       },
       "Currenterror": {
         "error": null,
@@ -3079,13 +3079,13 @@
         "fuel_power": 0
       },
       "PrEnergyElectricHc": {
-        "energy": 9909.33
+        "energy": 9949.31
       },
       "PrEnergyElectricHwc": {
         "energy": 0
       },
       "PrEnergyThermalHc": {
-        "energy": 9909.33
+        "energy": 9949.31
       },
       "PrEnergyThermalHwc": {
         "energy": 0
@@ -3124,13 +3124,13 @@
         "status": 0
       },
       "RunDataDiagnostic": {
-        "value": "6f 03"
+        "value": "c0 02"
       },
       "RunStatsHcStarts": {
         "value": 4
       },
       "SecondaryCircuitStatus03": {
-        "status": "12 03 00 00 80 0d ff"
+        "status": "16 03 00 00 80 0f ff"
       },
       "RunStatsHeaterHc": {
         "runtime": 0,
@@ -3158,28 +3158,28 @@
     },
     "calculated": {
       "calculated_delta_t": {
-        "value": 0.38
+        "value": 6.19
       },
       "calculated_thermal_power": {
-        "value": 663.8
+        "value": 10647.3
       },
       "calculated_live_cop": {
-        "value": 0
+        "value": 2.71
       },
       "calculated_cool_eer": {
         "value": 4.49
       },
       "calculated_heating_total_energy": {
-        "value": 78864.5
+        "value": 80589.2
       },
       "calculated_dhw_total_energy": {
-        "value": 83159.3
+        "value": 84071.2
       },
       "calculated_system_total_energy": {
-        "value": 376023.8
+        "value": 378660.4
       },
       "calculated_hc_cop": {
-        "value": 2.5
+        "value": 2.52
       },
       "calculated_hwc_cop": {
         "value": 3.49
@@ -3193,15 +3193,16 @@
         "status": "off"
       },
       "Vdatetime": {
-        "time": "12:28:19",
+        "time": "19:46:58",
         "date": "08.11.2026"
       },
       "Outsidetemp": {
-        "temp": 10.566
+        "temp": 15.289
       },
       "SystemStatus": {
         "status": 0
       }
     }
-  }
+  },
+  "manufacturer": "Saunier Duval"
 }

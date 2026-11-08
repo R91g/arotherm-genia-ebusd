@@ -30,9 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added passive eavesdropping (`u`) for official MiGo Link app schedule writes, decoding time intervals and target temperatures in real time without polling.
 - **Diagnostic eBUS Services (`read_parameter` & `write_parameter`):**
   - Added actions to read and write symbolic eBUS parameters via MQTT directly from Home Assistant Developer Tools or automations, with automatic circuit alias resolution (`08`, `15`, `outdoor`, `controller`).
-- **Anonymized Dumps & Community Test Fixtures:**
+- **Anonymized Dumps & Mode-Specific Community Test Fixtures:**
   - Added automatic serial number and barcode masking to `dump_mqtt_values` and `record_topic_changes` services for safe troubleshooting sharing.
-  - Added community snapshot test suite (`tests/fixtures/community/`) verifying entity stability across real hardware configurations; updated `saunier_geniaair_max_bass3.json` with live DHW production telemetry covering 50+ new refrigeration, electrical and diagnostic sensors.
+  - Organized Saunier Duval GeniaAir Max community test fixtures by distinct operating modes (`saunier_geniaair_max_heating.json`, `saunier_geniaair_max_acs.json`, and `saunier_geniaair_max_standby.json`), verifying entity stability, primary hydraulic thermodynamics, and humidity sensors across real-world operational states.
 - **Physical eBUS Health & Daemon Diagnostics:**
   - Added `binary_sensor.ebusd_running` and 7 diagnostic sensors attached to the root outdoor unit (arbitration latency, symbol rate, reconnects, uptime, scan status, active masters).
 - **Release Security Gate in CI:**
@@ -56,6 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added a 10-minute communication watchdog that safely marks control entities unavailable when bus telemetry ceases, keeping historical sensors available.
 - **CSV Header Compliance, Parity & Clean Hydration:**
   - Moved CSV column definitions to line 1 to comply with ebusd 26.1 C++ parser, filtered incompatible `b516` queries on HMU units, and enforced byte-for-byte parity and Unix `LF` line endings across `15.*.csv` and `08.hmu*.csv`.
+- **English Localization for Countdown Duration States:**
+  - Standardized coordinator string returns for `sensor.holiday_duration_remaining` and `sensor.cooling_duration_remaining` from Spanish (`Inactivo` / `Final abierto`) to standard English (`Inactive` / `Open-ended`), defined centrally in `const.py` (`STATE_INACTIVE` / `STATE_OPEN_ENDED`).
 - **Compatibility & Code Quality:**
   - Raised minimum supported Home Assistant version to `2024.12.0` and achieved 100% clean Pyright static typing and Ruff formatting across 129 unit tests.
 

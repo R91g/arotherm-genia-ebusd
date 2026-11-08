@@ -12,7 +12,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import CIRCUIT_BASS3, DEVICE_CLIMATE_CONTROLLER, DOMAIN
+from .const import CIRCUIT_BASS3, DEVICE_CLIMATE_CONTROLLER, DOMAIN, STATE_INACTIVE
 from .coordinator import SaunierGeniaCoordinator
 from .entity import SaunierGeniaEntity
 
@@ -249,7 +249,7 @@ class SaunierGeniaHolidayModeSwitch(SaunierGeniaEntity, SwitchEntity):
         if start_year == 15 or end_year == 15:
             return False
         if end_year is not None and end_year != 15:
-            return self.coordinator.get_holiday_remaining_days() != "Inactivo"
+            return self.coordinator.get_holiday_remaining_days() != STATE_INACTIVE
         return (z1_status is not None and z1_status.lower() == "holidayaway") or (
             hwc_status is not None and hwc_status.lower() == "holidayaway"
         )

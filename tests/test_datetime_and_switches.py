@@ -323,7 +323,7 @@ class TestDateTimeAndSwitches(unittest.TestCase):
         self.assertIn(("bass3", "CoolingEndDate", "15;08;26"), self.coord.writes)
 
     def test_sensor_dynamic_unit_of_measurement(self) -> None:
-        """Test that sensor suppresses unit of measurement for string states (Inactivo, Final abierto)."""
+        """Test that sensor suppresses unit of measurement for string states (Inactive, Open-ended)."""
         from custom_components.arotherm_genia_ebusd.sensor import SaunierGeniaSensor
         from custom_components.arotherm_genia_ebusd.sensor_descriptions import (
             SENSOR_DESCRIPTIONS,
@@ -339,14 +339,14 @@ class TestDateTimeAndSwitches(unittest.TestCase):
         self.assertEqual(sensor.native_value, 5)
         self.assertEqual(sensor.native_unit_of_measurement, "d")
 
-        # 2. When coordinator returns 'Inactivo'
-        self.coord.get_holiday_remaining_days = lambda: "Inactivo"
-        self.assertEqual(sensor.native_value, "Inactivo")
+        # 2. When coordinator returns 'Inactive'
+        self.coord.get_holiday_remaining_days = lambda: "Inactive"
+        self.assertEqual(sensor.native_value, "Inactive")
         self.assertIsNone(sensor.native_unit_of_measurement)
 
-        # 3. When coordinator returns 'Final abierto'
-        self.coord.get_holiday_remaining_days = lambda: "Final abierto"
-        self.assertEqual(sensor.native_value, "Final abierto")
+        # 3. When coordinator returns 'Open-ended'
+        self.coord.get_holiday_remaining_days = lambda: "Open-ended"
+        self.assertEqual(sensor.native_value, "Open-ended")
         self.assertIsNone(sensor.native_unit_of_measurement)
 
 

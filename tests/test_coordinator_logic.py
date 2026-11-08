@@ -319,19 +319,19 @@ class TestCoordinatorLogic(unittest.TestCase):
             )
 
     def test_holiday_and_cooling_remaining_days_states(self) -> None:
-        """Test remaining days calculations: Inactivo, Final abierto, and positive day counts."""
+        """Test remaining days calculations: Inactive, Open-ended, and positive day counts."""
         coord = SaunierGeniaCoordinator(MagicMock(), MagicMock())
         c_bass3 = CIRCUIT_BASS3.lower()
 
-        # 1. Holiday mode inactive: returns 'Inactivo'
+        # 1. Holiday mode inactive: returns 'Inactive'
         coord._state[(c_bass3, "Z1Status")] = {"value": "auto"}
-        self.assertEqual(coord.get_holiday_remaining_days(), "Inactivo")
+        self.assertEqual(coord.get_holiday_remaining_days(), "Inactive")
         attrs = coord.get_holiday_remaining_attributes()
         self.assertEqual(attrs["days_remaining"], 0)
         self.assertFalse(attrs["is_active"])
         self.assertFalse(attrs["is_open_ended"])
 
-        # 2. Holiday mode active with open-ended date (year 99): returns 'Final abierto'
+        # 2. Holiday mode active with open-ended date (year 99): returns 'Open-ended'
         coord._state[(c_bass3, "Z1Status")] = {"value": "holidayaway"}
         coord._state[(c_bass3, "HolidayStartDate")] = {
             "day": 30,
@@ -339,7 +339,7 @@ class TestCoordinatorLogic(unittest.TestCase):
             "year": 26,
         }
         coord._state[(c_bass3, "HolidayEndDate")] = {"day": 1, "month": 1, "year": 99}
-        self.assertEqual(coord.get_holiday_remaining_days(), "Final abierto")
+        self.assertEqual(coord.get_holiday_remaining_days(), "Open-ended")
         attrs = coord.get_holiday_remaining_attributes()
         self.assertIsNone(attrs["days_remaining"])
         self.assertTrue(attrs["is_active"])
@@ -358,19 +358,19 @@ class TestCoordinatorLogic(unittest.TestCase):
         self.assertTrue(attrs["is_active"])
         self.assertFalse(attrs["is_open_ended"])
 
-        # 4. Cooling inactive (year 19 or release status off): returns 'Inactivo'
+        # 4. Cooling inactive (year 19 or release status off): returns 'Inactive'
         coord._state[(c_bass3, "CoolingEndDate")] = {"day": 1, "month": 1, "year": 19}
-        self.assertEqual(coord.get_cooling_remaining_days(), "Inactivo")
+        self.assertEqual(coord.get_cooling_remaining_days(), "Inactive")
         c_attrs = coord.get_cooling_remaining_attributes()
         self.assertEqual(c_attrs["days_remaining"], 0)
         self.assertFalse(c_attrs["is_active"])
         self.assertFalse(c_attrs["is_open_ended"])
 
-        # 5. Cooling active with open-ended date (year 99): returns 'Final abierto'
+        # 5. Cooling active with open-ended date (year 99): returns 'Open-ended'
         coord._state[(c_bass3, "CoolingEndDate")] = {"day": 1, "month": 1, "year": 99}
         coord._state[(c_bass3, "CoolingReleaseStatus")] = {"value": "on"}
         coord._state[(c_bass3, "Z1OpModeCooling")] = {"value": "day"}
-        self.assertEqual(coord.get_cooling_remaining_days(), "Final abierto")
+        self.assertEqual(coord.get_cooling_remaining_days(), "Open-ended")
         c_attrs = coord.get_cooling_remaining_attributes()
         self.assertIsNone(c_attrs["days_remaining"])
         self.assertTrue(c_attrs["is_active"])
