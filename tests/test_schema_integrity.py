@@ -407,6 +407,56 @@ class TestSchemaIntegrity(unittest.TestCase):
             "08.hmu.HW5103.csv must be byte-for-byte identical to 08.hmu.csv",
         )
 
+    def test_controller_csvs_stay_identical_and_valid_types(self) -> None:
+        """Verify 15.*.csv parity, Unix LF line endings, and valid eBUSd message types."""
+        ebusd_cfg_dir = os.path.join(self.root_dir, "ebusd-configuration")
+        vaillant_dir = os.path.join(ebusd_cfg_dir, "vaillant")
+
+        # 1. Verify all 4 controller CSVs stay byte-for-byte identical
+        with open(os.path.join(vaillant_dir, "15.bass3.csv"), "rb") as fp:
+            bass3_bytes = fp.read()
+        for fname in ("15.basv3.csv", "15.ctlv2.csv", "15.ctlv3.csv"):
+            with open(os.path.join(vaillant_dir, fname), "rb") as fp:
+                other_bytes = fp.read()
+            self.assertEqual(
+                bass3_bytes,
+                other_bytes,
+                f"{fname} must be byte-for-byte identical to 15.bass3.csv",
+            )
+
+        # 2. Verify Unix LF line endings and valid message type tokens across all CSVs
+        valid_type_tokens = {"r", "r9", "w", "u", "uw"}
+        csv_files = glob.glob(
+            os.path.join(ebusd_cfg_dir, "**", "*.csv"), recursive=True
+        )
+        for csv_path in csv_files:
+            rel_path = os.path.relpath(csv_path, self.root_dir)
+            with open(csv_path, "rb") as bfp:
+                raw_bytes = bfp.read()
+            self.assertNotIn(
+                b"\r\n",
+                raw_bytes,
+                f"CSV file '{rel_path}' contains CRLF line endings; use LF for Linux ebusd compatibility",
+            )
+            for line_no, raw_line in enumerate(
+                raw_bytes.decode("utf-8").splitlines(), start=1
+            ):
+                line = raw_line.strip()
+                if not line or line.startswith(("#", "*", "type,")):
+                    continue
+                parts = next(csv.reader([line]))
+                raw_type = re.sub(r"^\[[^\]]+\]", "", parts[0].strip())
+                tokens = [t.strip() for t in raw_type.split(";") if t.strip()]
+                self.assertGreater(
+                    len(tokens), 0, f"Empty type in {rel_path}:{line_no}"
+                )
+                for tok in tokens:
+                    self.assertIn(
+                        tok,
+                        valid_type_tokens,
+                        f"Unexpected ebusd message type token '{tok}' in {rel_path}:{line_no}",
+                    )
+
 
 if __name__ == "__main__":
     unittest.main()

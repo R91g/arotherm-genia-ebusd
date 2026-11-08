@@ -33,6 +33,7 @@ from custom_components.arotherm_genia_ebusd.const import (
     CONF_OUTDOOR_MODEL,
     CONTROLLER_CIRCUITS,
     DOMAIN,
+    MESSAGE_ALIASES,
     OUTDOOR_CIRCUITS,
 )
 from custom_components.arotherm_genia_ebusd.coordinator import SaunierGeniaCoordinator
@@ -104,9 +105,13 @@ class TestCommunityFixtures(unittest.TestCase):
                         target_circuits = list(OUTDOOR_CIRCUITS)
 
                     for msg_name, payload in messages.items():
+                        alias = MESSAGE_ALIASES.get(msg_name.lower())
                         for circ in target_circuits:
                             coord._canonical_names[(circ, msg_name.lower())] = msg_name
                             coord._state[(circ, msg_name)] = payload
+                            if alias and alias != msg_name:
+                                coord._canonical_names[(circ, alias.lower())] = alias
+                                coord._state[(circ, alias)] = payload
 
                 coord._last_telemetry_time = 1000000000.0
 
@@ -144,6 +149,10 @@ class TestCommunityFixtures(unittest.TestCase):
                     self.assertTrue(climate.available)
                     self.assertIsNotNone(climate.target_temperature)
                     self.assertIsNotNone(climate.hvac_mode)
+                    if fixture_name == "saunier_geniaair_max_bass3.json":
+                        self.assertEqual(climate.current_humidity, 66)
+                    elif fixture_name == "vaillant_arotherm_plus_basv3.json":
+                        self.assertEqual(climate.current_humidity, 63)
 
                     water_heater = SaunierGeniaWaterHeater(coord)
                     self.assertTrue(water_heater.available)

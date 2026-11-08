@@ -59,8 +59,18 @@ class SupportsResponse(str, Enum):
     ONLY = "only"
 
 
+class RegistryEntryDisabler(str, Enum):
+    """Mock RegistryEntryDisabler enum."""
+
+    INTEGRATION = "integration"
+    USER = "user"
+
+
 sys.modules["homeassistant.exceptions"].HomeAssistantError = HomeAssistantError
 sys.modules["homeassistant.core"].SupportsResponse = SupportsResponse
+sys.modules[
+    "homeassistant.helpers.entity_registry"
+].RegistryEntryDisabler = RegistryEntryDisabler
 sys.modules["homeassistant.core"].ServiceResponse = dict[str, Any] | None
 sys.modules["homeassistant.components.diagnostics"].async_redact_data = (
     lambda data, to_redact: data
@@ -101,6 +111,37 @@ class MockEntity:
     def mode(self) -> Any:
         """Mock mode property for number entities."""
         return self._attr_mode
+
+    @property
+    def native_min_value(self) -> float:
+        """Mock native_min_value delegating to entity_description."""
+        if hasattr(self, "_attr_native_min_value"):
+            return self._attr_native_min_value
+        if hasattr(self, "entity_description") and (
+            self.entity_description.native_min_value is not None
+        ):
+            return self.entity_description.native_min_value
+        return 0.0
+
+    @property
+    def native_max_value(self) -> float:
+        """Mock native_max_value delegating to entity_description."""
+        if hasattr(self, "_attr_native_max_value"):
+            return self._attr_native_max_value
+        if hasattr(self, "entity_description") and (
+            self.entity_description.native_max_value is not None
+        ):
+            return self.entity_description.native_max_value
+        return 100.0
+
+    @property
+    def native_step(self) -> float | None:
+        """Mock native_step delegating to entity_description."""
+        if hasattr(self, "_attr_native_step"):
+            return self._attr_native_step
+        if hasattr(self, "entity_description"):
+            return self.entity_description.native_step
+        return None
 
     async def async_added_to_hass(self) -> None:
         """Mock async_added_to_hass."""

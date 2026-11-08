@@ -95,6 +95,7 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
         ]
         subscriptions = [
             (CIRCUIT_BASS3, "Z1RoomTemp"),
+            (CIRCUIT_BASS3, "Z1RoomHumidity"),
             (CIRCUIT_BASS3, "Z1ActualRoomTempDesired"),
             (CIRCUIT_BASS3, "Z1DayTemp"),
             (CIRCUIT_BASS3, "Z1NightTemp"),
@@ -261,6 +262,14 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
                 CIRCUIT_NETX3_ALT, "RoomTempDial", "temp"
             )
         return round(temp_dial, 2) if temp_dial is not None else None
+
+    @property
+    def current_humidity(self) -> int | None:
+        """Return the current relative room humidity (%) in Zone 1."""
+        humidity = self.coordinator.get_float(CIRCUIT_BASS3, "Z1RoomHumidity", "value")
+        if humidity is None or humidity <= 0.0 or humidity > 100.0:
+            return None
+        return round(humidity)
 
     # -------------------------------------------------------------------------
     # C) HVAC Mode State Machine

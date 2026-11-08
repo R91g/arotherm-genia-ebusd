@@ -73,13 +73,24 @@ class TestNumberPlatform(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(silent_desc.circuit, CIRCUIT_HMUX0)
         self.assertEqual(silent_desc.message, "CompressorSilentOperationLevel")
         self.assertEqual(silent_desc.field, "value")
-        self.assertEqual(silent_desc.native_min_value, 40.0)
+        self.assertEqual(silent_desc.native_min_value, 30.0)
         self.assertEqual(silent_desc.native_max_value, 60.0)
         self.assertEqual(silent_desc.native_step, 1.0)
         self.assertEqual(silent_desc.native_unit_of_measurement, PERCENTAGE)
         self.assertEqual(silent_desc.mode, NumberMode.BOX)
         self.assertEqual(silent_desc.entity_category, EntityCategory.CONFIG)
         self.assertTrue(silent_desc.is_integer)
+
+        # Verify max_cylinder_charge_time supports 0 (Off) and 15 min (observed on VRC 720 BASV3)
+        charge_desc = next(
+            (d for d in NUMBER_DESCRIPTIONS if d.key == "max_cylinder_charge_time"),
+            None,
+        )
+        self.assertIsNotNone(charge_desc)
+        assert charge_desc is not None
+        self.assertEqual(charge_desc.native_min_value, 0)
+        self.assertEqual(charge_desc.native_max_value, 180)
+        self.assertEqual(charge_desc.native_step, 5)
 
         # Verify all entities stay strictly in NumberMode.BOX
         for d in NUMBER_DESCRIPTIONS:
@@ -141,14 +152,16 @@ class TestNumberPlatform(unittest.IsolatedAsyncioTestCase):
         # Initial state is None before telemetry arrives
         self.assertIsNone(entity.native_value)
 
-        # Telemetry arrives on ebusd/hmu/CompressorSilentOperationLevel (Split unit)
+        # Telemetry arrives on ebusd/hmu/CompressorSilentOperationLevel (Split unit, e.g. 33% on VWL 55/6 A)
         msg = MagicMock()
         msg.topic = "ebusd/hmu/CompressorSilentOperationLevel"
-        msg.payload = '{"value": {"value": 60}}'
+        msg.payload = '{"value": {"value": 33}}'
         self.coordinator._async_on_mqtt_message(msg)
 
-        # Native value must reflect 60.0%
-        self.assertEqual(entity.native_value, 60.0)
+        # Native value must reflect 33.0% and lie cleanly within [native_min_value, native_max_value]
+        self.assertEqual(entity.native_value, 33.0)
+        self.assertGreaterEqual(entity.native_value, entity.native_min_value)
+        self.assertLessEqual(entity.native_value, entity.native_max_value)
 
         # Setting value to 50 via async_set_native_value on HMU Split
         with patch(

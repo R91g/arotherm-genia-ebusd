@@ -226,6 +226,7 @@ MESSAGE_ALIASES: dict[str, str] = {
     "waterthroughput": "RunDataFlowRate",
     "rundatastatuscode": "HMUStatusCode",
     "powerconsumptionhmu": "RunDataElectricPowerConsumption",
+    "z1maxflowtempdesired": "Z1RoomHumidity",
 }
 
 # Weekly timer passive update aliases for eavesdropping MiGo Link / gateway writes
@@ -422,6 +423,7 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_BASS3, "HwcParallelLoading"),
     (CIRCUIT_BASS3, "AdaptHeatCurve"),
     (CIRCUIT_BASS3, "BufferChargeOffset"),
+    (CIRCUIT_BASS3, "Z1RoomHumidity"),
     (CIRCUIT_BASS3, "MaxRoomHumidity"),
     (CIRCUIT_BASS3, "BivalencePointHc"),
     (CIRCUIT_BASS3, "BivalencePointHwc"),
@@ -440,7 +442,6 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_HMUX0, "RunDataFan1Speed"),
     (CIRCUIT_HMUX0, "RunDataFlowRate"),
     (CIRCUIT_HMUX0, "RunDataBuildingCPumpPower"),
-    (CIRCUIT_HMUX0, "RunDataElectricPowerConsumption"),
     (CIRCUIT_HMUX0, "RunDataHighPressure"),
     (CIRCUIT_HMUX0, "RunDataFlowTemp"),
     (CIRCUIT_HMUX0, "RunDataReturnTemp"),
@@ -483,15 +484,29 @@ HMUX0_EXCLUSIVE_MESSAGES: frozenset[str] = frozenset(
     }
 )
 
+# Unique ID suffixes of outdoor per-mode electrical sensors exclusive to HMUX0 b516 EEPROM
+HMUX0_ONLY_SENSOR_UNIQUE_ID_SUFFIXES: frozenset[str] = frozenset(
+    {
+        "hmux0_prenergyelectriccool_energy",
+        "hmux0_prenergyelectrichc_energy",
+        "hmux0_prenergyelectrichwc_energy",
+    }
+)
+
 # Additional eBUSd messages for Vaillant HMU00 (HW=5103) outdoor units
 HMU_HW5103_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_HMU, "FlowPressure"),
     (CIRCUIT_HMU, "YieldHc"),
     (CIRCUIT_HMU, "YieldHwc"),
     (CIRCUIT_HMU, "YieldCooling"),
+    (CIRCUIT_HMU, "CopHc"),
+    (CIRCUIT_HMU, "CopHwc"),
+    (CIRCUIT_HMU, "CopCooling"),
     (CIRCUIT_HMU, "TotalEnergyUsage"),
     (CIRCUIT_HMU, "EnergyIntegral"),
     (CIRCUIT_HMU, "CompressorSilentOperationLevel"),
+    (CIRCUIT_HMU, "CompressorHours"),
+    (CIRCUIT_HMU, "CompressorStarts"),
 ]
 
 # All 52 HMUStatusCode values (plus normalized aliases)

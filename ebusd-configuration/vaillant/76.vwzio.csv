@@ -12,29 +12,41 @@ uw,,,SetMode,target power and mode from regulator,,,b510,00,hcmode,,UCH,0=auto;1
 # ==============================================================================
 # 2. TEMPERATURES AND PUMP STATES (CONTROLLER 10 -> 76)
 # ==============================================================================
-u,,,Status01,circuit temperatures and pump state,,,b511,01,flow_temp,,D1C,,°C,flow temperature,return_temp,,D1C,,°C,return temperature,outside_temp,,D2B,,°C,outside temperature,hwc_temp,,D1C,,°C,hot water temperature,storage_temp,,D1C,,°C,storage temperature,pumpstate,,UCH,0=off;1=on;2=overrun;4=hwc,,pump status
-u,,,SecondaryCircuitStatus,secondary pump and circuit status,,,b512,0f0201,status,,HEX:7,,,
-u,,,SecondaryCircuitStatusStandby,secondary pump and circuit status standby,,,b512,0f0001,status,,HEX:7,,,
-u,,,SecondaryCircuitStatusHwc,secondary pump and circuit status hwc,,,b512,0f0202,status,,HEX:7,,,
-u,,,SecondaryCircuitStatus03,secondary pump and circuit status 03,,,b512,0f0301,status,,HEX:7,,,
+r;u,,,Status01,circuit temperatures and pump state,,,b511,01,flow_temp,,D1C,,°C,flow temperature,return_temp,,D1C,,°C,return temperature,outside_temp,,D2B,,°C,outside temperature,hwc_temp,,D1C,,°C,hot water temperature,storage_temp,,D1C,,°C,storage temperature,pumpstate,,UCH,0=off;1=on;2=overrun;4=hwc,,pump status
+
+# Immersion heater runtime and start count by mode (Heating, DHW)
+r;u,,,RunStatsHeaterHc,immersion heater runtime and start count in heating mode,,,b511,1801,ign,,IGN:1,,,,runtime,,ULG,,min,"immersion heater runtime",cycles,,ULG,,,"start count"
+r;u,,,RunStatsHeaterHwc,immersion heater runtime and start count in hot water mode,,,b511,1802,ign,,IGN:1,,,,runtime,,ULG,,min,"immersion heater runtime",cycles,,ULG,,,"start count"
+r;u,,,SecondaryCircuitStatus,secondary pump and circuit status,,,b512,0f0201,status,,HEX:7,,,
+r;u,,,SecondaryCircuitStatusStandby,secondary pump and circuit status standby,,,b512,0f0001,status,,HEX:7,,,
+r;u,,,SecondaryCircuitStatusHwc,secondary pump and circuit status hwc,,,b512,0f0202,status,,HEX:7,,,
+r;u,,,SecondaryCircuitStatus03,secondary pump and circuit status 03,,,b512,0f0301,status,,HEX:7,,,
 
 # ==============================================================================
-# 3. ENERGY TELEMETRY AND DIAGNOSTICS (b516 - ACTIVE r WITHOUT POLL + PASSIVE u)
+# 3. ENERGY TELEMETRY AND DIAGNOSTICS (b516 - PASSIVE u & ON-DEMAND READ r)
 # ==============================================================================
-u,,,EnergyStatsDescriptor,energy statistics EEPROM table descriptor,,,b516,11,data,,HEX:9,,,
-r,,,PowerStatus,instantaneous power consumption and active mode,,,b516,14,status,,UCH,0=standby;1=heating;2=hwc;3=cooling,,active energy integration mode,power,,EXP,,W,"instantaneous electrical power",fuel_power,,EXP,,W,"instantaneous fuel power"
-u,,,PrEnergySolarTotal,total solar energy sum,,,b516,1000ffff01000000,ign,,IGN:7,,,,energy,,EXP,,Wh,
-r,,,PrEnergyElectricHc,total heating electrical energy consumed,,,b516,1000ffff83030000,ign,,IGN:7,,,,energy,,EXP,,Wh,"cumulative heating and standby consumed electrical energy"
-r,,,PrEnergyElectricHwc,total hot water electrical energy consumed,,,b516,1000ffff83040000,ign,,IGN:7,,,,energy,,EXP,,Wh,"cumulative hot water consumed electrical energy"
-r,,,PrEnergyThermalHc,total heating thermal energy delivered,,,b516,1000ffff49030000,ign,,IGN:7,,,,energy,,EXP,,Wh,"cumulative heating delivered thermal energy"
-r,,,PrEnergyThermalHwc,total hot water thermal energy delivered,,,b516,1000ffff49040000,ign,,IGN:7,,,,energy,,EXP,,Wh,"cumulative hot water delivered thermal energy"
+r;u,,,EnergyStatsDescriptor,energy statistics EEPROM table descriptor,,,b516,11,data,,HEX:9,,,
+r;u,,,PowerStatus,instantaneous power consumption and active mode,,,b516,14,status,,UCH,0=standby;1=heating;2=hwc;3=cooling,,active energy integration mode,power,,EXP,,W,"instantaneous electrical power",fuel_power,,EXP,,W,"instantaneous fuel power"
+r;u,,,PrEnergySolarTotal,total solar energy sum,,,b516,1000ffff01000000,ign,,IGN:7,,,,energy,,EXP,,Wh,
+r;u,,,PrEnergyElectricHc,total heating electrical energy consumed,,,b516,1000ffff83030000,ign,,IGN:7,,,,energy,,EXP,,Wh,"cumulative heating and standby consumed electrical energy"
+r;u,,,PrEnergyElectricHwc,total hot water electrical energy consumed,,,b516,1000ffff83040000,ign,,IGN:7,,,,energy,,EXP,,Wh,"cumulative hot water consumed electrical energy"
+r;u,,,PrEnergyThermalHc,total heating thermal energy delivered,,,b516,1000ffff49030000,ign,,IGN:7,,,,energy,,EXP,,Wh,"cumulative heating delivered thermal energy"
+r;u,,,PrEnergyThermalHwc,total hot water thermal energy delivered,,,b516,1000ffff49040000,ign,,IGN:7,,,,energy,,EXP,,Wh,"cumulative hot water delivered thermal energy"
 
-u,,,RunStatsHcStarts,,,,b509,540200c00b,ign,,IGN:4,,,,value,,UIN,,,total starts of heating mode
-u,,,RunStatsHwcStarts,,,,b509,540200c10b,ign,,IGN:4,,,,value,,UIN,,,total starts of Hwc mode
-u,,,RunDataDiagnostic,diagnostic code readout,,,b509,540200cc10,ign,,IGN:4,,,,value,,HEX:2,,,
-u,,,Currenterror,current errors,,,b503,0001,error,,UIN,,,error number,error_1,,UIN,,,error number,error_2,,UIN,,,error number,error_3,,UIN,,,error number,error_4,,UIN,,,error number
-u,,,Errorhistory,Error_History,,,b503,0101,index,m,UCH,,,,status,,UCH,,,Status,time,,VTM,,,time,date,,HDA:3,,,date,error,,UIN,,,error number
-u,,,ErrorMemorySlot,error memory slot,,,b503,00,slot,m,UCH,,,,error,,UIN,,,error number,data,,HEX:8,,,
+r;u,,,RunStatsHcStarts,,,,b509,540200c00b,ign,,IGN:4,,,,value,,UIN,,,total starts of heating mode
+r;u,,,RunStatsHwcStarts,,,,b509,540200c10b,ign,,IGN:4,,,,value,,UIN,,,total starts of Hwc mode
+r;u,,,RunDataDiagnostic,diagnostic code readout,,,b509,540200cc10,ign,,IGN:4,,,,value,,HEX:2,,,
+r;u,,,RunStatsHeaterEnergy,electrical energy consumption of the immersion heater,,,b509,5402000c0b,ign,,IGN:4,,,,value,,ULG,,kWh,"electrical energy consumption of the immersion heater"
+r;u,,,RunDataHeaterFlowTemp,immersion heater flow temperature,,,b509,5402004c09,ign,,IGN:4,,,,value,,EXP,,°C,"immersion heater flow temperature"
+# Hourly diagnostic telemetry & hydraulic status (Section 4)
+r;u,,,RunDataDiagbf0d,minimum volumetric flow rate safety threshold,,,b509,540200bf0d,ign,,IGN:4,,,,value,,EXP,,l/min,"minimum volumetric flow rate safety threshold"
+r;u,,,RunDataDiagad0d,hydraulic actuator position status diagnostic,,,b509,540200ad0d,ign,,IGN:4,,,,status,,UCH,,,hydraulic actuator position status diagnostic
+r;u,,,RunDataDiagac0d,backup heater relay status diagnostic,,,b509,540200ac0d,ign,,IGN:4,,,,status,,UCH,,,backup heater relay status diagnostic
+r;u,,,RunDataDiag640b,hydraulic module runtime counter 640b,,,b509,540200640b,ign,,IGN:4,,,,hours,,UIN,,h,"hydraulic module runtime counter 640b"
+r;u,,,RunDataDiagbd0b,hydraulic module cycle counter bd0b,,,b509,540200bd0b,ign,,IGN:4,,,,switches,,ULG,,,hydraulic module cycle counter bd0b
+r;u,,,Currenterror,current errors,,,b503,0001,error,,UIN,,,error number,error_1,,UIN,,,error number,error_2,,UIN,,,error number,error_3,,UIN,,,error number,error_4,,UIN,,,error number
+r;u,,,Errorhistory,Error_History,,,b503,0101,index,m,UCH,,,,status,,UCH,,,Status,time,,VTM,,,time,date,,HDA:3,,,date,error,,UIN,,,error number
+r;u,,,ErrorMemorySlot,error memory slot,,,b503,00,slot,m,UCH,,,,error,,UIN,,,error number,data,,HEX:8,,,
 
 # ==============================================================================
 # 4. SERVICE MODE / RELAY TEST (ORIGINAL)

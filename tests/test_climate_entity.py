@@ -213,6 +213,26 @@ class TestClimateEntity(unittest.TestCase):
         self.assertFalse(self.climate.available)
         self.assertFalse(water_heater.available)
 
+    def test_current_humidity_valid_and_out_of_bounds(self) -> None:
+        """Verify Zone 1 climate entity exposes Z1RoomHumidity and filters invalid values."""
+        self.assertIsNone(self.climate.current_humidity)
+
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1roomhumidity")] = {
+            "value": 63.4
+        }
+        self.assertEqual(self.climate.current_humidity, 63)
+
+        # Out-of-bounds or sentinel readings (<= 0 or > 100) must return None
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1roomhumidity")] = {
+            "value": 0.0
+        }
+        self.assertIsNone(self.climate.current_humidity)
+
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1roomhumidity")] = {
+            "value": 105.0
+        }
+        self.assertIsNone(self.climate.current_humidity)
+
 
 if __name__ == "__main__":
     unittest.main()

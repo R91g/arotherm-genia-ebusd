@@ -366,6 +366,9 @@
           "four_port_valve_position_fault": "Advertencia posición válvula de 4 vías (S.590)"
         }
       },
+      "hmu_current_error": {
+        "name": "Diagnóstico de errores activos"
+      },
       "electric_power_consumption": {
         "name": "Potencia eléctrica instantánea"
       },
@@ -537,6 +540,9 @@
           "dhw": "Agua Caliente Sanitaria (ACS)"
         }
       },
+      "controller_current_error": {
+        "name": "Diagnóstico de errores activos"
+      },
       "water_pressure": {
         "name": "Presión de agua del circuito"
       },
@@ -548,6 +554,9 @@
       },
       "z1_room_temp": {
         "name": "Temperatura ambiente Zona 1"
+      },
+      "z1_room_humidity": {
+        "name": "Humedad ambiente Zona 1"
       },
       "z1_actual_room_temp_desired": {
         "name": "Consigna efectiva actual Zona 1"
@@ -696,6 +705,66 @@
       },
       "ebusd_arbitration_latency": {
         "name": "Latencia de arbitraje eBUS"
+      },
+      "evaporation_temp": {
+        "name": "Temperatura de evaporación del refrigerante"
+      },
+      "condensation_temp": {
+        "name": "Temperatura de condensación del refrigerante"
+      },
+      "condensate_temp": {
+        "name": "Temperatura de salida de condensador líquido"
+      },
+      "superheat": {
+        "name": "Recalentamiento en aspiración (Superheat)"
+      },
+      "subcooling": {
+        "name": "Subenfriamiento del condensador (Subcooling)"
+      },
+      "energy_integral": {
+        "name": "Integral de energía del compresor"
+      },
+      "compressor_flow_temp_desired": {
+        "name": "Consigna de impulsión del compresor"
+      },
+      "heat_output_internal": {
+        "name": "Potencia térmica interna lado agua"
+      },
+      "stats_compressor_hc_hours": {
+        "name": "Horas de funcionamiento del compresor en calefacción"
+      },
+      "stats_compressor_hc_starts": {
+        "name": "Arranques del compresor en calefacción"
+      },
+      "stats_compressor_hwc_hours": {
+        "name": "Horas de funcionamiento del compresor en ACS"
+      },
+      "stats_compressor_hwc_starts": {
+        "name": "Arranques del compresor en ACS"
+      },
+      "stats_compressor_cool_hours": {
+        "name": "Horas de funcionamiento del compresor en refrigeración"
+      },
+      "stats_compressor_cool_starts": {
+        "name": "Arranques del compresor en refrigeración"
+      },
+      "vwzio_heater_energy": {
+        "name": "Consumo eléctrico de la resistencia de apoyo"
+      },
+      "vwzio_heater_flow_temp": {
+        "name": "Temperatura de impulsión de la resistencia de apoyo"
+      },
+      "stats_vwzio_heater_hc_hours": {
+        "name": "Horas de la resistencia de apoyo en calefacción"
+      },
+      "stats_vwzio_heater_hc_starts": {
+        "name": "Conmutaciones de la resistencia de apoyo en calefacción"
+      },
+      "stats_vwzio_heater_hwc_hours": {
+        "name": "Horas de la resistencia de apoyo en ACS"
+      },
+      "stats_vwzio_heater_hwc_starts": {
+        "name": "Conmutaciones de la resistencia de apoyo en ACS"
       }
     }
   }

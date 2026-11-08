@@ -71,6 +71,7 @@ from .const import (
     HMU_HW5103_HYDRATION_MESSAGES,
     HMUX0_CUSTOM_SIGNATURE_MESSAGES,
     HMUX0_EXCLUSIVE_MESSAGES,
+    HMUX0_ONLY_SENSOR_UNIQUE_ID_SUFFIXES,
     HOLIDAY_DEFAULT_END_TIME,
     HOLIDAY_INDEFINITE_END_DATE,
     HOLIDAY_RESET_DATE,
@@ -121,13 +122,21 @@ _OUTDOOR_THERMO_TRIGGER_NAMES: tuple[str, ...] = (
     "yieldhc",
     "yieldhwc",
     "yieldcooling",
+    "cophc",
+    "cophwc",
+    "copcooling",
     "totalenergyusage",
     "flowpressure",
 )
 
-# Inputs in outdoor units (hmux0/hmu) and vwzio that trigger recalculation of thermodynamic & energy sensors
+# Inputs in outdoor units (hmux0/hmu), controller (15.*), and vwzio that trigger recalculation of thermodynamic & energy sensors
 THERMO_TRIGGER_MESSAGES: frozenset[tuple[str, str]] = frozenset(
     {(c, msg) for c in OUTDOOR_CIRCUITS for msg in _OUTDOOR_THERMO_TRIGGER_NAMES}
+    | {
+        (c, msg)
+        for c in CONTROLLER_CIRCUITS
+        for msg in ("prenergysumhc", "prenergysumhwc")
+    }
     | {
         (CIRCUIT_VWZIO, "powerstatus"),
         (CIRCUIT_VWZIO, "prenergyelectrichc"),
@@ -1254,9 +1263,37 @@ class SaunierGeniaCoordinator:
                 self._async_notify_message_listeners(circuit, msg_name)
 
     @callback
+    def _async_sync_hmux0_only_entities(self, is_split_hmu: bool) -> None:
+        """Disable or re-enable HMUX0-exclusive per-mode electrical sensors in Entity Registry."""
+        entry_id = getattr(self.entry, "entry_id", None)
+        if not isinstance(entry_id, str) or not entry_id:
+            return
+        from homeassistant.helpers import entity_registry as er
+
+        ent_reg = er.async_get(self.hass)
+        hmux0_uids = {
+            f"{entry_id}_{suffix}" for suffix in HMUX0_ONLY_SENSOR_UNIQUE_ID_SUFFIXES
+        }
+        for reg_entry in list(er.async_entries_for_config_entry(ent_reg, entry_id)):
+            if getattr(reg_entry, "unique_id", None) not in hmux0_uids:
+                continue
+            if is_split_hmu and reg_entry.disabled_by is None:
+                ent_reg.async_update_entity(
+                    reg_entry.entity_id,
+                    disabled_by=er.RegistryEntryDisabler.INTEGRATION,
+                )
+            elif (
+                not is_split_hmu
+                and reg_entry.disabled_by == er.RegistryEntryDisabler.INTEGRATION
+            ):
+                ent_reg.async_update_entity(reg_entry.entity_id, disabled_by=None)
+
+    @callback
     def _async_on_outdoor_circuit_changed(self, new_circuit: str) -> None:
         """Handle outdoor circuit transition (e.g. late HMU detection)."""
-        if new_circuit == CIRCUIT_HMU:
+        is_split_hmu = new_circuit in (CIRCUIT_HMU, CIRCUIT_HMU00)
+        self._async_sync_hmux0_only_entities(is_split_hmu)
+        if is_split_hmu:
             # 1. Purge incompatible Monobloc b516 messages from pending queue
             self._pending_hydration = [
                 (c, m)
@@ -1279,13 +1316,15 @@ class SaunierGeniaCoordinator:
                         self._async_run_hydration_queue(missing_hmu),
                         name=f"{self.entry.domain}_hmu_late_hydration",
                     )
+        if any((c, m.lower()) in THERMO_TRIGGER_MESSAGES for (c, m) in self._state):
+            self._async_recalculate_thermodynamics()
 
     @callback
     def _async_start_initial_hydration(self, _now: datetime) -> None:
         """Start background task to hydrate missing messages after retained wait."""
         self._hydration_timer_unsub = None
         self._initial_hydration_started = True
-        if self._active_outdoor_circuit == CIRCUIT_HMU:
+        if self._active_outdoor_circuit in (CIRCUIT_HMU, CIRCUIT_HMU00):
             missing: list[tuple[str, str]] = [
                 (circuit, message)
                 for circuit, message in ESSENTIAL_HYDRATION_MESSAGES
@@ -1334,7 +1373,7 @@ class SaunierGeniaCoordinator:
                 if self.has_message(circuit, message):
                     continue
                 if (
-                    self._active_outdoor_circuit == CIRCUIT_HMU
+                    self._active_outdoor_circuit in (CIRCUIT_HMU, CIRCUIT_HMU00)
                     and circuit in OUTDOOR_CIRCUITS
                     and message in HMUX0_EXCLUSIVE_MESSAGES
                 ):
@@ -1356,7 +1395,7 @@ class SaunierGeniaCoordinator:
         if self._hydration_task is not None and not self._hydration_task.done():
             return
         # Poll core operational messages + live telemetry & energy counters with gentle spacing
-        if self._active_outdoor_circuit == CIRCUIT_HMU:
+        if self._active_outdoor_circuit in (CIRCUIT_HMU, CIRCUIT_HMU00):
             fallback_energy_messages: list[tuple[str, str]] = [
                 (CIRCUIT_HMU, "HMUStatusCode"),
                 (CIRCUIT_HMU, "StateCompressor"),
@@ -1369,9 +1408,14 @@ class SaunierGeniaCoordinator:
                 (CIRCUIT_HMU, "YieldHc"),
                 (CIRCUIT_HMU, "YieldHwc"),
                 (CIRCUIT_HMU, "YieldCooling"),
+                (CIRCUIT_HMU, "CopHc"),
+                (CIRCUIT_HMU, "CopHwc"),
+                (CIRCUIT_HMU, "CopCooling"),
                 (CIRCUIT_HMU, "TotalEnergyUsage"),
                 (CIRCUIT_HMU, "FlowPressure"),
                 (CIRCUIT_HMU, "EnergyIntegral"),
+                (CIRCUIT_HMU, "CompressorHours"),
+                (CIRCUIT_HMU, "CompressorStarts"),
                 (CIRCUIT_VWZIO, "PowerStatus"),
                 (CIRCUIT_VWZIO, "PrEnergyElectricHc"),
                 (CIRCUIT_VWZIO, "PrEnergyElectricHwc"),
@@ -1402,10 +1446,11 @@ class SaunierGeniaCoordinator:
                 (CIRCUIT_VWZIO, "PrEnergyThermalHc"),
                 (CIRCUIT_VWZIO, "PrEnergyThermalHwc"),
             ]
+        controller_hydration_messages = [
+            item for item in ESSENTIAL_HYDRATION_MESSAGES if item[0] == CIRCUIT_BASS3
+        ]
         core_messages = list(
-            dict.fromkeys(
-                [*ESSENTIAL_HYDRATION_MESSAGES[:40], *fallback_energy_messages]
-            )
+            dict.fromkeys([*controller_hydration_messages, *fallback_energy_messages])
         )
         self._hydration_task = self.hass.async_create_background_task(
             self._async_force_poll_queue(core_messages),
@@ -1456,18 +1501,18 @@ class SaunierGeniaCoordinator:
 
         # 3. Live Instantaneous COP / EER
         elec_power = self.get_float(
-            self._active_outdoor_circuit, "RunDataElectricPowerConsumption", "power"
+            self._active_outdoor_circuit, "PowerStatus", "power"
         )
         if elec_power is None:
             elec_power = self.get_float(
-                self._active_outdoor_circuit, "PowerStatus", "power"
+                self._active_outdoor_circuit, "RunDataElectricPowerConsumption", "power"
             )
         if elec_power is None and self._active_outdoor_circuit != CIRCUIT_HMUX0:
-            elec_power = self.get_float(
-                CIRCUIT_HMUX0, "RunDataElectricPowerConsumption", "power"
-            )
+            elec_power = self.get_float(CIRCUIT_HMUX0, "PowerStatus", "power")
             if elec_power is None:
-                elec_power = self.get_float(CIRCUIT_HMUX0, "PowerStatus", "power")
+                elec_power = self.get_float(
+                    CIRCUIT_HMUX0, "RunDataElectricPowerConsumption", "power"
+                )
         live_cop, is_active = calculate_live_cop(
             thermal_power, elec_power, hmu_status, frozenset(ACTIVE_COMPRESSOR_STATUSES)
         )
@@ -1476,99 +1521,173 @@ class SaunierGeniaCoordinator:
                 self.last_active_cop = live_cop
             self._set_calculated(CALC_LIVE_COP, live_cop)
 
-        # 4. Per-Mode & Combined System Cumulative Electrical Energy (Wh)
+        # 4 & 5. Per-Mode & Combined System Cumulative Electrical Energy (Wh) & Efficiency (COP / EER)
         is_split_hmu = self._active_outdoor_circuit in (CIRCUIT_HMU, CIRCUIT_HMU00)
-        hmux0_elec_hc = (
-            0.0
-            if is_split_hmu
-            else self.get_float(CIRCUIT_HMUX0, "PrEnergyElectricHc", "energy")
-        )
-        hmux0_elec_hwc = (
-            0.0
-            if is_split_hmu
-            else self.get_float(CIRCUIT_HMUX0, "PrEnergyElectricHwc", "energy")
-        )
-        hmux0_elec_cool = (
-            0.0
-            if is_split_hmu
-            else self.get_float(CIRCUIT_HMUX0, "PrEnergyElectricCool", "energy")
-        )
         vwzio_elec_hc = self.get_float(CIRCUIT_VWZIO, "PrEnergyElectricHc", "energy")
         vwzio_elec_hwc = self.get_float(CIRCUIT_VWZIO, "PrEnergyElectricHwc", "energy")
-
-        heating_total_wh = calculate_combined_mode_energy(hmux0_elec_hc, vwzio_elec_hc)
-        if heating_total_wh is not None:
-            self._set_calculated(CALC_HEATING_TOTAL_ENERGY, heating_total_wh)
-
-        dhw_total_wh = calculate_combined_mode_energy(hmux0_elec_hwc, vwzio_elec_hwc)
-        if dhw_total_wh is not None:
-            self._set_calculated(CALC_DHW_TOTAL_ENERGY, dhw_total_wh)
-
-        system_total_wh = calculate_system_total_energy(
-            heating_total_wh, dhw_total_wh, hmux0_elec_cool
-        )
-        if system_total_wh is not None:
-            self._set_calculated(CALC_SYSTEM_TOTAL_ENERGY, system_total_wh)
-
-        # 5. Verified Cumulative Mode & Global Efficiency (COP / EER)
-        hmux0_therm_hc = (
-            0.0
-            if is_split_hmu
-            else self.get_float(CIRCUIT_HMUX0, "PrEnergyThermalHc", "energy")
-        )
-        hmux0_therm_hwc = (
-            0.0
-            if is_split_hmu
-            else self.get_float(CIRCUIT_HMUX0, "PrEnergyThermalHwc", "energy")
-        )
-        hmux0_therm_cool = (
-            0.0
-            if is_split_hmu
-            else self.get_float(CIRCUIT_HMUX0, "PrEnergyThermalCool", "energy")
-        )
         vwzio_therm_hc = self.get_float(CIRCUIT_VWZIO, "PrEnergyThermalHc", "energy")
         vwzio_therm_hwc = self.get_float(CIRCUIT_VWZIO, "PrEnergyThermalHwc", "energy")
 
-        hc_cop = calculate_combined_efficiency(
-            (hmux0_therm_hc, vwzio_therm_hc),
-            (hmux0_elec_hc, vwzio_elec_hc),
-        )
-        if hc_cop is not None:
-            self._set_calculated(CALC_HC_COP, hc_cop)
+        if is_split_hmu:
+            # HMU / HMU00 (HW5103): 76.vwzio only meters indoor standby/immersion heater,
+            # while outdoor compressor metering lives in 08.hmu (b51a, kWh) and 15.* (b524, kWh).
+            pr_sum_hc_kwh = self.get_float(CIRCUIT_BASS3, "PrEnergySumHc", "value")
+            if pr_sum_hc_kwh is not None:
+                self._set_calculated(
+                    CALC_HEATING_TOTAL_ENERGY, round(pr_sum_hc_kwh * 1000.0, 1)
+                )
 
-        hwc_cop = calculate_combined_efficiency(
-            (hmux0_therm_hwc, vwzio_therm_hwc),
-            (hmux0_elec_hwc, vwzio_elec_hwc),
-        )
-        if hwc_cop is not None:
-            self._set_calculated(CALC_HWC_COP, hwc_cop)
+            pr_sum_hwc_kwh = self.get_float(CIRCUIT_BASS3, "PrEnergySumHwc", "value")
+            if pr_sum_hwc_kwh is not None:
+                self._set_calculated(
+                    CALC_DHW_TOTAL_ENERGY, round(pr_sum_hwc_kwh * 1000.0, 1)
+                )
 
-        cool_eer = calculate_period_cop(
-            hmux0_therm_cool,
-            hmux0_elec_cool,
-            min_elec_energy=MIN_CUMULATIVE_ELECTRICAL_ENERGY_WH,
-        )
-        if cool_eer is not None:
-            self._set_calculated(CALC_COOL_EER, cool_eer)
+            total_usage_kwh = self.get_float(CIRCUIT_HMU, "TotalEnergyUsage", "value")
+            if (
+                total_usage_kwh is not None
+                and vwzio_elec_hc is not None
+                and vwzio_elec_hwc is not None
+            ):
+                self._set_calculated(
+                    CALC_SYSTEM_TOTAL_ENERGY,
+                    round(total_usage_kwh * 1000.0 + vwzio_elec_hc + vwzio_elec_hwc, 1),
+                )
 
-        global_efficiency = calculate_combined_efficiency(
-            (
-                hmux0_therm_hc,
-                vwzio_therm_hc,
-                hmux0_therm_hwc,
-                vwzio_therm_hwc,
+            yield_hc_kwh = self.get_float(CIRCUIT_HMU, "YieldHc", "value")
+            yield_hwc_kwh = self.get_float(CIRCUIT_HMU, "YieldHwc", "value")
+            yield_cool_kwh = self.get_float(CIRCUIT_HMU, "YieldCooling", "value")
+            hmu_cop_hc = self.get_float(CIRCUIT_HMU, "CopHc", "value")
+            hmu_cop_hwc = self.get_float(CIRCUIT_HMU, "CopHwc", "value")
+            hmu_cop_cool = self.get_float(CIRCUIT_HMU, "CopCooling", "value")
+
+            hc_cop: float | None = None
+            if hmu_cop_hc is not None and hmu_cop_hc > 0:
+                hc_cop = round(hmu_cop_hc, 2)
+            elif yield_hc_kwh is not None and pr_sum_hc_kwh is not None:
+                hc_cop = calculate_period_cop(
+                    (yield_hc_kwh + pr_sum_hc_kwh) * 1000.0,
+                    pr_sum_hc_kwh * 1000.0,
+                    min_elec_energy=MIN_CUMULATIVE_ELECTRICAL_ENERGY_WH,
+                )
+            if hc_cop is not None:
+                self._set_calculated(CALC_HC_COP, hc_cop)
+
+            hwc_cop: float | None = None
+            if hmu_cop_hwc is not None and hmu_cop_hwc > 0:
+                hwc_cop = round(hmu_cop_hwc, 2)
+            elif yield_hwc_kwh is not None and pr_sum_hwc_kwh is not None:
+                hwc_cop = calculate_period_cop(
+                    (yield_hwc_kwh + pr_sum_hwc_kwh) * 1000.0,
+                    pr_sum_hwc_kwh * 1000.0,
+                    min_elec_energy=MIN_CUMULATIVE_ELECTRICAL_ENERGY_WH,
+                )
+            if hwc_cop is not None:
+                self._set_calculated(CALC_HWC_COP, hwc_cop)
+
+            cool_eer: float | None = None
+            if hmu_cop_cool is not None and hmu_cop_cool > 0:
+                cool_eer = round(hmu_cop_cool, 2)
+            elif yield_cool_kwh is not None and yield_cool_kwh == 0.0:
+                cool_eer = 0.0
+            if cool_eer is not None:
+                self._set_calculated(CALC_COOL_EER, cool_eer)
+
+            if (
+                yield_hc_kwh is not None
+                and yield_hwc_kwh is not None
+                and yield_cool_kwh is not None
+                and total_usage_kwh is not None
+            ):
+                outdoor_therm_wh = (
+                    yield_hc_kwh + yield_hwc_kwh + yield_cool_kwh + total_usage_kwh
+                ) * 1000.0
+                global_efficiency = calculate_combined_efficiency(
+                    (outdoor_therm_wh, vwzio_therm_hc, vwzio_therm_hwc),
+                    (total_usage_kwh * 1000.0, vwzio_elec_hc, vwzio_elec_hwc),
+                )
+                if global_efficiency is not None:
+                    self._set_calculated(CALC_GLOBAL_EFFICIENCY, global_efficiency)
+        else:
+            # HMUX0 (HW0402): High-resolution b516 Wh EEPROM counters on 08.hmux0 + 76.vwzio
+            hmux0_elec_hc = self.get_float(
+                CIRCUIT_HMUX0, "PrEnergyElectricHc", "energy"
+            )
+            hmux0_elec_hwc = self.get_float(
+                CIRCUIT_HMUX0, "PrEnergyElectricHwc", "energy"
+            )
+            hmux0_elec_cool = self.get_float(
+                CIRCUIT_HMUX0, "PrEnergyElectricCool", "energy"
+            )
+
+            heating_total_wh = calculate_combined_mode_energy(
+                hmux0_elec_hc, vwzio_elec_hc
+            )
+            if heating_total_wh is not None:
+                self._set_calculated(CALC_HEATING_TOTAL_ENERGY, heating_total_wh)
+
+            dhw_total_wh = calculate_combined_mode_energy(
+                hmux0_elec_hwc, vwzio_elec_hwc
+            )
+            if dhw_total_wh is not None:
+                self._set_calculated(CALC_DHW_TOTAL_ENERGY, dhw_total_wh)
+
+            system_total_wh = calculate_system_total_energy(
+                heating_total_wh, dhw_total_wh, hmux0_elec_cool
+            )
+            if system_total_wh is not None:
+                self._set_calculated(CALC_SYSTEM_TOTAL_ENERGY, system_total_wh)
+
+            hmux0_therm_hc = self.get_float(
+                CIRCUIT_HMUX0, "PrEnergyThermalHc", "energy"
+            )
+            hmux0_therm_hwc = self.get_float(
+                CIRCUIT_HMUX0, "PrEnergyThermalHwc", "energy"
+            )
+            hmux0_therm_cool = self.get_float(
+                CIRCUIT_HMUX0, "PrEnergyThermalCool", "energy"
+            )
+
+            hc_cop = calculate_combined_efficiency(
+                (hmux0_therm_hc, vwzio_therm_hc),
+                (hmux0_elec_hc, vwzio_elec_hc),
+            )
+            if hc_cop is not None:
+                self._set_calculated(CALC_HC_COP, hc_cop)
+
+            hwc_cop = calculate_combined_efficiency(
+                (hmux0_therm_hwc, vwzio_therm_hwc),
+                (hmux0_elec_hwc, vwzio_elec_hwc),
+            )
+            if hwc_cop is not None:
+                self._set_calculated(CALC_HWC_COP, hwc_cop)
+
+            cool_eer = calculate_period_cop(
                 hmux0_therm_cool,
-            ),
-            (
-                hmux0_elec_hc,
-                vwzio_elec_hc,
-                hmux0_elec_hwc,
-                vwzio_elec_hwc,
                 hmux0_elec_cool,
-            ),
-        )
-        if global_efficiency is not None:
-            self._set_calculated(CALC_GLOBAL_EFFICIENCY, global_efficiency)
+                min_elec_energy=MIN_CUMULATIVE_ELECTRICAL_ENERGY_WH,
+            )
+            if cool_eer is not None:
+                self._set_calculated(CALC_COOL_EER, cool_eer)
+
+            global_efficiency = calculate_combined_efficiency(
+                (
+                    hmux0_therm_hc,
+                    vwzio_therm_hc,
+                    hmux0_therm_hwc,
+                    vwzio_therm_hwc,
+                    hmux0_therm_cool,
+                ),
+                (
+                    hmux0_elec_hc,
+                    vwzio_elec_hc,
+                    hmux0_elec_hwc,
+                    vwzio_elec_hwc,
+                    hmux0_elec_cool,
+                ),
+            )
+            if global_efficiency is not None:
+                self._set_calculated(CALC_GLOBAL_EFFICIENCY, global_efficiency)
 
     # -------------------------------------------------------------------------
     # Smart Forced DHW Boost Manager (Section 7.2)

@@ -26,12 +26,15 @@ from custom_components.arotherm_genia_ebusd.const import (
     DEVICE_HYDRAULIC_INTERFACE,
     DEVICE_OUTDOOR_UNIT,
     DEVICE_WIRELESS_THERMOSTAT,
+    HMUX0_ONLY_SENSOR_UNIQUE_ID_SUFFIXES,
 )
 from custom_components.arotherm_genia_ebusd.number import NUMBER_DESCRIPTIONS
 from custom_components.arotherm_genia_ebusd.select import SELECT_DESCRIPTIONS
 from custom_components.arotherm_genia_ebusd.sensor_descriptions import (
     SENSOR_DESCRIPTIONS,
     WEEKLY_SCHEDULE_SENSORS,
+    _get_electric_power,
+    _get_z1_room_humidity,
 )
 from custom_components.arotherm_genia_ebusd.switch import STANDARD_SWITCH_DESCRIPTIONS
 
@@ -98,6 +101,49 @@ class TestSensorRegistry(unittest.TestCase):
         self.assertEqual(desc.field, "flow_rate")
         self.assertEqual(desc.fallback_field, "value")
         self.assertEqual(desc.unique_id_suffix, "hmux0_rundataflowrate_value")
+
+    def test_electric_power_consumption_alignment_and_unique_id(self) -> None:
+        """Electric power consumption prioritizes PowerStatus while preserving legacy unique_id."""
+        desc = next(
+            d for d in SENSOR_DESCRIPTIONS if d.key == "electric_power_consumption"
+        )
+        self.assertEqual(desc.message, "PowerStatus")
+        self.assertEqual(desc.field, "power")
+        self.assertEqual(desc.fallback_message, "RunDataElectricPowerConsumption")
+        self.assertEqual(desc.fallback_field, "power")
+        self.assertEqual(
+            desc.unique_id_suffix, "hmux0_rundataelectricpowerconsumption_power"
+        )
+        self.assertIsNotNone(desc.value_fn)
+
+        from unittest.mock import MagicMock
+
+        coord = MagicMock()
+        coord.active_outdoor_circuit = CIRCUIT_HMUX0
+
+        # Case 1: Neither exists -> returns None
+        coord.get_float.return_value = None
+        self.assertIsNone(_get_electric_power(coord))
+
+        # Case 2: Only RunDataElectricPowerConsumption exists -> returns fallback
+        def mock_get_float_fallback(circuit, message, field):
+            if message == "RunDataElectricPowerConsumption" and field == "power":
+                return 123.4
+            return None
+
+        coord.get_float.side_effect = mock_get_float_fallback
+        self.assertEqual(_get_electric_power(coord), 123.4)
+
+        # Case 3: Both exist -> PowerStatus MUST take precedence
+        def mock_get_float_both(circuit, message, field):
+            if message == "PowerStatus" and field == "power":
+                return 456.7
+            if message == "RunDataElectricPowerConsumption" and field == "power":
+                return 123.4
+            return None
+
+        coord.get_float.side_effect = mock_get_float_both
+        self.assertEqual(_get_electric_power(coord), 456.7)
 
     def test_binary_sensors_validity(self) -> None:
         """Verify binary sensors have valid circuits and unique ID suffixes."""
@@ -236,6 +282,42 @@ class TestSensorRegistry(unittest.TestCase):
         self.assertEqual(
             overlap, set(), f"Active unique_id overlaps deprecated list: {overlap}"
         )
+
+    def test_hmux0_only_sensor_unique_id_suffixes_match_descriptions(self) -> None:
+        """Verify HMUX0_ONLY_SENSOR_UNIQUE_ID_SUFFIXES matches exactly the 3 hmux0_only descriptions."""
+        hmux0_only_descs = [d for d in SENSOR_DESCRIPTIONS if d.hmux0_only]
+        self.assertEqual(
+            {d.key for d in hmux0_only_descs},
+            {
+                "energy_electric_cool",
+                "energy_electric_hc_outdoor",
+                "energy_electric_hwc_outdoor",
+            },
+        )
+        computed_suffixes = {
+            d.unique_id_suffix
+            or f"{d.circuit.lower()}_{d.message.lower()}_{d.field.lower()}"
+            for d in hmux0_only_descs
+        }
+        self.assertEqual(computed_suffixes, set(HMUX0_ONLY_SENSOR_UNIQUE_ID_SUFFIXES))
+
+    def test_z1_room_humidity_sensor_and_bounds(self) -> None:
+        """Verify z1_room_humidity sensor description and physical bounds filter."""
+        from unittest.mock import MagicMock
+
+        desc = next(d for d in SENSOR_DESCRIPTIONS if d.key == "z1_room_humidity")
+        self.assertEqual(desc.device_key, DEVICE_CLIMATE_CONTROLLER)
+        self.assertEqual(desc.circuit, CIRCUIT_BASS3)
+        self.assertEqual(desc.message, "Z1RoomHumidity")
+        self.assertEqual(desc.field, "value")
+
+        coord = MagicMock()
+        coord.get_float.return_value = 66.24
+        self.assertEqual(_get_z1_room_humidity(coord), 66.2)
+
+        for invalid in (None, 0.0, -1.0, 100.5, 255.0):
+            coord.get_float.return_value = invalid
+            self.assertIsNone(_get_z1_room_humidity(coord))
 
 
 if __name__ == "__main__":

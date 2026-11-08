@@ -15,9 +15,13 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     CIRCUIT_BASS3,
+    CIRCUIT_HMU,
+    CIRCUIT_HMUX0,
+    CONTROLLER_CIRCUITS,
     DAY_SHORT_KEYS,
     DEVICE_CLIMATE_CONTROLLER,
     DOMAIN,
+    OUTDOOR_CIRCUITS,
     WEEKDAYS_LIST,
 )
 from .coordinator import SaunierGeniaCoordinator
@@ -94,6 +98,23 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
                     (CIRCUIT_BASS3, "Z1OpModeCooling"),
                 ]
             )
+        elif description.key == "electric_power_consumption":
+            subs.extend(
+                [
+                    (CIRCUIT_HMUX0, "PowerStatus"),
+                    (CIRCUIT_HMUX0, "RunDataElectricPowerConsumption"),
+                    (CIRCUIT_HMU, "PowerStatus"),
+                    (CIRCUIT_HMU, "RunDataElectricPowerConsumption"),
+                ]
+            )
+        elif description.key == "hmu_current_error":
+            subs.extend([(c, "Currenterror") for c in OUTDOOR_CIRCUITS])
+        elif description.key == "controller_current_error":
+            subs.extend([(c, "Currenterror") for c in CONTROLLER_CIRCUITS])
+        elif description.key == "energy_thermal_hc":
+            subs.append((CIRCUIT_BASS3, "PrEnergySumHc"))
+        elif description.key == "energy_thermal_hwc":
+            subs.append((CIRCUIT_BASS3, "PrEnergySumHwc"))
 
         c = description.circuit.lower()
         m = description.message.lower()
@@ -104,7 +125,7 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
             coordinator=coordinator,
             device_key=description.device_key,
             translation_key=description.translation_key or description.key,
-            subscriptions=subs,
+            subscriptions=list(dict.fromkeys(subs)),
             unique_id_suffix=unique_id_suffix,
         )
         self.entity_description = description

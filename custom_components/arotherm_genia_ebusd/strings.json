@@ -366,6 +366,9 @@
           "four_port_valve_position_fault": "4-port reversing valve position fault (S.590)"
         }
       },
+      "hmu_current_error": {
+        "name": "Active Error Diagnostics"
+      },
       "electric_power_consumption": {
         "name": "Instantaneous Electric Power Consumption"
       },
@@ -537,6 +540,9 @@
           "dhw": "Domestic Hot Water (DHW)"
         }
       },
+      "controller_current_error": {
+        "name": "Active Error Diagnostics"
+      },
       "water_pressure": {
         "name": "System Water Pressure"
       },
@@ -548,6 +554,9 @@
       },
       "z1_room_temp": {
         "name": "Zone 1 Room Temperature"
+      },
+      "z1_room_humidity": {
+        "name": "Zone 1 Room Humidity"
       },
       "z1_actual_room_temp_desired": {
         "name": "Zone 1 Effective Room Setpoint"
@@ -696,6 +705,66 @@
       },
       "ebusd_arbitration_latency": {
         "name": "eBUS Arbitration Latency"
+      },
+      "evaporation_temp": {
+        "name": "Refrigerant Evaporation Temperature"
+      },
+      "condensation_temp": {
+        "name": "Refrigerant Condensation Temperature"
+      },
+      "condensate_temp": {
+        "name": "Condenser Liquid Outlet Temperature"
+      },
+      "superheat": {
+        "name": "Suction Line Superheat"
+      },
+      "subcooling": {
+        "name": "Condenser Subcooling"
+      },
+      "energy_integral": {
+        "name": "Compressor Energy Integral"
+      },
+      "compressor_flow_temp_desired": {
+        "name": "Compressor Target Flow Temperature"
+      },
+      "heat_output_internal": {
+        "name": "Internal Water Heat Output"
+      },
+      "stats_compressor_hc_hours": {
+        "name": "Compressor Heating Operating Hours"
+      },
+      "stats_compressor_hc_starts": {
+        "name": "Compressor Heating Starts"
+      },
+      "stats_compressor_hwc_hours": {
+        "name": "Compressor Hot Water Operating Hours"
+      },
+      "stats_compressor_hwc_starts": {
+        "name": "Compressor Hot Water Starts"
+      },
+      "stats_compressor_cool_hours": {
+        "name": "Compressor Cooling Operating Hours"
+      },
+      "stats_compressor_cool_starts": {
+        "name": "Compressor Cooling Starts"
+      },
+      "vwzio_heater_energy": {
+        "name": "Hydraulic Auxiliary Heater Electric Energy"
+      },
+      "vwzio_heater_flow_temp": {
+        "name": "Hydraulic Auxiliary Heater Flow Temperature"
+      },
+      "stats_vwzio_heater_hc_hours": {
+        "name": "Hydraulic Auxiliary Heater Heating Operating Hours"
+      },
+      "stats_vwzio_heater_hc_starts": {
+        "name": "Hydraulic Auxiliary Heater Heating Starts"
+      },
+      "stats_vwzio_heater_hwc_hours": {
+        "name": "Hydraulic Auxiliary Heater Hot Water Operating Hours"
+      },
+      "stats_vwzio_heater_hwc_starts": {
+        "name": "Hydraulic Auxiliary Heater Hot Water Starts"
       }
     }
   }

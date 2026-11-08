@@ -14,17 +14,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Hardware: Vaillant HMU00 (HW5103) & aroTHERM Split Support:**
-  - Added dedicated configuration template `ebusd-configuration/vaillant/08.hmu.HW5103.csv` with automatic circuit aliasing (`hmux0` <-> `hmu`), Split water pressure (`FlowPressure`), silent mode levels, and legacy energy yield registers.
+  - Added dedicated configuration template `ebusd-configuration/vaillant/08.hmu.HW5103.csv` with automatic circuit aliasing (`hmux0` <-> `hmu`/`hmu00`), Split water pressure (`FlowPressure`), silent mode levels, compressor hours/starts fallbacks (`CompressorHours`/`CompressorStarts`), native COP registers (`CopHc`, `CopHwc`, `CopCooling`), and legacy energy yield registers.
 - **Hardware: sensoCOMFORT & sensoHOME Controllers (`CTLV2` & `CTLV3`):**
   - Added configuration templates `15.ctlv2.csv` and `15.ctlv3.csv` with automatic scan detection, bidirectional aliasing (`bass3`/`basv3` <-> `ctlv2`/`ctlv3`), and updated repair checks.
   - Added UK `aroTHERM pro 7.1` and `aroTHERM plus 8.1` models to the outdoor unit catalog.
+- **Refrigeration Cycle, Per-Mode Compressor & Auxiliary Heater Diagnostics:**
+  - Added refrigeration thermodynamics and compressor control sensors (`evaporation_temp`, `condensation_temp`, `condensate_temp`, `superheat`, synthetic `subcooling`, `energy_integral`, `compressor_flow_temp_desired`, and `heat_output_internal`).
+  - Added per-mode compressor operating hours and starts (`stats_compressor_hc_hours`, `stats_compressor_hc_starts`, `stats_compressor_hwc_hours`, `stats_compressor_hwc_starts`, `stats_compressor_cool_hours`, `stats_compressor_cool_starts`) with cross-circuit `hmux0`/`hmu` fallbacks.
+  - Added hydraulic auxiliary immersion heater telemetry and statistics on `76.vwzio` (`vwzio_heater_energy`, `vwzio_heater_flow_temp`, and heating/DHW operating hours and starts).
+  - Added active error diagnostic sensors (`hmu_current_error` and `controller_current_error`) decoding `Currenterror` across outdoor units and climate controllers.
+- **Zone 1 Relative Room Humidity (`Z1RoomHumidity`):**
+  - Exposed Zone 1 relative humidity (`b524 020003002800`) both as `sensor.z1_room_humidity` (`%`) and directly as `current_humidity` on `SaunierGeniaZone1Climate`, with backward-compatible MQTT aliasing from legacy `Z1MaxFlowTempDesired`.
 - **Weekly Schedule Multi-Slot Expansion (Slots 2 & 3):**
   - Expanded all daily schedules across heating, cooling, DHW, and circulation from 1 to 3 time slots across all 4 controller CSV configurations.
   - Added passive eavesdropping (`u`) for official MiGo Link app schedule writes, decoding time intervals and target temperatures in real time without polling.
 - **Diagnostic eBUS Services (`read_parameter` & `write_parameter`):**
   - Added actions to read and write symbolic eBUS parameters via MQTT directly from Home Assistant Developer Tools or automations, with automatic circuit alias resolution (`08`, `15`, `outdoor`, `controller`).
 - **Anonymized Dumps & Community Test Fixtures:**
-  - Added automatic serial number and barcode masking to `dump_mqtt_values` service for safe troubleshooting sharing.
+  - Added automatic serial number and barcode masking to `dump_mqtt_values` and `record_topic_changes` services for safe troubleshooting sharing.
   - Added community snapshot test suite (`tests/fixtures/community/`) verifying entity stability across real hardware configurations.
 - **Physical eBUS Health & Daemon Diagnostics:**
   - Added `binary_sensor.ebusd_running` and 7 diagnostic sensors attached to the root outdoor unit (arbitration latency, symbol rate, reconnects, uptime, scan status, active masters).
@@ -32,6 +39,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Hardened GitHub release workflow to require unit tests (Python 3.12 & 3.13), Ruff linter/formatter, Pyright typing, Hassfest, and HACS validation before building and publishing release archives.
 
 ### Fixed
+- **Cumulative Energy, COP/SCOP & Entity Cleanup on `HMU` / `HMU00` (`HW5103`) Units:**
+  - Fixed cumulative electrical/thermal energy totals, environmental yield (`YieldHc`/`YieldHwc`), per-mode historical COP/EER (`CopHc`/`CopHwc`/`CopCooling` with `1 + Yield/PrEnergySum` fallback), and global system efficiency on `hmu`/`hmu00` units lacking Monobloc `b516` EEPROM registers.
+  - Automatically disables the 3 Monobloc-exclusive outdoor per-mode electrical sensors (`energy_electric_hc_outdoor`, `energy_electric_hwc_outdoor`, `energy_electric_cool`) in the Entity Registry when an `hmu`/`hmu00` unit is detected, preserving manual user overrides.
+  - Prioritized `PowerStatus` over `RunDataElectricPowerConsumption` for instantaneous electrical power and live COP across `hmux0` and `hmu`.
+- **Controller Register `2800` & Parameter Range Corrections:**
+  - Corrected mislabeled `Z1MaxFlowTempDesired` (`020003002800` / invalid `w` `020103002800`) across `15.bass3.csv`, `15.basv3.csv`, `15.ctlv2.csv`, and `15.ctlv3.csv` to read-only `Z1RoomHumidity` (`%`).
+  - Widened `number.compressor_silent_operation_level` range to `30–60 %` and `number.max_cylinder_charge_time` range to `0–180 min` (`0 = Off`) to match field values observed on `basv3`/`hmu` installations.
 - **Schedule Validation & Mutex Safety:**
   - Added chronological ordering validation, overlap rejection, midnight normalization (`24:00`), mutex write locking, and automatic cache recovery on mid-cascade communication errors.
 - **Thermostat & Climate Symmetrical Operation:**
@@ -40,10 +54,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Evaluated thermal calculations against all canonical message aliases, immediately updating thermal power and live COP upon telemetry arrival.
 - **Connection Loss Watchdog:**
   - Added a 10-minute communication watchdog that safely marks control entities unavailable when bus telemetry ceases, keeping historical sensors available.
-- **CSV Header Compliance & Clean Hydration:**
-  - Moved CSV column definitions to line 1 to comply with ebusd 26.1 C++ parser, and filtered incompatible b516 queries on HMU Split units.
+- **CSV Header Compliance, Parity & Clean Hydration:**
+  - Moved CSV column definitions to line 1 to comply with ebusd 26.1 C++ parser, filtered incompatible `b516` queries on HMU units, and enforced byte-for-byte parity and Unix `LF` line endings across `15.*.csv` and `08.hmu*.csv`.
 - **Compatibility & Code Quality:**
-  - Raised minimum supported Home Assistant version to `2024.12.0` and achieved 100% clean Pyright static typing and Ruff formatting across 118 unit tests.
+  - Raised minimum supported Home Assistant version to `2024.12.0` and achieved 100% clean Pyright static typing and Ruff formatting across 129 unit tests.
+
+### Changed
+- **Selective Low-Priority `r9;u` Polling & Conservative Register Naming:**
+  - Assigned gentle `r9;u` background polling exclusively to registers not queried passively by `MiGo Link` (`0xf1`) across `08.hmux0.csv`, `08.hmu.csv` / `08.hmu.HW5103.csv`, and `15.*.csv`, keeping unpolled counters, COPs, and diagnostics fresh without saturating the bus.
+  - Conservatively re-labeled unverified hourly diagnostic registers (`RunDataDiagxxxx`) across `08.hmux0.csv`, `08.hmu*.csv`, and `76.vwzio.csv`.
 
 ---
 

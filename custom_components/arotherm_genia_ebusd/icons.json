@@ -311,6 +311,9 @@
       "water_pressure": {
         "default": "mdi:gauge"
       },
+      "z1_room_humidity": {
+        "default": "mdi:water-percent"
+      },
       "primary_flow_rate": {
         "default": "mdi:waves-arrow-right"
       },
