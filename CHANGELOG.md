@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added actions to read and write symbolic eBUS parameters via MQTT directly from Home Assistant Developer Tools or automations, with automatic circuit alias resolution (`08`, `15`, `outdoor`, `controller`).
 - **Anonymized Dumps & Community Test Fixtures:**
   - Added automatic serial number and barcode masking to `dump_mqtt_values` and `record_topic_changes` services for safe troubleshooting sharing.
-  - Added community snapshot test suite (`tests/fixtures/community/`) verifying entity stability across real hardware configurations.
+  - Added community snapshot test suite (`tests/fixtures/community/`) verifying entity stability across real hardware configurations; updated `saunier_geniaair_max_bass3.json` with live DHW production telemetry covering 50+ new refrigeration, electrical and diagnostic sensors.
 - **Physical eBUS Health & Daemon Diagnostics:**
   - Added `binary_sensor.ebusd_running` and 7 diagnostic sensors attached to the root outdoor unit (arbitration latency, symbol rate, reconnects, uptime, scan status, active masters).
 - **Release Security Gate in CI:**

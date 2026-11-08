@@ -150,7 +150,7 @@ class TestCommunityFixtures(unittest.TestCase):
                     self.assertIsNotNone(climate.target_temperature)
                     self.assertIsNotNone(climate.hvac_mode)
                     if fixture_name == "saunier_geniaair_max_bass3.json":
-                        self.assertEqual(climate.current_humidity, 66)
+                        self.assertEqual(climate.current_humidity, 64)
                     elif fixture_name == "vaillant_arotherm_plus_basv3.json":
                         self.assertEqual(climate.current_humidity, 63)
 
