@@ -23,12 +23,12 @@ A standard single-zone or multi-zone monobloc installation consists of the follo
 
 | Master Addr | Slave Addr | Physical Hardware | Manufacturer Device ID | Active Configuration | Functional Role in System |
 | :---: | :---: | :--- | :--- | :--- | :--- |
-| **`03`** | **`08`** | Monobloc Outdoor Heat Pump Unit | `MF=Vaillant;ID=HMUX0` | `08.hmux0.csv` | Variable-speed inverter compressor, ECM evaporator fan, electronic expansion valve (EEV), 4-way reversing valve, hydraulic circuit pressure sensor, refrigerant thermodynamic probes, water-side heat meter. |
-| **`10`** | **`15`** | Wall-Mounted Climate Controller | `MF=Vaillant;ID=BASS3` / `ID=BASV3`<br>*(MiPro Sense / sensoCOMFORT)* | `15.bass3.csv`<br>`15.basv3.csv` | Master system regulator, heating curve math, room ambient sensor, weekly schedule matrix (timers), DHW setpoints, holiday mode, installer configuration. |
-| **`71`** | **`76`** | Indoor Hydraulic Station / Tower | `MF=Vaillant;ID=VWZIO`<br>*(HPIM 7 / VWZ MEH 97/7)* | `76.vwzio.csv` | 3-way DHW diverter valve, secondary circulation pump, auxiliary electric backup heater stages, flow rate telemetry. |
-| **`f1`** | **`f6`** | Wi-Fi / Ethernet Network Gateway | `MF=Vaillant;ID=NETX3`<br>*(MiGo Link / sensoNET)* | `f6.netx3.csv` | Cloud gateway, NTP network time distribution, vendor mobile application backend polling engine. |
+| **`03`** | **`08`** | Monobloc Outdoor Heat Pump Unit | `MF=Vaillant;ID=HMUX0`<br>`MF=Vaillant;ID=HMU00` | `08.hmux0.csv`<br>`08.hmu.csv`<br>`08.hmu.HW5103.csv` | Variable-speed inverter compressor, ECM evaporator fan, electronic expansion valve (EEV), 4-way reversing valve, hydraulic circuit pressure sensor, refrigerant thermodynamic probes, water-side heat meter, and heating energy integral accumulator. |
+| **`10`** | **`15`** | Wall-Mounted Climate Controller | `MF=Vaillant;ID=BASS3`<br>`MF=Vaillant;ID=BASV3`<br>`MF=Vaillant;ID=CTLV2`<br>`MF=Vaillant;ID=CTLV3`<br>*(MiPro Sense / sensoCOMFORT)* | `15.bass3.csv`<br>`15.basv3.csv`<br>`15.ctlv2.csv`<br>`15.ctlv3.csv` | Master system regulator, heating curve math, room ambient sensor, weekly schedule matrix (b5 55 with 3 daily slots), DHW setpoints, cooling authorization double-locks, and holiday mode. |
+| **`71`** | **`76`** | Indoor Hydraulic Station / Tower | `MF=Vaillant;ID=VWZIO`<br>*(HPIM 7 / MEH 97/7 / uniTOWER / GeniaSet)* | `76.vwzio.csv` | 3-way DHW diverter valve, secondary circulation pump, auxiliary electric backup heater stages, flow rate telemetry, and multifunction relay (DHW recirculation). |
+| **`f1`** | **`f6`** | Wi-Fi / Ethernet Network Gateway | `MF=Vaillant;ID=NETX3`<br>`MF=Vaillant;ID=NETX2`<br>*(MiGo Link / sensoNET)* | `f6.netx3.csv` | Cloud gateway, NTP network time distribution, vendor mobile application backend polling engine. |
 | **`ff`** | **`04`** | Gateway Application Interface | `MF=Vaillant;ID=NETX3` | `04.netx3.csv` | High-level diagnostic and broadcast channel used by the vendor cloud app. |
-| **`31`** | **`36`** | Dedicated eBUSd Hardware Adapter | `ebusd` | *Internal daemon* | Local bridge interface, arbitration manager, and MQTT telemetry publisher. |
+| **`31`** | **`36`** | Dedicated eBUSd Hardware Adapter | `ebusd` | *Internal daemon* | Local bridge interface, arbitration manager, MQTT telemetry publisher, and TCP physical diagnostics daemon (port 8888). |
 
 ---
 
@@ -90,10 +90,11 @@ The outdoor inverter unit continuously processes internal safety and thermodynam
 2. **System Broadcasts (`broadcast.tsp`):** Emits passive broadcast telegrams on system status and cooling release flags.
 
 ### 2.4 eBUSd & Home Assistant Pacing Strategy
-Because `f1` and `10` already poll the bus heavily, an uncoordinated third-party integration querying hundreds of entities would immediately choke the bus. We designed a **four-tiered pacing strategy**:
-- **Level 1 (`r1` / `@poll(1)`):** Reserved strictly for **Real-Time Electric Power** (`RunDataElectricPowerConsumption` on `08.hmux0`). Rotates every ~10 seconds.
-- **Level 2 (`r2` / `r3`):** Reserved for **Core Live Dynamics** (`RunDataCompressorSpeed`, `RunDataFlowRate`, `HMUStatusCode`, `RunDataFlowTemp`, `RunDataReturnTemp` on `r2`; `WaterPressure`, `RunDataFan1Speed`, and `RunDataBuildingCPumpPower` on `r3`). Ensures 1–3 minute refresh intervals even when the cloud gateway (`f1`) only polls fan speed or flow rate once per hour.
-- **Level 3 (`r9` / `@poll(9)`):** Cumulative slow registers, outdoor temperature, and setpoints (~3.5 minutes per rotation).
+Because `f1` and `10` already poll the bus heavily, an uncoordinated third-party integration querying hundreds of entities would immediately choke the bus. We designed an **optimized multi-tiered pacing strategy**:
+- **Level 1 (`r1` / `@poll(1)`):** Reserved strictly for **Real-Time Electric Power** (`RunDataElectricPowerConsumption` on `08.hmux0` / `08.hmu`). Rotates every ~10 seconds.
+- **Level 2 (`r2`):** Reserved for **Core Thermal & Hydraulic Dynamics** (`RunDataCompressorSpeed`, `RunDataFlowRate`, `HMUStatusCode`, `RunDataFlowTemp`, `RunDataReturnTemp`). Ensures 1–2 minute refresh intervals without relying on external cloud traffic.
+- **Level 3 (`r3`):** Mechanical & circuit parameters (`WaterPressure` / `FlowPressure`, `RunDataFan1Speed`, and `RunDataBuildingCPumpPower`).
+- **Level 9 (`r9` / `@poll(9)`):** Slow accumulators, energy integral (`EnergyIntegral`), outdoor temperature, and target setpoints (~3.5 minutes per rotation).
 - **Passive Listening (`u`):** All 140 weekly schedule entities (`*_Timer*`), `StateCompressor` (`b5 11 00`), EEPROM energy history counters, and `PowerStatus` registers have **zero active polling overhead**. They are captured passively from the queries that `f1` and `10` already emit on the bus.
 
 ---
@@ -209,12 +210,34 @@ The following sub-registers under `b5 09 540200` provide low-level refrigeration
 - **`10D1` (`540200d110`):** Evaporator saturation temperature ($1/16\ ^\circ\text{C}$).
 - **`10D7` (`540200d710`):** Current suction line superheat ($1/16\text{ K}$): verifies directly against `RunDataCompressorInletTemp` minus `10D1`.
 - **`10DB` (`540200db10`):** Condenser liquid outlet temperature ($1/16\ ^\circ\text{C}$).
+- **Room Relative Humidity Correction (`Z1RoomHumidity`):** Register `020003002800` on the `15.bass3` / `15.ctlv2` climate controller (previously misidentified in legacy templates as `Z1MaxFlowTempDesired`) actually corresponds to **Zone 1 Room Relative Humidity (`Z1RoomHumidity`, `%`)** as measured by the thermostat's internal capacitive sensor.
+
+### 4.5 The Heating Energy Integral (`EnergyIntegral`, `°min`)
+In modern aroTHERM plus and GeniaAir systems, space heating compressor cycling is not governed by a simple hysteresis deadband around the flow setpoint, but by an **accumulated degree-minute energy integral**:
+
+$$\text{EI}(t) = \int_{t_0}^t \left( T_{\text{flow, actual}}(\tau) - T_{\text{flow, target}}(\tau) \right) d\tau$$
+
+- **Dynamic Behavior:**
+  - When $T_{\text{flow, actual}} < T_{\text{flow, target}}$ (the building is losing heat faster than supplied), the accumulator integrates negative degree-minutes ($^\circ\text{min}$).
+  - When the integral reaches the configured compressor start threshold (typically between $-60\ ^\circ\text{min}$ and $-100\ ^\circ\text{min}$ under parameter `EnergyIntegralStart` / `Energieintegral`), the compressor turns on.
+  - While the heat pump runs and raises the flow temperature above target ($T_{\text{flow, actual}} > T_{\text{flow, target}}$), the accumulator gains positive minutes and climbs back toward $0\ ^\circ\text{min}$. Once $0\ ^\circ\text{min}$ is restored, the heating demand is satisfied and the compressor either shuts off or steps down to minimum modulation.
+- **Underlying eBUS Registers:**
+  - `b5 1a 05ff3221` (`EnergyIntegral` on `08.hmu.csv` / `08.hmu.HW5103.csv`, signed integer `SIN`, $^\circ\text{min}$).
+  - `b5 09 540200fe0a` (`RunDataEnergyIntegral` on `08.hmux0.csv`, signed integer `SIN`, $^\circ\text{min}$).
+
+### 4.6 Compressor Silent Mode Operation Level (`CompressorSilentOperationLevel`)
+Night-time noise reduction / silent mode operation on the outdoor inverter is governed by register `b5 1a 05ff3428` (`w` `b5 1a 06`, data type `percent0`):
+- Establishes a maximum power ceiling cap for the inverter compressor:
+  - **Level 1:** Caps compressor at ~60% of maximum power output.
+  - **Level 2:** Caps compressor at ~50% of maximum power output.
+  - **Level 3:** Caps compressor at ~40% of maximum power output.
+- Operates in tandem with the regulator's silent scheduling time windows (`silentTimer`).
 
 ---
 
 ## 5. Weekly Schedule & Multi-Timer Programming (`b5 55` / `b5 a5/a6`)
 
-The climate regulator (`15.bass3`) manages weekly schedules across 4 distinct functional circuits:
+The climate regulator (`15.bass3` / `15.ctlv2` / `15.ctlv3`) manages weekly schedules across multiple distinct functional circuits:
 - **Circuit `03`:** Heating Zone 1 (`Z1Timer`)
 - **Circuit `02`:** Domestic Hot Water (`HwcTimer`)
 - **Circuit `01`:** Active Cooling (`CoolingTimer`)
@@ -231,6 +254,20 @@ Each day byte returns an integer ($0$ to $3$) representing how many time windows
 - **Write Telegram Structure:**
   `f1 15 b555 0c a6 ff <circuit> <day> <slot> <total_slots> <from_hour> <from_min> <to_hour> <to_min> ff ff`
 - **Critical `=FFFF` Constraint:** The terminal 2 bytes must be written as `0xFFFF`. Any attempt to pass null padding or omit these bytes causes the microcontroller to drop the telegram without updating EEPROM.
+
+### 5.3 Legacy `b5 24` vs Modern `b5 55` Timer Incompatibility
+In older ebusd configuration templates (designed for legacy VRC 700 controllers and boilers), timers were queried using circuit selectors under `b5 24` (`b5 24 0303...` for heating and `b5 24 0301...` for DHW).
+
+Empirical tests and bus telemetry from live hardware (`BASS3` SW=0708, `BASV3`, `CTLV2`, and `CTLV3`) have confirmed:
+1. Standard scalar registers on `b5 24` continue to work normally (e.g. `b5 24 020003002200` $\rightarrow$ `21.0 °C`).
+2. However, weekly schedule timer queries under `b5 24` return an **empty response** (`empty` / zero return bytes).
+3. Modern climate controllers strictly require the **`b5 55` command family** (`a4` for slot counting, `a5` for slot reading, and `a6` for slot writing with trailing `0xFFFF` padding).
+
+### 5.4 Circuit 04: Silent Mode Operating Schedule (`silentTimer`)
+In addition to the primary comfort circuits, the controller exposes **Circuit `04`**, dedicated exclusively to the Silent Mode noise-reduction schedule:
+- `b5 55 a40004`: Number of configured silent windows per weekday.
+- `b5 55 a50004`: Reading active silent window slots (`from_hour`, `from_min`, `to_hour`, `to_min`, without temperature field).
+- `b5 55 a6ff0004<day><slot><total>`: Writing and activating silent window schedules.
 
 ---
 
@@ -311,3 +348,4 @@ The parser extracts:
 3. **Hardware Revision (`hw_version`):** Automatically registers as `HW 05.04`.
 
 This populates the Home Assistant Device Registry natively with zero active bus queries.
+

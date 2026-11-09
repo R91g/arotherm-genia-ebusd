@@ -23,12 +23,12 @@ Una instalación monobloc estándar (ya sea con suelo radiante, radiadores o fan
 
 | Dirección Master | Dirección Slave | Dispositivo Físico | Identificador de Firmware | Archivo CSV Activo | Función en la Instalación |
 | :---: | :---: | :--- | :--- | :--- | :--- |
-| **`03`** | **`08`** | Unidad Exterior Monobloc | `MF=Vaillant;ID=HMUX0` | `08.hmux0.csv` | Compresor inverter de velocidad variable, ventilador modulante ECM, válvula de expansión electrónica (EEV), válvula de 4 vías de inversión de ciclo, presostato/sensor de presión de agua, sondas frigoríficas de freón R290, calorímetro de agua. |
-| **`10`** | **`15`** | Centralita Climática de Pared | `MF=Vaillant;ID=BASS3` / `ID=BASV3`<br>*(MiPro Sense / sensoCOMFORT)* | `15.bass3.csv`<br>`15.basv3.csv` | Regulador maestro del sistema, cálculo de curva de calefacción, sonda ambiente de sala, matriz de programación horaria semanal (b5 55), consignas de ACS y clima, modo vacaciones. |
-| **`71`** | **`76`** | Módulo Hidráulico Interior / Torre | `MF=Vaillant;ID=VWZIO`<br>*(HPIM 7 / MEH 97/7)* | `76.vwzio.csv` | Válvula de 3 vías de derivación a ACS, bomba circuladora secundaria de impulsión, etapas de apoyo eléctrico (si existen), telemetría de caudal. |
-| **`f1`** | **`f6`** | Pasarela de Comunicaciones Wi-Fi | `MF=Vaillant;ID=NETX3`<br>*(MiGo Link / sensoNET)* | `f6.netx3.csv` | Conexión con los servidores en la nube del fabricante, sincronización horaria de red NTP, motor de sondeo de la app móvil oficial. |
+| **`03`** | **`08`** | Unidad Exterior Monobloc | `MF=Vaillant;ID=HMUX0`<br>`MF=Vaillant;ID=HMU00` | `08.hmux0.csv`<br>`08.hmu.csv`<br>`08.hmu.HW5103.csv` | Compresor inverter de velocidad variable, ventilador modulante ECM, válvula de expansión electrónica (EEV), válvula de 4 vías de inversión de ciclo, presostato/sensor de presión de agua, sondas frigoríficas de freón R290, calorímetro de agua y acumulador de integral de energía. |
+| **`10`** | **`15`** | Centralita Climática de Pared | `MF=Vaillant;ID=BASS3`<br>`MF=Vaillant;ID=BASV3`<br>`MF=Vaillant;ID=CTLV2`<br>`MF=Vaillant;ID=CTLV3`<br>*(MiPro Sense / sensoCOMFORT)* | `15.bass3.csv`<br>`15.basv3.csv`<br>`15.ctlv2.csv`<br>`15.ctlv3.csv` | Regulador maestro del sistema, cálculo de curva de calefacción, sonda ambiente de sala, matriz de programación horaria semanal (b5 55 con 3 franjas diarias), consignas de ACS y clima, cerrojos de refrigeración y modo vacaciones. |
+| **`71`** | **`76`** | Módulo Hidráulico Interior / Torre | `MF=Vaillant;ID=VWZIO`<br>*(HPIM 7 / MEH 97/7 / uniTOWER / GeniaSet)* | `76.vwzio.csv` | Válvula de 3 vías de derivación a ACS, bomba circuladora secundaria de impulsión, etapas de apoyo eléctrico (si existen), telemetría de caudal y relé multifunción (recirculación de ACS). |
+| **`f1`** | **`f6`** | Pasarela de Comunicaciones Wi-Fi | `MF=Vaillant;ID=NETX3`<br>`MF=Vaillant;ID=NETX2`<br>*(MiGo Link / sensoNET)* | `f6.netx3.csv` | Conexión con los servidores en la nube del fabricante, sincronización horaria de red NTP, motor de sondeo de la app móvil oficial. |
 | **`ff`** | **`04`** | Interfaz de Aplicación Gateway | `MF=Vaillant;ID=NETX3` | `04.netx3.csv` | Canal broadcast y pasarela de diagnósticos avanzados de la app móvil. |
-| **`31`** | **`36`** | Adaptador eBUSd Físico | `ebusd` | *Interno* | Puente local de comunicaciones hacia el broker MQTT y Home Assistant. |
+| **`31`** | **`36`** | Adaptador eBUSd Físico | `ebusd` | *Interno* | Puente local de comunicaciones hacia el broker MQTT y Home Assistant, con servidor TCP de diagnósticos físicos en puerto 8888. |
 
 ---
 
@@ -90,10 +90,11 @@ Procesa continuamente sus lazos internos de seguridad y refrigeración:
 2. **Difusiones Broadcast (`broadcast.tsp`):** Emite telegramas pasivos de estado general y flags de autorización de refrigeración.
 
 ### 2.4 Estrategia de Sondeo de eBUSd y Home Assistant
-Dado que `f1` y `10` ya generan tráfico considerable, consultar cientos de entidades saturaría la línea. Por ello, diseñamos una **estrategia de cuatro niveles**:
-- **Nivel 1 (`r1` / `@poll(1)`):** Exclusivo para la **Potencia Eléctrica en Tiempo Real** (`RunDataElectricPowerConsumption` en `08.hmux0`). Rota cada ~10 segundos.
-- **Nivel 2 (`r2` / `r3`):** Reservado para la **Dinámica Operativa Principal** (`RunDataCompressorSpeed`, `RunDataFlowRate`, `HMUStatusCode`, `RunDataFlowTemp`, `RunDataReturnTemp` en `r2`; `WaterPressure`, `RunDataFan1Speed` y `RunDataBuildingCPumpPower` en `r3`). Garantiza actualizaciones cada 1–3 minutos sin depender de que la pasarela `f1` pregunte por el ventilador o el caudal una sola vez por hora.
-- **Nivel 3 (`r9` / `@poll(9)`):** Acumuladores lentos, temperatura exterior y consignas (~3,5 minutos por rotación).
+Dado que `f1` y `10` ya generan tráfico considerable, consultar cientos de entidades saturaría la línea. Por ello, diseñamos una **estrategia de niveles optimizada**:
+- **Nivel 1 (`r1` / `@poll(1)`):** Exclusivo para la **Potencia Eléctrica en Tiempo Real** (`RunDataElectricPowerConsumption` en `08.hmux0` / `08.hmu`). Rota cada ~10 segundos.
+- **Nivel 2 (`r2`):** Reservado para la **Dinámica Térmica e Hidráulica Crítica** (`RunDataCompressorSpeed`, `RunDataFlowRate`, `HMUStatusCode`, `RunDataFlowTemp`, `RunDataReturnTemp`). Garantiza datos vivos cada 1–2 minutos sin depender de la nube.
+- **Nivel 3 (`r3`):** Parámetros mecánicos y de circuito (`WaterPressure` / `FlowPressure`, `RunDataFan1Speed`, `RunDataBuildingCPumpPower`).
+- **Nivel 9 (`r9` / `@poll(9)`):** Acumuladores lentos, integral de energía (`EnergyIntegral`), temperatura exterior y consignas (~3,5 minutos por rotación).
 - **Escucha Pasiva Pura (`u`):** Las 140 entidades de horarios semanales (`*_Timer*`), `StateCompressor` (`b5 11 00`), los históricos EEPROM y los registros `PowerStatus` tienen **cero coste de tráfico**. Se capturan pasivamente aprovechando las consultas que `f1` y `10` ya emiten en el bus.
 
 ---
@@ -209,12 +210,34 @@ Los sub-registros bajo `b5 09 540200` exponen la termodinámica del gas refriger
 - **`10D1` (`540200d110`):** Temperatura de saturación del evaporador ($1/16\ ^\circ\text{C}$).
 - **`10D7` (`540200d710`):** Recalentamiento útil (*superheat*) en la aspiración ($1/16\text{ K}$): coincide con `RunDataCompressorInletTemp` menos `10D1`.
 - **`10DB` (`540200db10`):** Temperatura de líquido a la salida del condensador ($1/16\ ^\circ\text{C}$).
+- **Corrección de Humedad Relativa de Sala (`Z1RoomHumidity`):** El registro `020003002800` en la centralita `15.bass3` / `15.ctlv2` (anteriormente catalogado de forma errónea en plantillas heredadas como `Z1MaxFlowTempDesired`) corresponde en realidad a la **Humedad Relativa de Zona 1 (`Z1RoomHumidity`, `%`)** leída por el sensor capacitivo interno del termostato de ambiente.
+
+### 4.5 La Integral de Energía de Calefacción (`EnergyIntegral`, `°min`)
+En los sistemas modernos aroTHERM plus / GeniaAir, el encendido y apagado del compresor en calefacción no se rige por un termostato de histéresis simple sobre la temperatura de impulsión, sino por un **acumulador integral de grado-minuto**:
+
+$$\text{EI}(t) = \int_{t_0}^t \left( T_{\text{impulsion, real}}(\tau) - T_{\text{impulsion, consigna}}(\tau) \right) d\tau$$
+
+- **Comportamiento dinámico:**
+  - Cuando $T_{\text{impulsion, real}} < T_{\text{impulsion, consigna}}$ (la casa demanda calor), el integrador acumula valores negativos en minutos ($^\circ\text{min}$).
+  - Cuando la integral alcanza el umbral de disparo de arranque (típicamente configurable entre $-60\ ^\circ\text{min}$ y $-100\ ^\circ\text{min}$ en el parámetro `EnergyIntegralStart` / `Energieintegral`), el compresor arranca.
+  - Al funcionar la bomba de calor y elevar la temperatura por encima de la consigna ($T_{\text{impulsion, real}} > T_{\text{impulsion, consigna}}$), el integrador suma minutos positivos y sube gradualmente hacia $0\ ^\circ\text{min}$. Al alcanzar $0\ ^\circ\text{min}$, la demanda térmica se considera satisfecha y el compresor se detiene o modula a su mínimo técnico.
+- **Registros eBUS asociados:**
+  - `b5 1a 05ff3221` (`EnergyIntegral` en `08.hmu.csv` / `08.hmu.HW5103.csv`, tipo `SIN`, $^\circ\text{min}$).
+  - `b5 09 540200fe0a` (`RunDataEnergyIntegral` en `08.hmux0.csv`, tipo `SIN`, $^\circ\text{min}$).
+
+### 4.6 Nivel de Modo Silencioso del Compresor (`CompressorSilentOperationLevel`)
+El control de reducción de ruido nocturno o modo silencioso del compresor en la unidad exterior se gobierna a través del registro `b5 1a 05ff3428` (`w` `b5 1a 06`, tipo `percent0`):
+- Fija el techo máximo de potencia porcentual admisible para el compresor inverter:
+  - **Nivel 1:** Limita el compresor al ~60 % de su potencia máxima.
+  - **Nivel 2:** Limita el compresor al ~50 % de su potencia máxima.
+  - **Nivel 3:** Limita el compresor al ~40 % de su potencia máxima.
+- Este registro interactúa de forma complementaria con los calendarios de modo silencioso del regulador (`silentTimer`).
 
 ---
 
 ## 5. Programación Horaria Semanal (`b5 55` / `b5 a5/a6`)
 
-La centralita `15.bass3` gobierna cuatro circuitos de temporización independientes:
+La centralita `15.bass3` / `15.ctlv2` / `15.ctlv3` gobierna cuatro circuitos de temporización independientes:
 - **Circuito `03`:** Calefacción Zona 1 (`Z1Timer`)
 - **Circuito `02`:** Agua Caliente Sanitaria (`HwcTimer`)
 - **Circuito `01`:** Refrigeración Activa (`CoolingTimer`)
@@ -231,6 +254,20 @@ Cada byte de día indica cuántas franjas horarias ($0$ a $3$) están configurad
 - **Estructura de Escritura:**
   `f1 15 b555 0c a6 ff <circuito> <dia> <ranura> <total_ranuras> <from_hour> <from_min> <to_hour> <to_min> ff ff`
 - **Restricción Obligatoria del Relleno `=FFFF`:** Los 2 bytes finales deben inyectarse siempre como `0xFFFF`. Cualquier omisión o relleno nulo provoca que el microcontrolador descarte el paquete sin actualizar la EEPROM.
+
+### 5.3 Incompatibilidad de Horarios en `b5 24` frente a `b5 55`
+En versiones anteriores de archivos de configuración de ebusd (procedentes de calderas y reguladores de generaciones previas tipo VRC 700), se intentaba consultar los horarios mediante selectores de circuito en `b5 24` (`b5 24 0303...` para calefacción y `b5 24 0301...` para ACS).
+
+Las pruebas empíricas y trazas de bus en hardware real (`BASS3` SW=0708, `BASV3`, `CTLV2` y `CTLV3`) han demostrado que:
+1. Las consultas de parámetros escalares en `b5 24` funcionan con normalidad (ej. `b5 24 020003002200` $\rightarrow$ `21.0 °C`).
+2. Sin embargo, las consultas de temporizadores semanales mediante `b5 24` devuelven una **respuesta completamente vacía** (`empty` / sin bytes de retorno).
+3. El microcontrolador de la centralita **exige estrictamente la familia de comandos `b5 55`** (`a4` para conteo de ranuras, `a5` para lectura y `a6` para escritura con relleno de cola `0xFFFF`).
+
+### 5.4 Circuito 04: Horario de Modo Silencioso (`silentTimer`)
+Adicionalmente a los cuatro circuitos clásicos, la centralita expone el **Circuito `04`**, destinado específicamente al calendario de franjas horarias de Modo Silencioso:
+- `b5 55 a40004`: Conteo de franjas de modo silencioso configuradas por día de la semana.
+- `b5 55 a50004`: Lectura de franjas (`from_hour`, `from_min`, `to_hour`, `to_min`, sin byte de consigna de temperatura).
+- `b5 55 a6ff0004<dia><ranura><total>`: Escritura y activación del período silencioso.
 
 ---
 

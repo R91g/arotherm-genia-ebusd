@@ -16,7 +16,7 @@
 
 **aroTHERM & GeniaAir (eBUS)** (`arotherm_genia_ebusd`) is a **100% local (`local_push`), cloud-independent Home Assistant custom integration** for **Vaillant** and **Saunier Duval** R290 air-to-water heat pumps managed by **`sensoCOMFORT` (`VRC 720`)** or **`MiPro Sense` (`SRC 720`)** system controllers via [**eBUSd**](https://github.com/john30/ebusd).
 
-Designed directly around the native eBUS protocol shared by Vaillant Group heat pumps (`08.hmux0`, `15.bass3` / `15.basv3`, `76.vwzio`, `04.netx3`), this integration replaces raw MQTT auto-discovery clutter and cloud API dependencies with **142 strongly typed entities**, real-time thermodynamic & COP/EER calculations, firmware sentinel filtering, automatic Double-Lock cooling management, and Smart Forced DHW Boost.
+Designed directly around the native eBUS protocol shared by Vaillant Group heat pumps (`08.hmux0` / `08.hmu`, `15.bass3` / `15.basv3` / `15.ctlv2` / `15.ctlv3`, `76.vwzio`, `04.netx3` / `04.netx2`), this integration replaces raw MQTT auto-discovery clutter and cloud API dependencies with **177 strongly typed entities**, real-time thermodynamic & COP/EER calculations, firmware sentinel filtering, automatic Double-Lock cooling management, physical TCP diagnostics, and Smart Forced DHW Boost.
 
 ---
 
@@ -65,8 +65,8 @@ Vaillant and Saunier Duval aerothermal heat pumps share **100% identical eBUS el
 
 | Generation | Vaillant Commercial Models | Saunier Duval Commercial Models | Refrigerant / Board |
 | :--- | :--- | :--- | :--- |
-| **Current Generation (`/7.1` ES)** | `aroTHERM plus ES VWL 55/7.1 A 230V`<br>`aroTHERM plus ES VWL 85/7.1 A 230V`<br>`aroTHERM plus ES VWL 125/7.1 A 230V`<br>`aroTHERM plus ES VWL 125/7.1 A 400V`<br>`aroTHERM plus ES VWL 155/7.1 A 230V`<br>`aroTHERM plus ES VWL 155/7.1 A 400V` | `GeniaAir Max ES 5`<br>`GeniaAir Max ES 8`<br>`GeniaAir Max ES 12`<br>`GeniaAir Max ES 15`<br>`GeniaAir Iso ES` | R290 (`08.hmux0`) |
-| **Previous Generation (`/6` & `Max` Legacy)** | `aroTHERM plus VWL 35/6 A 230V (Legacy)`<br>`aroTHERM plus VWL 55/6 A 230V (Legacy)`<br>`aroTHERM plus VWL 75/6 A 230V (Legacy)`<br>`aroTHERM plus VWL 105/6 A 230V (Legacy)`<br>`aroTHERM plus VWL 125/6 A (Legacy)` | `GeniaAir Max 4 (Legacy)`<br>`GeniaAir Max 6 (Legacy)`<br>`GeniaAir Max 8 (Legacy)`<br>`GeniaAir Max 11 (Legacy)`<br>`GeniaAir Max 15 (Legacy)` | R290 (`08.hmux0`) |
+| **Current Generation (`/7.1` ES & International)** | `aroTHERM plus ES VWL 55/7.1 A 230V`<br>`aroTHERM plus ES VWL 85/7.1 A 230V`<br>`aroTHERM plus ES VWL 125/7.1 A 230V`<br>`aroTHERM plus ES VWL 125/7.1 A 400V`<br>`aroTHERM plus ES VWL 155/7.1 A 230V`<br>`aroTHERM plus ES VWL 155/7.1 A 400V` | `GeniaAir Max ES 5`<br>`GeniaAir Max ES 8`<br>`GeniaAir Max ES 12`<br>`GeniaAir Max ES 15`<br>`GeniaAir Iso ES` | R290 (`08.hmux0` / `08.hmu` / `08.hmu.HW5103`) |
+| **Previous Generation (`/6` & `Max` Legacy)** | `aroTHERM plus VWL 35/6 A 230V (Legacy)`<br>`aroTHERM plus VWL 55/6 A 230V (Legacy)`<br>`aroTHERM plus VWL 75/6 A 230V (Legacy)`<br>`aroTHERM plus VWL 105/6 A 230V (Legacy)`<br>`aroTHERM plus VWL 125/6 A (Legacy)` | `GeniaAir Max 4 (Legacy)`<br>`GeniaAir Max 6 (Legacy)`<br>`GeniaAir Max 8 (Legacy)`<br>`GeniaAir Max 11 (Legacy)`<br>`GeniaAir Max 15 (Legacy)` | R290 (`08.hmux0` / `08.hmu`) |
 
 ### 2. Indoor Hydraulic Modules, Interfaces & Towers (`76.vwzio`)
 
@@ -80,8 +80,8 @@ Vaillant and Saunier Duval aerothermal heat pumps share **100% identical eBUS el
 
 | Component Role | Vaillant Models | Saunier Duval Models | eBUS Address |
 | :--- | :--- | :--- | :---: |
-| **System Climate Controller (Required)** | `sensoCOMFORT VRC 720` (`720/2`, `720/3`) | `MiPro Sense SRC 720` (`720/2`, `720/3`) | `15` (`BASS3` / `BASV3`) |
-| **Wireless Room Thermostat / RF Receiver (Optional)** | `sensoCOMFORT RF VRC 720f` (`NETX3`) | `MiPro Sense RF SRC 720f` (`NETX3`) | `04` / `f6` |
+| **System Climate Controller (Required)** | `sensoCOMFORT VRC 720` (`720/2`, `720/3`) | `MiPro Sense SRC 720` (`720/2`, `720/3`) | `15` (`BASS3` / `BASV3` / `CTLV2` / `CTLV3`) |
+| **Wireless Room Thermostat / RF Receiver (Optional)** | `sensoCOMFORT RF VRC 720f` (`NETX3` / `NETX2`) | `MiPro Sense RF SRC 720f` (`NETX3` / `NETX2`) | `04` / `f6` |
 | **Official Cloud Gateway (Optional — Passive Synergy)** | `myVAILLANT connect VR 940f` / `sensoNET VR 921` | `MiGo Link SR 940f` | Master `f1` |
 
 > **Note:** An official cloud gateway (`myVAILLANT connect` / `MiGo Link`) is **not required**. If installed, the integration passively listens to its periodic eBUS queries with zero extra bus traffic. If absent, disable the cloud gateway toggle during setup and the integration will automatically run a gentle, collision-safe `/get` fallback polling loop.
@@ -99,24 +99,25 @@ Vaillant and Saunier Duval aerothermal heat pumps share **100% identical eBUS el
 - **Startup Hydration Queue:** On Home Assistant startup, the coordinator waits `5.0 s` to absorb retained MQTT payloads at zero bus cost, then requests **only missing registers** sequentially with `0.8 s` spacing.
 - **Optimistic Updates & Selective Confirmation:** Writes to passive `u` registers (setpoints, modes, schedules, dates) apply immediate optimistic UI state updates without triggering redundant `/get` cache rebounds, while multi-step transitions use `0.3 s`–`0.6 s` bus pacing.
 
-### 3. 142 Native Entities Organized into 4 Logical Devices
+### 3. 177 Native Entities Organized into 4 Logical Devices
 
 | Logical Device | eBUS Circuit | Highlights |
 | :--- | :---: | :--- |
-| **1. Outdoor Unit** (`<Outdoor Model>`) | `08.hmux0` | Live operating monitor (52+ `S.xx`/`S.xxx` states), compressor speed (`r/s`) & modulation (`%`), R290 high pressure, EEV steps, fan speeds, primary flow rate, high-precision flow/return temps, IEEE 754 (`EXP`) per-mode electrical, thermal & environmental yield counters (`Wh`), runtime hours/starts, and **calculated thermodynamic & system energy sensors**. |
-| **2. Climate Controller** (`sensoCOMFORT` / `MiPro Sense`) | `15.bass3` / `15.basv3` | **Zone 1 Climate (`climate`)**, **Domestic Hot Water (`water_heater`)**, heating curves, flow temperature limits, bivalence points, water pressure, service energy counters (`PrEnergySumHc` / `PrEnergySumHwc`), weekly schedule summaries, and configuration switches. |
-| **3. Hydraulic Interface** (`<Indoor Model>`) | `76.vwzio` | Secondary circuit operating state (heating, cooling, DHW, overrun, standby), instantaneous electrical power (`W`), `b5 16` auxiliary/secondary energy counters (`Wh`), 3-way diverter valve / secondary pump diagnostics, and active error monitoring (`OK` or fault codes). |
-| **4. Wireless Room Thermostat** *(Optional)* | `04.netx3` / `f6` / `broadcast` | Wireless room dial temperature, wireless target setpoint, broadcast outdoor temperature, and eBUS system date/time. *(If no wireless unit is installed, broadcast sensors automatically attach to the Climate Controller).* |
+| **1. Outdoor Unit** (`<Outdoor Model>`) | `08.hmux0` / `08.hmu` | Live operating monitor (52+ `S.xx`/`S.xxx` states), compressor speed (`r/s`) & modulation (`%`), R290 high pressure, EEV steps, fan speeds, primary flow rate, high-precision flow/return temps, IEEE 754 (`EXP`) per-mode electrical, thermal & environmental yield counters (`Wh`), runtime hours/starts, low-noise silent operation levels, and **calculated thermodynamic & system energy sensors**. |
+| **2. Climate Controller** (`sensoCOMFORT` / `MiPro Sense`) | `15.bass3` / `15.basv3` / `15.ctlv2` / `15.ctlv3` | **Zone 1 Climate (`climate`)**, **Domestic Hot Water (`water_heater`)**, heating curves, flow temperature limits, bivalence points, water pressure, heating energy integral (`EnergyIntegral`), service energy counters (`PrEnergySumHc` / `PrEnergySumHwc`), weekly schedule summaries, and configuration switches. |
+| **3. Hydraulic Interface** (`<Indoor Model>`) | `76.vwzio` | Secondary circuit operating state (heating, cooling, DHW, overrun, standby), instantaneous electrical power (`W`), `b5 16` auxiliary/secondary energy counters (`Wh`), backup heater state, 3-way diverter valve / secondary pump diagnostics, and active error monitoring (`OK` or fault codes). |
+| **4. Wireless Room Thermostat** *(Optional)* | `04.netx3` / `04.netx2` / `f6` / `broadcast` | Wireless room dial temperature, wireless target setpoint, broadcast outdoor temperature, and eBUS system date/time. *(If no wireless unit is installed, broadcast sensors automatically attach to the Climate Controller).* |
 
-**Platform Breakdown (142 entities total across 8 platforms):**
+**Platform Breakdown (177 entities total across 9 platforms):**
 - `climate` (**1**): Unified Heating/Cooling/Auto thermostat for Zone 1 with presets (`Scheduled (Comfort)`, `Continuous Manual`, `Eco (Night setback)`, `Quick Veto Override`, `Away / Holiday Mode`).
 - `water_heater` (**1**): Domestic Hot Water (DHW) cylinder controller (`Off`, `Time-controlled (Schedule)`, `Continuous (24h)`, `Boost`).
-- `sensor` (**92**): 88 telemetry, `Wh`-precision energy, diagnostic, and calculated thermodynamic sensors + 4 weekly timer schedule summary sensors (with full daily slot attributes).
-- `binary_sensor` (**8**): Compressor running, primary pump, defrost active, energy integration active, Zone 1 heating demand, hardware cooling lock release, broadcast cooling cycle, and physical eBUS signal.
-- `number` (**25**): All installer and user numeric parameters (heating curve, excess temp, min/max flow setpoints, summer limit, day/night/manual/veto/cooling/holiday setback setpoints, DHW setpoint & hysteresis/offset/timers, bivalence points, max room humidity).
+- `sensor` (**123**): Telemetry, `Wh`-precision energy matrices (electrical, thermal, environmental yields across heating, cooling, DHW, and auxiliary modules), calculated thermodynamics & COP/EER, physical bus diagnostics, missing CSV detector, and 4 weekly schedule summary sensors.
+- `binary_sensor` (**9**): Compressor running, primary pump, defrost active, energy integration active, Zone 1 heating demand, hardware cooling lock release, broadcast cooling cycle, physical eBUS signal, and backup heater active.
+- `number` (**26**): All installer and user numeric parameters (heating curve, excess temp, min/max flow setpoints, summer limit, day/night/manual/veto/cooling/holiday setback setpoints, DHW setpoint & hysteresis/offset/timers, bivalence points, max room humidity).
 - `select` (**5**): Zone 1 heating mode, Zone 1 cooling mode, DHW mode, night lowering mode (`eco`/`night`/`off`), and room temperature modulation mode (`off`/`modulating`/`thermostat`).
 - `switch` (**6**): Away Mode (`Holiday Mode`), One-Time DHW Charge (`Boost`), Cooling Season Authorization (`Lock 1`), Adaptive Heating Curve, DHW Parallel Loading, and Global System Off *(disabled by default for safety)*.
 - `datetime` (**4**): Interactive UI controls for Away Mode Start (`datetime`), Away Mode End (`datetime`), Manual Cooling Start Date (`datetime`), and Manual Cooling End Date (`datetime`).
+- `button` (**2**): Hot-Action buttons for eBUSd daemon control (`Reload CSV Configurations` and `Restart Bus Device Scan`).
 
 ### 4. Zone 1 Climate: Anti-Sentinel Filter & Automatic Double-Lock Cooling
 - **Firmware Anti-Sentinel Filtering:**
@@ -148,7 +149,21 @@ Total System Energy (Wh)     = Heating_Total_Wh + DHW_Total_Wh + Cooling_Total_W
 
 ### 7. Touch-Safe Controls (`NumberMode.BOX`) & Brand-Neutral `unique_id`s
 - **Touch Safety:** Every `number` entity enforces `NumberMode.BOX` (numeric input field with `+`/`-` steppers) rather than sliders, preventing accidental changes to heating curves or bivalence points while scrolling on a smartphone.
-- **Zero-Loss Reconfiguration:** All 142 entity `unique_id`s follow `{entry_id}_{circuit}_{message}_{field}` with zero brand strings. Reconfiguring manufacturer or hardware models never orphans entities or breaks historical energy graphs.
+- **Zero-Loss Reconfiguration:** All entity `unique_id`s follow `{entry_id}_{circuit}_{message}_{field}` with zero brand strings. Reconfiguring manufacturer or hardware models never orphans entities or breaks historical energy graphs.
+
+### 8. Physical Bus Diagnostics via Direct TCP Socket (`ebusctl`) & Action Buttons
+Beyond the primary MQTT telemetry transport, the integration includes an optional asynchronous **direct TCP socket client** connecting to the `ebusd` daemon (`ebusctl` interface, port `8888` by default):
+- **Physical Bus Performance Telemetry:** Real-time extraction of low-level bus metrics that are never published over MQTT: modulation symbol rate (`symbol rate`), line arbitration latency in microseconds (`arbitration latency`), transceiver response latency (`symbol latency`), and reconnect counter (`reconnects`).
+- **Proactive Missing CSV File Detection:** The coordinator inspects the device scan table reported by `ebusctl info`. If an address is physically online on the bus but lacks a matching configuration CSV (e.g. an international `HMU00` or a `CTLV2` controller when only legacy files are present), the `Missing CSV Devices` sensor (`sensor.ebusd_missing_csv_devices`) transitions from `OK` to `Pending` and details the exact hardware IDs in its attributes, alerting you before communication fails.
+- **Hot-Action Buttons:**
+  - **Reload CSV Configurations (`button.ebusd_reload_csv`):** Issues the `reload` command over the TCP socket, instructing `ebusd` to reparse and reload modified CSV files on-the-fly with zero container restarts.
+  - **Restart Bus Device Scan (`button.ebusd_restart_scan`):** Issues `scan full` to trigger hardware re-enumeration.
+- **Dynamic Entity Registry Lifecycle:** When the TCP diagnostic option is toggled off in settings, all physical bus sensors and action buttons are cleanly disabled in the Home Assistant Entity Registry to prevent clutter. Enabling TCP immediately reactivates them.
+
+### 9. Trilingual Localization (EN / ES / DE) & Transparent Entity Migration
+- **100% Trilingual Parity:** Complete translation parity across English, Spanish, and German (`en.json`, `es.json`, `de.json`, and `strings.json`) covering all entity names, option descriptions, service parameters, and repair dialogs.
+- **Dual Options Schema Registration:** Config flow options are registered under both `sections.advanced_options` and root `step.init.data`, guaranteeing flawless visual rendering across all Home Assistant UI themes and fallback form renderers.
+- **Transparent Legacy Registry Migration:** The coordinator automatically scans existing device registry entries on startup (`_async_migrate_legacy_device_names`), safely upgrading older Spanish system names to canonical English identifiers without altering any custom entity names set by the user.
 
 ---
 
@@ -202,10 +217,14 @@ Copy the CSV files into your `ebusd` configuration directory preserving the exac
 <ebusd-config-root>/en/
 ├── broadcast.csv              <-- MUST be placed in the root of en/ (NEVER inside vaillant/)
 └── vaillant/
-    ├── 04.netx3.csv           <-- Wireless room thermostat receiver
+    ├── 04.netx3.csv           <-- Wireless room thermostat receiver (NETX3 / NETX2)
+    ├── 08.hmu.csv             <-- Outdoor heat pump board (international / HMU00 variants)
+    ├── 08.hmu.HW5103.csv      <-- Outdoor heat pump board (HW=5103 matching priority)
     ├── 08.hmux0.csv           <-- Outdoor heat pump board (aroTHERM plus / GeniaAir Max)
     ├── 15.bass3.csv           <-- Climate controller (MiPro Sense SRC 720 / sensoCOMFORT VRC 720)
     ├── 15.basv3.csv           <-- Climate controller (sensoCOMFORT VRC 720 reporting BASV3)
+    ├── 15.ctlv2.csv           <-- Climate controller (sensoCOMFORT VRC 720/2)
+    ├── 15.ctlv3.csv           <-- Climate controller (sensoCOMFORT VRC 720/3)
     ├── 76.vwzio.csv           <-- Hydraulic module / tower (VWZ MEH / uniTOWER / HPIM 7 / GeniaSet)
     └── f6.netx3.csv           <-- Wireless room thermostat passive RF frames
 ```
@@ -318,6 +337,9 @@ Click **Configure** on the integration card in **Settings → Devices & Services
 | **Enable Smart Forced DHW Boost** (`force_dhw_boost`) | `True` | On / Off | Dynamically elevates `HwcTempDesired` to `T_current + Hysteresis + 1.5 °C` when `ΔT < Hysteresis` during one-time DHW Boost, restoring the original setpoint automatically afterward. |
 | **Automatically open Cooling Lock 1** (`auto_cooling_lock_bypass`) | `True` | On / Off | Automatically sets `CoolingStartDate = 01;01;26` and `CoolingEndDate = 01;01;99` when switching Zone 1 Climate to `Cool`, and locks back to `01;01;19` in `Heat` / `Off`. |
 | **Fallback `/get` polling interval** (`fallback_poll_interval`) | `300 s` | `60` – `3600 s` | Interval for gentle active `/get` polling of core registers. **Only active when the official cloud gateway (`f1`) option is disabled.** |
+| **Enable eBUSd TCP Diagnostics** (`enable_ebusd_tcp`) | `False` | On / Off | Enables direct asynchronous TCP queries to `ebusd` (`ebusctl`, port `8888`) to extract physical bus performance metrics, scan status, missing CSV alerts, and daemon control buttons. |
+| **eBUSd TCP Host** (`ebusd_tcp_host`) | `127.0.0.1` | Hostname / IP | IP address or hostname of the machine/container running `ebusd` (e.g. `127.0.0.1` or `core-ebusd`). |
+| **eBUSd TCP Port** (`ebusd_tcp_port`) | `8888` | `1` – `65535` | TCP port where `ebusd` accepts commands (default: `8888`). |
 
 ---
 
@@ -516,7 +538,7 @@ Key topics covered in the reference:
 This repository includes an offline unit test suite (requiring zero live Home Assistant runtime dependencies) and GitHub Actions workflows for **Hassfest**, **HACS Validation**, and **Ruff** linting:
 
 ```bash
-# Run all 118 unit tests (thermodynamics, config flow, unique_id registry, diagnostic services, community fixtures, schema parity)
+# Run all 143 unit tests (thermodynamics, config flow, unique_id registry, diagnostic services, community fixtures, schema parity)
 python -m unittest discover tests -v
 
 # Run Ruff linter & formatting checks

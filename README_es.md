@@ -16,7 +16,7 @@
 
 **aroTHERM & GeniaAir (eBUS)** (`arotherm_genia_ebusd`) es una **integración personalizada 100 % local (`local_push`) e independiente de la nube para Home Assistant**, diseñada para bombas de calor aerotérmicas R290 de **Vaillant** y **Saunier Duval** gobernadas por reguladores **`sensoCOMFORT` (`VRC 720`)** o **`MiPro Sense` (`SRC 720`)** a través de [**eBUSd**](https://github.com/john30/ebusd).
 
-Construida directamente sobre la arquitectura electrónica eBUS compartida por el Grupo Vaillant (`08.hmux0`, `15.bass3` / `15.basv3`, `76.vwzio`, `04.netx3`), sustituye el caos de entidades del auto-descubrimiento MQTT crudo y la dependencia de servidores externos por **142 entidades nativas fuertemente tipadas**, motor termodinámico y cálculo de COP/EER en tiempo real, filtrado de valores centinela de firmware, gestión automática del Doble Cerrojo de refrigeración y algoritmo inteligente de ACS Puntual (Boost Forzado).
+Construida directamente sobre la arquitectura electrónica eBUS compartida por el Grupo Vaillant (`08.hmux0` / `08.hmu`, `15.bass3` / `15.basv3` / `15.ctlv2` / `15.ctlv3`, `76.vwzio`, `04.netx3` / `04.netx2`), sustituye el caos de entidades del auto-descubrimiento MQTT crudo y la dependencia de servidores externos por **177 entidades nativas fuertemente tipadas**, motor termodinámico y cálculo de COP/EER en tiempo real, filtrado de valores centinela de firmware, gestión automática del Doble Cerrojo de refrigeración, diagnósticos físicos TCP y algoritmo inteligente de ACS Puntual (Boost Forzado).
 
 ---
 
@@ -65,8 +65,8 @@ Los equipos de aerotermia de Vaillant y Saunier Duval comparten **al 100 % las m
 
 | Generación | Modelos Comerciales Vaillant | Modelos Comerciales Saunier Duval | Refrigerante / Placa |
 | :--- | :--- | :--- | :--- |
-| **Generación Actual (`/7.1` ES)** | `aroTHERM plus ES VWL 55/7.1 A 230V`<br>`aroTHERM plus ES VWL 85/7.1 A 230V`<br>`aroTHERM plus ES VWL 125/7.1 A 230V`<br>`aroTHERM plus ES VWL 125/7.1 A 400V`<br>`aroTHERM plus ES VWL 155/7.1 A 230V`<br>`aroTHERM plus ES VWL 155/7.1 A 400V` | `GeniaAir Max ES 5`<br>`GeniaAir Max ES 8`<br>`GeniaAir Max ES 12`<br>`GeniaAir Max ES 15`<br>`GeniaAir Iso ES` | R290 (`08.hmux0`) |
-| **Generación Previa (`/6` y `Max` Legacy)** | `aroTHERM plus VWL 35/6 A 230V (Legacy)`<br>`aroTHERM plus VWL 55/6 A 230V (Legacy)`<br>`aroTHERM plus VWL 75/6 A 230V (Legacy)`<br>`aroTHERM plus VWL 105/6 A 230V (Legacy)`<br>`aroTHERM plus VWL 125/6 A (Legacy)` | `GeniaAir Max 4 (Legacy)`<br>`GeniaAir Max 6 (Legacy)`<br>`GeniaAir Max 8 (Legacy)`<br>`GeniaAir Max 11 (Legacy)`<br>`GeniaAir Max 15 (Legacy)` | R290 (`08.hmux0`) |
+| **Generación Actual (`/7.1` ES e Internacional)** | `aroTHERM plus ES VWL 55/7.1 A 230V`<br>`aroTHERM plus ES VWL 85/7.1 A 230V`<br>`aroTHERM plus ES VWL 125/7.1 A 230V`<br>`aroTHERM plus ES VWL 125/7.1 A 400V`<br>`aroTHERM plus ES VWL 155/7.1 A 230V`<br>`aroTHERM plus ES VWL 155/7.1 A 400V` | `GeniaAir Max ES 5`<br>`GeniaAir Max ES 8`<br>`GeniaAir Max ES 12`<br>`GeniaAir Max ES 15`<br>`GeniaAir Iso ES` | R290 (`08.hmux0` / `08.hmu` / `08.hmu.HW5103`) |
+| **Generación Previa (`/6` y `Max` Legacy)** | `aroTHERM plus VWL 35/6 A 230V (Legacy)`<br>`aroTHERM plus VWL 55/6 A 230V (Legacy)`<br>`aroTHERM plus VWL 75/6 A 230V (Legacy)`<br>`aroTHERM plus VWL 105/6 A 230V (Legacy)`<br>`aroTHERM plus VWL 125/6 A (Legacy)` | `GeniaAir Max 4 (Legacy)`<br>`GeniaAir Max 6 (Legacy)`<br>`GeniaAir Max 8 (Legacy)`<br>`GeniaAir Max 11 (Legacy)`<br>`GeniaAir Max 15 (Legacy)` | R290 (`08.hmux0` / `08.hmu`) |
 
 ### 2. Módulos Hidráulicos Interiores, Interfaces y Torres (`76.vwzio`)
 
@@ -80,8 +80,8 @@ Los equipos de aerotermia de Vaillant y Saunier Duval comparten **al 100 % las m
 
 | Rol del Componente | Modelos Vaillant | Modelos Saunier Duval | Dirección eBUS |
 | :--- | :--- | :--- | :---: |
-| **Controlador de Clima del Sistema (Requerido)** | `sensoCOMFORT VRC 720` (`720/2`, `720/3`) | `MiPro Sense SRC 720` (`720/2`, `720/3`) | `15` (`BASS3` / `BASV3`) |
-| **Termostato Inalámbrico / Receptor RF (Opcional)** | `sensoCOMFORT RF VRC 720f` (`NETX3`) | `MiPro Sense RF SRC 720f` (`NETX3`) | `04` / `f6` |
+| **Controlador de Clima del Sistema (Requerido)** | `sensoCOMFORT VRC 720` (`720/2`, `720/3`) | `MiPro Sense SRC 720` (`720/2`, `720/3`) | `15` (`BASS3` / `BASV3` / `CTLV2` / `CTLV3`) |
+| **Termostato Inalámbrico / Receptor RF (Opcional)** | `sensoCOMFORT RF VRC 720f` (`NETX3` / `NETX2`) | `MiPro Sense RF SRC 720f` (`NETX3` / `NETX2`) | `04` / `f6` |
 | **Pasarela Oficial en Nube (Opcional — Sinergia Pasiva)** | `myVAILLANT connect VR 940f` / `sensoNET VR 921` | `MiGo Link SR 940f` | Maestro `f1` |
 
 > **Nota:** **No es obligatorio** disponer de la pasarela oficial en la nube (`myVAILLANT connect` / `MiGo Link`). Si está conectada al bus, la integración aprovecha de forma pasiva sus lecturas periódicas sin inyectar tráfico adicional. Si no dispones de pasarela oficial, basta con desmarcar esa casilla en el asistente y la integración activará automáticamente un sondeo `/get` escalonado y libre de colisiones.
@@ -99,24 +99,25 @@ Los equipos de aerotermia de Vaillant y Saunier Duval comparten **al 100 % las m
 - **Cola de Hidratación Inicial:** Al arrancar Home Assistant, el coordinador espera `5.0 s` para absorber a coste cero los mensajes `retained` del broker MQTT y solicita secuencialmente (con `0.8 s` de pausa entre tramas) **únicamente los registros que falten**.
 - **Actualización Optimista y Confirmación Selectiva:** Las escrituras sobre registros pasivos `u` (consignas, modos, horarios, fechas) actualizan la interfaz al instante sin disparar lecturas `/get` redundantes que devuelvan valores antiguos en caché, espaciando las secuencias multipaso entre `0.3 s` y `0.6 s`.
 
-### 3. 142 Entidades Nativas Agrupadas en 4 Dispositivos Lógicos
+### 3. 177 Entidades Nativas Agrupadas en 4 Dispositivos Lógicos
 
 | Dispositivo Lógico | Circuito eBUS | Entidades Destacadas |
 | :--- | :---: | :--- |
-| **1. Unidad Exterior** (`<Modelo Exterior>`) | `08.hmux0` | Monitor operativo en vivo (52+ estados `S.xx`/`S.xxx`), velocidad (`r/s`) y modulación (`%`) del compresor, alta presión R290, pasos EEV, ventiladores, caudal primario, temperaturas de impulsión/retorno de alta precisión, contadores IEEE 754 (`EXP`) eléctricos, térmicos y de energía ambiental por modo (`Wh`), horas/arranques y **sensores termodinámicos y de energía total calculados**. |
-| **2. Controlador de Clima** (`sensoCOMFORT` / `MiPro Sense`) | `15.bass3` / `15.basv3` | **Climatización Zona 1 (`climate`)**, **Agua Caliente Sanitaria (`water_heater`)**, curvas climáticas, límites de impulsión, puntos de bivalencia, presión de agua, contadores de energía por servicio (`PrEnergySumHc` / `PrEnergySumHwc`), resúmenes de programación semanal e interruptores de sistema. |
-| **3. Interfaz Hidráulica** (`<Modelo Interior>`) | `76.vwzio` | Estado operativo del circuito secundario (calefacción, refrigeración, ACS, postcirculación, reposo), potencia eléctrica instantánea (`W`), contadores de energía `b5 16` (`Wh`), diagnóstico de válvula de 3 vías / bomba secundaria y monitor de errores activos (`OK` o códigos de avería). |
-| **4. Termostato Inalámbrico** *(Opcional)* | `04.netx3` / `f6` / `broadcast` | Temperatura en el dial inalámbrico, consigna inalámbrica, temperatura exterior por difusión (`Broadcast`) y fecha/hora del bus eBUS. *(Si no hay termostato inalámbrico instalado, los sensores broadcast se asocian automáticamente al Controlador de Clima).* |
+| **1. Unidad Exterior** (`<Modelo Exterior>`) | `08.hmux0` / `08.hmu` | Monitor operativo en vivo (52+ estados `S.xx`/`S.xxx`), velocidad (`r/s`) y modulación (`%`) del compresor, alta presión R290, pasos EEV, ventiladores, caudal primario, temperaturas de impulsión/retorno de alta precisión, contadores IEEE 754 (`EXP`) eléctricos, térmicos y de energía ambiental por modo (`Wh`), horas/arranques, niveles de reducción de ruido (modo silencioso) y **sensores termodinámicos y de energía total calculados**. |
+| **2. Controlador de Clima** (`sensoCOMFORT` / `MiPro Sense`) | `15.bass3` / `15.basv3` / `15.ctlv2` / `15.ctlv3` | **Climatización Zona 1 (`climate`)**, **Agua Caliente Sanitaria (`water_heater`)**, curvas climáticas, límites de impulsión, puntos de bivalencia, presión de agua, integral de energía de calefacción (`EnergyIntegral`), contadores de energía por servicio (`PrEnergySumHc` / `PrEnergySumHwc`), resúmenes de programación semanal e interruptores de sistema. |
+| **3. Interfaz Hidráulica** (`<Modelo Interior>`) | `76.vwzio` | Estado operativo del circuito secundario (calefacción, refrigeración, ACS, postcirculación, reposo), potencia eléctrica instantánea (`W`), contadores de energía `b5 16` (`Wh`), apoyo eléctrico auxiliar, diagnóstico de válvula de 3 vías / bomba secundaria y monitor de errores activos (`OK` o códigos de avería). |
+| **4. Termostato Inalámbrico** *(Opcional)* | `04.netx3` / `04.netx2` / `f6` / `broadcast` | Temperatura en el dial inalámbrico, consigna inalámbrica, temperatura exterior por difusión (`Broadcast`) y fecha/hora del bus eBUS. *(Si no hay termostato inalámbrico instalado, los sensores broadcast se asocian automáticamente al Controlador de Clima).* |
 
-**Desglose por Plataforma (142 entidades en total a través de 8 plataformas):**
+**Desglose por Plataforma (177 entidades en total a través de 9 plataformas):**
 - `climate` (**1**): Termostato unificado Calefacción / Refrigeración / Auto para Zona 1 con modos preestablecidos (`Programado (Confort)`, `Manual continuo`, `Eco (Reducción nocturna)`, `Anulación rápida (Quick Veto)`, `Modo Ausencia / Vacaciones`).
 - `water_heater` (**1**): Control del depósito de Agua Caliente Sanitaria (ACS) (`Apagado`, `Programación horaria`, `Continuo (24h)`, `Boost`).
-- `sensor` (**92**): 88 sensores de telemetría, energía en `Wh`, diagnóstico y cálculos termodinámicos + 4 sensores resumen de programación semanal (con el detalle diario completo en sus atributos) + sensores de días restantes de vacaciones y refrigeración.
-- `binary_sensor` (**8**): Compresor en marcha, bomba primaria, desescarche activo, integración de energía activa, demanda de calor Zona 1, autorización hardware de refrigeración, ciclo de frío broadcast y señal física eBUS.
-- `number` (**25**): Todos los parámetros numéricos de usuario e instalador (curva climática, sobretemperatura, impulsión mín./máx., corte de verano, consignas día/noche/manual/veto/frío/ausencia, consigna/histéresis/offset/tiempos de ACS, puntos de bivalencia y humedad máxima).
+- `sensor` (**123**): Sensores de telemetría, matrices de energía en `Wh` (rendimientos eléctrico, térmico y ambiental en calefacción, frío, ACS y módulo auxiliar), cálculos termodinámicos y COP/EER, diagnósticos físicos del bus, detector de CSV faltantes y 4 sensores resumen de programación semanal.
+- `binary_sensor` (**9**): Compresor en marcha, bomba primaria, desescarche activo, integración de energía activa, demanda de calor Zona 1, autorización hardware de refrigeración, ciclo de frío broadcast, señal física eBUS y apoyo eléctrico activo.
+- `number` (**26**): Todos los parámetros numéricos de usuario e instalador (curva climática, sobretemperatura, impulsión mín./máx., corte de verano, consignas día/noche/manual/veto/frío/ausencia, consigna/histéresis/offset/tiempos de ACS, puntos de bivalencia y humedad máxima).
 - `select` (**5**): Modo calefacción Zona 1, modo refrigeración Zona 1, modo ACS, modo reducción nocturna (`eco`/`night`/`off`) y control por temperatura ambiente (`off`/`modulating`/`thermostat`).
 - `switch` (**6**): Modo Ausencia (`Holiday Mode`), ACS Puntual (`Boost`), Autorización temporada de frío (`Cerrojo 1`), Curva de calefacción adaptativa, Carga paralela de ACS y calefacción, y Apagado global del sistema *(deshabilitado por defecto por seguridad)*.
 - `datetime` (**4**): Controles interactivos de interfaz para Fecha/Hora de Inicio y Fin del Modo Ausencia (`datetime`), y Fecha/Hora de Inicio y Fin de Refrigeración Manual (`datetime`).
+- `button` (**2**): Botones de acción en caliente para control del demonio eBUSd (`Recargar configuraciones CSV` y `Reiniciar escaneo de dispositivos`).
 
 ### 4. Climatización Zona 1: Filtro Anti-Centinela y Gestión Dual de Refrigeración
 - **Filtrado Anti-Centinela de Firmware:**
@@ -147,8 +148,22 @@ Consumo Eléctrico Total (Wh)    = Calefacción_Total_Wh + ACS_Total_Wh + Refrig
 *(Incluye puesta a cero durante desescarches y compresor en reposo para evitar falsos picos de COP por caudal residual de la bomba circuladora).*
 
 ### 7. Seguridad Táctil (`NumberMode.BOX`) e Identificadores `unique_id` Neutros
-- **Seguridad Táctil:** Los 25 controles `number` utilizan cajas numéricas con botones `+`/`-` (`NumberMode.BOX`) en lugar de barras deslizantes, evitando modificar por accidente la curva climática o los puntos de bivalencia al hacer scroll desde el móvil.
-- **Reconfiguración sin Pérdida de Datos:** Todos los `unique_id` siguen estrictamente el patrón `{entry_id}_{circuito}_{mensaje}_{campo}`, sin cadenas de marca. Cambiar de fabricante o modelo mediante **Reconfigurar** conserva al 100 % las 142 entidades, automatizaciones y estadísticas históricas.
+- **Seguridad Táctil:** Los controles `number` utilizan cajas numéricas con botones `+`/`-` (`NumberMode.BOX`) en lugar de barras deslizantes, evitando modificar por accidente la curva climática o los puntos de bivalencia al hacer scroll desde el móvil.
+- **Reconfiguración sin Pérdida de Datos:** Todos los `unique_id` siguen estrictamente el patrón `{entry_id}_{circuito}_{mensaje}_{campo}`, sin cadenas de marca. Cambiar de fabricante o modelo mediante **Reconfigurar** conserva al 100 % las entidades, automatizaciones y estadísticas históricas.
+
+### 8. Diagnóstico del Bus Físico por Socket TCP Directo (`ebusctl`) y Botones de Acción
+Más allá del transporte telemétrico primario por MQTT, la integración incorpora un cliente asíncrono opcional de **conexión TCP directa** con el demonio `ebusd` (interfaz `ebusctl`, puerto `8888` por defecto):
+- **Telemetría de Rendimiento del Bus Físico:** Extracción en tiempo real de métricas de bajo nivel que nunca se publican por MQTT: tasa de modulación en símbolos por segundo (`symbol rate`), latencia de arbitraje de línea en microsegundos (`arbitration latency`), latencia de respuesta del transceptor (`symbol latency`) y contador de reconexiones físicas (`reconnects`).
+- **Detección Proactiva de Archivos CSV Faltantes:** El coordinador analiza la tabla de escaneo de dispositivos reportada por `ebusctl info`. Si una dirección física está activa en el bus pero no dispone de un archivo de configuración CSV enlazado (por ejemplo, una unidad exterior `HMU00` internacional o un regulador `CTLV2` cuando solo se desplegaron los CSV antiguos), el sensor `Dispositivos sin CSV` (`sensor.ebusd_missing_csv_devices`) pasa de `OK` a `Pending` y desglosa los identificadores hardware en sus atributos, alertándote proactivamente antes de que fallen las entidades.
+- **Botones de Acción en Caliente:**
+  - **Recargar Configuraciones CSV (`button.ebusd_reload_csv`):** Emite el comando `reload` por TCP para que `ebusd` vuelva a analizar los archivos CSV modificados sobre la marcha sin necesidad de reiniciar el contenedor o add-on.
+  - **Reiniciar Escaneo de Dispositivos (`button.ebusd_restart_scan`):** Emite `scan full` para forzar la re-enumeración completa del bus físico.
+- **Ciclo de Vida Dinámico en el Registro de Entidades:** Si la opción de diagnóstico TCP se desactiva en los ajustes de la integración, todos los sensores físicos y botones de acción se deshabilitan limpiamente en el Registro de Entidades de Home Assistant para no saturar la vista. Al activarla, se habilitan de inmediato.
+
+### 9. Localización Trilingüe (ES / EN / DE) y Migración Transparente de Dispositivos
+- **Paridad Trilingüe al 100 %:** Traducción completa y rigurosa en español, inglés y alemán (`es.json`, `en.json`, `de.json` y `strings.json`) cubriendo el 100 % de los nombres de entidades, descripciones de opciones avanzadas, parámetros de acciones y notificaciones de reparación.
+- **Doble Registro del Esquema de Opciones:** Los campos del flujo de opciones se declaran simultáneamente en `sections.advanced_options` y en la raíz `step.init.data`, garantizando una presentación impecable tanto en interfaces modernas con secciones colapsables como en renderizadores clásicos de formularios planos.
+- **Migración Transparente del Registro de Dispositivos:** El coordinador analiza automáticamente los dispositivos existentes al arrancar (`_async_migrate_legacy_device_names`), actualizando de forma transparente los nombres de sistema en español a identificadores estándar canónicos en inglés sin alterar jamás los nombres personalizados que el usuario haya establecido en la interfaz.
 
 ---
 
@@ -202,10 +217,14 @@ Copia los archivos CSV en el directorio de configuración de `ebusd` respetando 
 <raiz-config-ebusd>/en/
 ├── broadcast.csv              <-- DEBE ir en la raíz de en/ (NUNCA dentro de vaillant/)
 └── vaillant/
-    ├── 04.netx3.csv           <-- Receptor radio del termostato inalámbrico
+    ├── 04.netx3.csv           <-- Receptor radio del termostato inalámbrico (NETX3 / NETX2)
+    ├── 08.hmu.csv             <-- Placa unidad exterior (variantes internacionales / HMU00)
+    ├── 08.hmu.HW5103.csv      <-- Placa unidad exterior (prioridad para HW=5103)
     ├── 08.hmux0.csv           <-- Placa unidad exterior (aroTHERM plus / GeniaAir Max)
     ├── 15.bass3.csv           <-- Controlador de clima (MiPro Sense SRC 720 / sensoCOMFORT VRC 720)
     ├── 15.basv3.csv           <-- Controlador de clima (sensoCOMFORT VRC 720 que reporta BASV3)
+    ├── 15.ctlv2.csv           <-- Controlador de clima (sensoCOMFORT VRC 720/2)
+    ├── 15.ctlv3.csv           <-- Controlador de clima (sensoCOMFORT VRC 720/3)
     ├── 76.vwzio.csv           <-- Módulo o torre hidráulica (VWZ MEH / uniTOWER / HPIM 7 / GeniaSet)
     └── f6.netx3.csv           <-- Tramas RF pasivas del termostato inalámbrico
 ```
@@ -318,6 +337,9 @@ Pulsa el botón **Configurar** dentro de la tarjeta de la integración en **Ajus
 | **Activar ACS Boost Forzado Inteligente** (`force_dhw_boost`) | `True` | Sí / No | Eleva dinámicamente `HwcTempDesired` a `T_actual + Histéresis + 1.5 °C` cuando `ΔT < Histéresis` durante una carga puntual de ACS, restaurando la consigna original automáticamente al terminar. |
 | **Abrir automáticamente el Cerrojo 1 de refrigeración** (`auto_cooling_lock_bypass`) | `True` | Sí / No | Escribe automáticamente `CoolingStartDate = 01;01;26` y `CoolingEndDate = 01;01;99` al activar el modo `Frío`, y vuelve a cerrarlo en `01;01;19` al pasar a `Calor` o `Apagado`. |
 | **Intervalo de sondeo `/get` de respaldo** (`fallback_poll_interval`) | `300 s` | `60` – `3600 s` | Frecuencia del sondeo activo suave de registros principales. **Solo actúa cuando la opción de pasarela oficial en nube (`f1`) está desactivada.** |
+| **Habilitar diagnósticos eBUSd por TCP** (`enable_ebusd_tcp`) | `False` | Sí / No | Permite realizar consultas asíncronas directas a `ebusd` (`ebusctl`, puerto `8888`) para extraer métricas físicas del bus, estado de escaneo, alertas de CSV faltantes y botones de control del demonio. |
+| **Host TCP de eBUSd** (`ebusd_tcp_host`) | `127.0.0.1` | Nombre / IP | Dirección IP o nombre de host de la máquina o contenedor donde corre `ebusd` (ej. `127.0.0.1` o `core-ebusd`). |
+| **Puerto TCP de eBUSd** (`ebusd_tcp_port`) | `8888` | `1` – `65535` | Puerto TCP donde `ebusd` acepta conexiones `ebusctl` (por defecto: `8888`). |
 
 ---
 
@@ -516,7 +538,7 @@ Temas clave documentados en detalle:
 Este repositorio incluye una batería de tests unitarios offline (ejecutables sin depender de una instancia activa de Home Assistant) y flujos de integración continua en GitHub Actions para **Hassfest**, **Validación HACS** y **Ruff**:
 
 ```bash
-# Ejecutar los 118 tests unitarios (termodinámica, config flow, registro unique_id, servicios de diagnóstico, fixtures comunitarios, paridad de esquemas)
+# Ejecutar los 143 tests unitarios (termodinámica, config flow, registro unique_id, servicios de diagnóstico, fixtures comunitarios, paridad de esquemas)
 python -m unittest discover tests -v
 
 # Verificar estilo y formato con Ruff
