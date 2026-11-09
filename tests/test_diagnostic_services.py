@@ -17,6 +17,8 @@ from custom_components.arotherm_genia_ebusd import (
     async_unload_entry,
 )
 from custom_components.arotherm_genia_ebusd.const import (
+    CONF_ENABLE_EBUSD_TCP,
+    CONF_ENABLE_SEND_HEX,
     DOMAIN,
     SERVICE_DUMP_MQTT_VALUES,
     SERVICE_READ_PARAMETER,
@@ -49,6 +51,10 @@ class TestDiagnosticServices(unittest.TestCase):
 
         self.hass.services.has_service.return_value = False
         self.hass.services.async_register.side_effect = mock_register
+
+        mock_entry = MagicMock()
+        mock_entry.options = {CONF_ENABLE_SEND_HEX: True, CONF_ENABLE_EBUSD_TCP: True}
+        self.hass.config_entries.async_entries.return_value = [mock_entry]
 
     def test_services_registered_with_supports_response_only(self) -> None:
         """Verify services register with SupportsResponse.ONLY."""
@@ -530,6 +536,21 @@ class TestDiagnosticServices(unittest.TestCase):
         self.assertEqual(result["host"], "192.168.1.50")
         self.assertEqual(result["port"], 8888)
 
+    def test_send_hex_command_disabled_by_default_raises(self) -> None:
+        """Verify send_hex_command raises HomeAssistantError when not enabled in options."""
+        mock_entry = MagicMock()
+        mock_entry.options = {CONF_ENABLE_SEND_HEX: False}
+        self.hass.config_entries.async_entries.return_value = [mock_entry]
+        _async_register_services(self.hass)
+        handler = self.registered_services[SERVICE_SEND_HEX_COMMAND]
+
+        call = MagicMock()
+        call.data = {"command": "08b51a"}
+
+        with self.assertRaises(HomeAssistantError) as ctx:
+            asyncio.run(handler(call))
+        self.assertIn("service is disabled for security reasons", str(ctx.exception))
+
     def test_send_hex_command_invalid_hex_raises(self) -> None:
         """Verify send_hex_command raises HomeAssistantError on non-hex characters."""
         _async_register_services(self.hass)
@@ -588,6 +609,36 @@ class TestDiagnosticServices(unittest.TestCase):
         ):
             asyncio.run(handler(call))
         self.assertIn("Could not connect to eBUSd TCP daemon", str(ctx.exception))
+
+    def test_send_hex_command_falls_back_to_addon_hostname(self) -> None:
+        """Verify send_hex_command falls back to b4d7ad18-ebusd if 127.0.0.1 fails."""
+        _async_register_services(self.hass)
+        handler = self.registered_services[SERVICE_SEND_HEX_COMMAND]
+
+        call = MagicMock()
+        call.data = {"command": "08b51a", "host": "127.0.0.1"}
+
+        mock_writer = MagicMock()
+        mock_writer.drain = AsyncMock()
+        mock_writer.wait_closed = AsyncMock()
+        mock_reader = AsyncMock()
+        mock_reader.readline = AsyncMock(return_value=b"0aff021b\n")
+
+        calls = []
+
+        async def fake_open_connection(h: str, p: int):
+            calls.append((h, p))
+            if h == "127.0.0.1":
+                raise OSError("Connection refused")
+            return mock_reader, mock_writer
+
+        with patch("asyncio.open_connection", side_effect=fake_open_connection):
+            result = asyncio.run(handler(call))
+
+        self.assertEqual(calls, [("127.0.0.1", 8888), ("b4d7ad18-ebusd", 8888)])
+        self.assertTrue(result["success"])
+        self.assertEqual(result["response"], "0aff021b")
+        self.assertEqual(result["host"], "b4d7ad18-ebusd")
 
     def test_send_hex_command_timeout_raises(self) -> None:
         """Verify send_hex_command raises HomeAssistantError on TCP timeout."""

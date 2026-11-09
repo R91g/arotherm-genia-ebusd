@@ -20,6 +20,7 @@ PLATFORMS: list[Platform] = [
     Platform.SELECT,
     Platform.SWITCH,
     Platform.DATETIME,
+    Platform.BUTTON,
 ]
 
 # Configuration keys and defaults (ConfigFlow)
@@ -192,6 +193,20 @@ DEFAULT_AUTO_COOLING_LOCK_BYPASS = True
 CONF_FALLBACK_POLL_INTERVAL = "fallback_poll_interval"
 DEFAULT_FALLBACK_POLL_INTERVAL = 300
 
+SECTION_ADVANCED_OPTIONS = "advanced_options"
+
+CONF_ENABLE_EBUSD_TCP = "enable_ebusd_tcp"
+DEFAULT_ENABLE_EBUSD_TCP = False
+
+CONF_EBUSD_TCP_HOST = "ebusd_tcp_host"
+DEFAULT_EBUSD_TCP_HOST = "127.0.0.1"
+
+CONF_EBUSD_TCP_PORT = "ebusd_tcp_port"
+DEFAULT_EBUSD_TCP_PORT = 8888
+
+CONF_ENABLE_SEND_HEX = "enable_send_hex"
+DEFAULT_ENABLE_SEND_HEX = False
+
 # Logical Device Identifiers
 DEVICE_OUTDOOR_UNIT = "outdoor_unit"
 DEVICE_CLIMATE_CONTROLLER = "climate_controller"
@@ -227,6 +242,8 @@ MESSAGE_ALIASES: dict[str, str] = {
     "rundatastatuscode": "HMUStatusCode",
     "powerconsumptionhmu": "RunDataElectricPowerConsumption",
     "z1maxflowtempdesired": "Z1RoomHumidity",
+    "rundataenergyintegral": "EnergyIntegral",
+    "energyintegral": "EnergyIntegral",
 }
 
 # Weekly timer passive update aliases for eavesdropping MiGo Link / gateway writes

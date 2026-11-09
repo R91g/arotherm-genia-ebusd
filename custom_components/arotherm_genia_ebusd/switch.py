@@ -217,7 +217,7 @@ class SaunierGeniaCoolingSeasonSwitch(SaunierGeniaEntity, SwitchEntity):
 
 
 class SaunierGeniaHolidayModeSwitch(SaunierGeniaEntity, SwitchEntity):
-    """Switch for Away / Holiday Mode (Modo Ausencia)."""
+    """Switch for Away / Holiday Mode."""
 
     _gate_availability_on_ebus = True
 

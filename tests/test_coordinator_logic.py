@@ -41,6 +41,7 @@ from custom_components.arotherm_genia_ebusd.const import (
     CIRCUIT_BASV3,
     CIRCUIT_CTLV2,
     CIRCUIT_CTLV3,
+    CIRCUIT_GLOBAL,
     CIRCUIT_HMU,
     CIRCUIT_HMUX0,
     CIRCUIT_VWZIO,
@@ -1992,6 +1993,384 @@ class TestCoordinatorLogic(unittest.TestCase):
         self.assertEqual(sensor.native_value, 63.0)
         for circ in (CIRCUIT_BASS3, CIRCUIT_BASV3, CIRCUIT_CTLV2, CIRCUIT_CTLV3):
             self.assertEqual(coord.get_float(circ, "Z1RoomHumidity", "value"), 63.0)
+
+    def test_ebusd_tcp_polling_disabled_by_default(self) -> None:
+        """Verify TCP polling returns early and does not connect when disabled in options."""
+        entry = MagicMock()
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {}
+        coord = SaunierGeniaCoordinator(MagicMock(), entry)
+
+        self.assertFalse(coord.is_ebusd_tcp_enabled)
+        self.assertEqual(coord.ebusd_tcp_host, "127.0.0.1")
+        self.assertEqual(coord.ebusd_tcp_port, 8888)
+
+        with patch("asyncio.open_connection") as mock_conn:
+            asyncio.run(coord._async_fetch_ebusd_tcp_info())
+            mock_conn.assert_not_called()
+
+    def test_ebusd_tcp_polling_fetches_and_populates_metrics(self) -> None:
+        """Verify TCP polling connects, requests info, parses metrics, and notifies entities."""
+        from custom_components.arotherm_genia_ebusd.const import (
+            CONF_EBUSD_TCP_HOST,
+            CONF_EBUSD_TCP_PORT,
+            CONF_ENABLE_EBUSD_TCP,
+        )
+
+        entry = MagicMock()
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {
+            CONF_ENABLE_EBUSD_TCP: True,
+            CONF_EBUSD_TCP_HOST: "192.168.1.55",
+            CONF_EBUSD_TCP_PORT: 8889,
+        }
+        coord = SaunierGeniaCoordinator(MagicMock(), entry)
+        self.assertTrue(coord.is_ebusd_tcp_enabled)
+
+        sample_lines = [
+            b"version: ebusd 26.1.26.1\n",
+            b"device: /dev/ttyUSB0\n",
+            b"signal: acquired\n",
+            b"symbol rate: 29\n",
+            b"max symbol rate: 98\n",
+            b"min arbitration micros: 12\n",
+            b"max arbitration micros: 45000\n",
+            b"reconnects: 3\n",
+            b"masters: 4\n",
+            b"messages: 652\n",
+            b"\n",
+        ]
+
+        mock_reader = AsyncMock()
+        mock_reader.readline = AsyncMock(side_effect=sample_lines)
+        mock_writer = MagicMock()
+        mock_writer.drain = AsyncMock()
+        mock_writer.wait_closed = AsyncMock()
+
+        notified_symbol_rate = False
+
+        def on_symbol_rate() -> None:
+            nonlocal notified_symbol_rate
+            notified_symbol_rate = True
+
+        coord.async_add_listener(CIRCUIT_GLOBAL, "symbol_rate", on_symbol_rate)
+
+        with patch(
+            "asyncio.open_connection", return_value=(mock_reader, mock_writer)
+        ) as mock_conn:
+            asyncio.run(coord._async_fetch_ebusd_tcp_info())
+
+        mock_conn.assert_called_once_with("192.168.1.55", 8889)
+        mock_writer.write.assert_called_once_with(b"info\n")
+        mock_writer.close.assert_called_once()
+
+        self.assertTrue(notified_symbol_rate)
+        self.assertEqual(
+            coord.get_str(CIRCUIT_GLOBAL, "version", "value"), "ebusd 26.1.26.1"
+        )
+        self.assertEqual(coord.get_int(CIRCUIT_GLOBAL, "symbol_rate", "value"), 29)
+        self.assertEqual(coord.get_int(CIRCUIT_GLOBAL, "reconnects", "value"), 3)
+        self.assertEqual(coord.get_int(CIRCUIT_GLOBAL, "masters", "value"), 4)
+        self.assertEqual(
+            coord.get_int(CIRCUIT_GLOBAL, "arbitration_latency", "value"), 45
+        )
+
+    def test_ebusd_tcp_polling_handles_connection_error_gracefully(self) -> None:
+        """Verify TCP polling catches network errors cleanly without crashing."""
+        from custom_components.arotherm_genia_ebusd.const import CONF_ENABLE_EBUSD_TCP
+
+        entry = MagicMock()
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {CONF_ENABLE_EBUSD_TCP: True}
+        coord = SaunierGeniaCoordinator(MagicMock(), entry)
+
+        with patch("asyncio.open_connection", side_effect=OSError("Host unreachable")):
+            asyncio.run(coord._async_fetch_ebusd_tcp_info())
+
+        # No error raised and state unpopulated
+        self.assertIsNone(coord.get_int(CIRCUIT_GLOBAL, "symbol_rate", "value"))
+
+    def test_ebusd_tcp_polling_falls_back_to_addon_hostname(self) -> None:
+        """Verify TCP polling falls back to b4d7ad18-ebusd if 127.0.0.1 fails."""
+        from custom_components.arotherm_genia_ebusd.const import (
+            CONF_EBUSD_TCP_HOST,
+            CONF_ENABLE_EBUSD_TCP,
+        )
+
+        entry = MagicMock()
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {
+            CONF_ENABLE_EBUSD_TCP: True,
+            CONF_EBUSD_TCP_HOST: "127.0.0.1",
+        }
+        coord = SaunierGeniaCoordinator(MagicMock(), entry)
+
+        mock_writer = MagicMock()
+        mock_writer.drain = AsyncMock()
+        mock_writer.wait_closed = AsyncMock()
+        mock_reader = AsyncMock()
+        mock_reader.readline.side_effect = [
+            b"version: ebusd 26.1\n",
+            b"symbol rate: 22\n",
+            b"",
+        ]
+
+        calls = []
+
+        async def fake_open_connection(h: str, p: int):
+            calls.append((h, p))
+            if h == "127.0.0.1":
+                raise OSError("Connection refused")
+            return mock_reader, mock_writer
+
+        with patch("asyncio.open_connection", side_effect=fake_open_connection):
+            asyncio.run(coord._async_fetch_ebusd_tcp_info())
+
+        self.assertEqual(calls, [("127.0.0.1", 8888), ("b4d7ad18-ebusd", 8888)])
+        self.assertEqual(coord.get_int(CIRCUIT_GLOBAL, "symbol_rate", "value"), 22)
+
+    def test_ebusd_daemon_sensors_disabled_by_default(self) -> None:
+        """Verify physical metrics without MQTT route are disabled by default in registry."""
+        from custom_components.arotherm_genia_ebusd.button import BUTTON_DESCRIPTIONS
+        from custom_components.arotherm_genia_ebusd.sensor_descriptions import (
+            SENSOR_DESCRIPTIONS,
+        )
+
+        disabled_keys = {
+            "ebusd_symbol_rate",
+            "ebusd_reconnects",
+            "ebusd_masters",
+            "ebusd_arbitration_latency",
+            "ebusd_missing_csv_devices",
+        }
+        for desc in SENSOR_DESCRIPTIONS:
+            if desc.key in disabled_keys:
+                self.assertFalse(
+                    desc.entity_registry_enabled_default,
+                    f"Sensor '{desc.key}' should be disabled by default.",
+                )
+
+        for btn_desc in BUTTON_DESCRIPTIONS:
+            self.assertFalse(
+                btn_desc.entity_registry_enabled_default,
+                f"Button '{btn_desc.key}' should be disabled by default.",
+            )
+
+    def test_ebusd_tcp_polling_detects_unloaded_csv_devices(self) -> None:
+        """Verify TCP polling detects scanned devices without loaded CSV files."""
+        from custom_components.arotherm_genia_ebusd.const import (
+            CONF_EBUSD_TCP_HOST,
+            CONF_ENABLE_EBUSD_TCP,
+        )
+
+        entry = MagicMock()
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {
+            CONF_ENABLE_EBUSD_TCP: True,
+            CONF_EBUSD_TCP_HOST: "192.168.1.100",
+        }
+        coord = SaunierGeniaCoordinator(MagicMock(), entry)
+
+        sample_lines = [
+            b"version: ebusd 26.1.26.1\n",
+            b'address 04: slave #25, scanned "MF=Vaillant;ID=NETX3;SW=0129;HW=0404", loaded "vaillant/04.netx3.csv"\n',
+            b'address 08: slave #11, scanned "MF=Vaillant;ID=HMUX0;SW=0407;HW=0504", loaded "vaillant/08.hmux0.csv"\n',
+            b'address 76: slave #9, scanned "MF=Vaillant;ID=VWZIO;SW=0500;HW=0504"\n',
+            b'address f6: slave #10, scanned "MF=Vaillant;ID=NETX3;SW=0129;HW=0404", loaded "vaillant/f6.netx3.csv"\n',
+            b"\n",
+        ]
+
+        mock_reader = AsyncMock()
+        mock_reader.readline = AsyncMock(side_effect=sample_lines)
+        mock_writer = MagicMock()
+        mock_writer.drain = AsyncMock()
+        mock_writer.wait_closed = AsyncMock()
+
+        with patch("asyncio.open_connection", return_value=(mock_reader, mock_writer)):
+            asyncio.run(coord._async_fetch_ebusd_tcp_info())
+
+        state_data = coord._state.get((CIRCUIT_GLOBAL, "missing_csv_devices"))
+        self.assertIsNotNone(state_data)
+        assert state_data is not None
+        self.assertEqual(state_data["value"], "VWZIO")
+        self.assertEqual(state_data["missing_count"], 1)
+        self.assertEqual(
+            state_data["missing_devices"], ["VWZIO (addr: 76, SW: 0500, HW: 0504)"]
+        )
+        self.assertEqual(
+            state_data["loaded_devices"],
+            [
+                "04: NETX3 (vaillant/04.netx3.csv)",
+                "08: HMUX0 (vaillant/08.hmux0.csv)",
+                "f6: NETX3 (vaillant/f6.netx3.csv)",
+            ],
+        )
+        self.assertEqual(state_data["total_scanned"], 4)
+
+    def test_ebusd_tcp_polling_missing_csv_ok_when_all_loaded(self) -> None:
+        """Verify missing CSV device sensor reports 'OK' when all scanned devices have loaded CSVs."""
+        from custom_components.arotherm_genia_ebusd.const import CONF_ENABLE_EBUSD_TCP
+
+        entry = MagicMock()
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {CONF_ENABLE_EBUSD_TCP: True}
+        coord = SaunierGeniaCoordinator(MagicMock(), entry)
+
+        sample_lines = [
+            b"version: ebusd 26.1.26.1\n",
+            b'address 08: slave #11, scanned "MF=Vaillant;ID=HMUX0;SW=0407;HW=0504", loaded "vaillant/08.hmux0.csv"\n',
+            b'address 76: slave #9, scanned "MF=Vaillant;ID=VWZIO;SW=0500;HW=0504", loaded "vaillant/76.vwzio.csv"\n',
+            b"\n",
+        ]
+
+        mock_reader = AsyncMock()
+        mock_reader.readline = AsyncMock(side_effect=sample_lines)
+        mock_writer = MagicMock()
+        mock_writer.drain = AsyncMock()
+        mock_writer.wait_closed = AsyncMock()
+
+        with patch("asyncio.open_connection", return_value=(mock_reader, mock_writer)):
+            asyncio.run(coord._async_fetch_ebusd_tcp_info())
+
+        state_data = coord._state.get((CIRCUIT_GLOBAL, "missing_csv_devices"))
+        self.assertIsNotNone(state_data)
+        assert state_data is not None
+        self.assertEqual(state_data["value"], "OK")
+        self.assertEqual(state_data["missing_count"], 0)
+        self.assertEqual(state_data["missing_devices"], [])
+        self.assertEqual(
+            state_data["loaded_devices"],
+            ["08: HMUX0 (vaillant/08.hmux0.csv)", "76: VWZIO (vaillant/76.vwzio.csv)"],
+        )
+        self.assertEqual(state_data["total_scanned"], 2)
+
+    def test_ebusd_tcp_reload_and_scan_commands(self) -> None:
+        """Verify reload and scan TCP commands send exact payloads and refresh info."""
+        from homeassistant.exceptions import HomeAssistantError
+
+        from custom_components.arotherm_genia_ebusd.button import (
+            BUTTON_DESCRIPTIONS,
+            SaunierGeniaButton,
+        )
+        from custom_components.arotherm_genia_ebusd.const import CONF_ENABLE_EBUSD_TCP
+
+        entry = MagicMock()
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {CONF_ENABLE_EBUSD_TCP: True}
+        coord = SaunierGeniaCoordinator(MagicMock(), entry)
+
+        reload_btn = SaunierGeniaButton(coord, BUTTON_DESCRIPTIONS[0])
+        scan_btn = SaunierGeniaButton(coord, BUTTON_DESCRIPTIONS[1])
+        self.assertTrue(reload_btn.available)
+        self.assertTrue(scan_btn.available)
+
+        with (
+            patch.object(
+                coord, "_async_send_ebusd_tcp_command", new_callable=AsyncMock
+            ) as mock_send,
+            patch.object(
+                coord, "_async_fetch_ebusd_tcp_info", new_callable=AsyncMock
+            ) as mock_fetch,
+        ):
+            mock_send.return_value = "done"
+
+            asyncio.run(reload_btn.async_press())
+            mock_send.assert_called_once_with("reload\n")
+            mock_fetch.assert_called_once()
+
+            mock_send.reset_mock()
+            mock_fetch.reset_mock()
+
+            asyncio.run(scan_btn.async_press())
+            mock_send.assert_called_once_with("scan config\n")
+            mock_fetch.assert_called_once()
+
+        # Connection error raises HomeAssistantError
+        with (
+            patch.object(
+                coord,
+                "_async_open_tcp_connection",
+                side_effect=OSError("Network down"),
+            ),
+            self.assertRaises(HomeAssistantError),
+        ):
+            asyncio.run(coord.async_ebusd_tcp_reload())
+
+    def test_async_sync_tcp_diagnostic_entities(self) -> None:
+        """Verify dynamic entity registry synchronization when TCP option changes."""
+        from homeassistant.helpers import entity_registry as er
+
+        from custom_components.arotherm_genia_ebusd import (
+            _async_sync_tcp_diagnostic_entities,
+        )
+        from custom_components.arotherm_genia_ebusd.const import CONF_ENABLE_EBUSD_TCP
+
+        hass = MagicMock()
+        mock_ent_reg = MagicMock()
+
+        entry = MagicMock()
+        entry.entry_id = "test_entry_123"
+        entry.options = {CONF_ENABLE_EBUSD_TCP: True}
+
+        mock_entity_disabled = MagicMock()
+        mock_entity_disabled.unique_id = "vaillant_ebusd_symbol_rate"
+        mock_entity_disabled.entity_id = "sensor.ebusd_symbol_rate"
+        mock_entity_disabled.disabled = True
+
+        mock_btn_disabled = MagicMock()
+        mock_btn_disabled.unique_id = "vaillant_button_ebusd_reload_csv"
+        mock_btn_disabled.entity_id = "button.ebusd_reload_csv"
+        mock_btn_disabled.disabled = True
+
+        mock_unrelated_disabled = MagicMock()
+        mock_unrelated_disabled.unique_id = "vaillant_unrelated_sensor"
+        mock_unrelated_disabled.entity_id = "sensor.unrelated"
+        mock_unrelated_disabled.disabled = True
+
+        entries_phase1 = [
+            mock_entity_disabled,
+            mock_btn_disabled,
+            mock_unrelated_disabled,
+        ]
+
+        with (
+            patch.object(er, "async_get", return_value=mock_ent_reg),
+            patch.object(
+                er, "async_entries_for_config_entry", return_value=entries_phase1
+            ),
+        ):
+            # 1. TCP enabled: enables disabled TCP entities
+            _async_sync_tcp_diagnostic_entities(hass, entry, reload_on_change=True)
+            mock_ent_reg.async_update_entity.assert_any_call(
+                "sensor.ebusd_symbol_rate", disabled_by=None
+            )
+            mock_ent_reg.async_update_entity.assert_any_call(
+                "button.ebusd_reload_csv", disabled_by=None
+            )
+            # Unrelated entity remains untouched
+            self.assertEqual(mock_ent_reg.async_update_entity.call_count, 2)
+            hass.async_create_task.assert_called_once()
+
+        # 2. TCP disabled: disables active TCP entities
+        entry.options = {CONF_ENABLE_EBUSD_TCP: False}
+        mock_entity_enabled = MagicMock()
+        mock_entity_enabled.unique_id = "vaillant_ebusd_symbol_rate"
+        mock_entity_enabled.entity_id = "sensor.ebusd_symbol_rate"
+        mock_entity_enabled.disabled = False
+        entries_phase2 = [mock_entity_enabled]
+        mock_ent_reg.async_update_entity.reset_mock()
+
+        with (
+            patch.object(er, "async_get", return_value=mock_ent_reg),
+            patch.object(
+                er, "async_entries_for_config_entry", return_value=entries_phase2
+            ),
+        ):
+            _async_sync_tcp_diagnostic_entities(hass, entry, reload_on_change=False)
+            mock_ent_reg.async_update_entity.assert_called_once_with(
+                "sensor.ebusd_symbol_rate",
+                disabled_by=er.RegistryEntryDisabler.INTEGRATION,
+            )
 
 
 if __name__ == "__main__":

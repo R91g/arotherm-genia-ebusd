@@ -1,0 +1,967 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Wärmepumpe konfigurieren (eBUSd)",
+        "description": "Richte die lokale MQTT-Verbindung zum eBUSd-Daemon (`--mqttjson` aktiviert) ein und wähle den Hersteller deiner Anlage.",
+        "data": {
+          "mqtt_prefix": "MQTT-Themen-Präfix in eBUSd",
+          "manufacturer": "Gerätehersteller"
+        }
+      },
+      "models": {
+        "title": "Installierte Hardware-Modelle",
+        "description": "Wähle die Außeneinheit der Wärmepumpe, das Innen-/Hydraulikmodul und das installierte Zubehör aus.",
+        "data": {
+          "outdoor_model": "Modell der Außeneinheit (Wärmepumpe)",
+          "indoor_model": "Modell des Innenmoduls / Hydraulikstation",
+          "has_wireless_room_unit": "Funk-Raumthermostat (Funkempfänger 04.netx3)",
+          "has_migo_link": "Offizielles Internet-Gateway (MiGo Link / myVAILLANT connect an eBUS f1)"
+        }
+      },
+      "reconfigure": {
+        "title": "Hersteller neu konfigurieren",
+        "description": "Ändere den Hersteller der installierten Anlage.",
+        "data": {
+          "manufacturer": "Gerätehersteller"
+        }
+      },
+      "reconfigure_models": {
+        "title": "Hardware-Modelle neu konfigurieren",
+        "description": "Aktualisiere die installierten Modelle für den ausgewählten Hersteller.",
+        "data": {
+          "outdoor_model": "Modell der Außeneinheit (Wärmepumpe)",
+          "indoor_model": "Modell des Innenmoduls / Hydraulikstation",
+          "has_wireless_room_unit": "Funk-Raumthermostat (Funkempfänger 04.netx3)",
+          "has_migo_link": "Offizielles Internet-Gateway (MiGo Link / myVAILLANT connect an eBUS f1)"
+        }
+      }
+    },
+    "error": {
+      "invalid_mqtt_prefix": "Das MQTT-Präfix darf nicht leer sein.",
+      "mqtt_not_configured": "Die Home Assistant MQTT-Integration ist nicht konfiguriert oder nicht aktiv."
+    },
+    "abort": {
+      "already_configured": "Diese eBUSd-Instanz ist in Home Assistant bereits konfiguriert."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Laufzeitoptionen (aroTHERM & GeniaAir)",
+        "description": "Passe die intelligenten Algorithmen für Warmwasser-Boost, die doppelte Kühlsperre und das Ausweich-Polling an.",
+        "sections": {
+          "advanced_options": {
+            "name": "Erweiterte Einstellungen (eBUSd TCP-Verbindung & HEX-Befehle)",
+            "description": "Konfigurieren Sie die direkte TCP-Socket-Verbindung mit dem eBUSd-Daemon, um physische Echtzeit-Metriken und erweiterte Befehle freizuschalten.",
+            "data": {
+              "enable_ebusd_tcp": "eBUSd physikalische Diagnose und Befehle über TCP aktivieren",
+              "ebusd_tcp_host": "eBUSd TCP-Host (IP oder Hostname)",
+              "ebusd_tcp_port": "eBUSd TCP-Port",
+              "enable_send_hex": "Hexadezimalen Rohbefehlsdienst aktivieren (send_hex_command)"
+            },
+            "data_description": {
+              "enable_ebusd_tcp": "Fragt den eBUSd-TCP-Socket regelmäßig ab, um die physische Symbolrate, Arbitrierungslatenz, Adapter-Wiederverbindungen zu überwachen und nicht geladene CSV-Dateien zu überprüfen. Aktiviert Diagnoseentitäten und Steuerungsschaltflächen automatisch.",
+              "ebusd_tcp_host": "eBUSd-Daemon-Adresse. In Home Assistant OS mit dem offiziellen Add-on wird sie automatisch erkannt oder verwenden Sie 'b4d7ad18-ebusd'. Bei lokalen Host-Installationen mit freigegebenem Port verwenden Sie '127.0.0.1'.",
+              "ebusd_tcp_port": "eBUSd TCP-Daemon-Port (Standard: 8888).",
+              "enable_send_hex": "Ermöglicht das Senden von eBUS-Rohtelegrammen im Hexadezimalformat über den Dienst arotherm_genia_ebusd.send_hex_command. Erfordert die aktivierte Option --enablehex in der eBUSd-Konfiguration."
+            }
+          }
+        },
+        "data": {
+          "force_dhw_boost": "Intelligenten Warmwasser-Boost aktivieren",
+          "auto_cooling_lock_bypass": "Kühlsperre 1 (01;01;99) beim Aktivieren des Kühlmodus automatisch aufheben",
+          "fallback_poll_interval": "Ausweich-Polling-Intervall (/get), falls kein offizielles Gateway vorhanden ist (Sekunden)"
+        },
+        "data_description": {
+          "force_dhw_boost": "Setzt automatisch Ist-Temp + Hysterese + 1,5 °C, wenn die Differenz zwischen Soll- und Speichertemperatur unter der Hysterese liegt.",
+          "auto_cooling_lock_bypass": "Hebt die Kühlsperre im Regler beim Umschalten auf Kühlbetrieb automatisch auf.",
+          "fallback_poll_interval": "Abfrageintervall, falls die Anlage über kein offizielles Cloud-Gateway verfügt."
+        }
+      }
+    }
+  },
+  "issues": {
+    "outdated_hmux0_csv": {
+      "title": "Veraltete Datei 08.hmux0.csv in eBUSd",
+      "description": "Deine `ebusd`-Instanz verwendet eine veraltete Version von `vaillant/08.hmux0.csv` (mit festem Durchfluss von 900 l/h oder alter `StateCompressor`-Definition). Ersetze die Datei `vaillant/08.hmux0.csv` in deinem eBUSd-Konfigurationsordner durch die in Version v1.2.4+ enthaltene Version und starte `ebusd` neu, um den Vortex-Durchflusssensor in Echtzeit (`540200090b`), den Typ `D2C` in `StateCompressor` und optimierte Polling-Prioritäten zu aktivieren. Dieser Hinweis verschwindet automatisch, sobald `ebusd` die neue CSV lädt."
+    },
+    "outdated_controller_csv": {
+      "title": "Veraltete Regler-Konfigurationsdatei (15.720.csv / 15.ctlv2.csv)",
+      "description": "Deine Regler-Konfigurationsdatei (`15.720.csv` oder `15.ctlv2.csv`) enthält noch nicht die neuen Schreibnachrichten für erweiterte Timer (`Timer*`), Flüstermodus-Leistungsstufen (`SilentMode*`), Warmwasser-Hysterese (`HwcTempMargin`) oder Einmal-Warmwasserladung (`SetModeQuickVetoHwc`). Ersetze die CSV-Datei durch die in diesem Repository mitgelieferte Version und starte `ebusd` neu, um alle Funktionen freizuschalten."
+    },
+    "missing_custom_csv": {
+      "title": "Angepasste eBUSd-Konfigurationsdateien nicht gefunden",
+      "description": "Es wurden noch nicht alle optimierten CSV-Dateien für dein System erkannt. Bitte kopiere die entsprechenden Dateien aus dem Ordner `ebusd-configuration` dieses Projekts in dein eBUSd-Verzeichnis."
+    },
+    "no_ebusd_mqtt_traffic": {
+      "title": "Kein MQTT-Verkehr von eBUSd erkannt",
+      "description": "Es wurden keine MQTT-Nachrichten unter dem konfigurierten Präfix empfangen. Prüfe, ob der eBUSd-Dienst läuft und mit dem MQTT-Broker verbunden ist."
+    },
+    "mqttjson_not_enabled": {
+      "title": "eBUSd --mqttjson ist nicht aktiviert",
+      "description": "Der eBUSd-Daemon sendet keine JSON-formatierten MQTT-Nachrichten. Stelle sicher, dass eBUSd mit dem Parameter `--mqttjson` gestartet wird."
+    }
+  },
+  "entity": {
+    "climate": {
+      "zone_1_climate": {
+        "name": "Klimazone 1",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "comfort": "Zeitgesteuert (Komfort)",
+              "manual": "Dauernd Manuell",
+              "eco": "Eco (Nachtabsenkung)",
+              "boost": "Schnell-Veto Übersteuerung"
+            }
+          }
+        }
+      }
+    },
+    "water_heater": {
+      "dhw_water_heater": {
+        "name": "Warmwasser (DHW)",
+        "state": {
+          "off": "Aus",
+          "eco": "Zeitgesteuert (Zeitplan)",
+          "performance": "Dauernd (24h)",
+          "boost": "Boost"
+        },
+        "state_attributes": {
+          "operation_mode": {
+            "state": {
+              "off": "Aus",
+              "eco": "Zeitgesteuert (Zeitplan)",
+              "performance": "Dauernd (24h)",
+              "boost": "Boost"
+            }
+          }
+        }
+      }
+    },
+    "number": {
+      "hc1_heat_curve": {
+        "name": "Heizkurve Heizkreis 1"
+      },
+      "hc1_excess_temp": {
+        "name": "Überhöhung Vorlauftemperatur Heizkreis 1 (ExcessTemp)"
+      },
+      "hc1_min_flow_temp_desired": {
+        "name": "Minimale Vorlauf-Solltemperatur Heizen"
+      },
+      "hc1_max_flow_temp_desired": {
+        "name": "Maximale Vorlauf-Solltemperatur Heizen"
+      },
+      "hc1_summer_temp_limit": {
+        "name": "Sommerabschaltung Außentemperaturgrenze (Sommerbetrieb)"
+      },
+      "cooling_flow_temp_desired_min": {
+        "name": "Minimale Vorlauf-Solltemperatur Kühlen"
+      },
+      "cooling_flow_temp_desired_max": {
+        "name": "Maximale Vorlauf-Solltemperatur Kühlen"
+      },
+      "z1_day_temp": {
+        "name": "Komfort-Raumtemperatur Zone 1 (Tag)"
+      },
+      "z1_night_temp": {
+        "name": "Absenk-Raumtemperatur Zone 1 (Nacht)"
+      },
+      "z1_manual_temp": {
+        "name": "Manuelle Solltemperatur Zone 1"
+      },
+      "z1_quick_veto_temp": {
+        "name": "Schnell-Veto Solltemperatur Zone 1"
+      },
+      "z1_cooling_temp_time_controlled": {
+        "name": "Zeitgesteuerte Kühl-Solltemperatur Zone 1 (Absenkung)"
+      },
+      "z1_cooling_temp_manual": {
+        "name": "Manuelle Kühl-Solltemperatur Zone 1"
+      },
+      "holiday_temp": {
+        "name": "Solltemperatur Abwesenheitsmodus"
+      },
+      "hwc_temp_desired": {
+        "name": "Warmwasser-Solltemperatur"
+      },
+      "hwc_max_flow_temp_desired": {
+        "name": "Maximale Warmwasser-Vorlauftemperatur"
+      },
+      "bivalence_point_hc": {
+        "name": "Bivalenzpunkt Heizen"
+      },
+      "bivalence_point_hwc": {
+        "name": "Bivalenzpunkt Warmwasser"
+      },
+      "alternative_point": {
+        "name": "Alternativpunkt Außentemperatur"
+      },
+      "cylinder_charge_hyst": {
+        "name": "Speicherlade-Hysterese Warmwasser"
+      },
+      "cylinder_charge_offset": {
+        "name": "Speicherlade-Offset Warmwasser"
+      },
+      "max_cylinder_charge_time": {
+        "name": "Maximale Warmwasserspeicher-Ladezeit"
+      },
+      "hwc_lock_time": {
+        "name": "Warmwasser-Sperrzeit"
+      },
+      "buffer_charge_offset": {
+        "name": "Pufferspeicher-Ladeüberhöhung"
+      },
+      "max_room_humidity": {
+        "name": "Maximal zulässige Raumluftfeuchtigkeit"
+      },
+      "compressor_silent_operation_level": {
+        "name": "Flüstermodus-Leistungsstufe"
+      }
+    },
+    "select": {
+      "z1_op_mode": {
+        "name": "Heizbetriebsart Zone 1",
+        "state": {
+          "off": "Aus",
+          "auto": "Zeitgesteuert (Auto)",
+          "day": "Dauernd Manuell (Tag)",
+          "night": "Nachtabsenkung (Nacht)"
+        }
+      },
+      "z1_op_mode_cooling": {
+        "name": "Kühlbetriebsart Zone 1",
+        "state": {
+          "off": "Aus",
+          "auto": "Zeitgesteuert (Auto)",
+          "day": "Dauernd Manuell (Tag)",
+          "night": "Absenkung (Nacht / Eco)"
+        }
+      },
+      "hwc_op_mode": {
+        "name": "Warmwasserbetriebsart",
+        "state": {
+          "off": "Aus",
+          "auto": "Zeitgesteuert (Auto)",
+          "day": "Dauernd (24h)",
+          "night": "Nachtabsenkung"
+        }
+      },
+      "hc1_auto_off_mode": {
+        "name": "Nachtabsenkungsmodus Heizkreis 1",
+        "state": {
+          "eco": "Eco (Abschaltung)",
+          "night": "Normal (Nachtabsenkung)"
+        }
+      },
+      "hc1_room_temp_switch_on": {
+        "name": "Raumaufschaltung Heizkreis 1",
+        "state": {
+          "off": "Inaktiv (Reine Heizkurve)",
+          "modulating": "Aktiv (Modulierend)",
+          "thermostat": "Erweitert (Thermostat-Abschaltung)"
+        }
+      }
+    },
+    "switch": {
+      "dhw_boost_switch": {
+        "name": "Einmalige Warmwasserladung (Boost)"
+      },
+      "cooling_season_authorization": {
+        "name": "Kühlbetrieb-Freigabe (Sperre 1)"
+      },
+      "holiday_mode_switch": {
+        "name": "Abwesenheitsmodus"
+      },
+      "adapt_heat_curve": {
+        "name": "Adaptive Heizkurve"
+      },
+      "hwc_parallel_loading": {
+        "name": "Parallele Warmwasser- und Heizungsladung"
+      },
+      "global_system_off": {
+        "name": "Gesamtes System Aus (Fachhandwerker)"
+      }
+    },
+    "datetime": {
+      "holiday_start_datetime": {
+        "name": "Startdatum Abwesenheitsmodus"
+      },
+      "holiday_end_datetime": {
+        "name": "Enddatum Abwesenheitsmodus"
+      },
+      "cooling_start_datetime": {
+        "name": "Startdatum Manueller Kühlbetrieb"
+      },
+      "cooling_end_datetime": {
+        "name": "Enddatum Manueller Kühlbetrieb"
+      }
+    },
+    "binary_sensor": {
+      "compressor_active": {
+        "name": "Verdichter läuft"
+      },
+      "primary_circulation_pump": {
+        "name": "Primärkreispumpe"
+      },
+      "defrost_active": {
+        "name": "Abtauung aktiv"
+      },
+      "energy_integration_active": {
+        "name": "Energieintegral-Berechnung aktiv"
+      },
+      "z1_heating_demand": {
+        "name": "Wärmeanforderung Zone 1"
+      },
+      "cooling_release_status": {
+        "name": "Kühlfreigabestatus (Hardware-Sperre 1)"
+      },
+      "broadcast_cooling_active": {
+        "name": "Aktiver Kühlzyklus (Broadcast)"
+      },
+      "ebusd_signal": {
+        "name": "eBUS-Signal"
+      },
+      "ebusd_running": {
+        "name": "Status eBUSd-Daemon"
+      }
+    },
+    "sensor": {
+      "hmu_status_code": {
+        "name": "Betriebsstatus Außeneinheit (Live-Monitor)",
+        "state": {
+          "frost_protect": "Frostschutz aktiv (S.34)",
+          "standby": "Bereitschaft (S.100)",
+          "heat_compressor_shutdown": "Heizen: Verdichter schaltet ab (S.101)",
+          "heat_compressor_blocked": "Heizen: Verdichter gesperrt (S.102)",
+          "heat_prerun": "Heizen: Pumpenvorlauf (S.103)",
+          "heat_compressor_active": "Heizen: Verdichter aktiv (S.104)",
+          "heat_overrun": "Heizen: Pumpennachlauf (S.107)",
+          "cool_compressor_shutdown": "Kühlen: Verdichter schaltet ab (S.111)",
+          "cool_compressor_blocked": "Kühlen: Verdichter gesperrt (S.112)",
+          "cool_prerun": "Kühlen: Pumpenvorlauf (S.113)",
+          "cool_compressor_active": "Kühlen: Verdichter aktiv (S.114)",
+          "cool_overrun": "Kühlen: Pumpennachlauf (S.117)",
+          "heat_immersion_heater_active": "Heizen: Zusatzheizung aktiv (S.125)",
+          "heat_immersion_active": "Heizen: Zusatzheizung aktiv (S.125)",
+          "hwc_compressor_blocked": "Warmwasser: Verdichter gesperrt (S.132)",
+          "hwc_prerun": "Warmwasser: Pumpenvorlauf (S.133)",
+          "hwc_compressor_active": "Warmwasser: Verdichter aktiv (S.134)",
+          "hwc_immersion_heater_active": "Warmwasser: Zusatzheizung aktiv (S.135)",
+          "hwc_immersion_active": "Warmwasser: Zusatzheizung aktiv (S.135)",
+          "hwc_overrun": "Warmwasser: Pumpennachlauf (S.137)",
+          "heat_immersion_heater_shutdown": "Heizen: Zusatzheizung schaltet ab (S.141)",
+          "heat_immersion_heater_blocked": "Heizen: Zusatzheizung gesperrt (S.142)",
+          "hwc_immersion_heater_shutdown": "Warmwasser: Zusatzheizung schaltet ab (S.151)",
+          "hwc_immersion_heater_blocked": "Warmwasser: Zusatzheizung gesperrt (S.152)",
+          "air_purging_program_active": "Entlüftungsprogramm aktiv (S.202)",
+          "compressor_oil_heating_active": "Kurbelwannenheizung aktiv (S.240)",
+          "fan1_blocked": "Lüfter 1 blockiert (S.252)",
+          "fan1_airinlet_too_high": "Lufteinlasstemperatur zu hoch (S.255)",
+          "fan1_airinlet_too_low": "Lufteinlasstemperatur zu niedrig (S.256)",
+          "fan2_blocked": "Lüfter 2 blockiert (S.260)",
+          "building_circuit_flow_too_low": "Gebäudekreis-Durchfluss zu gering (S.275)",
+          "building_circuit_pump_fault": "Fehler Gebäudekreispumpe (S.277)",
+          "frequency_converter_fault_compressor": "Inverter: Verdichterfehler (S.280)",
+          "frequency_converter_fault_mains_voltage": "Inverter: Netzspannungsfehler (S.281)",
+          "frequency_converter_fault_overheating": "Inverter: Überhitzungsfehler (S.282)",
+          "deicing_time_too_long": "Abtauzeit überschritten (S.283)",
+          "deicing_flow_temp_too_low": "Vorlauftemperatur beim Abtauen zu niedrig (S.284)",
+          "compressor_outlet_temp_too_high": "Verdichterauslass-Temperatur zu hoch (S.285)",
+          "hot_gas_temp_switch_open": "Heißgas-Thermoschalter offen (S.286)",
+          "fan1_wind": "Hohe Windlast an Lüfter 1 (S.287)",
+          "fan2_wind": "Hohe Windlast an Lüfter 2 (S.288)",
+          "current_limt_active": "Strombegrenzung aktiv (S.289)",
+          "high_pressure_switch_open": "Hochdruckschalter offen (S.302)",
+          "compressor_outlet_temp_too_high_1": "Verdichterauslass-Grenztemperatur (S.303)",
+          "evaporation_temp_too_low": "Verdampfungstemperatur zu niedrig (S.304)",
+          "condensation_temp_too_low": "Kondensationstemperatur zu niedrig (S.305)",
+          "evaporation_temp_too_high": "Verdampfungstemperatur zu hoch (S.306)",
+          "condensation_temp_too_high": "Kondensationstemperatur zu hoch (S.308)",
+          "building_circuit_return_temp_too_low": "Gebäudekreis-Rücklauftemperatur zu niedrig (S.312)",
+          "building_circuit_return_temp_too_high": "Gebäudekreis-Rücklauftemperatur zu hoch (S.314)",
+          "immersion_heater_flow_temp_too_high": "Zusatzheizung-Vorlauftemperatur zu hoch (S.351)",
+          "deicing_active": "Abtauung aktiv (S.516)",
+          "deicing": "Abtauung aktiv (S.516)",
+          "frequency_converter_fault": "Fehler Frequenzumrichter (S.575)",
+          "connection_fault_frequency_converter": "Kommunikationsfehler Frequenzumrichter (S.581)",
+          "four_port_valve_position_fault": "Fehler 4-Wege-Umschaltventil (S.590)"
+        }
+      },
+      "hmu_current_error": {
+        "name": "Aktive Fehlerdiagnose"
+      },
+      "electric_power_consumption": {
+        "name": "Momentane elektrische Leistungsaufnahme"
+      },
+      "calculated_thermal_power": {
+        "name": "Momentane thermische Leistung (Berechnet)"
+      },
+      "calculated_delta_t": {
+        "name": "Primärkreis-Temperaturdifferenz (ΔT)"
+      },
+      "calculated_live_cop": {
+        "name": "Aktueller Momentan-COP / EER"
+      },
+      "calculated_hc_cop": {
+        "name": "Historischer Heiz-COP"
+      },
+      "calculated_hwc_cop": {
+        "name": "Historischer Warmwasser-COP"
+      },
+      "calculated_cool_eer": {
+        "name": "Historische Kühl-EER"
+      },
+      "calculated_global_efficiency": {
+        "name": "Historische Gesamteffizienz (COP/EER)"
+      },
+      "calculated_system_total_energy": {
+        "name": "Elektrische Gesamtenergie System"
+      },
+      "calculated_heating_total_energy": {
+        "name": "Elektrische Energie Heizen Gesamt"
+      },
+      "calculated_dhw_total_energy": {
+        "name": "Elektrische Energie Warmwasser Gesamt"
+      },
+      "primary_flow_rate": {
+        "name": "Heizkreis-Volumenstrom"
+      },
+      "refrigerant_high_pressure": {
+        "name": "R290 Kältemittel-Hochdruck"
+      },
+      "flow_temp_precision": {
+        "name": "Vorlauftemperatur Primärkreis (Präzise)"
+      },
+      "return_temp_precision": {
+        "name": "Rücklauftemperatur Primärkreis (Präzise)"
+      },
+      "air_inlet_temp": {
+        "name": "Lufteintrittstemperatur Außeneinheit"
+      },
+      "compressor_inlet_temp": {
+        "name": "Sauggastemperatur Verdichtereinlass"
+      },
+      "compressor_outlet_temp": {
+        "name": "Heißgastemperatur Verdichterauslass"
+      },
+      "eev_outlet_temp": {
+        "name": "Temperatur nach Expansionsventil (EEV)"
+      },
+      "condenser_out_temp": {
+        "name": "Kondensator-Austrittstemperatur"
+      },
+      "building_cpump_power": {
+        "name": "Leistung Gebäudekreispumpe"
+      },
+      "compressor_speed_rps": {
+        "name": "Verdichterfrequenz (RPS)"
+      },
+      "compressor_modulation": {
+        "name": "Verdichter-Modulation"
+      },
+      "fan1_speed": {
+        "name": "Drehzahl Lüfter 1"
+      },
+      "fan2_speed": {
+        "name": "Drehzahl Lüfter 2"
+      },
+      "eev_position_abs": {
+        "name": "Abschalt-/Schrittposition EEV"
+      },
+      "setmode_flow_temp_desired": {
+        "name": "Angeforderte Vorlauf-Solltemperatur (SetMode)"
+      },
+      "setmode_hc_mode": {
+        "name": "Angeforderte Wärmepumpen-Betriebsart (SetMode)",
+        "state": {
+          "auto": "Auto",
+          "off": "Bereitschaft (Aus)",
+          "heat": "Heizen",
+          "water": "Warmwasser"
+        }
+      },
+      "energy_electric_cool": {
+        "name": "Elektrische Energie Kühlen Gesamt"
+      },
+      "energy_thermal_hc": {
+        "name": "Thermische Energie Heizen Gesamt"
+      },
+      "energy_thermal_hwc": {
+        "name": "Thermische Energie Warmwasser Gesamt"
+      },
+      "energy_thermal_cool": {
+        "name": "Thermische Energie Kühlen Gesamt"
+      },
+      "energy_env_yield_hc": {
+        "name": "Umweltertrag Heizen"
+      },
+      "energy_env_yield_hwc": {
+        "name": "Umweltertrag Warmwasser"
+      },
+      "energy_electric_hc_outdoor": {
+        "name": "Elektrische Energie Außeneinheit Heizen"
+      },
+      "energy_electric_hwc_outdoor": {
+        "name": "Elektrische Energie Außeneinheit Warmwasser"
+      },
+      "stats_hmu_hours": {
+        "name": "Betriebsstunden Außeneinheit"
+      },
+      "stats_compressor_hours": {
+        "name": "Betriebsstunden Verdichter"
+      },
+      "stats_compressor_starts": {
+        "name": "Gesamte Verdichterstarts"
+      },
+      "stats_hc_hours": {
+        "name": "Betriebsstunden Heizmodus"
+      },
+      "stats_hc_starts": {
+        "name": "Gesamte Starts Heizmodus"
+      },
+      "stats_hwc_hours": {
+        "name": "Betriebsstunden Warmwassermodus"
+      },
+      "stats_hwc_starts": {
+        "name": "Gesamte Starts Warmwassermodus"
+      },
+      "stats_building_cpump_hours": {
+        "name": "Betriebsstunden Gebäudekreispumpe"
+      },
+      "stats_building_cpump_starts": {
+        "name": "Gesamte Starts Gebäudekreispumpe"
+      },
+      "stats_4port_valve_hours": {
+        "name": "Betriebsstunden 4-Wege-Umschaltventil (Kühlen)"
+      },
+      "stats_4port_valve_switches": {
+        "name": "Gesamte Schaltzyklen 4-Wege-Umschaltventil"
+      },
+      "stats_fan1_hours": {
+        "name": "Betriebsstunden Lüfter 1"
+      },
+      "stats_fan2_hours": {
+        "name": "Betriebsstunden Lüfter 2"
+      },
+      "stats_deice_hours": {
+        "name": "Gesamte Betriebsstunden Abtauung"
+      },
+      "stats_immersion_heater_hours": {
+        "name": "Betriebsstunden Zusatzheizung"
+      },
+      "stats_immersion_heater_starts": {
+        "name": "Gesamte Starts Zusatzheizung"
+      },
+      "system_operating_state": {
+        "name": "System-Betriebszustand",
+        "state": {
+          "standby": "Bereitschaft",
+          "heating": "Heizen",
+          "cooling": "Kühlen",
+          "dhw": "Warmwasser"
+        }
+      },
+      "controller_current_error": {
+        "name": "Aktive Fehlerdiagnose Regler"
+      },
+      "water_pressure": {
+        "name": "Anlagen-Wasserdruck"
+      },
+      "displayed_outside_temp": {
+        "name": "Angezeigte Außentemperatur"
+      },
+      "outside_temp_avg": {
+        "name": "Gedämpfte Außentemperatur (3h-Mittelwert)"
+      },
+      "z1_room_temp": {
+        "name": "Raumtemperatur Zone 1"
+      },
+      "z1_room_humidity": {
+        "name": "Raumluftfeuchtigkeit Zone 1"
+      },
+      "z1_actual_room_temp_desired": {
+        "name": "Effektive Raum-Solltemperatur Zone 1"
+      },
+      "hc1_flow_temp": {
+        "name": "Vorlauftemperatur Heizkreis 1"
+      },
+      "hc1_actual_flow_temp_desired": {
+        "name": "Berechnete Vorlauf-Solltemperatur Heizkreis 1"
+      },
+      "hwc_storage_temp": {
+        "name": "Warmwasserspeicher-Temperatur (Fühler SP1)"
+      },
+      "hwc_flow_temp": {
+        "name": "Warmwasser-Vorlauftemperatur"
+      },
+      "z1_status": {
+        "name": "Status Heizkreis Zone 1",
+        "state": {
+          "auto": "Automatisch (Zeitplan)",
+          "ventilation": "Lüften",
+          "veto": "Manuelle Übersteuerung (Schnell-Veto)",
+          "holidayaway": "Abwesend (Urlaub)",
+          "load": "Ladung",
+          "off": "Aus"
+        }
+      },
+      "hwc_status": {
+        "name": "Status Warmwasserkreis",
+        "state": {
+          "auto": "Bereitschaft (Zeitplan)",
+          "holidayaway": "Abwesend (Urlaub)",
+          "load": "Speicherladung aktiv",
+          "off": "Aus"
+        }
+      },
+      "hc1_pump_status": {
+        "name": "Pumpenstatus Heizkreis 1"
+      },
+      "hydraulic_scheme": {
+        "name": "Hydraulikplan-Code des Systems"
+      },
+      "holiday_duration_remaining": {
+        "name": "Verbleibende Abwesenheitsdauer"
+      },
+      "cooling_duration_remaining": {
+        "name": "Verbleibende Kühldauer"
+      },
+      "bass3_energy_hc_this_month": {
+        "name": "Heizenergie-Verbrauch aktueller Monat (BASS3)"
+      },
+      "bass3_energy_hc_last_month": {
+        "name": "Heizenergie-Verbrauch letzter Monat (BASS3)"
+      },
+      "bass3_energy_hc_total": {
+        "name": "Heizenergie-Verbrauch Gesamt (BASS3)"
+      },
+      "bass3_energy_hwc_this_month": {
+        "name": "Warmwasserenergie-Verbrauch aktueller Monat (BASS3)"
+      },
+      "bass3_energy_hwc_last_month": {
+        "name": "Warmwasserenergie-Verbrauch letzter Monat (BASS3)"
+      },
+      "bass3_energy_hwc_total": {
+        "name": "Warmwasserenergie-Verbrauch Gesamt (BASS3)"
+      },
+      "solar_yield_total": {
+        "name": "Solarer Gesamtertrag"
+      },
+      "vwzio_secondary_circuit_status": {
+        "name": "Status Sekundärkreis",
+        "state": {
+          "standby": "Bereitschaft",
+          "heating": "Heizen aktiv",
+          "cooling": "Kühlen aktiv",
+          "dhw": "Warmwasser",
+          "overrun": "Pumpennachlauf"
+        }
+      },
+      "vwzio_secondary_circuit_hwc": {
+        "name": "Status Warmwasser Sekundärkreis",
+        "state": {
+          "standby": "Bereitschaft",
+          "dhw": "Warmwasserladung aktiv"
+        }
+      },
+      "vwzio_current_error": {
+        "name": "Aktive Fehlerdiagnose Hydraulikstation"
+      },
+      "vwzio_electric_power": {
+        "name": "Momentane elektrische Leistung Hydraulikstation"
+      },
+      "vwzio_energy_electric_hc": {
+        "name": "Elektrische Energie Hydraulikstation Heizen"
+      },
+      "vwzio_energy_electric_hwc": {
+        "name": "Elektrische Energie Hydraulikstation Warmwasser"
+      },
+      "vwzio_energy_thermal_hc": {
+        "name": "Thermische Energie Hydraulikstation Heizen"
+      },
+      "vwzio_energy_thermal_hwc": {
+        "name": "Thermische Energie Hydraulikstation Warmwasser"
+      },
+      "wireless_room_temp_dial": {
+        "name": "Funkthermostat Drehregler-Einstellung"
+      },
+      "wireless_room_target_temp": {
+        "name": "Funkthermostat Ziel-Solltemperatur"
+      },
+      "broadcast_outside_temp": {
+        "name": "Broadcast-Außentemperatur"
+      },
+      "broadcast_datetime": {
+        "name": "Broadcast eBUS Systemdatum & Uhrzeit"
+      },
+      "z1_weekly_schedule_summary": {
+        "name": "Wochenplan Heizen Zone 1"
+      },
+      "hwc_weekly_schedule_summary": {
+        "name": "Wochenplan Warmwasser"
+      },
+      "cooling_weekly_schedule_summary": {
+        "name": "Wochenplan Kühlen"
+      },
+      "circulation_weekly_schedule_summary": {
+        "name": "Wochenplan Zirkulationspumpe"
+      },
+      "ebusd_uptime": {
+        "name": "ebusd Betriebszeit (Uptime)"
+      },
+      "ebusd_version": {
+        "name": "ebusd Daemon-Version"
+      },
+      "ebusd_scan_status": {
+        "name": "ebusd Scan-Status"
+      },
+      "ebusd_symbol_rate": {
+        "name": "Physikalische eBUS Symbolrate"
+      },
+      "ebusd_reconnects": {
+        "name": "Anzahl eBUS Adapter-Wiederverbindungen"
+      },
+      "ebusd_masters": {
+        "name": "Erkannte eBUS-Master-Geräte"
+      },
+      "ebusd_arbitration_latency": {
+        "name": "eBUS Arbitrierungslatenz"
+      },
+      "evaporation_temp": {
+        "name": "Kältemittel Verdampfungstemperatur"
+      },
+      "condensation_temp": {
+        "name": "Kältemittel Kondensationstemperatur"
+      },
+      "condensate_temp": {
+        "name": "Kondensat-Austrittstemperatur"
+      },
+      "superheat": {
+        "name": "Sauggas-Überhitzung"
+      },
+      "subcooling": {
+        "name": "Kältemittel-Unterkühlung"
+      },
+      "energy_integral": {
+        "name": "Energieintegral des Verdichters"
+      },
+      "compressor_flow_temp_desired": {
+        "name": "Ziel-Vorlauftemperatur Verdichter"
+      },
+      "heat_output_internal": {
+        "name": "Interne Wärmeleistung Wasser"
+      },
+      "stats_compressor_hc_hours": {
+        "name": "Betriebsstunden Verdichter Heizen"
+      },
+      "stats_compressor_hc_starts": {
+        "name": "Starts Verdichter Heizen"
+      },
+      "stats_compressor_hwc_hours": {
+        "name": "Betriebsstunden Verdichter Warmwasser"
+      },
+      "stats_compressor_hwc_starts": {
+        "name": "Starts Verdichter Warmwasser"
+      },
+      "stats_compressor_cool_hours": {
+        "name": "Betriebsstunden Verdichter Kühlen"
+      },
+      "stats_compressor_cool_starts": {
+        "name": "Starts Verdichter Kühlen"
+      },
+      "vwzio_heater_energy": {
+        "name": "Elektrische Energie Zusatzheizung (Hydraulikstation)"
+      },
+      "vwzio_heater_flow_temp": {
+        "name": "Vorlauftemperatur Zusatzheizung (Hydraulikstation)"
+      },
+      "stats_vwzio_heater_hc_hours": {
+        "name": "Betriebsstunden Zusatzheizung Heizen"
+      },
+      "stats_vwzio_heater_hc_starts": {
+        "name": "Starts Zusatzheizung Heizen"
+      },
+      "stats_vwzio_heater_hwc_hours": {
+        "name": "Betriebsstunden Zusatzheizung Warmwasser"
+      },
+      "stats_vwzio_heater_hwc_starts": {
+        "name": "Starts Zusatzheizung Warmwasser"
+      },
+      "ebusd_missing_csv_devices": {
+        "name": "eBUS-Geräte ohne geladene CSV"
+      }
+    },
+    "button": {
+      "ebusd_reload_csv": {
+        "name": "eBUSd CSV-Dateien neu laden"
+      },
+      "ebusd_restart_scan": {
+        "name": "eBUSd Geräte-Scan neu starten"
+      }
+    }
+  },
+  "services": {
+    "set_weekly_timer": {
+      "name": "Wöchentlichen Zeitplan konfigurieren (b5 55)",
+      "description": "Konfiguriert ein wöchentliches Zeitfenster am Klimaregler (15.bass3 / 15.ctlv2 / 15.ctlv3) für Heizkreis Zone 1, Warmwasser (DHW), Kühlung oder Zirkulation.",
+      "fields": {
+        "circuit_type": {
+          "name": "Schaltkreis",
+          "description": "Zu ändernder Zeitplan-Schaltkreis (Heizung, Warmwasser, Kühlung oder Zirkulation)."
+        },
+        "day": {
+          "name": "Wochentag",
+          "description": "Bestimmter Wochentag, Werktage (Montag bis Freitag) oder alle Tage (Montag bis Sonntag)."
+        },
+        "slot": {
+          "name": "Zeitfenster-Nummer (Slot)",
+          "description": "Nummer des täglichen Zeitfensters (1, 2 oder 3). Standard: 1."
+        },
+        "start_time": {
+          "name": "Startzeit",
+          "description": "Startzeit des Zeitfensters im 24-Stunden-Format HH:MM (z. B. 13:10)."
+        },
+        "end_time": {
+          "name": "Endzeit",
+          "description": "Endzeit des Zeitfensters im 24-Stunden-Format HH:MM (z. B. 14:50)."
+        }
+      }
+    },
+    "force_dhw_boost": {
+      "name": "Intelligenten Warmwasser-Boost aktivieren",
+      "description": "Startet eine einmalige Speicherladung (HwcSFMode = load), überwindet die Hysterese durch dynamische temporäre Sollwerterhöhung (T_aktuell + Hysterese + 1,5 °C) und stellt nach Abschluss den ursprünglichen Sollwert wieder her.",
+      "fields": {
+        "boost_temp": {
+          "name": "Temporäre Boost-Temperatur (Optional - PV-Überschuss)",
+          "description": "Optionaler temporärer Sollwert in °C für diesen Ladezyklus (z. B. 60 °C für Solarüberschüsse). Wenn weggelassen, wird automatisch T_aktuell + Hysterese + 1,5 °C berechnet."
+        }
+      }
+    },
+    "set_holiday_mode": {
+      "name": "Urlaubs- / Abwesenheitsmodus aktivieren",
+      "description": "Aktiviert den Urlaubs-/Abwesenheitsmodus am Klimaregler (15.bass3 / 15.ctlv2 / 15.ctlv3), pausiert die Warmwasserbereitung und senkt die Heiz-Solltemperatur für einen zeitgesteuerten oder unbefristeten Zeitraum.",
+      "fields": {
+        "temperature": {
+          "name": "Absenktemperatur",
+          "description": "Solltemperatur in °C während der Abwesenheit (Standard: 15.0 °C)."
+        },
+        "start_date": {
+          "name": "Startdatum (Optional)",
+          "description": "Startdatum im Format JJJJ-MM-TT oder TT/MM/JJJJ. Standard: heute."
+        },
+        "start_time": {
+          "name": "Startzeit (Optional)",
+          "description": "Startzeit im Format HH:MM. Standard: aktuelle Uhrzeit."
+        },
+        "end_date": {
+          "name": "Enddatum (Optional)",
+          "description": "Enddatum der Abwesenheit. Wenn weggelassen, wird der Modus unbefristet aktiviert (bis zum manuellen Abbruch)."
+        },
+        "end_time": {
+          "name": "Endzeit (Optional)",
+          "description": "Endzeit im Format HH:MM (Standard: 23:59)."
+        }
+      }
+    },
+    "cancel_holiday_mode": {
+      "name": "Urlaubs- / Abwesenheitsmodus abbrechen",
+      "description": "Beendet den Urlaubs-/Abwesenheitsmodus am Klimaregler (15.bass3 / 15.ctlv2 / 15.ctlv3) sofort und stellt den normalen Automatikbetrieb für Heizung und Warmwasser wieder her."
+    },
+    "dump_mqtt_values": {
+      "name": "MQTT-Werte ausgeben (Diagnose)",
+      "description": "Gibt den vollständigen Systemzustand und empfangene eBUSd-MQTT-Variablen strukturiert aus, um sie in GitHub-Issues oder zur Fehlersuche anzuhängen.",
+      "fields": {
+        "circuit": {
+          "name": "Schaltkreis-Filter (Optional)",
+          "description": "Filtert die Ausgabe nach einem bestimmten eBUS-Schaltkreis (z. B. '08', '15', 'hmu', 'bass3'). Wenn weggelassen, werden alle aktiven Kreise ausgegeben."
+        },
+        "anonymize": {
+          "name": "Seriennummern anonymisieren (Empfohlen)",
+          "description": "Maskiert automatisch 28-stellige Hardware-Seriennummern, damit der Auszug sicher in öffentlichen GitHub-Issues geteilt werden kann."
+        }
+      }
+    },
+    "record_topic_changes": {
+      "name": "MQTT-Themenänderungen aufzeichnen (Live-Diagnose)",
+      "description": "Startet eine temporäre Aufzeichnung des eBUSd-MQTT-Verkehrs für eine konfigurierbare Dauer und erfasst Themen, Payloads und Zeitstempel.",
+      "fields": {
+        "duration": {
+          "name": "Dauer (Sekunden)",
+          "description": "Aufnahmedauer in Sekunden (zwischen 5 und 120 Sekunden, Standard: 30)."
+        },
+        "circuit": {
+          "name": "Schaltkreis- / Themenfilter (Optional)",
+          "description": "Filtert aufgezeichnete Nachrichten nach einer Teilzeichenfolge (z. B. '08', '15', 'hmu'). Wenn weggelassen, wird der gesamte Verkehr aufgezeichnet."
+        },
+        "anonymize": {
+          "name": "Seriennummern anonymisieren (Empfohlen)",
+          "description": "Maskiert automatisch Seriennummern und Hardware-Identifikatoren in den MQTT-Nutzdaten."
+        }
+      }
+    },
+    "send_hex_command": {
+      "name": "Direkten HEX-Befehl senden (TCP-Diagnose)",
+      "description": "Sendet ein rohes hexadezimales Befehlstelegramm über TCP (Port 8888) an den eBUSd-Daemon und gibt die Antwortbytes zurück. Erfordert eBUSd mit der Option '--enablehex' und aktivierter Option 'enable_send_hex' in den Einstellungen. Erfordert keine CSV-Änderungen.",
+      "fields": {
+        "command": {
+          "name": "Hexadezimaler Befehl",
+          "description": "Zu sendende Hexadezimal-Bytefolge (Leerzeichen werden ignoriert, z. B. '08b51a0405ff3428')."
+        },
+        "host": {
+          "name": "Host / IP-Adresse (Optional)",
+          "description": "IP-Adresse oder Hostname des eBUSd-Daemons (Standard: 127.0.0.1 oder b4d7ad18-ebusd)."
+        },
+        "port": {
+          "name": "TCP-Port (Optional)",
+          "description": "TCP-Port des eBUSd-Daemons (Standard: 8888)."
+        },
+        "timeout": {
+          "name": "Zeitüberschreitung (Sekunden)",
+          "description": "Maximale Wartezeit in Sekunden für Verbindungsaufbau und Antwort (Standard: 5.0 Sekunden)."
+        }
+      }
+    },
+    "read_parameter": {
+      "name": "Parameter über MQTT lesen",
+      "description": "Liest ein symbolisches eBUSd-Register über MQTT (Veröffentlichung unter '<Präfix>/<Kreis>/<Name>/get' und Warten auf '<Präfix>/<Kreis>/<Name>'). Unterstützt Cache-Rückgabe oder erzwungenes Lesen vom physischen Bus.",
+      "fields": {
+        "circuit": {
+          "name": "Schaltkreis",
+          "description": "eBUS-Schaltkreisbezeichnung oder Adresse (z. B. 'hmu', '08', 'bass3', 'ctlv2')."
+        },
+        "name": {
+          "name": "Parameter- / Nachrichtenname",
+          "description": "Symbolischer Registername laut CSV-Dateien (z. B. 'CompressorSilentOperationLevel', 'Status01', 'Z1OpMode')."
+        },
+        "force": {
+          "name": "Physisches Bus-Lesen erzwingen (Optional)",
+          "description": "Wenn wahr, wird eine aktive Abfrage auf dem physischen Bus erzwungen, anstatt des Cache-Werts."
+        },
+        "timeout": {
+          "name": "Zeitüberschreitung (Sekunden)",
+          "description": "Maximale Wartezeit in Sekunden auf Antwort über MQTT (Standard: 5.0 Sekunden)."
+        }
+      }
+    },
+    "write_parameter": {
+      "name": "Parameter über MQTT schreiben",
+      "description": "Schreibt einen Wert in ein symbolisches eBUSd-Register über MQTT (Veröffentlichung unter '<Präfix>/<Kreis>/<Name>/set'). Wendet optimistische Zustandsaktualisierung in Home Assistant an und nutzt intelligentes Routing.",
+      "fields": {
+        "circuit": {
+          "name": "Schaltkreis",
+          "description": "eBUS-Schaltkreisbezeichnung oder Adresse (z. B. 'hmu', '08', 'bass3', 'ctlv2')."
+        },
+        "name": {
+          "name": "Parameter- / Nachrichtenname",
+          "description": "Symbolischer Registername laut CSV-Dateien (z. B. 'CompressorSilentOperationLevel', 'Z1OpMode')."
+        },
+        "value": {
+          "name": "Zu schreibender Wert",
+          "description": "Wert oder Nutzdaten-Zeichenfolge, die an eBUSd gesendet wird."
+        }
+      }
+    }
+  }
+}

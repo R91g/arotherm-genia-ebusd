@@ -50,10 +50,33 @@
       "init": {
         "title": "Runtime Options (aroTHERM & GeniaAir)",
         "description": "Tune the Smart Forced DHW Boost algorithm, Double-Lock cooling automation, and fallback polling interval.",
+        "sections": {
+          "advanced_options": {
+            "name": "Advanced Settings (eBUSd TCP Connection & HEX Commands)",
+            "description": "Configure direct TCP socket connectivity with the eBUSd daemon to unlock real-time physical metrics and advanced commands.",
+            "data": {
+              "enable_ebusd_tcp": "Enable eBUSd physical diagnostics and commands via TCP",
+              "ebusd_tcp_host": "eBUSd TCP Host (IP or hostname)",
+              "ebusd_tcp_port": "eBUSd TCP Port",
+              "enable_send_hex": "Enable raw hexadecimal command service (send_hex_command)"
+            },
+            "data_description": {
+              "enable_ebusd_tcp": "Periodically queries the eBUSd TCP socket to monitor physical symbol rate, arbitration latency, adapter reconnects, and verify unloaded CSV files. Automatically activates diagnostic entities and action buttons.",
+              "ebusd_tcp_host": "eBUSd daemon address. In Home Assistant OS with the official add-on it is auto-detected or use 'b4d7ad18-ebusd'. For native host setups with exposed port, use '127.0.0.1'.",
+              "ebusd_tcp_port": "eBUSd TCP daemon port (default: 8888).",
+              "enable_send_hex": "Enables sending raw hexadecimal eBUS telegrams via the arotherm_genia_ebusd.send_hex_command service. Requires the --enablehex flag enabled in eBUSd configuration."
+            }
+          }
+        },
         "data": {
-          "force_dhw_boost": "Enable Smart Forced DHW Boost (applies T_current + hysteresis + 1.5 °C when ΔT < hysteresis)",
+          "force_dhw_boost": "Enable Smart Forced DHW Boost",
           "auto_cooling_lock_bypass": "Automatically open Cooling Lock 1 (01;01;99) when selecting Cool mode",
           "fallback_poll_interval": "Fallback /get polling interval when cloud gateway is absent (seconds)"
+        },
+        "data_description": {
+          "force_dhw_boost": "Automatically applies T_current + hysteresis + 1.5 °C when the gap between setpoint and tank temperature is below the hysteresis margin.",
+          "auto_cooling_lock_bypass": "Unlocks the cooling season authorization lock on the controller when switching to cooling mode.",
+          "fallback_poll_interval": "Polling frequency when the installation lacks an official cloud gateway."
         }
       }
     }
@@ -765,6 +788,179 @@
       },
       "stats_vwzio_heater_hwc_starts": {
         "name": "Hydraulic Auxiliary Heater Hot Water Starts"
+      },
+      "ebusd_missing_csv_devices": {
+        "name": "eBUS Missing CSV Devices"
+      }
+    },
+    "button": {
+      "ebusd_reload_csv": {
+        "name": "Reload eBUSd CSV Files"
+      },
+      "ebusd_restart_scan": {
+        "name": "Restart eBUSd Device Scan"
+      }
+    }
+  },
+  "services": {
+    "set_weekly_timer": {
+      "name": "Set Weekly Schedule Timer (b5 55)",
+      "description": "Configures a weekly schedule time slot on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3) for Zone 1 Heating, Domestic Hot Water (DHW), Cooling, or Circulation.",
+      "fields": {
+        "circuit_type": {
+          "name": "Circuit Type",
+          "description": "Schedule circuit to modify (Heating, DHW, Cooling, or Circulation)."
+        },
+        "day": {
+          "name": "Day of the Week",
+          "description": "Specific day of the week, Weekdays (Monday to Friday), or All Days (Monday to Sunday)."
+        },
+        "slot": {
+          "name": "Time Slot Number",
+          "description": "Daily time slot index (1, 2, or 3). Defaults to 1."
+        },
+        "start_time": {
+          "name": "Start Time",
+          "description": "Slot start time in HH:MM 24-hour format (e.g. 13:10)."
+        },
+        "end_time": {
+          "name": "End Time",
+          "description": "Slot end time in HH:MM 24-hour format (e.g. 14:50)."
+        }
+      }
+    },
+    "force_dhw_boost": {
+      "name": "Activate Smart Forced DHW Boost",
+      "description": "Initiates a one-time domestic hot water tank charge (HwcSFMode = load) automatically overcoming thermostat hysteresis via dynamic temporary setpoint elevation (T_current + hysteresis + 1.5 °C) and restores original setpoint upon completion.",
+      "fields": {
+        "boost_temp": {
+          "name": "Temporary Boost Temperature (Optional - Solar Surpluses)",
+          "description": "Optional temporary setpoint in °C for this specific boost cycle (e.g. 60 °C for PV solar surpluses). If omitted, automatically applies T_current + hysteresis + 1.5 °C."
+        }
+      }
+    },
+    "set_holiday_mode": {
+      "name": "Set Holiday / Away Mode",
+      "description": "Activates Holiday/Away Mode on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3), suspending hot water production and reducing heating setpoint to setback temperature during a timed or open-ended window.",
+      "fields": {
+        "temperature": {
+          "name": "Setback Temperature",
+          "description": "Target temperature in °C during absence (default 15.0 °C)."
+        },
+        "start_date": {
+          "name": "Start Date (Optional)",
+          "description": "Start date in YYYY-MM-DD or DD/MM/YYYY format. Defaults to today."
+        },
+        "start_time": {
+          "name": "Start Time (Optional)",
+          "description": "Start time in HH:MM format. Defaults to current time."
+        },
+        "end_date": {
+          "name": "End Date (Optional)",
+          "description": "End date of absence. If omitted, sets an open-ended/indefinite absence until manually cancelled."
+        },
+        "end_time": {
+          "name": "End Time (Optional)",
+          "description": "End time in HH:MM format (defaults to 23:59)."
+        }
+      }
+    },
+    "cancel_holiday_mode": {
+      "name": "Cancel Holiday / Away Mode",
+      "description": "Immediately cancels Holiday/Away Mode on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3) and restores automatic schedule operation for heating and domestic hot water."
+    },
+    "dump_mqtt_values": {
+      "name": "Dump MQTT Values (Diagnostics)",
+      "description": "Dumps full installation state and eBUSd MQTT telemetry into a structured JSON format suitable for troubleshooting or attaching to GitHub issues.",
+      "fields": {
+        "circuit": {
+          "name": "Circuit Filter (Optional)",
+          "description": "Filters telemetry by a specific eBUS circuit (e.g. '08', '15', 'hmu', 'bass3'). If omitted, dumps all active circuits."
+        },
+        "anonymize": {
+          "name": "Anonymize Serial Numbers (Recommended)",
+          "description": "Automatically masks 28-character hardware serial numbers so diagnostic dumps can be safely shared in public GitHub issue threads."
+        }
+      }
+    },
+    "record_topic_changes": {
+      "name": "Record MQTT Topic Changes (Live Diagnostics)",
+      "description": "Records real-time eBUSd MQTT traffic for a configurable duration, capturing topics, raw payloads, and timestamps.",
+      "fields": {
+        "duration": {
+          "name": "Duration (seconds)",
+          "description": "Recording duration in seconds (between 5 and 120 seconds, defaults to 30)."
+        },
+        "circuit": {
+          "name": "Circuit / Topic Substring Filter (Optional)",
+          "description": "Filters captured messages by substring (e.g. '08', '15', 'hmu'). If omitted, records all MQTT traffic under prefix."
+        },
+        "anonymize": {
+          "name": "Anonymize Serial Numbers (Recommended)",
+          "description": "Automatically masks manufacturing serial numbers and hardware identifiers found in payloads."
+        }
+      }
+    },
+    "send_hex_command": {
+      "name": "Send Direct Raw HEX Command (TCP Diagnostics)",
+      "description": "Sends a raw hexadecimal command telegram to the eBUSd daemon over TCP (port 8888) and returns decoded response bytes. Requires eBUSd running with '--enablehex' and the 'enable_send_hex' option enabled in integration options. Does not require modifying CSV files.",
+      "fields": {
+        "command": {
+          "name": "Hexadecimal Command String",
+          "description": "Hex byte string to send (spaces are automatically stripped, e.g. '08b51a0405ff3428')."
+        },
+        "host": {
+          "name": "Host / IP Address (Optional)",
+          "description": "IP address or hostname where eBUSd daemon is running (defaults to 127.0.0.1 or b4d7ad18-ebusd)."
+        },
+        "port": {
+          "name": "TCP Port (Optional)",
+          "description": "eBUSd TCP daemon port (defaults to 8888)."
+        },
+        "timeout": {
+          "name": "Timeout (seconds)",
+          "description": "Maximum time in seconds to connect and await daemon response (defaults to 5.0 seconds)."
+        }
+      }
+    },
+    "read_parameter": {
+      "name": "Read Parameter via MQTT",
+      "description": "Reads a symbolic eBUSd register via MQTT (publishing to '<prefix>/<circuit>/<name>/get' and awaiting reply on '<prefix>/<circuit>/<name>'). Supports returning cached value or forcing an active bus read.",
+      "fields": {
+        "circuit": {
+          "name": "Circuit",
+          "description": "eBUS circuit name or address (e.g. 'hmu', '08', 'bass3', 'ctlv2')."
+        },
+        "name": {
+          "name": "Parameter / Message Name",
+          "description": "Symbolic register name as defined in CSV files (e.g. 'CompressorSilentOperationLevel', 'Status01', 'Z1OpMode')."
+        },
+        "force": {
+          "name": "Force Physical Bus Read (Optional)",
+          "description": "If true, forces an active read from the physical bus instead of returning cached value if present."
+        },
+        "timeout": {
+          "name": "Timeout (seconds)",
+          "description": "Maximum time in seconds to wait for eBUSd reply via MQTT (defaults to 5.0 seconds)."
+        }
+      }
+    },
+    "write_parameter": {
+      "name": "Write Parameter via MQTT",
+      "description": "Writes a value to a symbolic eBUSd register via MQTT (publishing to '<prefix>/<circuit>/<name>/set'). Applies optimistic state update in Home Assistant and leverages intelligent circuit alias routing.",
+      "fields": {
+        "circuit": {
+          "name": "Circuit",
+          "description": "eBUS circuit name or address (e.g. 'hmu', '08', 'bass3', 'ctlv2')."
+        },
+        "name": {
+          "name": "Parameter / Message Name",
+          "description": "Symbolic register name as defined in CSV files (e.g. 'CompressorSilentOperationLevel', 'Z1OpMode')."
+        },
+        "value": {
+          "name": "Value to Write",
+          "description": "Value or string payload to send to eBUSd."
+        }
       }
     }
   }

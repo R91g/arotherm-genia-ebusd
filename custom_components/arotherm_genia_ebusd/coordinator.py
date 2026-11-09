@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import time
@@ -13,6 +14,7 @@ from typing import Any
 from homeassistant.components import mqtt
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import async_call_later, async_track_time_interval
 
 from .const import (
@@ -40,6 +42,9 @@ from .const import (
     CIRCUIT_NETX3_ALT,
     CIRCUIT_VWZIO,
     CONF_AUTO_COOLING_LOCK_BYPASS,
+    CONF_EBUSD_TCP_HOST,
+    CONF_EBUSD_TCP_PORT,
+    CONF_ENABLE_EBUSD_TCP,
     CONF_FALLBACK_POLL_INTERVAL,
     CONF_FORCE_DHW_BOOST,
     CONF_HAS_MIGO_LINK,
@@ -53,6 +58,9 @@ from .const import (
     DEFAULT_AUTO_COOLING_LOCK_BYPASS,
     DEFAULT_CYLINDER_HYST,
     DEFAULT_DEVICE_VERSIONS,
+    DEFAULT_EBUSD_TCP_HOST,
+    DEFAULT_EBUSD_TCP_PORT,
+    DEFAULT_ENABLE_EBUSD_TCP,
     DEFAULT_FALLBACK_POLL_INTERVAL,
     DEFAULT_FORCE_DHW_BOOST,
     DEFAULT_HAS_MIGO_LINK,
@@ -293,6 +301,7 @@ class SaunierGeniaCoordinator:
         self._mqtt_unsubs: list[CALLBACK_TYPE] = []
         self._hydration_timer_unsub: CALLBACK_TYPE | None = None
         self._fallback_poll_unsub: CALLBACK_TYPE | None = None
+        self._ebusd_tcp_poll_unsub: CALLBACK_TYPE | None = None
         self._hydration_task: asyncio.Task[None] | None = None
         self._pending_get_unsubs: dict[tuple[str, str], CALLBACK_TYPE] = {}
 
@@ -477,6 +486,25 @@ class SaunierGeniaCoordinator:
         )
 
     @property
+    def is_ebusd_tcp_enabled(self) -> bool:
+        """Return True if advanced eBUSd TCP connection is enabled."""
+        return bool(
+            self.entry.options.get(CONF_ENABLE_EBUSD_TCP, DEFAULT_ENABLE_EBUSD_TCP)
+        )
+
+    @property
+    def ebusd_tcp_host(self) -> str:
+        """Return configured eBUSd TCP host."""
+        return str(
+            self.entry.options.get(CONF_EBUSD_TCP_HOST, DEFAULT_EBUSD_TCP_HOST)
+        ).strip()
+
+    @property
+    def ebusd_tcp_port(self) -> int:
+        """Return configured eBUSd TCP port."""
+        return int(self.entry.options.get(CONF_EBUSD_TCP_PORT, DEFAULT_EBUSD_TCP_PORT))
+
+    @property
     def outdoor_device_id(self) -> str | None:
         """Return the internal Home Assistant Device Registry ID for the outdoor unit."""
         if self._outdoor_device_id:
@@ -636,6 +664,8 @@ class SaunierGeniaCoordinator:
                 timedelta(seconds=interval),
             )
 
+        self._async_setup_ebusd_tcp_polling()
+
     async def async_unload(self) -> None:
         """Unsubscribe from MQTT and cancel all background tasks and timers."""
         for unsub in self._mqtt_unsubs:
@@ -649,6 +679,10 @@ class SaunierGeniaCoordinator:
         if self._fallback_poll_unsub is not None:
             self._fallback_poll_unsub()
             self._fallback_poll_unsub = None
+
+        if self._ebusd_tcp_poll_unsub is not None:
+            self._ebusd_tcp_poll_unsub()
+            self._ebusd_tcp_poll_unsub = None
 
         if self._dhw_boost_timeout_unsub is not None:
             self._dhw_boost_timeout_unsub()
@@ -1464,6 +1498,259 @@ class SaunierGeniaCoordinator:
         for circuit, message in messages:
             await self.async_request_get(circuit, message)
             await asyncio.sleep(HYDRATION_STEP_DELAY_SECONDS)
+
+    # -------------------------------------------------------------------------
+    # Advanced eBUSd TCP Daemon Polling (Diagnostics & Info)
+    # -------------------------------------------------------------------------
+
+    @callback
+    def _async_setup_ebusd_tcp_polling(self) -> None:
+        """Set up or cancel periodic eBUSd TCP info polling based on options."""
+        if self._ebusd_tcp_poll_unsub is not None:
+            self._ebusd_tcp_poll_unsub()
+            self._ebusd_tcp_poll_unsub = None
+
+        if not self.is_ebusd_tcp_enabled:
+            return
+
+        _LOGGER.info(
+            "Advanced eBUSd TCP connection enabled; polling info from %s:%s every 60s",
+            self.ebusd_tcp_host,
+            self.ebusd_tcp_port,
+        )
+
+        if self.hass:
+            self.hass.async_create_background_task(
+                self._async_fetch_ebusd_tcp_info(),
+                name=f"{DOMAIN}_initial_tcp_info_{self.entry.entry_id}",
+            )
+            self._ebusd_tcp_poll_unsub = async_track_time_interval(
+                self.hass,
+                self._async_run_ebusd_tcp_poll,
+                timedelta(seconds=60),
+            )
+
+    async def _async_run_ebusd_tcp_poll(self, _now: datetime) -> None:
+        """Periodic timer callback to fetch eBUSd TCP daemon info."""
+        await self._async_fetch_ebusd_tcp_info()
+
+    async def _async_open_tcp_connection(
+        self, host: str, port: int, timeout: float = 3.0
+    ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
+        """Open TCP connection to eBUSd socket, falling back to HA add-on hostnames if localhost fails."""
+        try:
+            connect_coro = asyncio.open_connection(host, port)
+            return await asyncio.wait_for(connect_coro, timeout=timeout)
+        except (TimeoutError, OSError):
+            if host in ("127.0.0.1", "localhost"):
+                fallback_hosts = ("b4d7ad18-ebusd", "local-ebusd", "ebusd")
+                for fb_host in fallback_hosts:
+                    try:
+                        connect_coro = asyncio.open_connection(fb_host, port)
+                        reader, writer = await asyncio.wait_for(
+                            connect_coro, timeout=timeout
+                        )
+                        _LOGGER.debug(
+                            "Connected to eBUSd TCP socket via fallback host '%s:%s'",
+                            fb_host,
+                            port,
+                        )
+                        return reader, writer
+                    except (TimeoutError, OSError):
+                        continue
+            raise
+
+    async def _async_fetch_ebusd_tcp_info(self) -> None:
+        """Fetch daemon health, metrics, and loaded CSV status directly from eBUSd TCP socket."""
+        if not self.is_ebusd_tcp_enabled:
+            return
+
+        host = self.ebusd_tcp_host
+        port = self.ebusd_tcp_port
+        reader: asyncio.StreamReader | None = None
+        writer: asyncio.StreamWriter | None = None
+        try:
+            reader, writer = await self._async_open_tcp_connection(
+                host, port, timeout=3.0
+            )
+            writer.write(b"info\n")
+            await writer.drain()
+
+            lines: list[str] = []
+            while True:
+                try:
+                    line_bytes = await asyncio.wait_for(reader.readline(), timeout=3.0)
+                except (TimeoutError, StopAsyncIteration):
+                    break
+                if not line_bytes:
+                    break
+                line = line_bytes.decode("ascii", errors="replace").strip()
+                if not line:
+                    continue
+                lines.append(line)
+        except (TimeoutError, OSError) as err:
+            _LOGGER.debug(
+                "Unable to connect to eBUSd TCP socket at %s:%s for info: %s",
+                host,
+                port,
+                err,
+            )
+            return
+        finally:
+            if writer is not None:
+                writer.close()
+                with contextlib.suppress(OSError):
+                    await writer.wait_closed()
+
+        if not lines:
+            return
+
+        missing_csv_devices: list[dict[str, str]] = []
+        loaded_csv_devices: list[dict[str, str]] = []
+        total_scanned = 0
+
+        for line in lines:
+            if ":" not in line:
+                continue
+            key, _, val = line.partition(":")
+            key = key.strip().lower()
+            val = val.strip()
+
+            if key == "version":
+                self._state[(CIRCUIT_GLOBAL, "version")] = {"value": val}
+                self._async_notify_message_listeners(CIRCUIT_GLOBAL, "version")
+            elif key == "symbol rate":
+                with contextlib.suppress(ValueError):
+                    self._state[(CIRCUIT_GLOBAL, "symbol_rate")] = {"value": int(val)}
+                    self._async_notify_message_listeners(CIRCUIT_GLOBAL, "symbol_rate")
+            elif key == "reconnects":
+                with contextlib.suppress(ValueError):
+                    self._state[(CIRCUIT_GLOBAL, "reconnects")] = {"value": int(val)}
+                    self._async_notify_message_listeners(CIRCUIT_GLOBAL, "reconnects")
+            elif key == "masters":
+                with contextlib.suppress(ValueError):
+                    self._state[(CIRCUIT_GLOBAL, "masters")] = {"value": int(val)}
+                    self._async_notify_message_listeners(CIRCUIT_GLOBAL, "masters")
+            elif key in ("max arbitration micros", "arbitration micros"):
+                with contextlib.suppress(ValueError):
+                    micros = int(val)
+                    ms = round(micros / 1000.0)
+                    self._state[(CIRCUIT_GLOBAL, "arbitration_latency")] = {"value": ms}
+                    self._async_notify_message_listeners(
+                        CIRCUIT_GLOBAL, "arbitration_latency"
+                    )
+            elif key.startswith("address ") and 'scanned "' in val:
+                total_scanned += 1
+                addr = key.replace("address", "").strip()
+                scanned_part = val.partition('scanned "')[2].partition('"')[0]
+                fields = dict(
+                    item.split("=", 1)
+                    for item in scanned_part.split(";")
+                    if "=" in item
+                )
+                dev_id = fields.get("ID", addr)
+                sw_ver = fields.get("SW", "")
+                hw_ver = fields.get("HW", "")
+                if ', loaded "' in val:
+                    csv_file = val.partition(', loaded "')[2].rstrip('"')
+                    loaded_csv_devices.append(
+                        {
+                            "address": addr,
+                            "id": dev_id,
+                            "csv": csv_file,
+                            "sw": sw_ver,
+                            "hw": hw_ver,
+                        }
+                    )
+                else:
+                    missing_csv_devices.append(
+                        {
+                            "address": addr,
+                            "id": dev_id,
+                            "sw": sw_ver,
+                            "hw": hw_ver,
+                        }
+                    )
+
+        summary_val = (
+            ", ".join(d["id"] for d in missing_csv_devices)
+            if missing_csv_devices
+            else "OK"
+        )
+        self._state[(CIRCUIT_GLOBAL, "missing_csv_devices")] = {
+            "value": summary_val,
+            "missing_count": len(missing_csv_devices),
+            "missing_devices": [
+                f"{d['id']} (addr: {d['address']}, SW: {d['sw']}, HW: {d['hw']})"
+                for d in missing_csv_devices
+            ],
+            "loaded_devices": [
+                f"{d['address']}: {d['id']} ({d['csv']})" for d in loaded_csv_devices
+            ],
+            "total_scanned": total_scanned,
+        }
+        self._async_notify_message_listeners(CIRCUIT_GLOBAL, "missing_csv_devices")
+
+    async def async_ebusd_tcp_reload(self) -> str:
+        """Send reload command to eBUSd via TCP socket to reload all CSV definition files."""
+        res = await self._async_send_ebusd_tcp_command("reload\n")
+        await self._async_fetch_ebusd_tcp_info()
+        return res
+
+    async def async_ebusd_tcp_scan(self) -> str:
+        """Send scan config command to eBUSd via TCP socket to restart device scanning."""
+        res = await self._async_send_ebusd_tcp_command("scan config\n")
+        await self._async_fetch_ebusd_tcp_info()
+        return res
+
+    async def _async_send_ebusd_tcp_command(self, cmd: str) -> str:
+        """Send a raw command string to eBUSd TCP socket and return its decoded response."""
+        if not self.is_ebusd_tcp_enabled:
+            raise HomeAssistantError(
+                "eBUSd TCP connection is disabled in integration options."
+            )
+
+        host = self.ebusd_tcp_host
+        port = self.ebusd_tcp_port
+        try:
+            reader, writer = await self._async_open_tcp_connection(
+                host, port, timeout=5.0
+            )
+        except (TimeoutError, OSError) as err:
+            _LOGGER.error(
+                "Failed to connect to eBUSd TCP socket at %s:%s for command '%s': %s",
+                host,
+                port,
+                cmd.strip(),
+                err,
+            )
+            raise HomeAssistantError(
+                f"Failed to connect to eBUSd daemon at {host}:{port}: {err}"
+            ) from err
+
+        try:
+            writer.write(cmd.encode("ascii"))
+            await writer.drain()
+            raw = await asyncio.wait_for(reader.readline(), timeout=5.0)
+            resp = raw.decode("ascii", errors="replace").strip()
+        except (TimeoutError, OSError) as err:
+            _LOGGER.error(
+                "Error communicating with eBUSd TCP socket at %s:%s for command '%s': %s",
+                host,
+                port,
+                cmd.strip(),
+                err,
+            )
+            raise HomeAssistantError(
+                f"Error sending command '{cmd.strip()}' to eBUSd: {err}"
+            ) from err
+        finally:
+            writer.close()
+            with contextlib.suppress(OSError):
+                await writer.wait_closed()
+
+        await self._async_fetch_ebusd_tcp_info()
+        return resp
 
     # -------------------------------------------------------------------------
     # Real-Time Thermodynamic Calculations (Section 6.2)

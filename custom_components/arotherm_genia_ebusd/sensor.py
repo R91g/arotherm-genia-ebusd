@@ -181,6 +181,15 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
         """Return optional extra state attributes."""
         if self.entity_description.attr_fn is not None:
             return self.entity_description.attr_fn(self.coordinator)
+        msg_data = self.coordinator.get_message(
+            self.entity_description.circuit, self.entity_description.message
+        )
+        if isinstance(msg_data, dict):
+            extra = {
+                k: v for k, v in msg_data.items() if k != self.entity_description.field
+            }
+            if extra:
+                return extra
         return None
 
 

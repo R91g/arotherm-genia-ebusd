@@ -42,6 +42,7 @@ class TestSchemaIntegrity(unittest.TestCase):
         self.icons_path = os.path.join(self.component_dir, "icons.json")
         self.es_path = os.path.join(self.component_dir, "translations", "es.json")
         self.en_path = os.path.join(self.component_dir, "translations", "en.json")
+        self.de_path = os.path.join(self.component_dir, "translations", "de.json")
         self.services_path = os.path.join(self.component_dir, "services.yaml")
 
     def test_manifest_schema(self) -> None:
@@ -101,24 +102,29 @@ class TestSchemaIntegrity(unittest.TestCase):
         )
 
     def test_translations_parity(self) -> None:
-        """Verify complete parity between strings.json, en.json, and es.json."""
+        """Verify complete parity between strings.json, en.json, es.json, and de.json."""
         with open(self.strings_path, "r", encoding="utf-8") as fp:
             strings = json.load(fp)
         with open(self.en_path, "r", encoding="utf-8") as fp:
             en = json.load(fp)
         with open(self.es_path, "r", encoding="utf-8") as fp:
             es = json.load(fp)
+        with open(self.de_path, "r", encoding="utf-8") as fp:
+            de = json.load(fp)
 
         # Check top-level sections
         self.assertEqual(set(strings.keys()), set(en.keys()))
         self.assertEqual(set(strings.keys()), set(es.keys()))
+        self.assertEqual(set(strings.keys()), set(de.keys()))
 
         # Check config steps parity
         strings_steps = set(strings.get("config", {}).get("step", {}).keys())
         en_steps = set(en.get("config", {}).get("step", {}).keys())
         es_steps = set(es.get("config", {}).get("step", {}).keys())
+        de_steps = set(de.get("config", {}).get("step", {}).keys())
         self.assertEqual(strings_steps, en_steps)
         self.assertEqual(strings_steps, es_steps)
+        self.assertEqual(strings_steps, de_steps)
         self.assertIn("user", strings_steps)
         self.assertIn("models", strings_steps)
 
@@ -126,8 +132,21 @@ class TestSchemaIntegrity(unittest.TestCase):
         strings_entities = set(strings.get("entity", {}).keys())
         en_entities = set(en.get("entity", {}).keys())
         es_entities = set(es.get("entity", {}).keys())
+        de_entities = set(de.get("entity", {}).keys())
         self.assertEqual(strings_entities, en_entities)
         self.assertEqual(strings_entities, es_entities)
+        self.assertEqual(strings_entities, de_entities)
+
+        # Check services parity
+        strings_services = set(strings.get("services", {}).keys())
+        en_services = set(en.get("services", {}).keys())
+        es_services = set(es.get("services", {}).keys())
+        de_services = set(de.get("services", {}).keys())
+        self.assertEqual(strings_services, en_services)
+        self.assertEqual(strings_services, es_services)
+        self.assertEqual(strings_services, de_services)
+        self.assertIn("set_weekly_timer", strings_services)
+        self.assertIn("force_dhw_boost", strings_services)
 
         # Check for empty strings in all translation files
         def check_no_empty_strings(obj: dict | list | str, path: str = "") -> None:
@@ -147,6 +166,7 @@ class TestSchemaIntegrity(unittest.TestCase):
         check_no_empty_strings(strings, "strings.json")
         check_no_empty_strings(en, "en.json")
         check_no_empty_strings(es, "es.json")
+        check_no_empty_strings(de, "de.json")
 
     def test_services_yaml(self) -> None:
         """Verify services.yaml exposes services registered in __init__.py."""
@@ -456,6 +476,84 @@ class TestSchemaIntegrity(unittest.TestCase):
                         valid_type_tokens,
                         f"Unexpected ebusd message type token '{tok}' in {rel_path}:{line_no}",
                     )
+
+    def test_legacy_device_name_migration(self) -> None:
+        """Verify _async_migrate_legacy_device_names updates legacy Spanish device registry names to English."""
+        from unittest.mock import MagicMock, patch
+
+        from homeassistant.helpers import device_registry as dr
+
+        from custom_components.arotherm_genia_ebusd import (
+            _async_migrate_legacy_device_names,
+        )
+
+        hass = MagicMock()
+        entry = MagicMock()
+        entry.entry_id = "test_entry_456"
+
+        mock_dev_reg = MagicMock()
+
+        # Legacy Spanish devices
+        dev_outdoor = MagicMock()
+        dev_outdoor.id = "dev_1"
+        dev_outdoor.name = "GeniaAir Max ES 15 (Unidad Exterior)"
+        dev_outdoor.name_by_user = None
+
+        dev_controller = MagicMock()
+        dev_controller.id = "dev_2"
+        dev_controller.name = "MiPro Sense (Regulador Climático)"
+        dev_controller.name_by_user = None
+
+        dev_hydraulic = MagicMock()
+        dev_hydraulic.id = "dev_3"
+        dev_hydraulic.name = "HPIM 7 230V (Interfaz Hidráulica)"
+        dev_hydraulic.name_by_user = None
+
+        dev_thermostat = MagicMock()
+        dev_thermostat.id = "dev_4"
+        dev_thermostat.name = "MiPro Sense (Termostato Inalámbrico)"
+        dev_thermostat.name_by_user = None
+
+        # User-customized device (should NOT be overwritten)
+        dev_custom = MagicMock()
+        dev_custom.id = "dev_5"
+        dev_custom.name = "Custom Heat Pump (Unidad Exterior)"
+        dev_custom.name_by_user = "My Custom Name"
+
+        # Modern English device (should NOT be changed)
+        dev_en = MagicMock()
+        dev_en.id = "dev_6"
+        dev_en.name = "GeniaAir Max ES 15 (Outdoor Unit)"
+        dev_en.name_by_user = None
+
+        devices = [
+            dev_outdoor,
+            dev_controller,
+            dev_hydraulic,
+            dev_thermostat,
+            dev_custom,
+            dev_en,
+        ]
+
+        with (
+            patch.object(dr, "async_get", return_value=mock_dev_reg),
+            patch.object(dr, "async_entries_for_config_entry", return_value=devices),
+        ):
+            _async_migrate_legacy_device_names(hass, entry)
+
+            mock_dev_reg.async_update_device.assert_any_call(
+                "dev_1", name="GeniaAir Max ES 15 (Outdoor Unit)"
+            )
+            mock_dev_reg.async_update_device.assert_any_call(
+                "dev_2", name="MiPro Sense (Climate Controller)"
+            )
+            mock_dev_reg.async_update_device.assert_any_call(
+                "dev_3", name="HPIM 7 230V (Hydraulic Interface)"
+            )
+            mock_dev_reg.async_update_device.assert_any_call(
+                "dev_4", name="MiPro Sense (Wireless Thermostat)"
+            )
+            self.assertEqual(mock_dev_reg.async_update_device.call_count, 4)
 
 
 if __name__ == "__main__":

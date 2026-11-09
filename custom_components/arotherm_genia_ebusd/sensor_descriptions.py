@@ -1896,6 +1896,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         native_unit_of_measurement="symbols/s",
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(
@@ -1907,6 +1908,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         field="value",
         state_class=SensorStateClass.TOTAL_INCREASING,
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(
@@ -1918,6 +1920,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         field="value",
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(
@@ -1931,7 +1934,18 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         is_integer=True,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="ebusd_missing_csv_devices",
+        translation_key="ebusd_missing_csv_devices",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_GLOBAL,
+        message="missing_csv_devices",
+        field="value",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
     ),
 )
 

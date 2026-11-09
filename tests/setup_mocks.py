@@ -13,6 +13,7 @@ MOCKED_MODULES = [
     "homeassistant",
     "homeassistant.components",
     "homeassistant.components.binary_sensor",
+    "homeassistant.components.button",
     "homeassistant.components.climate",
     "homeassistant.components.datetime",
     "homeassistant.components.diagnostics",
@@ -25,6 +26,7 @@ MOCKED_MODULES = [
     "homeassistant.config_entries",
     "homeassistant.const",
     "homeassistant.core",
+    "homeassistant.data_entry_flow",
     "homeassistant.exceptions",
     "homeassistant.helpers",
     "homeassistant.helpers.config_validation",
@@ -79,6 +81,28 @@ sys.modules["homeassistant.components.mqtt"].async_subscribe = AsyncMock(
     return_value=MagicMock()
 )
 sys.modules["homeassistant.components.mqtt"].async_publish = AsyncMock()
+
+
+class MockSchema:
+    """Mock voluptuous.Schema."""
+
+    def __init__(self, schema: Any = None) -> None:
+        self.schema = schema or {}
+
+    def __call__(self, val: Any) -> Any:
+        return val
+
+
+class MockMarker:
+    """Mock voluptuous.Required and voluptuous.Optional."""
+
+    def __init__(self, schema: Any, **kwargs: Any) -> None:
+        self.schema = schema
+
+
+sys.modules["voluptuous"].Schema = MockSchema
+sys.modules["voluptuous"].Required = MockMarker
+sys.modules["voluptuous"].Optional = MockMarker
 
 
 class MockEntity:
@@ -222,6 +246,42 @@ sys.modules[
 sys.modules[
     "homeassistant.components.datetime"
 ].DateTimeEntityDescription = MockEntityDescription
+sys.modules[
+    "homeassistant.components.button"
+].ButtonEntityDescription = MockEntityDescription
+
+
+class MockButtonEntity(MockEntity):
+    """Mock Button Entity."""
+
+    def press(self) -> None:
+        """Press the button."""
+
+    async def async_press(self) -> None:
+        """Press the button asynchronously."""
+
+
+sys.modules["homeassistant.components.button"].ButtonEntity = MockButtonEntity
+
+
+class MockRegistryEntryDisabler:
+    """Mock RegistryEntryDisabler enum."""
+
+    INTEGRATION = "integration"
+    USER = "user"
+
+
+sys.modules[
+    "homeassistant.helpers.entity_registry"
+].RegistryEntryDisabler = MockRegistryEntryDisabler
+
+
+def mock_section(schema: Any, options: dict[str, Any] | None = None) -> Any:
+    """Mock data_entry_flow.section helper."""
+    return schema
+
+
+sys.modules["homeassistant.data_entry_flow"].section = mock_section
 
 # Mock common string enums and constants
 from datetime import UTC, datetime
@@ -246,3 +306,46 @@ sys.modules["homeassistant.const"].UnitOfVolumeFlowRate = MagicMock(
 sys.modules["homeassistant.const"].UnitOfTime = MagicMock(
     HOURS="h", MINUTES="min", SECONDS="s", DAYS="d"
 )
+sys.modules["homeassistant.const"].Platform = MagicMock(
+    CLIMATE="climate",
+    WATER_HEATER="water_heater",
+    SENSOR="sensor",
+    BINARY_SENSOR="binary_sensor",
+    NUMBER="number",
+    SELECT="select",
+    SWITCH="switch",
+    DATETIME="datetime",
+    BUTTON="button",
+)
+
+
+class MockOptionsFlow:
+    """Mock OptionsFlow base class."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        pass
+
+    def async_show_form(
+        self,
+        step_id: str | None = None,
+        data_schema: Any = None,
+        errors: dict[str, str] | None = None,
+        description_placeholders: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        return {
+            "type": "form",
+            "step_id": step_id,
+            "data_schema": data_schema,
+            "errors": errors or {},
+            "description_placeholders": description_placeholders,
+        }
+
+    def async_create_entry(self, title: str = "", data: Any = None) -> dict[str, Any]:
+        return {
+            "type": "create_entry",
+            "title": title,
+            "data": data or {},
+        }
+
+
+sys.modules["homeassistant.config_entries"].OptionsFlow = MockOptionsFlow

@@ -28,7 +28,15 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     CIRCUIT_BASS3,
+    CONF_EBUSD_TCP_HOST,
+    CONF_EBUSD_TCP_PORT,
+    CONF_ENABLE_EBUSD_TCP,
+    CONF_ENABLE_SEND_HEX,
     DAY_SHORT_KEYS,
+    DEFAULT_EBUSD_TCP_HOST,
+    DEFAULT_EBUSD_TCP_PORT,
+    DEFAULT_ENABLE_EBUSD_TCP,
+    DEFAULT_ENABLE_SEND_HEX,
     DEFAULT_HOLIDAY_TEMP,
     DEPRECATED_UNIQUE_ID_SUFFIXES,
     DEVICE_OUTDOOR_UNIT,
@@ -107,10 +115,8 @@ RECORD_TOPIC_CHANGES_SCHEMA = vol.Schema(
 SEND_HEX_COMMAND_SCHEMA = vol.Schema(
     {
         vol.Required("command"): cv.string,
-        vol.Optional("host", default="127.0.0.1"): cv.string,
-        vol.Optional("port", default=8888): vol.All(
-            vol.Coerce(int), vol.Range(min=1, max=65535)
-        ),
+        vol.Optional("host"): cv.string,
+        vol.Optional("port"): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
         vol.Optional("timeout", default=5.0): vol.All(
             vol.Coerce(float), vol.Range(min=1.0, max=30.0)
         ),
@@ -182,6 +188,34 @@ def _async_cleanup_deprecated_entities(hass: HomeAssistant, entry: ConfigEntry) 
             ent_reg.async_remove(reg_entry.entity_id)
 
 
+def _async_migrate_legacy_device_names(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Migrate legacy Spanish device registry names to English for existing installations."""
+    dev_reg = dr.async_get(hass)
+    translations_map = {
+        " (Unidad Exterior)": " (Outdoor Unit)",
+        " (Regulador Climático)": " (Climate Controller)",
+        " (Interfaz Hidráulica)": " (Hydraulic Interface)",
+        " (Termostato Inalámbrico)": " (Wireless Thermostat)",
+    }
+    for device_entry in list(
+        dr.async_entries_for_config_entry(dev_reg, entry.entry_id)
+    ):
+        if device_entry.name_by_user is not None or not device_entry.name:
+            continue
+        new_name = device_entry.name
+        for es_suffix, en_suffix in translations_map.items():
+            if es_suffix in new_name:
+                new_name = new_name.replace(es_suffix, en_suffix)
+        if new_name != device_entry.name:
+            _LOGGER.info(
+                "Migrating device name '%s' -> '%s' (device_id=%s)",
+                device_entry.name,
+                new_name,
+                device_entry.id,
+            )
+            dev_reg.async_update_device(device_entry.id, name=new_name)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Saunier Duval GeniaAir Max ES & MiPro Sense from a config entry."""
     # 1. Initialize and connect the centralized eBUSd MQTT coordinator
@@ -192,6 +226,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # 2. Clean up deprecated b5 16 entities before forwarding platform setups
     _async_cleanup_deprecated_entities(hass, entry)
+    _async_migrate_legacy_device_names(hass, entry)
+    _async_sync_tcp_diagnostic_entities(hass, entry, reload_on_change=False)
 
     # 3. Pre-register parent outdoor device in device registry so child devices can use via_device_id
     dev_reg = dr.async_get(hass)
@@ -220,6 +256,42 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
+def _async_sync_tcp_diagnostic_entities(
+    hass: HomeAssistant, entry: ConfigEntry, reload_on_change: bool = True
+) -> None:
+    """Enable or disable TCP diagnostic entities based on enable_ebusd_tcp option."""
+    is_tcp_enabled = bool(
+        entry.options.get(CONF_ENABLE_EBUSD_TCP, DEFAULT_ENABLE_EBUSD_TCP)
+    )
+    ent_reg = er.async_get(hass)
+    tcp_suffixes = (
+        "_ebusd_symbol_rate",
+        "_ebusd_reconnects",
+        "_ebusd_masters",
+        "_ebusd_arbitration_latency",
+        "_ebusd_missing_csv_devices",
+        "_button_ebusd_reload_csv",
+        "_button_ebusd_restart_scan",
+    )
+    entities_to_update: list[
+        tuple[er.RegistryEntry, er.RegistryEntryDisabler | None]
+    ] = []
+    for reg_entry in er.async_entries_for_config_entry(ent_reg, entry.entry_id):
+        if any(reg_entry.unique_id.endswith(sfx) for sfx in tcp_suffixes):
+            if is_tcp_enabled and reg_entry.disabled:
+                entities_to_update.append((reg_entry, None))
+            elif not is_tcp_enabled and not reg_entry.disabled:
+                entities_to_update.append(
+                    (reg_entry, er.RegistryEntryDisabler.INTEGRATION)
+                )
+
+    if entities_to_update:
+        for reg_entry, disabled_by in entities_to_update:
+            ent_reg.async_update_entity(reg_entry.entity_id, disabled_by=disabled_by)
+        if reload_on_change:
+            hass.async_create_task(hass.config_entries.async_reload(entry.entry_id))
+
+
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Handle options update in real time."""
     coordinator: SaunierGeniaCoordinator | None = hass.data.get(DOMAIN, {}).get(
@@ -227,6 +299,8 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
     )
     if coordinator is not None:
         coordinator.async_update_options()
+
+    _async_sync_tcp_diagnostic_entities(hass, entry, reload_on_change=True)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -754,6 +828,18 @@ def _async_register_services(hass: HomeAssistant) -> None:
             call: ServiceCall,
         ) -> ServiceResponse:
             """Handle arotherm_genia_ebusd.send_hex_command service call via TCP socket."""
+            entries = hass.config_entries.async_entries(DOMAIN)
+            is_hex_enabled = any(
+                entry.options.get(CONF_ENABLE_SEND_HEX, DEFAULT_ENABLE_SEND_HEX)
+                for entry in entries
+            )
+            if not is_hex_enabled:
+                raise HomeAssistantError(
+                    "The send_hex_command service is disabled for security reasons. "
+                    "To enable it, navigate to Settings > Devices & Services > "
+                    "aroTHERM & GeniaAir (eBUS) > Configure and enable 'send_hex_command'."
+                )
+
             command_raw = str(call.data["command"]).strip().replace(" ", "")
             if not command_raw or not all(
                 c in "0123456789abcdefABCDEF" for c in command_raw
@@ -763,15 +849,68 @@ def _async_register_services(hass: HomeAssistant) -> None:
                     "Must contain only valid hexadecimal characters."
                 )
 
-            host = str(call.data.get("host", "127.0.0.1")).strip()
-            port = int(call.data.get("port", 8888))
+            active_entry = next(
+                (
+                    e
+                    for e in entries
+                    if e.options.get(CONF_ENABLE_EBUSD_TCP, DEFAULT_ENABLE_EBUSD_TCP)
+                ),
+                entries[0] if entries else None,
+            )
+            default_host = (
+                str(
+                    active_entry.options.get(
+                        CONF_EBUSD_TCP_HOST, DEFAULT_EBUSD_TCP_HOST
+                    )
+                ).strip()
+                if active_entry
+                else DEFAULT_EBUSD_TCP_HOST
+            )
+            default_port = (
+                int(
+                    active_entry.options.get(
+                        CONF_EBUSD_TCP_PORT, DEFAULT_EBUSD_TCP_PORT
+                    )
+                )
+                if active_entry
+                else DEFAULT_EBUSD_TCP_PORT
+            )
+
+            host = str(call.data.get("host") or default_host).strip()
+            port = int(call.data.get("port") or default_port)
             timeout = float(call.data.get("timeout", 5.0))
 
             reader: asyncio.StreamReader | None = None
             writer: asyncio.StreamWriter | None = None
             try:
-                connect_coro = asyncio.open_connection(host, port)
-                reader, writer = await asyncio.wait_for(connect_coro, timeout=timeout)
+                try:
+                    connect_coro = asyncio.open_connection(host, port)
+                    reader, writer = await asyncio.wait_for(
+                        connect_coro, timeout=timeout
+                    )
+                except (TimeoutError, OSError):
+                    if host in ("127.0.0.1", "localhost"):
+                        fallback_hosts = ("b4d7ad18-ebusd", "local-ebusd", "ebusd")
+                        connected = False
+                        for fb_host in fallback_hosts:
+                            try:
+                                connect_coro = asyncio.open_connection(fb_host, port)
+                                reader, writer = await asyncio.wait_for(
+                                    connect_coro, timeout=timeout
+                                )
+                                host = fb_host
+                                connected = True
+                                break
+                            except (TimeoutError, OSError):
+                                continue
+                        if not connected:
+                            raise
+                    else:
+                        raise
+                if reader is None or writer is None:
+                    raise HomeAssistantError(
+                        f"Could not connect to eBUSd TCP daemon at {host}:{port}"
+                    )
                 writer.write(f"hex {command_raw}\n".encode("ascii"))
                 await writer.drain()
 

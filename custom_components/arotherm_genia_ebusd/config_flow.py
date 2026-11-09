@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import voluptuous as vol
+from homeassistant import data_entry_flow
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -25,6 +26,10 @@ from homeassistant.helpers.selector import (
 
 from .const import (
     CONF_AUTO_COOLING_LOCK_BYPASS,
+    CONF_EBUSD_TCP_HOST,
+    CONF_EBUSD_TCP_PORT,
+    CONF_ENABLE_EBUSD_TCP,
+    CONF_ENABLE_SEND_HEX,
     CONF_FALLBACK_POLL_INTERVAL,
     CONF_FORCE_DHW_BOOST,
     CONF_HAS_MIGO_LINK,
@@ -34,6 +39,10 @@ from .const import (
     CONF_MQTT_PREFIX,
     CONF_OUTDOOR_MODEL,
     DEFAULT_AUTO_COOLING_LOCK_BYPASS,
+    DEFAULT_EBUSD_TCP_HOST,
+    DEFAULT_EBUSD_TCP_PORT,
+    DEFAULT_ENABLE_EBUSD_TCP,
+    DEFAULT_ENABLE_SEND_HEX,
     DEFAULT_FALLBACK_POLL_INTERVAL,
     DEFAULT_FORCE_DHW_BOOST,
     DEFAULT_HAS_MIGO_LINK,
@@ -51,6 +60,7 @@ from .const import (
     MANUFACTURERS,
     OUTDOOR_MODELS_BY_MANUFACTURER,
     OUTDOOR_MODELS_SAUNIER,
+    SECTION_ADVANCED_OPTIONS,
 )
 
 
@@ -316,39 +326,115 @@ class SaunierGeniaOptionsFlowHandler(OptionsFlow):
     ) -> ConfigFlowResult:
         """Manage the integration options in real time."""
         if user_input is not None:
+            if SECTION_ADVANCED_OPTIONS in user_input and isinstance(
+                user_input[SECTION_ADVANCED_OPTIONS], dict
+            ):
+                user_input.update(user_input.pop(SECTION_ADVANCED_OPTIONS))
+
+            if CONF_EBUSD_TCP_HOST in user_input:
+                user_input[CONF_EBUSD_TCP_HOST] = str(
+                    user_input[CONF_EBUSD_TCP_HOST]
+                ).strip()
+            if CONF_EBUSD_TCP_PORT in user_input:
+                user_input[CONF_EBUSD_TCP_PORT] = int(user_input[CONF_EBUSD_TCP_PORT])
             return self.async_create_entry(title="", data=user_input)
 
         options = self.config_entry.options
+        adv_options = options.get(SECTION_ADVANCED_OPTIONS, {})
+        if not isinstance(adv_options, dict):
+            adv_options = {}
 
-        schema = vol.Schema(
+        enable_tcp_default = bool(
+            options.get(
+                CONF_ENABLE_EBUSD_TCP,
+                adv_options.get(CONF_ENABLE_EBUSD_TCP, DEFAULT_ENABLE_EBUSD_TCP),
+            )
+        )
+        tcp_host_default = str(
+            options.get(
+                CONF_EBUSD_TCP_HOST,
+                adv_options.get(CONF_EBUSD_TCP_HOST, DEFAULT_EBUSD_TCP_HOST),
+            )
+        ).strip()
+        tcp_port_default = int(
+            options.get(
+                CONF_EBUSD_TCP_PORT,
+                adv_options.get(CONF_EBUSD_TCP_PORT, DEFAULT_EBUSD_TCP_PORT),
+            )
+        )
+        send_hex_default = bool(
+            options.get(
+                CONF_ENABLE_SEND_HEX,
+                adv_options.get(CONF_ENABLE_SEND_HEX, DEFAULT_ENABLE_SEND_HEX),
+            )
+        )
+
+        advanced_schema = vol.Schema(
             {
                 vol.Required(
-                    CONF_FORCE_DHW_BOOST,
-                    default=options.get(CONF_FORCE_DHW_BOOST, DEFAULT_FORCE_DHW_BOOST),
+                    CONF_ENABLE_EBUSD_TCP,
+                    default=enable_tcp_default,
                 ): BooleanSelector(),
                 vol.Required(
-                    CONF_AUTO_COOLING_LOCK_BYPASS,
-                    default=options.get(
-                        CONF_AUTO_COOLING_LOCK_BYPASS,
-                        DEFAULT_AUTO_COOLING_LOCK_BYPASS,
-                    ),
-                ): BooleanSelector(),
+                    CONF_EBUSD_TCP_HOST,
+                    default=tcp_host_default,
+                ): TextSelector(),
                 vol.Required(
-                    CONF_FALLBACK_POLL_INTERVAL,
-                    default=options.get(
-                        CONF_FALLBACK_POLL_INTERVAL,
-                        DEFAULT_FALLBACK_POLL_INTERVAL,
-                    ),
+                    CONF_EBUSD_TCP_PORT,
+                    default=tcp_port_default,
                 ): NumberSelector(
                     NumberSelectorConfig(
-                        min=60,
-                        max=3600,
-                        step=10,
-                        unit_of_measurement="s",
+                        min=1,
+                        max=65535,
+                        step=1,
                         mode=NumberSelectorMode.BOX,
                     )
                 ),
+                vol.Required(
+                    CONF_ENABLE_SEND_HEX,
+                    default=send_hex_default,
+                ): BooleanSelector(),
             }
         )
 
-        return self.async_show_form(step_id="init", data_schema=schema)
+        section_fn = getattr(data_entry_flow, "section", None)
+        base_schema_dict: dict[Any, Any] = {
+            vol.Required(
+                CONF_FORCE_DHW_BOOST,
+                default=options.get(CONF_FORCE_DHW_BOOST, DEFAULT_FORCE_DHW_BOOST),
+            ): BooleanSelector(),
+            vol.Required(
+                CONF_AUTO_COOLING_LOCK_BYPASS,
+                default=options.get(
+                    CONF_AUTO_COOLING_LOCK_BYPASS,
+                    DEFAULT_AUTO_COOLING_LOCK_BYPASS,
+                ),
+            ): BooleanSelector(),
+            vol.Required(
+                CONF_FALLBACK_POLL_INTERVAL,
+                default=options.get(
+                    CONF_FALLBACK_POLL_INTERVAL,
+                    DEFAULT_FALLBACK_POLL_INTERVAL,
+                ),
+            ): NumberSelector(
+                NumberSelectorConfig(
+                    min=60,
+                    max=3600,
+                    step=10,
+                    unit_of_measurement="s",
+                    mode=NumberSelectorMode.BOX,
+                )
+            ),
+        }
+
+        if section_fn is not None:
+            base_schema_dict[vol.Required(SECTION_ADVANCED_OPTIONS)] = section_fn(
+                advanced_schema,
+                {"collapsed": not enable_tcp_default},
+            )
+        else:
+            base_schema_dict.update(advanced_schema.schema)
+
+        return self.async_show_form(
+            step_id="init", data_schema=vol.Schema(base_schema_dict)
+        )

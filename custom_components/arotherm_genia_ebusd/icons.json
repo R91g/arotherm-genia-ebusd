@@ -427,6 +427,9 @@
       },
       "ebusd_arbitration_latency": {
         "default": "mdi:clock-fast"
+      },
+      "ebusd_missing_csv_devices": {
+        "default": "mdi:file-alert"
       }
     },
     "number": {
@@ -508,7 +511,23 @@
       "compressor_silent_operation_level": {
         "default": "mdi:volume-mute"
       }
+    },
+    "button": {
+      "ebusd_reload_csv": {
+        "default": "mdi:refresh"
+      },
+      "ebusd_restart_scan": {
+        "default": "mdi:radar"
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "sections": {
+          "advanced_options": "mdi:cog-transfer-outline"
+        }
+      }
     }
   }
 }
-

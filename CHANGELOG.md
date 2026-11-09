@@ -33,12 +33,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Anonymized Dumps & Mode-Specific Community Test Fixtures:**
   - Added automatic serial number and barcode masking to `dump_mqtt_values` and `record_topic_changes` services for safe troubleshooting sharing.
   - Organized Saunier Duval GeniaAir Max community test fixtures by distinct operating modes (`saunier_geniaair_max_heating.json`, `saunier_geniaair_max_acs.json`, and `saunier_geniaair_max_standby.json`), verifying entity stability, primary hydraulic thermodynamics, and humidity sensors across real-world operational states.
-- **Physical eBUS Health & Daemon Diagnostics:**
-  - Added `binary_sensor.ebusd_running` and 7 diagnostic sensors attached to the root outdoor unit (arbitration latency, symbol rate, reconnects, uptime, scan status, active masters).
+- **Physical eBUS Health & Advanced TCP Daemon Diagnostics:**
+  - Added `binary_sensor.ebusd_running` and 7 diagnostic sensors attached to the root outdoor unit (uptime, scan status, daemon version, arbitration latency, symbol rate, reconnects, active masters).
+  - Disabled unreachable MQTT metrics (`symbol_rate`, `reconnects`, `masters`, `arbitration_latency`) by default in the entity registry (`entity_registry_enabled_default = False`) to prevent `Unknown` entities on pure MQTT setups.
+  - Added optional **Advanced eBUSd TCP Connection** in integration Options Flow (`enable_ebusd_tcp`, `ebusd_tcp_host` default `127.0.0.1`, `ebusd_tcp_port` default `8888`), periodically querying `info` via non-blocking TCP socket to hydrate daemon health metrics.
+  - Added `sensor.ebusd_missing_csv_devices` diagnostic sensor identifying scanned eBUS devices missing loaded CSV files, with full device inventory attributes (`missing_count`, `missing_devices`, `loaded_devices`, `total_scanned`).
+  - Added action buttons `button.ebusd_reload_csv` (reloads CSV definitions on the daemon in real time) and `button.ebusd_restart_scan` (restarts bus device identification).
+  - Synchronized entity registry state dynamically: toggling `enable_ebusd_tcp` automatically enables or disables TCP diagnostic entities and action buttons without manual registry intervention.
+  - Protected `send_hex_command` behind an explicit security opt-in switch (`enable_send_hex`) in Options Flow, automatically defaulting `host` and `port` to configured integration settings.
+- **Multilingual Support & Complete Translation Parity (EN, ES, DE):**
+  - Added complete German (`de.json`) translation suite across all entity platforms, configuration and options flows, device classes, and actions.
+  - Localized all 9 integration actions/services across `strings.json`, `translations/en.json`, `translations/es.json`, and `translations/de.json` with 100% key parity.
+  - Migrated `services.yaml` base names and descriptions to standard English.
 - **Release Security Gate in CI:**
   - Hardened GitHub release workflow to require unit tests (Python 3.12 & 3.13), Ruff linter/formatter, Pyright typing, Hassfest, and HACS validation before building and publishing release archives.
 
 ### Fixed
+- **Legacy Spanish Device Registry Migration:**
+  - Automatically migrates existing device entries in the Home Assistant Device Registry from legacy Spanish default names (`(Unidad Exterior)`, `(Regulador Climático)`, `(Interfaz Hidráulica)`, `(Termostato Inalámbrico)`) to standard English (`(Outdoor Unit)`, `(Climate Controller)`, `(Hydraulic Interface)`, `(Wireless Thermostat)`), preserving any custom user-assigned names (`name_by_user`).
 - **Cumulative Energy, COP/SCOP & Entity Cleanup on `HMU` / `HMU00` (`HW5103`) Units:**
   - Fixed cumulative electrical/thermal energy totals, environmental yield (`YieldHc`/`YieldHwc`), per-mode historical COP/EER (`CopHc`/`CopHwc`/`CopCooling` with `1 + Yield/PrEnergySum` fallback), and global system efficiency on `hmu`/`hmu00` units lacking Monobloc `b516` EEPROM registers.
   - Automatically disables the 3 Monobloc-exclusive outdoor per-mode electrical sensors (`energy_electric_hc_outdoor`, `energy_electric_hwc_outdoor`, `energy_electric_cool`) in the Entity Registry when an `hmu`/`hmu00` unit is detected, preserving manual user overrides.

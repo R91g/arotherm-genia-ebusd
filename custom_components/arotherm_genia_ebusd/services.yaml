@@ -1,54 +1,54 @@
 set_weekly_timer:
-  name: Configurar programación horaria semanal (b5 55)
+  name: Set Weekly Schedule Timer (b5 55)
   description: >
-    Modifica una franja horaria semanal en el regulador MiPro Sense (15.bass3)
-    para Calefacción Zona 1, Agua Caliente Sanitaria (ACS), Refrigeración o Recirculación.
+    Configures a weekly schedule time slot on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3)
+    for Zone 1 Heating, Domestic Hot Water (DHW), Cooling, or Circulation.
   fields:
     circuit_type:
-      name: Circuito
-      description: Circuito de programación horaria a modificar.
+      name: Circuit Type
+      description: Schedule circuit to modify (Heating, DHW, Cooling, or Circulation).
       required: true
       example: "dhw"
       selector:
         select:
           options:
-            - label: "Calefacción Zona 1 (Z1Timer)"
+            - label: "Zone 1 Heating (Z1Timer)"
               value: "heating"
-            - label: "Agua Caliente Sanitaria - ACS (HwcTimer)"
+            - label: "Domestic Hot Water - DHW (HwcTimer)"
               value: "dhw"
-            - label: "Refrigeración (CoolingTimer)"
+            - label: "Cooling (CoolingTimer)"
               value: "cooling"
-            - label: "Recirculación (CirculationTimer)"
+            - label: "Circulation (CirculationTimer)"
               value: "circulation"
     day:
-      name: Día de la semana
-      description: Día específico, Lunes a Viernes (Weekdays) o toda la semana (All).
+      name: Day of the Week
+      description: Specific day of the week, Weekdays (Monday to Friday), or All Days (Monday to Sunday).
       required: true
       example: "All"
       selector:
         select:
           options:
-            - label: "Lunes (Monday)"
+            - label: "Monday"
               value: "Monday"
-            - label: "Martes (Tuesday)"
+            - label: "Tuesday"
               value: "Tuesday"
-            - label: "Miércoles (Wednesday)"
+            - label: "Wednesday"
               value: "Wednesday"
-            - label: "Jueves (Thursday)"
+            - label: "Thursday"
               value: "Thursday"
-            - label: "Viernes (Friday)"
+            - label: "Friday"
               value: "Friday"
-            - label: "Sábado (Saturday)"
+            - label: "Saturday"
               value: "Saturday"
-            - label: "Domingo (Sunday)"
+            - label: "Sunday"
               value: "Sunday"
-            - label: "Lunes a Viernes (Weekdays)"
+            - label: "Weekdays (Monday - Friday)"
               value: "Weekdays"
-            - label: "Todos los días L-D (All)"
+            - label: "All Days (Monday - Sunday)"
               value: "All"
     slot:
-      name: Ranura horaria (Slot)
-      description: Número de ranura diaria (1, 2 o 3). Por defecto 1.
+      name: Time Slot Number
+      description: Daily time slot index (1, 2, or 3). Defaults to 1.
       required: false
       default: 1
       selector:
@@ -58,32 +58,32 @@ set_weekly_timer:
           step: 1
           mode: box
     start_time:
-      name: Hora de inicio
-      description: Hora de inicio de la franja en formato HH:MM (ej. 13:10).
+      name: Start Time
+      description: Slot start time in HH:MM 24-hour format (e.g. 13:10).
       required: true
       example: "13:10"
       selector:
         text:
     end_time:
-      name: Hora de fin
-      description: Hora de finalización de la franja en formato HH:MM (ej. 14:50).
+      name: End Time
+      description: Slot end time in HH:MM 24-hour format (e.g. 14:50).
       required: true
       example: "14:50"
       selector:
         text:
 
 force_dhw_boost:
-  name: Activar ACS Puntual Forzado Inteligente (Boost)
+  name: Activate Smart Forced DHW Boost
   description: >
-    Inicia una carga puntual del depósito de ACS (HwcSFMode = load) superando
-    automáticamente la histéresis mediante elevación dinámica temporal de consigna
-    (T_actual + histéresis + 1.5 °C) y restauración automática al finalizar.
+    Initiates a one-time domestic hot water tank charge (HwcSFMode = load)
+    automatically overcoming thermostat hysteresis via dynamic temporary setpoint elevation
+    (T_current + hysteresis + 1.5 °C) and restores original setpoint upon completion.
   fields:
     boost_temp:
-      name: Temperatura temporal de Boost (Opcional - Excedentes)
+      name: Temporary Boost Temperature (Optional - Solar Surpluses)
       description: >
-        Consigna temporal opcional en °C para este ciclo concreto (ej. 60 °C para excedentes solares).
-        Si se omite, calcula automáticamente T_actual + histéresis + 1.5 °C.
+        Optional temporary setpoint in °C for this specific boost cycle (e.g. 60 °C for PV solar surpluses).
+        If omitted, automatically applies T_current + hysteresis + 1.5 °C.
       required: false
       example: 60.0
       selector:
@@ -95,15 +95,15 @@ force_dhw_boost:
           mode: box
 
 set_holiday_mode:
-  name: Activar Modo Ausencia / Vacaciones
+  name: Set Holiday / Away Mode
   description: >
-    Activa el Modo Ausencia en el regulador MiPro Sense (15.bass3),
-    suspendiendo la producción de ACS y reduciendo la consigna de calefacción
-    a la temperatura de mantenimiento seleccionada durante una ventana temporal o indefinida.
+    Activates Holiday/Away Mode on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3),
+    suspending hot water production and reducing heating setpoint to setback temperature
+    during a timed or open-ended window.
   fields:
     temperature:
-      name: Temperatura de ausencia
-      description: Consigna de temperatura en °C durante la ausencia (por defecto 15.0 °C).
+      name: Setback Temperature
+      description: Target temperature in °C during absence (defaults to 15.0 °C).
       required: false
       default: 15.0
       example: 15.0
@@ -115,74 +115,74 @@ set_holiday_mode:
           unit_of_measurement: "°C"
           mode: box
     start_date:
-      name: Fecha de inicio (Opcional)
-      description: Fecha de inicio de la ausencia en formato AAAA-MM-DD o DD/MM/AAAA. Por defecto, hoy.
+      name: Start Date (Optional)
+      description: Start date in YYYY-MM-DD or DD/MM/YYYY format. Defaults to today.
       required: false
       example: "2026-10-30"
       selector:
         text:
     start_time:
-      name: Hora de inicio (Opcional)
-      description: Hora de inicio de la ausencia en formato HH:MM. Por defecto, hora actual.
+      name: Start Time (Optional)
+      description: Start time in HH:MM format. Defaults to current time.
       required: false
       example: "10:30"
       selector:
         text:
     end_date:
-      name: Fecha de fin (Opcional)
-      description: Fecha de finalización de la ausencia. Si se omite, se establece de forma abierta/indefinida (hasta cancelación manual).
+      name: End Date (Optional)
+      description: End date of absence. If omitted, sets an open-ended/indefinite absence until manually cancelled.
       required: false
       example: "2026-11-05"
       selector:
         text:
     end_time:
-      name: Hora de fin (Opcional)
-      description: Hora de finalización en formato HH:MM (por defecto 23:59).
+      name: End Time (Optional)
+      description: End time in HH:MM format (defaults to 23:59).
       required: false
       example: "23:59"
       selector:
         text:
 
 cancel_holiday_mode:
-  name: Cancelar Modo Ausencia / Vacaciones
+  name: Cancel Holiday / Away Mode
   description: >
-    Cancela de forma inmediata el Modo Ausencia en el regulador MiPro Sense (15.bass3)
-    y restablece el funcionamiento automático en calefacción y agua caliente sanitaria (ACS).
+    Immediately cancels Holiday/Away Mode on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3)
+    and restores automatic schedule operation for heating and domestic hot water.
 
 dump_mqtt_values:
-  name: Volcar valores MQTT (Diagnóstico)
+  name: Dump MQTT Values (Diagnostics)
   description: >
-    Vuelca el estado completo de la instalación y las variables MQTT recibidas de eBUSd
-    en un formato estructurado para adjuntar en issues de GitHub o soporte técnico.
+    Dumps full installation state and eBUSd MQTT telemetry into a structured JSON
+    format suitable for troubleshooting or attaching to GitHub issues.
   fields:
     circuit:
-      name: Circuito (Opcional)
+      name: Circuit Filter (Optional)
       description: >
-        Filtra el volcado por un circuito específico (ej. "08", "15", "hmu", "bass3").
-        Si se omite, se vuelcan todos los circuitos activos.
+        Filters telemetry by a specific eBUS circuit (e.g. "08", "15", "hmu", "bass3").
+        If omitted, dumps all active circuits.
       required: false
       example: "08"
       selector:
         text:
     anonymize:
-      name: Anonimizar números de serie (Recomendado)
+      name: Anonymize Serial Numbers (Recommended)
       description: >
-        Enmascara automáticamente los números de serie largos de fabricación (28 caracteres)
-        para que el volcado pueda compartirse de forma segura y privada en incidencias públicas de GitHub.
+        Automatically masks 28-character hardware serial numbers so diagnostic dumps
+        can be safely shared in public GitHub issue threads.
       required: false
       default: true
       selector:
         boolean:
 
 record_topic_changes:
-  name: Grabar cambios de tópicos MQTT (Diagnóstico en vivo)
+  name: Record MQTT Topic Changes (Live Diagnostics)
   description: >
-    Inicia una captura temporal de los mensajes MQTT que circulan bajo el prefijo de eBUSd
-    durante un intervalo de tiempo configurable, registrando tópicos, cargas útiles y marcas temporales.
+    Records real-time eBUSd MQTT traffic for a configurable duration, capturing
+    topics, raw payloads, and timestamps.
   fields:
     duration:
-      name: Duración (segundos)
-      description: Tiempo durante el cual se grabará el tráfico MQTT (entre 5 y 120 segundos, por defecto 30).
+      name: Duration (seconds)
+      description: Recording duration in seconds (between 5 and 120 seconds, defaults to 30).
       required: false
       default: 30
       example: 30
@@ -194,49 +194,49 @@ record_topic_changes:
           unit_of_measurement: "s"
           mode: box
     circuit:
-      name: Filtro de circuito / tópico (Opcional)
+      name: Circuit / Topic Substring Filter (Optional)
       description: >
-        Filtra los mensajes grabados por una subcadena en el tópico (ej. "08", "15", "hmu").
-        Si se omite, se graba todo el tráfico bajo el prefijo MQTT.
+        Filters captured messages by substring (e.g. "08", "15", "hmu").
+        If omitted, records all MQTT traffic under prefix.
       required: false
       example: "08"
       selector:
         text:
     anonymize:
-      name: Anonimizar números de serie (Recomendado)
+      name: Anonymize Serial Numbers (Recommended)
       description: >
-        Enmascara automáticamente los números de serie largos de fabricación (28 caracteres)
-        y datos identificativos de hardware recogidos en los mensajes MQTT.
+        Automatically masks manufacturing serial numbers and hardware identifiers
+        found in MQTT payloads.
       required: false
       default: true
       selector:
         boolean:
 
 send_hex_command:
-  name: Enviar comando hexadecimal directo (Diagnóstico TCP)
+  name: Send Direct Raw HEX Command (TCP Diagnostics)
   description: >
-    Envía un comando hexadecimal en crudo al demonio eBUSd a través de su interfaz TCP
-    (puerto 8888) y devuelve los bytes de respuesta. Requiere que eBUSd esté iniciado con
-    el argumento '--enablehex'. No requiere modificar ningún archivo CSV.
+    Sends a raw hexadecimal command telegram to the eBUSd daemon over TCP (port 8888)
+    and returns decoded response bytes. Requires eBUSd running with '--enablehex'
+    and the 'enable_send_hex' option enabled in integration options. Does not require modifying CSV files.
   fields:
     command:
-      name: Comando hexadecimal
-      description: Cadena hexadecimal de bytes a enviar (los espacios son ignorados).
+      name: Hexadecimal Command String
+      description: Hex byte string to send (spaces are automatically stripped, e.g. "08b51a0405ff3428").
       required: true
       example: "08b51a0405ff3428"
       selector:
         text:
     host:
-      name: Host / Dirección IP (Opcional)
-      description: Dirección IP o nombre de host donde se ejecuta el demonio eBUSd (por defecto 127.0.0.1).
+      name: Host / IP Address (Optional)
+      description: IP address or hostname where eBUSd daemon is running (defaults to 127.0.0.1 or b4d7ad18-ebusd).
       required: false
       default: "127.0.0.1"
       example: "127.0.0.1"
       selector:
         text:
     port:
-      name: Puerto TCP (Opcional)
-      description: Puerto TCP del demonio eBUSd (por defecto 8888).
+      name: TCP Port (Optional)
+      description: eBUSd TCP daemon port (defaults to 8888).
       required: false
       default: 8888
       example: 8888
@@ -247,8 +247,8 @@ send_hex_command:
           step: 1
           mode: box
     timeout:
-      name: Tiempo de espera (segundos)
-      description: Tiempo máximo para conectar y esperar la respuesta del demonio (por defecto 5 segundos).
+      name: Timeout (seconds)
+      description: Maximum time in seconds to connect and await daemon response (defaults to 5.0 seconds).
       required: false
       default: 5.0
       example: 5.0
@@ -261,38 +261,37 @@ send_hex_command:
           mode: box
 
 read_parameter:
-  name: Leer parámetro por MQTT
+  name: Read Parameter via MQTT
   description: >
-    Lee un registro simbólico de eBUSd a través de MQTT (publicando en '<prefijo>/<circuito>/<nombre>/get'
-    y esperando la respuesta en '<prefijo>/<circuito>/<nombre>'). Permite devolver el valor almacenado en
-    caché o forzar una lectura activa del bus físico.
+    Reads a symbolic eBUSd register via MQTT (publishing to '<prefix>/<circuit>/<name>/get'
+    and awaiting reply on '<prefix>/<circuit>/<name>'). Supports returning cached value or
+    forcing an active physical bus read.
   fields:
     circuit:
-      name: Circuito
-      description: Identificador o nombre del circuito eBUS (ej. "hmu", "08", "bass3", "ctlv2").
+      name: Circuit
+      description: eBUS circuit name or address (e.g. "hmu", "08", "bass3", "ctlv2").
       required: true
       example: "08"
       selector:
         text:
     name:
-      name: Nombre del parámetro / mensaje
+      name: Parameter / Message Name
       description: >
-        Nombre simbólico del registro eBUSd tal como está definido en los archivos CSV
-        (ej. "CompressorSilentOperationLevel", "Status01", "Z1OpMode").
+        Symbolic register name as defined in CSV files (e.g. "CompressorSilentOperationLevel", "Status01", "Z1OpMode").
       required: true
       example: "CompressorSilentOperationLevel"
       selector:
         text:
     force:
-      name: Forzar lectura física (Opcional)
-      description: Si es verdadero, fuerza una consulta activa al bus físico en lugar de devolver el valor en caché si existe.
+      name: Force Physical Bus Read (Optional)
+      description: If true, forces an active read from the physical bus instead of returning cached value if present.
       required: false
       default: false
       selector:
         boolean:
     timeout:
-      name: Tiempo de espera (segundos)
-      description: Tiempo máximo para esperar la respuesta de eBUSd vía MQTT (por defecto 5 segundos).
+      name: Timeout (seconds)
+      description: Maximum time in seconds to wait for eBUSd reply via MQTT (defaults to 5.0 seconds).
       required: false
       default: 5.0
       example: 5.0
@@ -305,30 +304,29 @@ read_parameter:
           mode: box
 
 write_parameter:
-  name: Escribir parámetro por MQTT
+  name: Write Parameter via MQTT
   description: >
-    Escribe un valor en un registro simbólico de eBUSd a través de MQTT (publicando en '<prefijo>/<circuito>/<nombre>/set').
-    Aplica una actualización optimista en el estado de Home Assistant y aprovecha el enrutamiento inteligente de circuitos.
+    Writes a value to a symbolic eBUSd register via MQTT (publishing to '<prefix>/<circuit>/<name>/set').
+    Applies optimistic state update in Home Assistant and leverages intelligent circuit alias routing.
   fields:
     circuit:
-      name: Circuito
-      description: Identificador o nombre del circuito eBUS (ej. "hmu", "08", "bass3", "ctlv2").
+      name: Circuit
+      description: eBUS circuit name or address (e.g. "hmu", "08", "bass3", "ctlv2").
       required: true
       example: "08"
       selector:
         text:
     name:
-      name: Nombre del parámetro / mensaje
+      name: Parameter / Message Name
       description: >
-        Nombre simbólico del registro eBUSd tal como está definido en los archivos CSV
-        (ej. "CompressorSilentOperationLevel", "Z1OpMode").
+        Symbolic register name as defined in CSV files (e.g. "CompressorSilentOperationLevel", "Z1OpMode").
       required: true
       example: "CompressorSilentOperationLevel"
       selector:
         text:
     value:
-      name: Valor a escribir
-      description: Valor o cadena de texto que se enviará en el payload de escritura a eBUSd.
+      name: Value to Write
+      description: Value or string payload to send to eBUSd.
       required: true
       example: "50"
       selector:
