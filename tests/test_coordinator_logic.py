@@ -2313,9 +2313,14 @@ class TestCoordinatorLogic(unittest.TestCase):
         entry.options = {CONF_ENABLE_EBUSD_TCP: True}
 
         mock_entity_disabled = MagicMock()
-        mock_entity_disabled.unique_id = "vaillant_ebusd_symbol_rate"
+        mock_entity_disabled.unique_id = "vaillant_global_symbol_rate_value"
         mock_entity_disabled.entity_id = "sensor.ebusd_symbol_rate"
         mock_entity_disabled.disabled = True
+
+        mock_missing_disabled = MagicMock()
+        mock_missing_disabled.unique_id = "vaillant_global_missing_csv_devices_value"
+        mock_missing_disabled.entity_id = "sensor.ebusd_missing_csv_devices"
+        mock_missing_disabled.disabled = True
 
         mock_btn_disabled = MagicMock()
         mock_btn_disabled.unique_id = "vaillant_button_ebusd_reload_csv"
@@ -2329,6 +2334,7 @@ class TestCoordinatorLogic(unittest.TestCase):
 
         entries_phase1 = [
             mock_entity_disabled,
+            mock_missing_disabled,
             mock_btn_disabled,
             mock_unrelated_disabled,
         ]
@@ -2345,10 +2351,13 @@ class TestCoordinatorLogic(unittest.TestCase):
                 "sensor.ebusd_symbol_rate", disabled_by=None
             )
             mock_ent_reg.async_update_entity.assert_any_call(
+                "sensor.ebusd_missing_csv_devices", disabled_by=None
+            )
+            mock_ent_reg.async_update_entity.assert_any_call(
                 "button.ebusd_reload_csv", disabled_by=None
             )
             # Unrelated entity remains untouched
-            self.assertEqual(mock_ent_reg.async_update_entity.call_count, 2)
+            self.assertEqual(mock_ent_reg.async_update_entity.call_count, 3)
             hass.async_create_task.assert_called_once()
 
         # 2. TCP disabled: disables active TCP entities

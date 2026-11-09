@@ -129,6 +129,16 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
             unique_id_suffix=unique_id_suffix,
         )
         self.entity_description = description
+        if description.key in {
+            "ebusd_symbol_rate",
+            "ebusd_reconnects",
+            "ebusd_masters",
+            "ebusd_arbitration_latency",
+            "ebusd_missing_csv_devices",
+        }:
+            self._attr_entity_registry_enabled_default = (
+                coordinator.is_ebusd_tcp_enabled
+            )
 
     @property
     def native_value(self) -> Any:

@@ -265,6 +265,11 @@ def _async_sync_tcp_diagnostic_entities(
     )
     ent_reg = er.async_get(hass)
     tcp_suffixes = (
+        "_global_symbol_rate_value",
+        "_global_reconnects_value",
+        "_global_masters_value",
+        "_global_arbitration_latency_value",
+        "_global_missing_csv_devices_value",
         "_ebusd_symbol_rate",
         "_ebusd_reconnects",
         "_ebusd_masters",

@@ -76,6 +76,7 @@ class SaunierGeniaButton(SaunierGeniaEntity, ButtonEntity):
             unique_id_suffix=f"button_{description.key}",
         )
         self.entity_description = description
+        self._attr_entity_registry_enabled_default = coordinator.is_ebusd_tcp_enabled
 
     @property
     def available(self) -> bool:

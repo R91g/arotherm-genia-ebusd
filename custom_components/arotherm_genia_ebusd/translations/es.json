@@ -62,7 +62,7 @@
             },
             "data_description": {
               "enable_ebusd_tcp": "Conecta periódicamente al socket TCP de eBUSd para obtener la tasa de símbolos, latencia de arbitraje, reconexiones del adaptador y verificar qué archivos CSV faltan por cargar. Habilita automáticamente las entidades de diagnóstico y los botones de recarga.",
-              "ebusd_tcp_host": "Dirección del demonio eBUSd. En Home Assistant OS con el add-on oficial se autodetecta o usa 'b4d7ad18-ebusd'. Si eBUSd corre con el puerto expuesto en local, usa '127.0.0.1'.",
+              "ebusd_tcp_host": "Dirección del demonio eBUSd. En Home Assistant OS con el add-on comunitario (LukasGrebe) se autodetecta o usa 'b4d7ad18-ebusd'. Si eBUSd corre con el puerto expuesto en local, usa '127.0.0.1'.",
               "ebusd_tcp_port": "Puerto TCP del demonio eBUSd (por defecto: 8888).",
               "enable_send_hex": "Permite enviar tramas hexadecimales en bruto directamente al bus mediante el servicio arotherm_genia_ebusd.send_hex_command. Requiere que eBUSd tenga activado el parámetro --enablehex en su configuración."
             }
@@ -71,12 +71,20 @@
         "data": {
           "force_dhw_boost": "Activar ACS Boost Forzado Inteligente",
           "auto_cooling_lock_bypass": "Abrir automáticamente el Cerrojo 1 de refrigeración (01;01;99) al activar modo Frío",
-          "fallback_poll_interval": "Intervalo de sondeo /get de respaldo si no hay pasarela oficial (segundos)"
+          "fallback_poll_interval": "Intervalo de sondeo /get de respaldo si no hay pasarela oficial (segundos)",
+          "enable_ebusd_tcp": "Habilitar diagnóstico físico y comandos de eBUSd por TCP",
+          "ebusd_tcp_host": "Host TCP de eBUSd (IP o nombre de host)",
+          "ebusd_tcp_port": "Puerto TCP de eBUSd",
+          "enable_send_hex": "Habilitar servicio de comandos hexadecimales (send_hex_command)"
         },
         "data_description": {
           "force_dhw_boost": "Aplica automáticamente T_actual + histéresis + 1.5 °C cuando la diferencia entre la consigna y la temperatura del depósito sea inferior a la histéresis.",
           "auto_cooling_lock_bypass": "Desbloquea el cerrojo de refrigeración en el regulador al conmutar a frío.",
-          "fallback_poll_interval": "Frecuencia de sondeo cuando la instalación no cuenta con pasarela oficial en nube."
+          "fallback_poll_interval": "Frecuencia de sondeo cuando la instalación no cuenta con pasarela oficial en nube.",
+          "enable_ebusd_tcp": "Conecta periódicamente al socket TCP de eBUSd para obtener la tasa de símbolos, latencia de arbitraje, reconexiones del adaptador y verificar qué archivos CSV faltan por cargar. Habilita automáticamente las entidades de diagnóstico y los botones de recarga.",
+          "ebusd_tcp_host": "Dirección del demonio eBUSd. En Home Assistant OS con el add-on comunitario (LukasGrebe) se autodetecta o usa 'b4d7ad18-ebusd'. Si eBUSd corre con el puerto expuesto en local, usa '127.0.0.1'.",
+          "ebusd_tcp_port": "Puerto TCP del demonio eBUSd (por defecto: 8888).",
+          "enable_send_hex": "Permite enviar tramas hexadecimales en bruto directamente al bus mediante el servicio arotherm_genia_ebusd.send_hex_command. Requiere que eBUSd tenga activado el parámetro --enablehex en su configuración."
         }
       }
     }

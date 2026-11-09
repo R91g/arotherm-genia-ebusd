@@ -62,7 +62,7 @@
             },
             "data_description": {
               "enable_ebusd_tcp": "Periodically queries the eBUSd TCP socket to monitor physical symbol rate, arbitration latency, adapter reconnects, and verify unloaded CSV files. Automatically activates diagnostic entities and action buttons.",
-              "ebusd_tcp_host": "eBUSd daemon address. In Home Assistant OS with the official add-on it is auto-detected or use 'b4d7ad18-ebusd'. For native host setups with exposed port, use '127.0.0.1'.",
+              "ebusd_tcp_host": "eBUSd daemon address. In Home Assistant OS with the community add-on (LukasGrebe) it is auto-detected or use 'b4d7ad18-ebusd'. For native host setups with exposed port, use '127.0.0.1'.",
               "ebusd_tcp_port": "eBUSd TCP daemon port (default: 8888).",
               "enable_send_hex": "Enables sending raw hexadecimal eBUS telegrams via the arotherm_genia_ebusd.send_hex_command service. Requires the --enablehex flag enabled in eBUSd configuration."
             }
@@ -71,12 +71,20 @@
         "data": {
           "force_dhw_boost": "Enable Smart Forced DHW Boost",
           "auto_cooling_lock_bypass": "Automatically open Cooling Lock 1 (01;01;99) when selecting Cool mode",
-          "fallback_poll_interval": "Fallback /get polling interval when cloud gateway is absent (seconds)"
+          "fallback_poll_interval": "Fallback /get polling interval when cloud gateway is absent (seconds)",
+          "enable_ebusd_tcp": "Enable eBUSd physical diagnostics and commands via TCP",
+          "ebusd_tcp_host": "eBUSd TCP Host (IP or hostname)",
+          "ebusd_tcp_port": "eBUSd TCP Port",
+          "enable_send_hex": "Enable raw hexadecimal command service (send_hex_command)"
         },
         "data_description": {
           "force_dhw_boost": "Automatically applies T_current + hysteresis + 1.5 °C when the gap between setpoint and tank temperature is below the hysteresis margin.",
           "auto_cooling_lock_bypass": "Unlocks the cooling season authorization lock on the controller when switching to cooling mode.",
-          "fallback_poll_interval": "Polling frequency when the installation lacks an official cloud gateway."
+          "fallback_poll_interval": "Polling frequency when the installation lacks an official cloud gateway.",
+          "enable_ebusd_tcp": "Periodically queries the eBUSd TCP socket to monitor physical symbol rate, arbitration latency, adapter reconnects, and verify unloaded CSV files. Automatically activates diagnostic entities and action buttons.",
+          "ebusd_tcp_host": "eBUSd daemon address. In Home Assistant OS with the community add-on (LukasGrebe) it is auto-detected or use 'b4d7ad18-ebusd'. For native host setups with exposed port, use '127.0.0.1'.",
+          "ebusd_tcp_port": "eBUSd TCP daemon port (default: 8888).",
+          "enable_send_hex": "Enables sending raw hexadecimal eBUS telegrams via the arotherm_genia_ebusd.send_hex_command service. Requires the --enablehex flag enabled in eBUSd configuration."
         }
       }
     }
