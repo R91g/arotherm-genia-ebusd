@@ -99,6 +99,12 @@ r;u,,,RunStatsFan1Hours,fan 1 operating hours,,,b509,540200d70b,ign,,IGN:4,,,,va
 r;u,,,RunStatsFan1Starts,fan 1 start count,,,b509,540200d80b,ign,,IGN:4,,,,value,,UIN,,,start count
 r;u,,,RunStatsFan2Hours,fan 2 operating hours,,,b509,540200d90b,ign,,IGN:4,,,,value,,UIN,,h,hours
 r;u,,,RunStatsFan2Starts,fan 2 start count,,,b509,540200da0b,ign,,IGN:4,,,,value,,UIN,,,start count
+r;u,,,RunStatsCoolingHours,cooling operating hours,,,b509,540200e10b,ign,,IGN:4,,,,value,,UIN,,h,cooling operating hours
+r;u,,,RunStatsCoolingStarts,cooling start count,,,b509,540200e20b,ign,,IGN:4,,,,value,,UIN,,,cooling start count
+r;u,,,RunStatsDeiceHours,defrost operating hours,,,b509,540200e30b,ign,,IGN:4,,,,value,,UIN,,h,defrost operating hours
+r;u,,,RunStatsDeiceStarts,defrost start count,,,b509,540200e40b,ign,,IGN:4,,,,value,,UIN,,,defrost start count
+r;u,,,RunStatsImmersionHeaterHours,backup electric heater operating hours,,,b509,540200e50b,ign,,IGN:4,,,,value,,UIN,,h,backup electric heater operating hours
+r;u,,,RunStatsImmersionHeaterStarts,backup electric heater start count,,,b509,540200e60b,ign,,IGN:4,,,,value,,UIN,,,backup electric heater start count
 # Hourly diagnostic telemetry & inverter parameters (Section 3)
 r;u,,,RunDataDiag000b,inverter compressor dynamic control offset,,,b509,540200000b,ign,,IGN:4,,,,value,,SLG,,,inverter compressor dynamic control offset
 r;u,,,RunDataDiag010b,inverter fan load diagnostic index,,,b509,540200010b,ign,,IGN:4,,,,value,,ULG,,,inverter secondary stage or fan load index

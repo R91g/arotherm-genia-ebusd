@@ -550,11 +550,20 @@
       "stats_fan1_hours": {
         "name": "Betriebsstunden Lüfter 1"
       },
+      "stats_fan1_starts": {
+        "name": "Gesamte Starts Lüfter 1"
+      },
       "stats_fan2_hours": {
         "name": "Betriebsstunden Lüfter 2"
       },
+      "stats_fan2_starts": {
+        "name": "Gesamte Starts Lüfter 2"
+      },
       "stats_deice_hours": {
         "name": "Gesamte Betriebsstunden Abtauung"
+      },
+      "stats_deice_starts": {
+        "name": "Gesamte Abtauzyklen"
       },
       "stats_immersion_heater_hours": {
         "name": "Betriebsstunden Zusatzheizung"
@@ -813,7 +822,7 @@
   "services": {
     "set_weekly_timer": {
       "name": "Wöchentlichen Zeitplan konfigurieren (b5 55)",
-      "description": "Konfiguriert ein wöchentliches Zeitfenster am Klimaregler (15.bass3 / 15.ctlv2 / 15.ctlv3) für Heizkreis Zone 1, Warmwasser (DHW), Kühlung oder Zirkulation.",
+      "description": "Konfiguriert oder löscht wöchentliche Zeitfenster am Klimaregler (15.bass3 / 15.ctlv2 / 15.ctlv3) für Heizkreis Zone 1, Warmwasser (DHW), Kühlung oder Zirkulation. Unterstützt Zeitfenster (1, 2, 3), das Löschen einzelner Zeitfenster oder das Leeren des gesamten Tages.",
       "fields": {
         "circuit_type": {
           "name": "Schaltkreis",
@@ -821,19 +830,31 @@
         },
         "day": {
           "name": "Wochentag",
-          "description": "Bestimmter Wochentag, Werktage (Montag bis Freitag) oder alle Tage (Montag bis Sonntag)."
+          "description": "Bestimmter Wochentag (z. B. Monday, Tuesday), Werktage (Weekdays), Wochenende (Weekend) oder alle Tage (All)."
+        },
+        "action": {
+          "name": "Aktion",
+          "description": "Auszuführende Aktion: 'set' zum Hinzufügen/Ändern eines Fensters, 'delete' zum Löschen eines Fensters oder 'clear' zum Leeren des gesamten Tages (0 aktive Fenster)."
         },
         "slot": {
           "name": "Zeitfenster-Nummer (Slot)",
-          "description": "Nummer des täglichen Zeitfensters (1, 2 oder 3). Standard: 1."
+          "description": "Nummer des täglichen Zeitfensters (1, 2 oder 3). Standard: 1. Wird bei Aktion 'clear' ignoriert."
         },
         "start_time": {
           "name": "Startzeit",
-          "description": "Startzeit des Zeitfensters im 24-Stunden-Format HH:MM (z. B. 13:10)."
+          "description": "Startzeit des Zeitfensters im 24-Stunden-Format HH:MM (z. B. 13:10). Erforderlich für Aktion 'set'."
         },
         "end_time": {
           "name": "Endzeit",
-          "description": "Endzeit des Zeitfensters im 24-Stunden-Format HH:MM (z. B. 14:50)."
+          "description": "Endzeit des Zeitfensters im 24-Stunden-Format HH:MM (z. B. 14:50, oder 24:00 für den ganzen Tag). Erforderlich für Aktion 'set'."
+        },
+        "temp": {
+          "name": "Zieltemperatur-Sollwert (Optional)",
+          "description": "Zieltemperatur-Sollwert in °C für dieses Fenster. Bei Auslassung wird der aktive Kreis-Sollwert verwendet."
+        },
+        "reset_remaining": {
+          "name": "Verbleibende Fenster zurücksetzen",
+          "description": "Bei Aktivierung mit Slot 1 wird der Tag mit genau diesem einen Zeitfenster überschrieben (total_slots=1), wodurch die Slots 2 und 3 zurückgesetzt werden."
         }
       }
     },

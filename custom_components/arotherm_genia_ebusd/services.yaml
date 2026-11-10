@@ -2,7 +2,8 @@ set_weekly_timer:
   name: Set Weekly Schedule Timer (b5 55)
   description: >
     Configures a weekly schedule time slot on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3)
-    for Zone 1 Heating, Domestic Hot Water (DHW), Cooling, or Circulation.
+    for Zone 1 Heating, Domestic Hot Water (DHW), Cooling, or Circulation. Supports configuring slots (1, 2, 3),
+    deleting individual slots, or clearing the entire day.
   fields:
     circuit_type:
       name: Circuit Type
@@ -12,45 +13,64 @@ set_weekly_timer:
       selector:
         select:
           options:
-            - label: "Zone 1 Heating (Z1Timer)"
-              value: "heating"
-            - label: "Domestic Hot Water - DHW (HwcTimer)"
+            - label: "Domestic Hot Water - DHW / Agua Caliente Sanitaria - ACS (HwcTimer)"
               value: "dhw"
-            - label: "Cooling (CoolingTimer)"
+            - label: "Zone 1 Heating / Calefacción Zona 1 (Z1Timer)"
+              value: "heating"
+            - label: "Cooling / Refrigeración (CoolingTimer)"
               value: "cooling"
-            - label: "Circulation (CirculationTimer)"
+            - label: "Circulation / Recirculación (CirculationTimer)"
               value: "circulation"
     day:
       name: Day of the Week
-      description: Specific day of the week, Weekdays (Monday to Friday), or All Days (Monday to Sunday).
+      description: Specific day of the week (e.g. Monday / Lunes), Weekdays (Laborables), Weekend (Fin de semana), or All Days (Toda la semana). Accepts English and Spanish names.
       required: true
-      example: "All"
+      example: "Monday"
+      selector:
+        select:
+          custom_value: true
+          options:
+            - label: "Monday / Lunes"
+              value: "Monday"
+            - label: "Tuesday / Martes"
+              value: "Tuesday"
+            - label: "Wednesday / Miércoles"
+              value: "Wednesday"
+            - label: "Thursday / Jueves"
+              value: "Thursday"
+            - label: "Friday / Viernes"
+              value: "Friday"
+            - label: "Saturday / Sábado"
+              value: "Saturday"
+            - label: "Sunday / Domingo"
+              value: "Sunday"
+            - label: "Weekdays / Laborables (Lunes - Viernes)"
+              value: "Weekdays"
+            - label: "Weekend / Fin de semana (Sábado - Domingo)"
+              value: "Weekend"
+            - label: "All Days / Toda la semana (Lunes - Domingo)"
+              value: "All"
+    action:
+      name: Action
+      description: "Action to perform: 'set' to add/update a time slot, 'delete' to remove a specific slot and shift remaining slots down, or 'clear' to erase all slots for the day (0 active slots)."
+      required: false
+      default: "set"
+      example: "set"
       selector:
         select:
           options:
-            - label: "Monday"
-              value: "Monday"
-            - label: "Tuesday"
-              value: "Tuesday"
-            - label: "Wednesday"
-              value: "Wednesday"
-            - label: "Thursday"
-              value: "Thursday"
-            - label: "Friday"
-              value: "Friday"
-            - label: "Saturday"
-              value: "Saturday"
-            - label: "Sunday"
-              value: "Sunday"
-            - label: "Weekdays (Monday - Friday)"
-              value: "Weekdays"
-            - label: "All Days (Monday - Sunday)"
-              value: "All"
+            - label: "Set / Configurar franja (set)"
+              value: "set"
+            - label: "Delete / Borrar ranura (delete)"
+              value: "delete"
+            - label: "Clear Day / Limpiar día completo (clear)"
+              value: "clear"
     slot:
       name: Time Slot Number
-      description: Daily time slot index (1, 2, or 3). Defaults to 1.
+      description: Daily time slot index (1, 2, or 3). Defaults to 1. Ignored when action is 'clear'.
       required: false
       default: 1
+      example: 1
       selector:
         number:
           min: 1
@@ -59,18 +79,37 @@ set_weekly_timer:
           mode: box
     start_time:
       name: Start Time
-      description: Slot start time in HH:MM 24-hour format (e.g. 13:10).
-      required: true
+      description: Slot start time in HH:MM 24-hour format (e.g. 13:10). Required when action is 'set'.
+      required: false
       example: "13:10"
       selector:
         text:
     end_time:
       name: End Time
-      description: Slot end time in HH:MM 24-hour format (e.g. 14:50).
-      required: true
+      description: Slot end time in HH:MM 24-hour format (e.g. 14:50, or 24:00 for all day). Required when action is 'set'.
+      required: false
       example: "14:50"
       selector:
         text:
+    temp:
+      name: Target Temperature Setpoint (Optional)
+      description: Optional target temperature setpoint in °C for this slot. If omitted, uses current circuit setpoint (e.g. 50 °C for DHW, 20 °C for Zone 1 Heating).
+      required: false
+      example: 50.0
+      selector:
+        number:
+          min: 5.0
+          max: 80.0
+          step: 0.5
+          unit_of_measurement: "°C"
+          mode: box
+    reset_remaining:
+      name: Reset Remaining Slots (Overwrite Day)
+      description: When enabled with slot 1, overwrites the day with only this slot (total_slots=1), resetting slots 2 and 3 if they existed. Useful when prior slot telemetry is not yet known.
+      required: false
+      default: false
+      selector:
+        boolean:
 
 force_dhw_boost:
   name: Activate Smart Forced DHW Boost

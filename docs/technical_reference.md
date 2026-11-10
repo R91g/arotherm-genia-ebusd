@@ -242,32 +242,61 @@ The climate regulator (`15.bass3` / `15.ctlv2` / `15.ctlv3`) manages weekly sche
 - **Circuit `02`:** Domestic Hot Water (`HwcTimer`)
 - **Circuit `01`:** Active Cooling (`CoolingTimer`)
 - **Circuit `00`:** DHW Circulation Pump (`CirculationTimer`)
+- **Circuit `04`:** Outdoor Unit Silent Mode Schedule (`silentTimer`)
 
-### 5.1 Slot Count Query (`b5 55 a4`)
-Query: `f1 15 b555 03 a4 00 <circuit>`  
-Response: `09 00 <mon_slots> <tue_slots> <wed_slots> <thu_slots> <fri_slots> <sat_slots> <sun_slots> 00`  
-Each day byte returns an integer ($0$ to $3$) representing how many time windows are currently programmed.
+### 5.1 Slot Count Query (`b5 55 a4 00`)
+- **Query Telegram:** `10 15 b5 55 03 a4 00 <circuit>` (or initiated by MiGo Link / gateway `f1`).
+- **Response:** `09 00 <mon_slots> <tue_slots> <wed_slots> <thu_slots> <fri_slots> <sat_slots> <sun_slots> 00`
+- Each day byte returns an integer ($0$ to $3$) representing how many time windows are currently active for that weekday.
+- In eBUSd CSV definitions, these entries must be configured as `r;u` (e.g. `CirculationTimer_Slots`, `HwcTimer_Slots`, `Z1Timer_Slots`) to allow active on-demand bus reads (`/get`) while updating state from passive periodic polling broadcasts.
 
-### 5.2 Slot Read (`b5 55 a5`) & Write (`b5 55 a6`)
-- **Read:** Addressed by day (`00` = Monday .. `06` = Sunday) and slot index (`00` .. `02`).
-  - Fields: `from_hour (UCH)`, `from_min (UCH)`, `to_hour (UCH)`, `to_min (UCH)`, `cooling_temp (D1C, circuit 01 only)`, `ignore (HEX:2 = FFFF)`.
-- **Write Telegram Structure:**
-  `f1 15 b555 0c a6 ff <circuit> <day> <slot> <total_slots> <from_hour> <from_min> <to_hour> <to_min> ff ff`
-- **Critical `=FFFF` Constraint:** The terminal 2 bytes must be written as `0xFFFF`. Any attempt to pass null padding or omit these bytes causes the microcontroller to drop the telegram without updating EEPROM.
+### 5.2 Slot Read (`b5 55 a5 00`) & Write (`b5 55 a6 00`) Protocol
+Empirical testing on real hardware (`BASS3` SW=0708, `CTLV2`, `CTLV3`) identified the exact telegram structure:
 
-### 5.3 Legacy `b5 24` vs Modern `b5 55` Timer Incompatibility
+#### A. Read Telegram Structure (`a5 00`):
+- **Query:** `10 15 b5 55 04 a5 00 <circuit> <day>`
+  - Days are zero-indexed: `00` = Monday .. `06` = Sunday.
+  - Slots are zero-indexed in the query: `00` (Slot 1), `01` (Slot 2), `02` (Slot 3).
+- **Master Data / Response:** `07 00 <from_h> <from_m> <to_h> <to_m> <temp_lsb> <temp_msb>`
+  - Time resolution is 10 minutes (`UCH`).
+  - **Temperature Encoding (`temp` / `cooling_temp`):** All comfort circuits (`01`, `02`, `03`) return a 2-byte unsigned little-endian integer in tenths of a degree Celsius (`UIN,10,°C`). For example, `f4 01` (hex `0x01F4` = 500) corresponds to `50.0 °C`. (Legacy CSV definitions previously misidentified this field as 1-byte `D1C`, which triggered eBUSd `ERR: argument value out of valid range` errors).
+
+#### B. Write Telegram Structure (`a6 00`):
+- **Command:** `10 15 b5 55 0c a6 00 <circuit> <day> <slot> <total_slots> <from_h> <from_m> <to_h> <to_m> <temp_lsb> <temp_msb>`
+  - Note the command bytes: `a6 00` (NOT `a6 ff`).
+  - `<slot>`: 0-indexed slot (`00` .. `02`).
+  - `<total_slots>`: Total active slots for this day (`01` .. `03` when active, or `00` when clearing).
+  - `<temp_lsb> <temp_msb>`: 2-byte target temperature setpoint in tenths of a degree (`UIN,10,°C`), little-endian (e.g. `c8 00` for 20.0 °C, `f4 01` for 50.0 °C). The trailing bytes are NOT `ff ff`.
+- **Microcontroller Acknowledgment:** The controller acknowledges valid writes with `01 00`.
+
+### 5.3 Contiguous Slot Rule, Slot Deletion & Day Clearing
+The controller firmware enforces strict slot continuity:
+1. **Contiguous Slot Indexing:** Daily time slots must always be sequential: Slots $1 \dots N$ with `total_slots = N`. Gaps are strictly rejected.
+2. **Atomic Day Rewriting:** Modifying any slot requires that all active slots for that day are rewritten with the updated `total_slots` count and chronological start/end times.
+3. **Deleting a Specific Slot:** To remove slot $k$, all subsequent slots ($k+1 \dots N$) are shifted down to positions $k \dots N-1$, and all $N-1$ remaining slots are rewritten with `total_slots = N - 1`.
+4. **Clearing a Day (0 Active Slots):** To wipe all scheduled periods for a day, write slot 1 with `total_slots = 00` and `from = 00:00`, `to = 00:00`:
+   `15 b5 55 0c a6 00 <circuit> <day> 00 00 00 00 00 00 <temp_lsb> <temp_msb>`
+   The controller responds with `01 00` and immediately zeroes the active slot count in `_Slots` (`a4 00`) for that day.
+
+### 5.4 Continuous 24-Hour Scheduling ("All Day")
+- To schedule continuous operation throughout the entire day, the end time must be set to **`24:00`**:
+  `from_hour: 0x00`, `from_min: 0x00`, `to_hour: 0x18` (24 decimal), `to_min: 0x00`.
+- The controller hardware renders this directly as `00:00 - 24:00`.
+- Passing `00:00 - 00:00` represents a 0-duration window; Home Assistant services reject `00:00 - 00:00` in `action: set` and advise using `end_time: "24:00"` for 24-hour schedules, or `action: "delete"` / `"clear"` for removal.
+
+### 5.5 Legacy `b5 24` vs Modern `b5 55` Timer Incompatibility
 In older ebusd configuration templates (designed for legacy VRC 700 controllers and boilers), timers were queried using circuit selectors under `b5 24` (`b5 24 0303...` for heating and `b5 24 0301...` for DHW).
 
 Empirical tests and bus telemetry from live hardware (`BASS3` SW=0708, `BASV3`, `CTLV2`, and `CTLV3`) have confirmed:
 1. Standard scalar registers on `b5 24` continue to work normally (e.g. `b5 24 020003002200` $\rightarrow$ `21.0 °C`).
 2. However, weekly schedule timer queries under `b5 24` return an **empty response** (`empty` / zero return bytes).
-3. Modern climate controllers strictly require the **`b5 55` command family** (`a4` for slot counting, `a5` for slot reading, and `a6` for slot writing with trailing `0xFFFF` padding).
+3. Modern climate controllers strictly require the **`b5 55` command family** (`a4` for slot counting, `a5` for slot reading, and `a6` for slot writing with Little-Endian `UIN,10` temperature encoding).
 
-### 5.4 Circuit 04: Silent Mode Operating Schedule (`silentTimer`)
+### 5.6 Circuit 04: Silent Mode Operating Schedule (`silentTimer`)
 In addition to the primary comfort circuits, the controller exposes **Circuit `04`**, dedicated exclusively to the Silent Mode noise-reduction schedule:
-- `b5 55 a40004`: Number of configured silent windows per weekday.
-- `b5 55 a50004`: Reading active silent window slots (`from_hour`, `from_min`, `to_hour`, `to_min`, without temperature field).
-- `b5 55 a6ff0004<day><slot><total>`: Writing and activating silent window schedules.
+- `b5 55 a4 00 04`: Number of configured silent windows per weekday.
+- `b5 55 a5 00 04`: Reading active silent window slots (`from_hour`, `from_min`, `to_hour`, `to_min`, without temperature field).
+- `b5 55 a6 00 04 <day> <slot> <total>`: Writing and activating silent window schedules.
 
 ---
 

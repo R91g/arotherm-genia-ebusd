@@ -273,7 +273,7 @@ class SaunierGeniaWeeklyScheduleSensor(SaunierGeniaEntity, SensorEntity):
         active_count = slots_msg.get(short_key)
         max_slots = 3
         if isinstance(active_count, (int, float)) and 0 <= int(active_count) <= 3:
-            max_slots = int(active_count) if int(active_count) > 0 else 1
+            max_slots = int(active_count)
 
         formatted: list[str] = []
         for s_idx in range(1, max_slots + 1):
@@ -304,11 +304,16 @@ class SaunierGeniaWeeklyScheduleSensor(SaunierGeniaEntity, SensorEntity):
         schedule_dict: dict[str, dict[str, Any]] = {}
         for day in WEEKDAYS_LIST:
             short_key = DAY_SHORT_KEYS[day]
+            raw_count = slots_msg.get(short_key)
+            try:
+                active_count = int(raw_count) if raw_count is not None else 1
+            except (ValueError, TypeError):
+                active_count = 1
             schedule_dict[day] = {
-                "active_slots": slots_msg.get(short_key, 1),
-                "Slot 1": self._format_slot(day, 1),
-                "Slot 2": self._format_slot(day, 2),
-                "Slot 3": self._format_slot(day, 3),
+                "active_slots": active_count,
+                "Slot 1": self._format_slot(day, 1) if active_count >= 1 else None,
+                "Slot 2": self._format_slot(day, 2) if active_count >= 2 else None,
+                "Slot 3": self._format_slot(day, 3) if active_count >= 3 else None,
             }
         return {
             "timer_prefix": self._timer_prefix,

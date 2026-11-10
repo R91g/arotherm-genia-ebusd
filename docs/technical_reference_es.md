@@ -237,37 +237,66 @@ El control de reducción de ruido nocturno o modo silencioso del compresor en la
 
 ## 5. Programación Horaria Semanal (`b5 55` / `b5 a5/a6`)
 
-La centralita `15.bass3` / `15.ctlv2` / `15.ctlv3` gobierna cuatro circuitos de temporización independientes:
+La centralita `15.bass3` / `15.ctlv2` / `15.ctlv3` gobierna múltiples circuitos de temporización independientes:
 - **Circuito `03`:** Calefacción Zona 1 (`Z1Timer`)
 - **Circuito `02`:** Agua Caliente Sanitaria (`HwcTimer`)
 - **Circuito `01`:** Refrigeración Activa (`CoolingTimer`)
 - **Circuito `00`:** Bomba de Recirculación de ACS (`CirculationTimer`)
+- **Circuito `04`:** Calendario de Modo Silencioso de la Unidad Exterior (`silentTimer`)
 
-### 5.1 Conteo de Ranuras (`b5 55 a4`)
-Consulta: `f1 15 b555 03 a4 00 <circuito>`  
-Respuesta: `09 00 <ranuras_L> <ranuras_M> <ranuras_X> <ranuras_J> <ranuras_V> <ranuras_S> <ranuras_D> 00`  
-Cada byte de día indica cuántas franjas horarias ($0$ a $3$) están configuradas.
+### 5.1 Conteo de Ranuras Activas (`b5 55 a4 00`)
+- **Telegrama de Consulta:** `10 15 b5 55 03 a4 00 <circuito>` (o iniciado por MiGo Link / pasarela `f1`).
+- **Respuesta:** `09 00 <ranuras_L> <ranuras_M> <ranuras_X> <ranuras_J> <ranuras_V> <ranuras_S> <ranuras_D> 00`
+- Cada byte de día indica cuántas franjas horarias ($0$ a $3$) están activas en ese día de la semana.
+- En las definiciones CSV de eBUSd, estas entradas deben configurarse como `r;u` (ej. `CirculationTimer_Slots`, `HwcTimer_Slots`, `Z1Timer_Slots`) para permitir lecturas activas bajo demanda (`/get`) y a la vez actualizar el estado ante emisiones de sondeo pasivo.
 
-### 5.2 Lectura (`b5 55 a5`) y Escritura (`b5 55 a6`)
-- **Lectura:** Indexada por día (`00` = Lunes .. `06` = Domingo) y ranura (`00` .. `02`).
-  - Campos: `from_hour (UCH)`, `from_min (UCH)`, `to_hour (UCH)`, `to_min (UCH)`, `cooling_temp (D1C, solo en circuito 01)`, `ignore (HEX:2 = FFFF)`.
-- **Estructura de Escritura:**
-  `f1 15 b555 0c a6 ff <circuito> <dia> <ranura> <total_ranuras> <from_hour> <from_min> <to_hour> <to_min> ff ff`
-- **Restricción Obligatoria del Relleno `=FFFF`:** Los 2 bytes finales deben inyectarse siempre como `0xFFFF`. Cualquier omisión o relleno nulo provoca que el microcontrolador descarte el paquete sin actualizar la EEPROM.
+### 5.2 Protocolo de Lectura (`b5 55 a5 00`) y Escritura (`b5 55 a6 00`)
+Las pruebas empíricas y trazas en hardware real (`BASS3` SW=0708, `CTLV2`, `CTLV3`) desvelaron la estructura exacta de los telegramas:
 
-### 5.3 Incompatibilidad de Horarios en `b5 24` frente a `b5 55`
+#### A. Estructura de Lectura (`a5 00`):
+- **Consulta:** `10 15 b5 55 04 a5 00 <circuito> <dia>`
+  - Los días están indexados en base cero: `00` = Lunes .. `06` = Domingo.
+  - Las ranuras se indexan en base cero en la consulta: `00` (Ranura 1), `01` (Ranura 2), `02` (Ranura 3).
+- **Datos de Respuesta:** `07 00 <from_h> <from_m> <to_h> <to_m> <temp_lsb> <temp_msb>`
+  - La resolución horaria es de 10 minutos (`UCH`).
+  - **Codificación de Temperatura (`temp` / `cooling_temp`):** Todos los circuitos de confort (`01`, `02`, `03`) devuelven un entero sin signo de 2 bytes en formato Little-Endian con décimas de grado Celsius (`UIN,10,°C`). Por ejemplo, `f4 01` (hex `0x01F4` = 500) corresponde a `50,0 °C`. (En CSVs antiguos este campo se tipaba erróneamente como `D1C` de 1 byte, provocando errores `ERR: argument value out of valid range` en eBUSd).
+
+#### B. Estructura de Escritura (`a6 00`):
+- **Comando:** `10 15 b5 55 0c a6 00 <circuito> <dia> <ranura> <total_ranuras> <from_h> <from_m> <to_h> <to_m> <temp_lsb> <temp_msb>`
+  - El subcomando es `a6 00` (NO `a6 ff`).
+  - `<ranura>`: Índice de ranura en base cero (`00` .. `02`).
+  - `<total_ranuras>`: Ranuras activas totales para ese día (`01` .. `03` en días activos, o `00` al vaciar).
+  - `<temp_lsb> <temp_msb>`: Consigna de temperatura objetivo de 2 bytes en décimas de grado (`UIN,10,°C`), Little-Endian (ej. `c8 00` para 20,0 °C o `f4 01` para 50,0 °C). Los bytes finales NO son `ff ff`.
+- **Reconocimiento del Microcontrolador:** La centralita confirma escrituras correctas respondiendo `01 00`.
+
+### 5.3 Regla de Continuidad de Ranuras, Borrado y Vaciado de Día
+El firmware de la centralita impone reglas estrictas de contigüidad:
+1. **Indexación Contigua:** Las ranuras horarias diarias deben ser siempre secuenciales: Ranuras $1 \dots N$ con `total_ranuras = N`. No se admiten huecos ni ranuras intermedias vacías.
+2. **Reescritura Atómica del Día:** Modificar cualquier ranura exige reescribir todas las ranuras activas de ese día con el nuevo valor de `total_ranuras` y horarios en orden cronológico estricto sin solapamientos.
+3. **Borrar una Ranura Específica:** Para eliminar la ranura $k$, las ranuras posteriores ($k+1 \dots N$) se desplazan hacia abajo a las posiciones $k \dots N-1$, y se reescriben las $N-1$ ranuras restantes con `total_ranuras = N - 1`.
+4. **Vaciar un Día Completo (0 Ranuras Activas):** Para borrar todas las franjas de un día, se escribe la ranura 1 con `total_ranuras = 00` y horarios `from = 00:00`, `to = 00:00`:
+   `15 b5 55 0c a6 00 <circuito> <dia> 00 00 00 00 00 00 <temp_lsb> <temp_msb>`
+   La centralita responde `01 00` y pone de inmediato a `00` el contador de ranuras activas en `_Slots` (`a4 00`) para ese día.
+
+### 5.4 Programación de 24 Horas Continuas («Todo el día»)
+- Para programar funcionamiento continuo durante todo el día, la hora de finalización debe fijarse en **`24:00`**:
+  `from_hour: 0x00`, `from_min: 0x00`, `to_hour: 0x18` (24 en decimal), `to_min: 0x00`.
+- El display de la centralita lo muestra directamente como `00:00 - 24:00`.
+- Pasar `00:00 - 00:00` representa una franja de duración cero; los servicios de Home Assistant rechazan `00:00 - 00:00` en `action: set` y orientan didácticamente a usar `end_time: "24:00"` para 24 horas continuas, o `action: "delete"` / `"clear"` para borrar.
+
+### 5.5 Incompatibilidad de Horarios en `b5 24` frente a `b5 55`
 En versiones anteriores de archivos de configuración de ebusd (procedentes de calderas y reguladores de generaciones previas tipo VRC 700), se intentaba consultar los horarios mediante selectores de circuito en `b5 24` (`b5 24 0303...` para calefacción y `b5 24 0301...` para ACS).
 
 Las pruebas empíricas y trazas de bus en hardware real (`BASS3` SW=0708, `BASV3`, `CTLV2` y `CTLV3`) han demostrado que:
 1. Las consultas de parámetros escalares en `b5 24` funcionan con normalidad (ej. `b5 24 020003002200` $\rightarrow$ `21.0 °C`).
 2. Sin embargo, las consultas de temporizadores semanales mediante `b5 24` devuelven una **respuesta completamente vacía** (`empty` / sin bytes de retorno).
-3. El microcontrolador de la centralita **exige estrictamente la familia de comandos `b5 55`** (`a4` para conteo de ranuras, `a5` para lectura y `a6` para escritura con relleno de cola `0xFFFF`).
+3. El microcontrolador de la centralita **exige estrictamente la familia de comandos `b5 55`** (`a4` para conteo de ranuras, `a5` para lectura y `a6` para escritura con codificación de temperatura Little-Endian `UIN,10`).
 
-### 5.4 Circuito 04: Horario de Modo Silencioso (`silentTimer`)
-Adicionalmente a los cuatro circuitos clásicos, la centralita expone el **Circuito `04`**, destinado específicamente al calendario de franjas horarias de Modo Silencioso:
-- `b5 55 a40004`: Conteo de franjas de modo silencioso configuradas por día de la semana.
-- `b5 55 a50004`: Lectura de franjas (`from_hour`, `from_min`, `to_hour`, `to_min`, sin byte de consigna de temperatura).
-- `b5 55 a6ff0004<dia><ranura><total>`: Escritura y activación del período silencioso.
+### 5.6 Circuito 04: Horario de Modo Silencioso (`silentTimer`)
+Adicionalmente a los cuatro circuitos de confort, la centralita expone el **Circuito `04`**, destinado específicamente al calendario de franjas horarias de Modo Silencioso:
+- `b5 55 a4 00 04`: Conteo de franjas de modo silencioso configuradas por día de la semana.
+- `b5 55 a5 00 04`: Lectura de franjas (`from_hour`, `from_min`, `to_hour`, `to_min`, sin byte de consigna de temperatura).
+- `b5 55 a6 00 04 <dia> <ranura> <total>`: Escritura y activación del período silencioso.
 
 ---
 

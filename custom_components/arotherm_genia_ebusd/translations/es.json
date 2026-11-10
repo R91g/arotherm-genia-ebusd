@@ -550,11 +550,20 @@
       "stats_fan1_hours": {
         "name": "Horas de funcionamiento ventilador 1"
       },
+      "stats_fan1_starts": {
+        "name": "Arranques acumulados ventilador 1"
+      },
       "stats_fan2_hours": {
         "name": "Horas de funcionamiento ventilador 2"
       },
+      "stats_fan2_starts": {
+        "name": "Arranques acumulados ventilador 2"
+      },
       "stats_deice_hours": {
         "name": "Horas acumuladas en desescarche"
+      },
+      "stats_deice_starts": {
+        "name": "Ciclos acumulados de desescarche"
       },
       "stats_immersion_heater_hours": {
         "name": "Horas de funcionamiento resistencia de apoyo"
@@ -813,27 +822,39 @@
   "services": {
     "set_weekly_timer": {
       "name": "Configurar programación horaria semanal (b5 55)",
-      "description": "Modifica una franja horaria semanal en el regulador climático (15.bass3 / 15.ctlv2 / 15.ctlv3) para Calefacción Zona 1, Agua Caliente Sanitaria (ACS), Refrigeración o Recirculación.",
+      "description": "Modifica o borra franjas horarias semanales en el regulador climático (15.bass3 / 15.ctlv2 / 15.ctlv3) para Calefacción Zona 1, Agua Caliente Sanitaria (ACS), Refrigeración o Recirculación. Permite configurar ranuras (1, 2, 3), borrar ranuras sueltas o limpiar el día entero.",
       "fields": {
         "circuit_type": {
           "name": "Circuito",
-          "description": "Circuito de programación horaria a modificar."
+          "description": "Circuito de programación horaria a modificar (Calefacción, ACS, Refrigeración o Recirculación)."
         },
         "day": {
           "name": "Día de la semana",
-          "description": "Día específico, Lunes a Viernes (Weekdays) o toda la semana (All)."
+          "description": "Día específico (ej. Lunes / Monday), Laborables (Weekdays), Fin de semana (Weekend) o Toda la semana (All). Acepta nombres en español e inglés."
+        },
+        "action": {
+          "name": "Acción",
+          "description": "Acción a realizar: 'set' para añadir o modificar franja, 'delete' para borrar una ranura específica desplazando las siguientes, o 'clear' para limpiar el día entero (0 ranuras activas)."
         },
         "slot": {
           "name": "Ranura horaria (Slot)",
-          "description": "Número de ranura diaria (1, 2 o 3). Por defecto 1."
+          "description": "Número de ranura diaria (1, 2 o 3). Por defecto 1. Se ignora si la acción es 'clear'."
         },
         "start_time": {
           "name": "Hora de inicio",
-          "description": "Hora de inicio de la franja en formato HH:MM (ej. 13:10)."
+          "description": "Hora de inicio de la franja en formato HH:MM (ej. 13:10). Obligatoria si la acción es 'set'."
         },
         "end_time": {
           "name": "Hora de fin",
-          "description": "Hora de finalización de la franja en formato HH:MM (ej. 14:50)."
+          "description": "Hora de finalización de la franja en formato HH:MM (ej. 14:50, o 24:00 para todo el día). Obligatoria si la acción es 'set'."
+        },
+        "temp": {
+          "name": "Temperatura objetivo (Opcional)",
+          "description": "Consigna de temperatura en °C para esta franja. Si se omite, utiliza la consigna activa del circuito."
+        },
+        "reset_remaining": {
+          "name": "Sobrescribir y reiniciar franjas restantes",
+          "description": "Si se activa junto a la ranura 1, configura 1 única franja activa y resetea las ranuras 2 y 3 sin requerir telemetría previa de la línea eBUS."
         }
       }
     },

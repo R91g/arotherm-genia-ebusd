@@ -351,25 +351,75 @@ The integration registers two custom actions under the `arotherm_genia_ebusd` do
 
 [![Open your Home Assistant instance and show your service developer tools.](https://my.home-assistant.io/badges/developer_call_service.svg)](https://my.home-assistant.io/redirect/developer_call_service/?service=arotherm_genia_ebusd.set_weekly_timer)
 
-Modifies native `b5 55` weekly time programs directly inside the `sensoCOMFORT` / `MiPro Sense` (`15.bass3`) controller, with automatic `600 ms` bus pacing across multi-day writes.
+Modifies or clears native `b5 55` weekly time programs directly inside the `sensoCOMFORT` / `MiPro Sense` (`15.bass3` / `15.ctlv2` / `15.ctlv3`) controller, synchronizing active slot counts and maintaining automatic `600 ms` bus pacing across multi-day writes.
 
 | Parameter | Required | Allowed Values | Description |
 | :--- | :---: | :--- | :--- |
 | `circuit_type` | Yes | `heating`, `dhw`, `cooling`, `circulation` | Target weekly schedule (`Z1Timer`, `HwcTimer`, `CoolingTimer`, or `CirculationTimer`). |
-| `day` | Yes | `Monday`..`Sunday`, `Weekdays`, `All` | Single day, Monday–Friday (`Weekdays`), or Monday–Sunday (`All`). |
-| `slot` | No | `1`, `2`, `3` *(default: `1`)* | Daily time window slot (`1` to `3`). |
-| `start_time` | Yes | `"HH:MM"` *(e.g. `"13:00"`)* | Window start time (24h format, 10-minute controller resolution). |
-| `end_time` | Yes | `"HH:MM"` *(e.g. `"15:30"`)* | Window end time (24h format). |
+| `day` | Yes | `Monday`..`Sunday`, `Weekdays`, `Weekend`, `All`<br>*(or in Spanish: `Lunes`..`Domingo`, `Laborables`, `Fin de semana`, `Todos`)* | Single day, Monday–Friday (`Weekdays`), Saturday–Sunday (`Weekend`), or Monday–Sunday (`All`). |
+| `action` | No | `set`, `delete`, `clear` *(default: `set`)* | Action to perform:<br>• `set`: creates or updates the designated slot.<br>• `delete`: removes the specified slot and shifts subsequent slots down.<br>• `clear`: empties the entire day, leaving 0 active slots. |
+| `slot` | No | `1`, `2`, `3` *(default: `1`)* | Daily time slot index (`1` to `3`). Ignored when `action: clear`. |
+| `start_time` | Optional* | `"HH:MM"` *(e.g. `"13:10"`)* | Window start time (24h format, 10-minute resolution). *Required when `action: set`. |
+| `end_time` | Optional* | `"HH:MM"` *(e.g. `"15:30"` or `"24:00"`)* | Window end time (24h format, use `"24:00"` for all day). *Required when `action: set`. |
+| `temp` | No | `5.0` – `80.0` *(°C)* | Optional target temperature setpoint for this slot. If omitted, uses active circuit setpoint (e.g. 50 °C for DHW, 20 °C for Zone 1). |
+| `reset_remaining` | No | `true`, `false` *(default: `false`)* | When set to `true` with `slot: 1` in `set` mode, overwrites the day to exactly 1 active slot (`total_slots = 1`) and erases previous slots 2 and 3 without requiring prior telemetry from the eBUS line. |
 
-**Automation Example — Align DHW schedule with peak solar PV hours every day:**
+#### Configuration & Automation Examples
+
+**Example 1 — Set DHW schedule across all days (with `reset_remaining: true` to initialize day):**
 ```yaml
 action: arotherm_genia_ebusd.set_weekly_timer
 data:
   circuit_type: dhw
-  day: All
+  day: All               # or "Todos"
   slot: 1
   start_time: "13:00"
   end_time: "15:30"
+  reset_remaining: true  # Enforces 1 active slot and erases slots 2 and 3
+```
+
+**Example 2 — Set continuous 24-hour heating (All Day) in Zone 1:**
+```yaml
+action: arotherm_genia_ebusd.set_weekly_timer
+data:
+  circuit_type: heating
+  day: All               # or "Todos"
+  slot: 1
+  start_time: "00:00"
+  end_time: "24:00"      # Native eBUS encoding for continuous 24-hour schedule
+  temp: 20.5
+  reset_remaining: true  # 1 active slot for the full day
+```
+
+**Example 3 — Add a second heating slot (Slot 2) on weekends:**
+```yaml
+action: arotherm_genia_ebusd.set_weekly_timer
+data:
+  circuit_type: heating
+  day: Weekend           # or "Fin de semana"
+  slot: 2
+  start_time: "17:00"
+  end_time: "22:00"
+  temp: 21.0
+```
+
+**Example 4 — Delete a specific slot (Slot 2) on a single day:**
+```yaml
+action: arotherm_genia_ebusd.set_weekly_timer
+data:
+  circuit_type: dhw
+  day: Monday            # or "Lunes"
+  action: delete
+  slot: 2
+```
+
+**Example 5 — Clear all schedule slots for a day (0 active slots):**
+```yaml
+action: arotherm_genia_ebusd.set_weekly_timer
+data:
+  circuit_type: dhw
+  day: Monday            # or "Lunes"
+  action: clear
 ```
 
 ### 2. `arotherm_genia_ebusd.force_dhw_boost`

@@ -197,7 +197,14 @@ def parse_ebusd_payload(raw_payload: str) -> dict[str, Any]:
 # same named fields that ebusd publishes in its MQTT JSON (e.g. day/month/year).
 DATE_WRITE_FIELDS: tuple[str, ...] = ("day", "month", "year")
 TIME_WRITE_FIELDS: tuple[str, ...] = ("hours", "minutes", "seconds")
-TIMER_WRITE_FIELDS: tuple[str, ...] = ("from_hour", "from_min", "to_hour", "to_min")
+TIMER_WRITE_FIELDS: tuple[str, ...] = (
+    "total_slots",
+    "from_hour",
+    "from_min",
+    "to_hour",
+    "to_min",
+    "temp",
+)
 
 
 def _coerce_scalar(raw: Any) -> Any:
@@ -1255,7 +1262,18 @@ class SaunierGeniaCoordinator:
             parts = [_coerce_scalar(part) for part in value.split(";")]
             layout = _multi_field_layout(canonical, current)
             if layout:
-                current.update(zip(layout, parts, strict=False))
+                if len(parts) == 4 and layout == TIMER_WRITE_FIELDS:
+                    current.update(
+                        zip(
+                            ("from_hour", "from_min", "to_hour", "to_min"),
+                            parts,
+                            strict=False,
+                        )
+                    )
+                else:
+                    current.update(zip(layout, parts, strict=False))
+                    if "CoolingTimer_" in canonical and "temp" in current:
+                        current["cooling_temp"] = current["temp"]
             else:
                 current["value"] = value.strip()
         else:

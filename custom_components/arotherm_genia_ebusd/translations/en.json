@@ -550,11 +550,20 @@
       "stats_fan1_hours": {
         "name": "Fan 1 Operating Hours"
       },
+      "stats_fan1_starts": {
+        "name": "Fan 1 Total Starts"
+      },
       "stats_fan2_hours": {
         "name": "Fan 2 Operating Hours"
       },
+      "stats_fan2_starts": {
+        "name": "Fan 2 Total Starts"
+      },
       "stats_deice_hours": {
         "name": "Defrost Total Operating Hours"
+      },
+      "stats_deice_starts": {
+        "name": "Defrost Total Cycles"
       },
       "stats_immersion_heater_hours": {
         "name": "Backup Immersion Heater Operating Hours"
@@ -813,7 +822,7 @@
   "services": {
     "set_weekly_timer": {
       "name": "Set Weekly Schedule Timer (b5 55)",
-      "description": "Configures a weekly schedule time slot on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3) for Zone 1 Heating, Domestic Hot Water (DHW), Cooling, or Circulation.",
+      "description": "Configures a weekly schedule time slot on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3) for Zone 1 Heating, Domestic Hot Water (DHW), Cooling, or Circulation. Supports configuring slots (1, 2, 3), deleting individual slots, or clearing the entire day.",
       "fields": {
         "circuit_type": {
           "name": "Circuit Type",
@@ -821,7 +830,11 @@
         },
         "day": {
           "name": "Day of the Week",
-          "description": "Specific day of the week, Weekdays (Monday to Friday), or All Days (Monday to Sunday)."
+          "description": "Specific day of the week, Weekdays, Weekend, or All Days. Accepts English and Spanish names."
+        },
+        "action": {
+          "name": "Action",
+          "description": "Action to perform: 'set' to add/update a time slot, 'delete' to remove a specific slot, or 'clear' to erase all slots for the day."
         },
         "slot": {
           "name": "Time Slot Number",
@@ -829,11 +842,19 @@
         },
         "start_time": {
           "name": "Start Time",
-          "description": "Slot start time in HH:MM 24-hour format (e.g. 13:10)."
+          "description": "Slot start time in HH:MM 24-hour format (e.g. 13:10). Required for action 'set'."
         },
         "end_time": {
           "name": "End Time",
-          "description": "Slot end time in HH:MM 24-hour format (e.g. 14:50)."
+          "description": "Slot end time in HH:MM 24-hour format (e.g. 14:50, or 24:00 for all day). Required for action 'set'."
+        },
+        "temp": {
+          "name": "Target Temperature Setpoint (Optional)",
+          "description": "Target temperature setpoint in °C for this slot. If omitted, uses current circuit setpoint."
+        },
+        "reset_remaining": {
+          "name": "Reset Remaining Slots (Overwrite Day)",
+          "description": "When enabled with slot 1, overwrites the day with only this slot (total_slots=1), resetting slots 2 and 3 if they existed."
         }
       }
     },

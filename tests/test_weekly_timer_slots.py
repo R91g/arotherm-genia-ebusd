@@ -99,7 +99,8 @@ class TestWeeklyTimerSlots(unittest.TestCase):
 
         # End 00:00 (with start > 0) -> 1440 minutes (24:00)
         self.assertEqual(_parse_hhmm("00:00", is_end=True), (0, 0))
-        self.assertEqual(_time_to_minutes(0, 0, is_end=True), 1440)
+        self.assertEqual(_time_to_minutes(0, 0, is_end=True, start_minutes=600), 1440)
+        self.assertEqual(_time_to_minutes(0, 0, is_end=True, start_minutes=0), 0)
 
         # End 24:00 -> 1440 minutes
         self.assertEqual(_parse_hhmm("24:00", is_end=True), (24, 0))
@@ -287,10 +288,14 @@ class TestWeeklyTimerSlots(unittest.TestCase):
         }
         asyncio.run(services[SERVICE_SET_WEEKLY_TIMER](call1))
 
-        # Check writes for Call 1: Slot 2 written
-        self.assertEqual(len(written_params), 1)
+        # Check writes for Call 1: Both Slot 1 and Slot 2 written with total_slots=2
+        self.assertEqual(len(written_params), 2)
         self.assertEqual(
-            written_params[0], (CIRCUIT_BASS3, "Z1Timer_Monday_Slot2", "16;0;17;15")
+            written_params[0], (CIRCUIT_BASS3, "Z1Timer_Monday", "2;8;0;14;30;20.0")
+        )
+        self.assertEqual(
+            written_params[1],
+            (CIRCUIT_BASS3, "Z1Timer_Monday_Slot2", "2;16;0;17;15;20.0"),
         )
         # Check optimistic counter updated to 2
         self.assertEqual(_get_active_slot_count(coord, "Z1Timer", "Monday"), 2)
@@ -307,13 +312,14 @@ class TestWeeklyTimerSlots(unittest.TestCase):
         }
         asyncio.run(services[SERVICE_SET_WEEKLY_TIMER](call2))
 
-        # Check writes for Call 2: Slot 1 written AND Slot 2 restored!
+        # Check writes for Call 2: Slot 1 written AND Slot 2 retained with total_slots=2!
         self.assertEqual(len(written_params), 2)
         self.assertEqual(
-            written_params[0], (CIRCUIT_BASS3, "Z1Timer_Monday", "7;0;14;0")
+            written_params[0], (CIRCUIT_BASS3, "Z1Timer_Monday", "2;7;0;14;0;20.0")
         )
         self.assertEqual(
-            written_params[1], (CIRCUIT_BASS3, "Z1Timer_Monday_Slot2", "16;0;17;15")
+            written_params[1],
+            (CIRCUIT_BASS3, "Z1Timer_Monday_Slot2", "2;16;0;17;15;20.0"),
         )
         # Counter remains 2
         self.assertEqual(_get_active_slot_count(coord, "Z1Timer", "Monday"), 2)
@@ -352,6 +358,46 @@ class TestWeeklyTimerSlots(unittest.TestCase):
         self.assertIn("Tuesday", str(ctx.exception))
         # Ensure zero writes were made!
         coord.async_write_parameter.assert_not_called()
+
+    def test_service_reset_remaining_slot_1_proceeds_without_cached_count(self) -> None:
+        """Verify that setting slot 1 with reset_remaining=True succeeds even if active count is unknown."""
+        hass = MagicMock()
+        services: dict[str, Any] = {}
+        hass.services.has_service.return_value = False
+        hass.services.async_register.side_effect = (
+            lambda d, s, h, schema=None, *args, **kwargs: services.update({s: h})
+        )
+
+        coord = SaunierGeniaCoordinator(hass, MagicMock(data={"mqtt_prefix": "ebusd"}))
+        coord._state[("hmux0", "status01")] = {"temp1": 35.0}  # operational
+        # Monday slot count is NOT set (None)
+
+        written_params: list[tuple[str, str, str]] = []
+
+        async def record_write(circuit: str, message: str, payload: str) -> None:
+            written_params.append((circuit, message, payload))
+
+        coord.async_write_parameter = AsyncMock(side_effect=record_write)
+        hass.data = {DOMAIN: {"entry_id": coord}}
+        _async_register_services(hass)
+
+        call = MagicMock()
+        call.data = {
+            "circuit_type": "dhw",
+            "day": "Monday",
+            "slot": 1,
+            "start_time": "13:10",
+            "end_time": "14:50",
+            "reset_remaining": True,
+        }
+        asyncio.run(services[SERVICE_SET_WEEKLY_TIMER](call))
+
+        self.assertEqual(len(written_params), 1)
+        self.assertEqual(
+            written_params[0],
+            (CIRCUIT_BASS3, "HwcTimer_Monday", "1;13;10;14;50;50.0"),
+        )
+        self.assertEqual(_get_active_slot_count(coord, "HwcTimer", "Monday"), 1)
 
     def test_service_mid_cascade_failure_invalidates_cache(self) -> None:
         """Verify that failure during writing upper slots invalidates day's cached count."""
@@ -406,24 +452,27 @@ class TestWeeklyTimerSlots(unittest.TestCase):
         for fname in CONTROLLER_CSVS:
             text = (CSV_DIR / fname).read_text(encoding="utf-8")
             for prefix in TIMER_CIRCUIT_PREFIXES.values():
+                slots_name = f"{prefix}_Slots"
+                self.assertIsNotNone(
+                    re.search(rf"^r;u,,,{slots_name},", text, re.MULTILINE),
+                    f"{fname}: {slots_name} must be defined as r;u",
+                )
                 for day in WEEKDAYS_LIST:
                     for slot_num in (1, 2, 3):
                         suffix = "" if slot_num == 1 else f"_Slot{slot_num}"
                         name = f"{prefix}_{day}{suffix}"
-                        pattern = rf"^([uw]),,,{re.escape(name)},.*$"
+                        pattern = rf"^(r;u|u|w),,,{re.escape(name)},.*$"
                         rows = re.findall(pattern, text, flags=re.MULTILINE)
                         self.assertEqual(
-                            sorted(rows), ["u", "w"], f"{fname}: {name} incomplete"
+                            sorted(rows), ["r;u", "w"], f"{fname}: {name} incomplete"
                         )
                         w_row = re.search(
-                            rf"^w,,,{re.escape(name)},[^,]*,,,b555,(a6ff[0-9a-f]+),",
+                            rf"^w,,,{re.escape(name)},[^,]*,,,b555,(a600[0-9a-f]+),total_slots,,UCH,",
                             text,
                             flags=re.MULTILINE,
                         )
-                        assert w_row is not None
-                        # last byte of the write ID equals slot number (total_slots)
-                        self.assertTrue(
-                            w_row.group(1).endswith(f"{slot_num:02d}"), name
+                        self.assertIsNotNone(
+                            w_row, f"{fname}: {name} write pattern mismatch"
                         )
 
     def test_controller_csvs_stay_identical(self) -> None:
@@ -588,6 +637,215 @@ class TestWeeklyTimerSlots(unittest.TestCase):
             # Active slots must be updated immediately in Z1Timer_Slots
             active_slots = _get_active_slot_count(coord, "Z1Timer", frame["day_name"])
             self.assertEqual(active_slots, frame["expected_active_slots"])
+
+    def test_service_clear_day_action(self) -> None:
+        """Verify action='clear' zeroes active slots and sets 00:00-00:00 payload."""
+        hass = MagicMock()
+        services: dict[str, Any] = {}
+        hass.services.has_service.return_value = False
+        hass.services.async_register.side_effect = (
+            lambda d, s, h, schema=None, *args, **kwargs: services.update({s: h})
+        )
+
+        coord = SaunierGeniaCoordinator(hass, MagicMock(data={"mqtt_prefix": "ebusd"}))
+        coord._state[("hmux0", "status01")] = {"temp1": 35.0}
+
+        written_params: list[tuple[str, str, str]] = []
+
+        async def record_write(circuit: str, message: str, payload: str) -> None:
+            written_params.append((circuit, message, payload))
+
+        coord.async_write_parameter = AsyncMock(side_effect=record_write)
+        hass.data = {DOMAIN: {"entry_id": coord}}
+        _async_register_services(hass)
+
+        call = MagicMock()
+        call.data = {
+            "circuit_type": "dhw",
+            "day": "Monday",
+            "action": "clear",
+        }
+        asyncio.run(services[SERVICE_SET_WEEKLY_TIMER](call))
+
+        self.assertEqual(len(written_params), 1)
+        self.assertEqual(
+            written_params[0],
+            (CIRCUIT_BASS3, "HwcTimer_Monday", "0;0;0;0;0;50.0"),
+        )
+        self.assertEqual(_get_active_slot_count(coord, "HwcTimer", "Monday"), 0)
+
+    def test_service_delete_slot_action(self) -> None:
+        """Verify action='delete' shifts subsequent slots and decrements total_slots."""
+        hass = MagicMock()
+        services: dict[str, Any] = {}
+        hass.services.has_service.return_value = False
+        hass.services.async_register.side_effect = (
+            lambda d, s, h, schema=None, *args, **kwargs: services.update({s: h})
+        )
+
+        coord = SaunierGeniaCoordinator(hass, MagicMock(data={"mqtt_prefix": "ebusd"}))
+        coord._state[("hmux0", "status01")] = {"temp1": 35.0}
+
+        # Seed initial state: Monday has 3 slots
+        coord.async_set_optimistic_active_slots("HwcTimer", "Monday", 3)
+        coord._state[(CIRCUIT_BASS3, "HwcTimer_Monday")] = _slot(8, 0, 10, 0)
+        coord._state[(CIRCUIT_BASS3, "HwcTimer_Monday_Slot2")] = _slot(12, 0, 14, 0)
+        coord._state[(CIRCUIT_BASS3, "HwcTimer_Monday_Slot3")] = _slot(17, 0, 20, 0)
+
+        written_params: list[tuple[str, str, str]] = []
+
+        async def record_write(circuit: str, message: str, payload: str) -> None:
+            written_params.append((circuit, message, payload))
+
+        coord.async_write_parameter = AsyncMock(side_effect=record_write)
+        hass.data = {DOMAIN: {"entry_id": coord}}
+        _async_register_services(hass)
+
+        # Delete Slot 2: Slot 3 should become Slot 2, total_slots = 2
+        call = MagicMock()
+        call.data = {
+            "circuit_type": "dhw",
+            "day": "Monday",
+            "action": "delete",
+            "slot": 2,
+        }
+        asyncio.run(services[SERVICE_SET_WEEKLY_TIMER](call))
+
+        self.assertEqual(len(written_params), 2)
+        self.assertEqual(
+            written_params[0],
+            (CIRCUIT_BASS3, "HwcTimer_Monday", "2;8;0;10;0;50.0"),
+        )
+        self.assertEqual(
+            written_params[1],
+            (CIRCUIT_BASS3, "HwcTimer_Monday_Slot2", "2;17;0;20;0;50.0"),
+        )
+        self.assertEqual(_get_active_slot_count(coord, "HwcTimer", "Monday"), 2)
+
+    def test_service_spanish_day_names_accepted(self) -> None:
+        """Verify Spanish day names (Lunes, Fin de semana, Todos) are normalized and accepted."""
+        hass = MagicMock()
+        services: dict[str, Any] = {}
+        hass.services.has_service.return_value = False
+        hass.services.async_register.side_effect = (
+            lambda d, s, h, schema=None, *args, **kwargs: services.update({s: h})
+        )
+
+        coord = SaunierGeniaCoordinator(hass, MagicMock(data={"mqtt_prefix": "ebusd"}))
+        coord._state[("hmux0", "status01")] = {"temp1": 35.0}
+
+        written_params: list[tuple[str, str, str]] = []
+
+        async def record_write(circuit: str, message: str, payload: str) -> None:
+            written_params.append((circuit, message, payload))
+
+        coord.async_write_parameter = AsyncMock(side_effect=record_write)
+        hass.data = {DOMAIN: {"entry_id": coord}}
+        _async_register_services(hass)
+
+        # 1. "Lunes" with reset_remaining
+        call1 = MagicMock()
+        call1.data = {
+            "circuit_type": "dhw",
+            "day": "Lunes",
+            "slot": 1,
+            "start_time": "13:10",
+            "end_time": "14:50",
+            "reset_remaining": True,
+        }
+        asyncio.run(services[SERVICE_SET_WEEKLY_TIMER](call1))
+        self.assertEqual(len(written_params), 1)
+        self.assertEqual(written_params[0][1], "HwcTimer_Monday")
+
+        # 2. "Fin de semana"
+        written_params.clear()
+        coord.async_set_optimistic_active_slots("HwcTimer", "Saturday", 1)
+        coord.async_set_optimistic_active_slots("HwcTimer", "Sunday", 1)
+        call2 = MagicMock()
+        call2.data = {
+            "circuit_type": "dhw",
+            "day": "Fin de semana",
+            "slot": 1,
+            "start_time": "10:00",
+            "end_time": "12:00",
+            "reset_remaining": True,
+        }
+        asyncio.run(services[SERVICE_SET_WEEKLY_TIMER](call2))
+        self.assertEqual(len(written_params), 2)
+        self.assertEqual(written_params[0][1], "HwcTimer_Saturday")
+        self.assertEqual(written_params[1][1], "HwcTimer_Sunday")
+
+    def test_service_zero_zero_rejected_with_action_advice(self) -> None:
+        """Verify start_time='00:00' and end_time='00:00' raises educational error advising '24:00' or 'delete'/'clear'."""
+        hass = MagicMock()
+        services: dict[str, Any] = {}
+        hass.services.has_service.return_value = False
+        hass.services.async_register.side_effect = (
+            lambda d, s, h, schema=None, *args, **kwargs: services.update({s: h})
+        )
+
+        coord = SaunierGeniaCoordinator(hass, MagicMock(data={"mqtt_prefix": "ebusd"}))
+        coord._state[("hmux0", "status01")] = {"temp1": 35.0}
+        hass.data = {DOMAIN: {"entry_id": coord}}
+        _async_register_services(hass)
+
+        call = MagicMock()
+        call.data = {
+            "circuit_type": "dhw",
+            "day": "Monday",
+            "action": "set",
+            "slot": 1,
+            "start_time": "00:00",
+            "end_time": "00:00",
+        }
+        with self.assertRaises(HomeAssistantError) as ctx:
+            asyncio.run(services[SERVICE_SET_WEEKLY_TIMER](call))
+        self.assertIn(
+            "To program a full 24-hour day (all day), set end_time to '24:00'",
+            str(ctx.exception),
+        )
+        self.assertIn("action to 'delete' or 'clear'", str(ctx.exception))
+
+    def test_service_full_day_twenty_four_hours(self) -> None:
+        """Verify start_time='00:00' and end_time='24:00' correctly encodes 24-hour full day."""
+        hass = MagicMock()
+        services: dict[str, Any] = {}
+        hass.services.has_service.return_value = False
+        hass.services.async_register.side_effect = (
+            lambda d, s, h, schema=None, *args, **kwargs: services.update({s: h})
+        )
+
+        coord = SaunierGeniaCoordinator(hass, MagicMock(data={"mqtt_prefix": "ebusd"}))
+        coord._state[("hmux0", "status01")] = {"temp1": 35.0}
+
+        written_params: list[tuple[str, str, str]] = []
+
+        async def record_write(circuit: str, message: str, payload: str) -> None:
+            written_params.append((circuit, message, payload))
+
+        coord.async_write_parameter = AsyncMock(side_effect=record_write)
+        hass.data = {DOMAIN: {"entry_id": coord}}
+        _async_register_services(hass)
+
+        call = MagicMock()
+        call.data = {
+            "circuit_type": "heating",
+            "day": "Monday",
+            "action": "set",
+            "slot": 1,
+            "start_time": "00:00",
+            "end_time": "24:00",
+            "temp": 20.5,
+            "reset_remaining": True,
+        }
+        asyncio.run(services[SERVICE_SET_WEEKLY_TIMER](call))
+
+        self.assertEqual(len(written_params), 1)
+        self.assertEqual(
+            written_params[0],
+            (CIRCUIT_BASS3, "Z1Timer_Monday", "1;0;0;24;0;20.5"),
+        )
+        self.assertEqual(_get_active_slot_count(coord, "Z1Timer", "Monday"), 1)
 
 
 if __name__ == "__main__":

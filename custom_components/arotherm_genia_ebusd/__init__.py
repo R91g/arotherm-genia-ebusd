@@ -61,15 +61,67 @@ _LOGGER = logging.getLogger(__name__)
 
 TIME_PATTERN = re.compile(r"^(([01]?\d|2[0-3]):([0-5]\d)|24:00)$")
 
+DAY_NAME_MAPPING: dict[str, str] = {
+    # English canonical
+    "monday": "Monday",
+    "tuesday": "Tuesday",
+    "wednesday": "Wednesday",
+    "thursday": "Thursday",
+    "friday": "Friday",
+    "saturday": "Saturday",
+    "sunday": "Sunday",
+    "weekdays": "Weekdays",
+    "weekend": "Weekend",
+    "all": "All",
+    # Spanish localized
+    "lunes": "Monday",
+    "martes": "Tuesday",
+    "miercoles": "Wednesday",
+    "miércoles": "Wednesday",
+    "jueves": "Thursday",
+    "viernes": "Friday",
+    "sabado": "Saturday",
+    "sábado": "Saturday",
+    "domingo": "Sunday",
+    "laborables": "Weekdays",
+    "lunes a viernes": "Weekdays",
+    "entre semana": "Weekdays",
+    "semana": "Weekdays",
+    "fin de semana": "Weekend",
+    "finde": "Weekend",
+    "todos": "All",
+    "toda la semana": "All",
+    "lunes a domingo": "All",
+}
+
+
+def normalize_day_name(day_str: str) -> str:
+    """Normalize day string (in English or Spanish) to canonical day name."""
+    cleaned = day_str.strip().lower()
+    canonical = DAY_NAME_MAPPING.get(cleaned)
+    if canonical:
+        return canonical
+    for w in [*WEEKDAYS_LIST, "Weekdays", "Weekend", "All"]:
+        if w.lower() == cleaned:
+            return w
+    raise HomeAssistantError(
+        f"Invalid day '{day_str}'. Valid days are Monday to Sunday (or Lunes a Domingo), "
+        "'Weekdays' ('Laborables'), 'Weekend' ('Fin de semana'), or 'All' ('Todos')."
+    )
+
+
 SET_WEEKLY_TIMER_SCHEMA = vol.Schema(
     {
         vol.Required("circuit_type"): vol.In(
             ["heating", "dhw", "cooling", "circulation"]
         ),
-        vol.Required("day"): vol.In([*WEEKDAYS_LIST, "Weekdays", "All"]),
+        vol.Required("day"): cv.string,
+        vol.Optional("action", default="set"): vol.In(["set", "delete", "clear"]),
         vol.Optional("slot", default=1): vol.In([1, 2, 3]),
-        vol.Required("start_time"): cv.string,
-        vol.Required("end_time"): cv.string,
+        vol.Optional("start_time"): cv.string,
+        vol.Optional("end_time"): cv.string,
+        vol.Optional("temp"): vol.All(vol.Coerce(float), vol.Range(min=5.0, max=80.0)),
+        vol.Optional("reset_remaining", default=False): cv.boolean,
     }
 )
 
@@ -165,9 +217,11 @@ def _parse_hhmm(time_str: str, is_end: bool = False) -> tuple[int, int]:
     return hour, minute
 
 
-def _time_to_minutes(hour: int, minute: int, is_end: bool = False) -> int:
+def _time_to_minutes(
+    hour: int, minute: int, is_end: bool = False, start_minutes: int = 0
+) -> int:
     """Convert hour and minute into minutes from 00:00 (0 to 1440)."""
-    if is_end and (hour == 24 or (hour == 0 and minute == 0)):
+    if is_end and (hour == 24 or (hour == 0 and minute == 0 and start_minutes > 0)):
         return 1440
     return hour * 60 + minute
 
@@ -389,6 +443,177 @@ def upper_slots_to_writes(
     return [(f"{prefix}_{day_name}_Slot{n}", data) for n, data in upper_slots]
 
 
+def _get_default_circuit_temp(
+    coordinator: SaunierGeniaCoordinator, circuit_type: str
+) -> float:
+    """Return default or active target temperature for a timer circuit."""
+    if circuit_type == "dhw":
+        msg = coordinator.get_message(CIRCUIT_BASS3, "HwcTempDesired") or {}
+        raw = msg.get("temp", msg.get("value"))
+        if raw is not None:
+            try:
+                return float(raw)
+            except (ValueError, TypeError):
+                pass
+        return 50.0
+    if circuit_type == "heating":
+        msg = coordinator.get_message(CIRCUIT_BASS3, "Z1DayTemp") or {}
+        raw = msg.get("temp", msg.get("value"))
+        if raw is not None:
+            try:
+                return float(raw)
+            except (ValueError, TypeError):
+                pass
+        return 20.0
+    if circuit_type == "cooling":
+        msg = coordinator.get_message(CIRCUIT_BASS3, "Z1CoolingTempDesired") or {}
+        raw = msg.get("temp", msg.get("value"))
+        if raw is not None:
+            try:
+                return float(raw)
+            except (ValueError, TypeError):
+                pass
+        return 22.0
+    # Circulation uses 20.0 as standard dummy temperature setpoint in eBUS telegrams
+    return 20.0
+
+
+async def _async_collect_day_writes(
+    coordinator: SaunierGeniaCoordinator,
+    prefix: str,
+    day_name: str,
+    new_total: int,
+    target_slot: int,
+    target_from_h: int,
+    target_from_m: int,
+    target_to_h: int,
+    target_to_m: int,
+    target_temp: float,
+    default_temp: float,
+) -> list[tuple[str, str]]:
+    """Generate ordered (message, payload) writes for all active slots of day_name.
+
+    In the b5 55 a6 protocol, all active slots for a given day must be written
+    with total_slots equal to new_total and include the target temperature setpoint.
+    """
+    writes: list[tuple[str, str]] = []
+    for s_idx in range(1, new_total + 1):
+        suffix = "" if s_idx == 1 else f"_Slot{s_idx}"
+        msg_name = f"{prefix}_{day_name}{suffix}"
+        if s_idx == target_slot:
+            fh = target_from_h
+            fm = target_from_m
+            th = target_to_h
+            tm = target_to_m
+            slot_temp = target_temp
+        else:
+            msg = coordinator.get_message(CIRCUIT_BASS3, msg_name)
+            fields = (
+                [msg.get(k) for k in ("from_hour", "from_min", "to_hour", "to_min")]
+                if msg
+                else []
+            )
+            if (not fields or any(v is None for v in fields)) and hasattr(
+                coordinator, "async_request_get"
+            ):
+                with contextlib.suppress(Exception):
+                    await coordinator.async_request_get(CIRCUIT_BASS3, msg_name)
+                    for _ in range(10):
+                        await asyncio.sleep(0.05)
+                        msg = coordinator.get_message(CIRCUIT_BASS3, msg_name)
+                        fields = (
+                            [
+                                msg.get(k)
+                                for k in (
+                                    "from_hour",
+                                    "from_min",
+                                    "to_hour",
+                                    "to_min",
+                                )
+                            ]
+                            if msg
+                            else []
+                        )
+                        if fields and not any(v is None for v in fields):
+                            break
+            if not fields or any(v is None for v in fields):
+                raise HomeAssistantError(
+                    f"Cannot safely modify slot {target_slot} on {day_name}: current data of "
+                    f"slot {s_idx} is unknown, rewriting would erase it. "
+                    "Wait for the schedule to be read from the bus and retry."
+                )
+            try:
+                raw_fh, raw_fm, raw_th, raw_tm = (
+                    int(v) for v in fields if v is not None
+                )
+            except (TypeError, ValueError) as err:
+                raise HomeAssistantError(
+                    f"Invalid stored data for slot {s_idx} on {day_name}."
+                ) from err
+            fh = raw_fh
+            fm = raw_fm
+            th = (
+                24
+                if (raw_th == 24 or (raw_th == 0 and raw_tm == 0 and raw_fh > 0))
+                else raw_th
+            )
+            tm = 0 if th == 24 else raw_tm
+            raw_temp = msg.get("temp", msg.get("cooling_temp")) if msg else None
+            try:
+                slot_temp = float(raw_temp) if raw_temp is not None else default_temp
+            except (ValueError, TypeError):
+                slot_temp = default_temp
+
+        payload = f"{new_total};{fh};{fm};{th};{tm};{slot_temp:.1f}"
+        writes.append((msg_name, payload))
+    return writes
+
+
+async def _async_hydrate_day_schedule(
+    coordinator: SaunierGeniaCoordinator,
+    prefix: str,
+    day_name: str,
+    active_count: int,
+    exclude_slot: int | None = None,
+    timeout: float = 2.0,
+) -> None:
+    """Read all active slots for day_name from physical bus via MQTT if not already cached."""
+    if not hasattr(coordinator, "async_request_get"):
+        return
+    for s_idx in range(1, active_count + 1):
+        if s_idx == exclude_slot:
+            continue
+        suffix = "" if s_idx == 1 else f"_Slot{s_idx}"
+        msg_name = f"{prefix}_{day_name}{suffix}"
+        msg = coordinator.get_message(CIRCUIT_BASS3, msg_name)
+        fields = (
+            [msg.get(k) for k in ("from_hour", "from_min", "to_hour", "to_min")]
+            if msg
+            else []
+        )
+        if not fields or any(v is None for v in fields):
+            with contextlib.suppress(Exception):
+                await coordinator.async_request_get(CIRCUIT_BASS3, msg_name)
+                for _ in range(int(timeout / 0.1)):
+                    await asyncio.sleep(0.1)
+                    msg = coordinator.get_message(CIRCUIT_BASS3, msg_name)
+                    fields = (
+                        [
+                            msg.get(k)
+                            for k in (
+                                "from_hour",
+                                "from_min",
+                                "to_hour",
+                                "to_min",
+                            )
+                        ]
+                        if msg
+                        else []
+                    )
+                    if fields and not any(v is None for v in fields):
+                        break
+
+
 def _validate_daily_schedule(
     coordinator: SaunierGeniaCoordinator,
     prefix: str,
@@ -485,33 +710,62 @@ def _async_register_services(hass: HomeAssistant) -> None:
                 raise HomeAssistantError(f"No configured instances of {DOMAIN} found.")
 
             circuit_type: str = call.data["circuit_type"]
-            day_selection: str = call.data["day"]
+            raw_day: str = call.data["day"]
+            day_selection = normalize_day_name(raw_day)
+            action: str = str(call.data.get("action", "set")).strip().lower()
             slot: int = int(call.data.get("slot", 1))
-            start_time: str = call.data["start_time"]
-            end_time: str = call.data["end_time"]
+            start_time_raw: str | None = call.data.get("start_time")
+            end_time_raw: str | None = call.data.get("end_time")
+            temp_input: float | None = call.data.get("temp")
+            reset_remaining: bool = bool(call.data.get("reset_remaining", False))
 
-            from_h, from_m = _parse_hhmm(start_time, is_end=False)
-            to_h, to_m = _parse_hhmm(end_time, is_end=True)
+            if action == "set":
+                if not start_time_raw or not end_time_raw:
+                    raise HomeAssistantError(
+                        "Parameters 'start_time' and 'end_time' are required when action is 'set'."
+                    )
+                start_time = start_time_raw.strip()
+                end_time = end_time_raw.strip()
+                from_h, from_m = _parse_hhmm(start_time, is_end=False)
+                to_h, to_m = _parse_hhmm(end_time, is_end=True)
 
-            from_minutes = _time_to_minutes(from_h, from_m, is_end=False)
-            to_minutes = _time_to_minutes(to_h, to_m, is_end=True)
-
-            if from_minutes >= to_minutes:
-                raise HomeAssistantError(
-                    f"Start time '{start_time}' must be earlier than end time '{end_time}'. "
-                    "Time slots cannot cross midnight into the next day."
+                from_minutes = _time_to_minutes(from_h, from_m, is_end=False)
+                to_minutes = _time_to_minutes(
+                    to_h, to_m, is_end=True, start_minutes=from_minutes
                 )
 
-            # Wire encoding: if end is midnight (1440 minutes), write hour 24
-            wire_to_h = 24 if to_minutes == 1440 else to_h
-            wire_to_m = 0 if to_minutes == 1440 else to_m
+                if from_minutes >= to_minutes:
+                    if from_minutes == 0 and to_minutes == 0:
+                        raise HomeAssistantError(
+                            "Start time '00:00' cannot be equal to end time '00:00'. "
+                            "To program a full 24-hour day (all day), set end_time to '24:00'. "
+                            "To delete this slot or clear the day, set action to 'delete' or 'clear'."
+                        )
+                    if from_minutes == to_minutes:
+                        raise HomeAssistantError(
+                            f"Start time '{start_time}' cannot be equal to end time '{end_time}'. "
+                            "To delete this slot or clear the day, set action to 'delete' or 'clear'."
+                        )
+                    raise HomeAssistantError(
+                        f"Start time '{start_time}' must be earlier than end time '{end_time}'. "
+                        "Time slots cannot cross midnight into the next day."
+                    )
+
+                # Wire encoding: if end is midnight (1440 minutes), write hour 24
+                wire_to_h = 24 if to_minutes == 1440 else to_h
+                wire_to_m = 0 if to_minutes == 1440 else to_m
+            else:
+                start_time = ""
+                end_time = ""
+                from_h = from_m = wire_to_h = wire_to_m = 0
+                from_minutes = to_minutes = 0
 
             prefix = TIMER_CIRCUIT_PREFIXES[circuit_type]
-            slot_suffix = "" if slot == 1 else f"_Slot{slot}"
-            payload = f"{from_h};{from_m};{wire_to_h};{wire_to_m}"
 
             if day_selection == "Weekdays":
                 target_days = WEEKDAYS_LIST[:5]
+            elif day_selection == "Weekend":
+                target_days = WEEKDAYS_LIST[5:]
             elif day_selection == "All":
                 target_days = WEEKDAYS_LIST
             else:
@@ -524,24 +778,156 @@ def _async_register_services(hass: HomeAssistant) -> None:
                     )
 
                 async with coordinator.timer_write_lock:
+                    default_temp = _get_default_circuit_temp(coordinator, circuit_type)
+                    target_temp = (
+                        float(temp_input) if temp_input is not None else default_temp
+                    )
+
                     # Validate every target day BEFORE writing anything, so a rejected
                     # request never leaves the schedule half-modified.
-                    plans: list[tuple[str, list[tuple[int, str]], int]] = []
+                    plans: list[tuple[str, int, list[tuple[str, str]]]] = []
                     for day_name in target_days:
+                        if action == "clear":
+                            writes = [
+                                (
+                                    f"{prefix}_{day_name}",
+                                    f"0;0;0;0;0;{default_temp:.1f}",
+                                )
+                            ]
+                            plans.append((day_name, 0, writes))
+                            continue
+
                         active_count = _get_active_slot_count(
                             coordinator, prefix, day_name
                         )
+                        if (
+                            active_count is None
+                            and reset_remaining
+                            and slot == 1
+                            and action == "set"
+                        ):
+                            # Explicit single slot overwrite requested: no prior slot state needed
+                            active_count = 1
+
+                        if active_count is None and hasattr(
+                            coordinator, "async_request_get"
+                        ):
+                            with contextlib.suppress(Exception):
+                                await coordinator.async_request_get(
+                                    CIRCUIT_BASS3, f"{prefix}_Slots"
+                                )
+                                for _ in range(25):
+                                    await asyncio.sleep(0.1)
+                                    active_count = _get_active_slot_count(
+                                        coordinator, prefix, day_name
+                                    )
+                                    if active_count is not None:
+                                        break
+
                         if active_count is None:
                             raise HomeAssistantError(
                                 f"Cannot modify schedule for {day_name}: active slot count "
-                                f"({prefix}_Slots) is not known yet. Wait for eBUS telemetry "
-                                "or read the schedule first."
+                                f"({prefix}_Slots) is not known yet. Wait for eBUS telemetry, "
+                                "or pass 'reset_remaining: true' with slot 1 to overwrite the schedule without waiting."
                             )
+
+                        if action == "delete":
+                            if active_count == 0 or slot > active_count:
+                                # Day is already empty or slot does not exist: clear to 0 safely
+                                writes = [
+                                    (
+                                        f"{prefix}_{day_name}",
+                                        f"0;0;0;0;0;{default_temp:.1f}",
+                                    )
+                                ]
+                                plans.append((day_name, 0, writes))
+                                continue
+
+                            # Hydrate all active slots of this day to preserve remaining ones
+                            await _async_hydrate_day_schedule(
+                                coordinator=coordinator,
+                                prefix=prefix,
+                                day_name=day_name,
+                                active_count=active_count,
+                                exclude_slot=None,
+                            )
+
+                            if active_count <= 1:
+                                # Deleting the only active slot clears the day to 0 slots
+                                writes = [
+                                    (
+                                        f"{prefix}_{day_name}",
+                                        f"0;0;0;0;0;{default_temp:.1f}",
+                                    )
+                                ]
+                                plans.append((day_name, 0, writes))
+                            else:
+                                remaining_slots: list[
+                                    tuple[int, int, int, int, float]
+                                ] = []
+                                for s_idx in range(1, active_count + 1):
+                                    if s_idx == slot:
+                                        continue
+                                    suffix = "" if s_idx == 1 else f"_Slot{s_idx}"
+                                    msg = (
+                                        coordinator.get_message(
+                                            CIRCUIT_BASS3,
+                                            f"{prefix}_{day_name}{suffix}",
+                                        )
+                                        or {}
+                                    )
+                                    try:
+                                        fh = int(msg.get("from_hour", 0))
+                                        fm = int(msg.get("from_min", 0))
+                                        th = int(msg.get("to_hour", 0))
+                                        tm = int(msg.get("to_min", 0))
+                                        raw_t = msg.get("temp", msg.get("cooling_temp"))
+                                        st = (
+                                            float(raw_t)
+                                            if raw_t is not None
+                                            else default_temp
+                                        )
+                                    except (TypeError, ValueError):
+                                        fh = fm = th = tm = 0
+                                        st = default_temp
+                                    remaining_slots.append((fh, fm, th, tm, st))
+
+                                new_total = len(remaining_slots)
+                                writes = []
+                                for new_idx, (
+                                    fh,
+                                    fm,
+                                    th,
+                                    tm,
+                                    st,
+                                ) in enumerate(remaining_slots, 1):
+                                    suffix = "" if new_idx == 1 else f"_Slot{new_idx}"
+                                    writes.append(
+                                        (
+                                            f"{prefix}_{day_name}{suffix}",
+                                            f"{new_total};{fh};{fm};{th};{tm};{st:.1f}",
+                                        )
+                                    )
+                                plans.append((day_name, new_total, writes))
+                            continue
+
+                        # action == "set"
                         if slot > active_count + 1:
                             raise HomeAssistantError(
                                 f"Cannot write slot {slot} on {day_name}: only "
                                 f"{active_count} slot(s) are currently active. "
                                 f"Fill slot {active_count + 1} first."
+                            )
+
+                        new_total = slot if reset_remaining else max(active_count, slot)
+
+                        if not (reset_remaining and slot == 1):
+                            await _async_hydrate_day_schedule(
+                                coordinator=coordinator,
+                                prefix=prefix,
+                                day_name=day_name,
+                                active_count=active_count,
+                                exclude_slot=slot,
                             )
 
                         _validate_daily_schedule(
@@ -553,29 +939,31 @@ def _async_register_services(hass: HomeAssistant) -> None:
                             to_minutes=to_minutes,
                             start_time_str=start_time,
                             end_time_str=end_time,
-                            active_count=active_count,
+                            active_count=new_total if reset_remaining else active_count,
                         )
 
-                        upper_slots = _collect_upper_slots(
-                            coordinator, prefix, day_name, slot, active_count
+                        writes = await _async_collect_day_writes(
+                            coordinator=coordinator,
+                            prefix=prefix,
+                            day_name=day_name,
+                            new_total=new_total,
+                            target_slot=slot,
+                            target_from_h=from_h,
+                            target_from_m=from_m,
+                            target_to_h=wire_to_h,
+                            target_to_m=wire_to_m,
+                            target_temp=target_temp,
+                            default_temp=default_temp,
                         )
-                        new_total = max(active_count, slot)
-                        plans.append((day_name, upper_slots, new_total))
+                        plans.append((day_name, new_total, writes))
 
                     # Physical eBUS bus runs at 2400 baud (~240 bytes/s) with hardware collision
                     # arbitration. Consecutive writes require pacing (~600 ms) to prevent
                     # bus arbitration collisions with MiPro Sense or buffer overflows.
                     first_write = True
-                    for day_name, upper_slots, new_total in plans:
+                    for day_name, new_total, writes in plans:
                         try:
-                            # The b5 55 write command carries a hardcoded total_slots byte equal to
-                            # the slot index, so writing slot N truncates the day to N slots.
-                            # Rewrite the previously active upper slots (ascending) with their
-                            # current data afterwards to restore the correct total_slots.
-                            writes: list[tuple[str, str]] = [
-                                (f"{prefix}_{day_name}{slot_suffix}", payload),
-                                *upper_slots_to_writes(prefix, day_name, upper_slots),
-                            ]
+                            # In b5 55 a6 protocol, all active slots for a day carry total_slots = new_total
                             for message, msg_payload in writes:
                                 if not first_write:
                                     await asyncio.sleep(0.6)
