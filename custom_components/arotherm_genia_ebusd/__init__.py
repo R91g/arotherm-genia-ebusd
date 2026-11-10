@@ -240,6 +240,14 @@ def _async_cleanup_deprecated_entities(hass: HomeAssistant, entry: ConfigEntry) 
                 reg_entry.unique_id,
             )
             ent_reg.async_remove(reg_entry.entity_id)
+        elif reg_entry.entity_id.endswith(
+            "_consigna_confort_calefaccion_zona_1_dia"
+        ) or reg_entry.entity_id.endswith("_zone_1_comfort_heating_setpoint_day"):
+            _LOGGER.info(
+                "Purging legacy entity %s to regenerate entity ID without 'calefaccion/heating'",
+                reg_entry.entity_id,
+            )
+            ent_reg.async_remove(reg_entry.entity_id)
 
 
 def _async_migrate_legacy_device_names(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -564,7 +572,10 @@ async def _async_collect_day_writes(
             except (ValueError, TypeError):
                 slot_temp = default_temp
 
-        payload = f"{new_total};{fh};{fm};{th};{tm};{slot_temp:.1f}"
+        if prefix == "CirculationTimer":
+            payload = f"{new_total};{fh};{fm};{th};{tm}"
+        else:
+            payload = f"{new_total};{fh};{fm};{th};{tm};{slot_temp:.1f}"
         writes.append((msg_name, payload))
     return writes
 
@@ -788,12 +799,12 @@ def _async_register_services(hass: HomeAssistant) -> None:
                     plans: list[tuple[str, int, list[tuple[str, str]]]] = []
                     for day_name in target_days:
                         if action == "clear":
-                            writes = [
-                                (
-                                    f"{prefix}_{day_name}",
-                                    f"0;0;0;0;0;{default_temp:.1f}",
-                                )
-                            ]
+                            clear_payload = (
+                                "0;0;0;0;0"
+                                if prefix == "CirculationTimer"
+                                else f"0;0;0;0;0;{default_temp:.1f}"
+                            )
+                            writes = [(f"{prefix}_{day_name}", clear_payload)]
                             plans.append((day_name, 0, writes))
                             continue
 
@@ -832,14 +843,14 @@ def _async_register_services(hass: HomeAssistant) -> None:
                             )
 
                         if action == "delete":
+                            empty_payload = (
+                                "0;0;0;0;0"
+                                if prefix == "CirculationTimer"
+                                else f"0;0;0;0;0;{default_temp:.1f}"
+                            )
                             if active_count == 0 or slot > active_count:
                                 # Day is already empty or slot does not exist: clear to 0 safely
-                                writes = [
-                                    (
-                                        f"{prefix}_{day_name}",
-                                        f"0;0;0;0;0;{default_temp:.1f}",
-                                    )
-                                ]
+                                writes = [(f"{prefix}_{day_name}", empty_payload)]
                                 plans.append((day_name, 0, writes))
                                 continue
 
@@ -854,12 +865,7 @@ def _async_register_services(hass: HomeAssistant) -> None:
 
                             if active_count <= 1:
                                 # Deleting the only active slot clears the day to 0 slots
-                                writes = [
-                                    (
-                                        f"{prefix}_{day_name}",
-                                        f"0;0;0;0;0;{default_temp:.1f}",
-                                    )
-                                ]
+                                writes = [(f"{prefix}_{day_name}", empty_payload)]
                                 plans.append((day_name, 0, writes))
                             else:
                                 remaining_slots: list[
@@ -902,10 +908,15 @@ def _async_register_services(hass: HomeAssistant) -> None:
                                     st,
                                 ) in enumerate(remaining_slots, 1):
                                     suffix = "" if new_idx == 1 else f"_Slot{new_idx}"
+                                    payload = (
+                                        f"{new_total};{fh};{fm};{th};{tm}"
+                                        if prefix == "CirculationTimer"
+                                        else f"{new_total};{fh};{fm};{th};{tm};{st:.1f}"
+                                    )
                                     writes.append(
                                         (
                                             f"{prefix}_{day_name}{suffix}",
-                                            f"{new_total};{fh};{fm};{th};{tm};{st:.1f}",
+                                            payload,
                                         )
                                     )
                                 plans.append((day_name, new_total, writes))

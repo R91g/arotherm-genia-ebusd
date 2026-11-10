@@ -14,14 +14,15 @@ from homeassistant.components.climate import HVACMode
 from custom_components.arotherm_genia_ebusd.climate import (
     COOLING_ACTIVE_MODES,
     HEATING_ACTIVE_MODES,
+    PRESET_COMFORT,
     PRESET_ECO,
+    PRESET_MANUAL,
     SEASON_COOLING,
     SEASON_HEATING,
     SaunierGeniaZone1Climate,
 )
 from custom_components.arotherm_genia_ebusd.const import (
     CIRCUIT_BASS3,
-    CIRCUIT_BROADCAST,
 )
 
 
@@ -139,29 +140,18 @@ class TestClimateEntity(unittest.TestCase):
             (CIRCUIT_BASS3, "Z1OpModeCooling", "night"), self.coordinator.writes
         )
 
-    def test_auto_mode_transitions_to_cooling_when_hot_outside(self) -> None:
-        """Verify setting HVACMode.AUTO with high outside temp activates cooling even if previous was heating."""
-        self.climate._active_season = SEASON_HEATING
-        self.coordinator._state[(CIRCUIT_BROADCAST.lower(), "outsidetemp")] = {
-            "temp": 28.5
-        }
-
-        asyncio.run(self.climate.async_set_hvac_mode(HVACMode.AUTO))
-
-        self.assertEqual(self.climate._active_season, SEASON_COOLING)
-        self.assertIn((CIRCUIT_BASS3, "Z1OpMode", "off"), self.coordinator.writes)
-        self.assertIn(
-            (CIRCUIT_BASS3, "Z1OpModeCooling", "auto"), self.coordinator.writes
+    def test_hvac_modes_contains_only_off_heat_cool(self) -> None:
+        """Verify HVACMode.AUTO is removed and only OFF, HEAT, COOL are exposed."""
+        self.assertEqual(
+            self.climate.hvac_modes,
+            [HVACMode.OFF, HVACMode.HEAT, HVACMode.COOL],
         )
+        self.assertNotIn(HVACMode.AUTO, self.climate.hvac_modes)
 
-    def test_auto_mode_transitions_to_heating_when_cold_outside(self) -> None:
-        """Verify setting HVACMode.AUTO with low outside temp activates heating even if previous was cooling."""
+    def test_apply_hvac_mode_heat_sets_heating_and_preserves_schedule(self) -> None:
+        """Verify setting HVACMode.HEAT turns off cooling and writes Z1OpMode=auto by default."""
         self.climate._active_season = SEASON_COOLING
-        self.coordinator._state[(CIRCUIT_BROADCAST.lower(), "outsidetemp")] = {
-            "temp": 12.0
-        }
-
-        asyncio.run(self.climate.async_set_hvac_mode(HVACMode.AUTO))
+        asyncio.run(self.climate.async_set_hvac_mode(HVACMode.HEAT))
 
         self.assertEqual(self.climate._active_season, SEASON_HEATING)
         self.assertIn(
@@ -169,16 +159,74 @@ class TestClimateEntity(unittest.TestCase):
         )
         self.assertIn((CIRCUIT_BASS3, "Z1OpMode", "auto"), self.coordinator.writes)
 
-    def test_auto_mode_preserves_previous_season_when_outside_temp_none(self) -> None:
-        """Verify setting HVACMode.AUTO without outside temp sensor falls back to previous season."""
-        self.climate._active_season = SEASON_COOLING
-        # No outside temp in coordinator
-        asyncio.run(self.climate.async_set_hvac_mode(HVACMode.AUTO))
+    def test_apply_hvac_mode_cool_sets_cooling_and_opens_calendar(self) -> None:
+        """Verify setting HVACMode.COOL turns off heating, opens calendar lock, and writes Z1OpModeCooling=auto."""
+        self.climate._active_season = SEASON_HEATING
+        asyncio.run(self.climate.async_set_hvac_mode(HVACMode.COOL))
 
         self.assertEqual(self.climate._active_season, SEASON_COOLING)
+        self.assertIn((CIRCUIT_BASS3, "Z1OpMode", "off"), self.coordinator.writes)
         self.assertIn(
             (CIRCUIT_BASS3, "Z1OpModeCooling", "auto"), self.coordinator.writes
         )
+
+    def test_hvac_mode_stays_heat_across_presets(self) -> None:
+        """Verify hvac_mode remains HVACMode.HEAT across comfort (auto), manual (day), and eco (night) presets."""
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "off"
+        }
+
+        # Preset comfort (Z1OpMode = "auto")
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "auto"}
+        self.assertEqual(self.climate.hvac_mode, HVACMode.HEAT)
+        self.assertEqual(self.climate.preset_mode, PRESET_COMFORT)
+
+        # Preset manual (Z1OpMode = "day")
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "day"}
+        self.assertEqual(self.climate.hvac_mode, HVACMode.HEAT)
+        self.assertEqual(self.climate.preset_mode, PRESET_MANUAL)
+
+        # Preset eco (Z1OpMode = "night")
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {
+            "value": "night"
+        }
+        self.assertEqual(self.climate.hvac_mode, HVACMode.HEAT)
+        self.assertEqual(self.climate.preset_mode, PRESET_ECO)
+
+    def test_target_temperature_prioritizes_actual_desired_and_none_when_idle(
+        self,
+    ) -> None:
+        """Verify target_temperature returns Z1ActualRoomTempDesired when active and None when idle outside schedule."""
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "off"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "auto"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1daytemp")] = {"value": 24.0}
+
+        # During active schedule slot (e.g. 21.0 °C desired)
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1actualroomtempdesired")] = {
+            "value": 21.0
+        }
+        self.assertEqual(self.climate.target_temperature, 21.0)
+
+        # Outside schedule slot at night (0.0 °C reported, idle)
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1actualroomtempdesired")] = {
+            "value": 0.0
+        }
+        self.assertIsNone(self.climate.target_temperature)
+
+    def test_cooling_release_off_with_both_auto_defaults_to_heat(self) -> None:
+        """Verify that when both modes are auto but CoolingReleaseStatus=off, heating is active (Issue #7)."""
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "auto"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "auto"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "coolingreleasestatus")] = {
+            "value": "off"
+        }
+
+        self.assertEqual(self.climate.hvac_mode, HVACMode.HEAT)
+        self.assertEqual(self.climate.preset_mode, PRESET_COMFORT)
 
     def test_climate_and_water_heater_availability(self) -> None:
         """Verify climate and DHW entities availability gates on is_ebus_operational."""

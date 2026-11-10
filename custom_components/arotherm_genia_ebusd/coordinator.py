@@ -1070,10 +1070,18 @@ class SaunierGeniaCoordinator:
 
     def get_message(self, circuit: str, message: str) -> dict[str, Any] | None:
         """Return the full normalized dict for (circuit, message), or None."""
-        c_key = circuit.lower()
+        c_key = self.resolve_circuit(circuit).lower()
         m_lower = message.lower()
         canonical = self._canonical_names.get((c_key, m_lower), message)
-        return self._state.get((c_key, canonical))
+        res = self._state.get((c_key, canonical))
+        if res is not None:
+            return res
+        # Fallback to literal circuit if resolve_circuit changed it but data was keyed by literal
+        lit_key = circuit.lower()
+        if lit_key != c_key:
+            canonical_lit = self._canonical_names.get((lit_key, m_lower), message)
+            return self._state.get((lit_key, canonical_lit))
+        return None
 
     def get_field(
         self,

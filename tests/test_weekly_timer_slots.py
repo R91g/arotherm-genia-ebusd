@@ -847,6 +847,60 @@ class TestWeeklyTimerSlots(unittest.TestCase):
         )
         self.assertEqual(_get_active_slot_count(coord, "Z1Timer", "Monday"), 1)
 
+    def test_service_circulation_writes_payload_without_temp(self) -> None:
+        """Verify circulation timer writes 5-field payload (total;fh;fm;th;tm) without temperature."""
+        hass = MagicMock()
+        services: dict[str, Any] = {}
+        hass.services.has_service.return_value = False
+        hass.services.async_register.side_effect = (
+            lambda d, s, h, schema=None, *args, **kwargs: services.update({s: h})
+        )
+
+        coord = SaunierGeniaCoordinator(hass, MagicMock(data={"mqtt_prefix": "ebusd"}))
+        coord._state[("hmux0", "status01")] = {"temp1": 35.0}
+
+        written_params: list[tuple[str, str, str]] = []
+
+        async def record_write(circuit: str, message: str, payload: str) -> None:
+            written_params.append((circuit, message, payload))
+
+        coord.async_write_parameter = AsyncMock(side_effect=record_write)
+        hass.data = {DOMAIN: {"entry_id": coord}}
+        _async_register_services(hass)
+
+        call = MagicMock()
+        call.data = {
+            "circuit_type": "circulation",
+            "day": "Monday",
+            "action": "set",
+            "slot": 1,
+            "start_time": "06:00",
+            "end_time": "22:00",
+            "reset_remaining": True,
+        }
+        asyncio.run(services[SERVICE_SET_WEEKLY_TIMER](call))
+
+        self.assertEqual(len(written_params), 1)
+        self.assertEqual(
+            written_params[0],
+            (CIRCUIT_BASS3, "CirculationTimer_Monday", "1;6;0;22;0"),
+        )
+        self.assertEqual(_get_active_slot_count(coord, "CirculationTimer", "Monday"), 1)
+
+        # Test clear action for circulation
+        call_clear = MagicMock()
+        call_clear.data = {
+            "circuit_type": "circulation",
+            "day": "Monday",
+            "action": "clear",
+        }
+        written_params.clear()
+        asyncio.run(services[SERVICE_SET_WEEKLY_TIMER](call_clear))
+        self.assertEqual(
+            written_params[0],
+            (CIRCUIT_BASS3, "CirculationTimer_Monday", "0;0;0;0;0"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

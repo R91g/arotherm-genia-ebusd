@@ -21,6 +21,7 @@ if TESTS_DIR not in sys.path:
     sys.path.insert(0, TESTS_DIR)
 
 import setup_mocks  # noqa: F401
+from homeassistant.components.climate import HVACMode
 
 from custom_components.arotherm_genia_ebusd.climate import SaunierGeniaZone1Climate
 from custom_components.arotherm_genia_ebusd.const import (
@@ -35,6 +36,7 @@ from custom_components.arotherm_genia_ebusd.const import (
     DOMAIN,
     MESSAGE_ALIASES,
     OUTDOOR_CIRCUITS,
+    PRESET_COMFORT,
 )
 from custom_components.arotherm_genia_ebusd.coordinator import SaunierGeniaCoordinator
 from custom_components.arotherm_genia_ebusd.sensor import SaunierGeniaSensor
@@ -151,7 +153,8 @@ class TestCommunityFixtures(unittest.TestCase):
                     # 8. Instantiate Climate and Water Heater entities and verify properties
                     climate = SaunierGeniaZone1Climate(coord)
                     self.assertTrue(climate.available)
-                    self.assertIsNotNone(climate.target_temperature)
+                    if climate.target_temperature is not None:
+                        self.assertIsInstance(climate.target_temperature, float)
                     self.assertIsNotNone(climate.hvac_mode)
                     if fixture_name == "saunier_geniaair_max_heating.json":
                         self.assertEqual(climate.current_humidity, 67)
@@ -245,6 +248,18 @@ class TestCommunityFixtures(unittest.TestCase):
         self.assertIsNotNone(z1_slots)
         hwc_slots = coord.get_message("ctlv3", "HwcTimer_Slots")
         self.assertIsNotNone(hwc_slots)
+
+        # Verify climate entity properties on Lassal's controller (Issue #7)
+        climate = SaunierGeniaZone1Climate(coord)
+        self.assertEqual(climate.hvac_mode, HVACMode.HEAT)
+        self.assertEqual(climate.preset_mode, PRESET_COMFORT)
+        self.assertIsNone(
+            climate.target_temperature
+        )  # Idle at night (0 °C reported by eBUS)
+
+        # When active daytime slot is simulated (e.g. 21.0 °C), target_temperature reports 21.0
+        coord._state[("ctlv3", "Z1ActualRoomTempDesired")] = {"value": 21.0}
+        self.assertEqual(climate.target_temperature, 21.0)
 
 
 if __name__ == "__main__":

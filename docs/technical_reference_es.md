@@ -238,10 +238,10 @@ El control de reducción de ruido nocturno o modo silencioso del compresor en la
 ## 5. Programación Horaria Semanal (`b5 55` / `b5 a5/a6`)
 
 La centralita `15.bass3` / `15.ctlv2` / `15.ctlv3` gobierna múltiples circuitos de temporización independientes:
-- **Circuito `03`:** Calefacción Zona 1 (`Z1Timer`)
-- **Circuito `02`:** Agua Caliente Sanitaria (`HwcTimer`)
+- **Circuito `00`:** Calefacción Zona 1 (`Z1Timer`)
 - **Circuito `01`:** Refrigeración Activa (`CoolingTimer`)
-- **Circuito `00`:** Bomba de Recirculación de ACS (`CirculationTimer`)
+- **Circuito `02`:** Agua Caliente Sanitaria (`HwcTimer`)
+- **Circuito `03`:** Bomba de Recirculación de ACS (`CirculationTimer`)
 - **Circuito `04`:** Calendario de Modo Silencioso de la Unidad Exterior (`silentTimer`)
 
 ### 5.1 Conteo de Ranuras Activas (`b5 55 a4 00`)
@@ -259,14 +259,16 @@ Las pruebas empíricas y trazas en hardware real (`BASS3` SW=0708, `CTLV2`, `CTL
   - Las ranuras se indexan en base cero en la consulta: `00` (Ranura 1), `01` (Ranura 2), `02` (Ranura 3).
 - **Datos de Respuesta:** `07 00 <from_h> <from_m> <to_h> <to_m> <temp_lsb> <temp_msb>`
   - La resolución horaria es de 10 minutos (`UCH`).
-  - **Codificación de Temperatura (`temp` / `cooling_temp`):** Todos los circuitos de confort (`01`, `02`, `03`) devuelven un entero sin signo de 2 bytes en formato Little-Endian con décimas de grado Celsius (`UIN,10,°C`). Por ejemplo, `f4 01` (hex `0x01F4` = 500) corresponde a `50,0 °C`. (En CSVs antiguos este campo se tipaba erróneamente como `D1C` de 1 byte, provocando errores `ERR: argument value out of valid range` en eBUSd).
+  - **Codificación de Temperatura (`temp` / `cooling_temp`):** Todos los circuitos de confort con consigna de temperatura (`00` Calefacción, `01` Refrigeración, `02` ACS) devuelven un entero sin signo de 2 bytes en formato Little-Endian con décimas de grado Celsius (`UIN,10,°C`). Por ejemplo, `f4 01` (hex `0x01F4` = 500) corresponde a `50,0 °C`. (En CSVs antiguos este campo se tipaba erróneamente como `D1C` de 1 byte, provocando errores `ERR: argument value out of valid range` en eBUSd).
+  - **Circuitos sin Temperatura (`03` Recirculación, `04` Modo Silencioso):** Estos circuitos no emplean consigna de temperatura; los 2 bytes finales son siempre `ff ff` (`ign_end,,IGN:2`). Si se envía un valor de temperatura al circuito `03`, la centralita rechaza la escritura respondiendo `resp = 01`.
 
 #### B. Estructura de Escritura (`a6 00`):
 - **Comando:** `10 15 b5 55 0c a6 00 <circuito> <dia> <ranura> <total_ranuras> <from_h> <from_m> <to_h> <to_m> <temp_lsb> <temp_msb>`
   - El subcomando es `a6 00` (NO `a6 ff`).
+  - `<circuito>`: `00` para Calefacción, `01` para Refrigeración, `02` para ACS, `03` para Recirculación.
   - `<ranura>`: Índice de ranura en base cero (`00` .. `02`).
   - `<total_ranuras>`: Ranuras activas totales para ese día (`01` .. `03` en días activos, o `00` al vaciar).
-  - `<temp_lsb> <temp_msb>`: Consigna de temperatura objetivo de 2 bytes en décimas de grado (`UIN,10,°C`), Little-Endian (ej. `c8 00` para 20,0 °C o `f4 01` para 50,0 °C). Los bytes finales NO son `ff ff`.
+  - `<temp_lsb> <temp_msb>`: Para circuitos con temperatura (`00`, `01`, `02`), consigna de temperatura objetivo de 2 bytes en décimas de grado (`UIN,10,°C`), Little-Endian (ej. `c8 00` para 20,0 °C o `f4 01` para 50,0 °C). Para el Circuito `03` (Recirculación), estos 2 bytes deben ser `ff ff` (`IGN:2`).
 - **Reconocimiento del Microcontrolador:** La centralita confirma escrituras correctas respondiendo `01 00`.
 
 ### 5.3 Regla de Continuidad de Ranuras, Borrado y Vaciado de Día

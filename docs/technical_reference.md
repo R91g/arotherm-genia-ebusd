@@ -238,10 +238,10 @@ Night-time noise reduction / silent mode operation on the outdoor inverter is go
 ## 5. Weekly Schedule & Multi-Timer Programming (`b5 55` / `b5 a5/a6`)
 
 The climate regulator (`15.bass3` / `15.ctlv2` / `15.ctlv3`) manages weekly schedules across multiple distinct functional circuits:
-- **Circuit `03`:** Heating Zone 1 (`Z1Timer`)
-- **Circuit `02`:** Domestic Hot Water (`HwcTimer`)
+- **Circuit `00`:** Heating Zone 1 (`Z1Timer`)
 - **Circuit `01`:** Active Cooling (`CoolingTimer`)
-- **Circuit `00`:** DHW Circulation Pump (`CirculationTimer`)
+- **Circuit `02`:** Domestic Hot Water (`HwcTimer`)
+- **Circuit `03`:** DHW Circulation Pump (`CirculationTimer`)
 - **Circuit `04`:** Outdoor Unit Silent Mode Schedule (`silentTimer`)
 
 ### 5.1 Slot Count Query (`b5 55 a4 00`)
@@ -259,14 +259,16 @@ Empirical testing on real hardware (`BASS3` SW=0708, `CTLV2`, `CTLV3`) identifie
   - Slots are zero-indexed in the query: `00` (Slot 1), `01` (Slot 2), `02` (Slot 3).
 - **Master Data / Response:** `07 00 <from_h> <from_m> <to_h> <to_m> <temp_lsb> <temp_msb>`
   - Time resolution is 10 minutes (`UCH`).
-  - **Temperature Encoding (`temp` / `cooling_temp`):** All comfort circuits (`01`, `02`, `03`) return a 2-byte unsigned little-endian integer in tenths of a degree Celsius (`UIN,10,°C`). For example, `f4 01` (hex `0x01F4` = 500) corresponds to `50.0 °C`. (Legacy CSV definitions previously misidentified this field as 1-byte `D1C`, which triggered eBUSd `ERR: argument value out of valid range` errors).
+  - **Temperature Encoding (`temp` / `cooling_temp`):** All comfort circuits with temperature (`00` Heating, `01` Cooling, `02` DHW) return a 2-byte unsigned little-endian integer in tenths of a degree Celsius (`UIN,10,°C`). For example, `f4 01` (hex `0x01F4` = 500) corresponds to `50.0 °C`. (Legacy CSV definitions previously misidentified this field as 1-byte `D1C`, which triggered eBUSd `ERR: argument value out of valid range` errors).
+  - **Circuits without Temperature (`03` Circulation, `04` Silent Mode):** These circuits do not use temperature setpoints; the trailing 2 bytes are always `ff ff` (`ign_end,,IGN:2`). Sending a non-`ffff` temperature setpoint to circuit `03` causes the controller to reject the write (`resp = 01`).
 
 #### B. Write Telegram Structure (`a6 00`):
 - **Command:** `10 15 b5 55 0c a6 00 <circuit> <day> <slot> <total_slots> <from_h> <from_m> <to_h> <to_m> <temp_lsb> <temp_msb>`
   - Note the command bytes: `a6 00` (NOT `a6 ff`).
+  - `<circuit>`: `00` for Heating, `01` for Cooling, `02` for DHW, `03` for Circulation.
   - `<slot>`: 0-indexed slot (`00` .. `02`).
   - `<total_slots>`: Total active slots for this day (`01` .. `03` when active, or `00` when clearing).
-  - `<temp_lsb> <temp_msb>`: 2-byte target temperature setpoint in tenths of a degree (`UIN,10,°C`), little-endian (e.g. `c8 00` for 20.0 °C, `f4 01` for 50.0 °C). The trailing bytes are NOT `ff ff`.
+  - `<temp_lsb> <temp_msb>`: For comfort circuits (`00`, `01`, `02`), 2-byte target temperature setpoint in tenths of a degree (`UIN,10,°C`), little-endian (e.g. `c8 00` for 20.0 °C, `f4 01` for 50.0 °C). For Circuit `03` (Circulation), these bytes must be `ff ff` (`IGN:2`).
 - **Microcontroller Acknowledgment:** The controller acknowledges valid writes with `01 00`.
 
 ### 5.3 Contiguous Slot Rule, Slot Deletion & Day Clearing

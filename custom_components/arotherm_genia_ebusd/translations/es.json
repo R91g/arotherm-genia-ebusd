@@ -171,7 +171,7 @@
         "name": "Temperatura máxima de impulsión refrigeración"
       },
       "z1_day_temp": {
-        "name": "Consigna confort calefacción Zona 1 (Día)"
+        "name": "Consigna confort Zona 1 (Día)"
       },
       "z1_night_temp": {
         "name": "Consigna reducción nocturna Zona 1 (Noche)"

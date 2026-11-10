@@ -84,7 +84,6 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             HVACMode.OFF,
             HVACMode.HEAT,
             HVACMode.COOL,
-            HVACMode.AUTO,
         ]
         self._attr_preset_modes = [
             PRESET_COMFORT,
@@ -181,41 +180,78 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
         ).lower()
         return cool_mode, heat_mode
 
+    def _is_cooling_active(self) -> bool:
+        """Return True if cooling mode is currently active."""
+        cool_mode, heat_mode = self._read_modes()
+        if cool_mode not in COOLING_ACTIVE_MODES:
+            return False
+        # If cooling is manually forced to "day", it is active
+        if cool_mode == "day":
+            return True
+        # If cooling is in "auto" or "night", check cooling release / authorization
+        cooling_release = (
+            self.coordinator.get_str(CIRCUIT_BASS3, "CoolingReleaseStatus", "value")
+            or ""
+        ).lower()
+        if cooling_release == "on":
+            return True
+        if cooling_release == "off":
+            return False
+        # Fallback when CoolingReleaseStatus not reported: heating takes precedence if active
+        return heat_mode not in HEATING_ACTIVE_MODES
+
+    def _is_heating_active(self) -> bool:
+        """Return True if heating mode is currently active."""
+        if self._is_cooling_active():
+            return False
+        _, heat_mode = self._read_modes()
+        return heat_mode in HEATING_ACTIVE_MODES
+
     def _is_cooling_context(self) -> bool:
-        """Return True if Zone 1 is in cooling (COOL, or AUTO with cooling season)."""
-        cool_mode, _ = self._read_modes()
-        return cool_mode in COOLING_ACTIVE_MODES
+        """Return True if Zone 1 is in active cooling."""
+        return self._is_cooling_active()
 
     @callback
     def _async_refresh_derived_state(self) -> None:
         """Update active season and seasonal setpoint memory from the latest bus data.
 
-        - Season: cooling if Z1OpModeCooling is auto/day, heating if Z1OpMode is
-          auto/day/night; if both are off, the last known season is kept (needed to
-          restore the right setpoint when switching back on).
+        - Season: cooling if cooling is active, heating if heating is active; if both
+          are off, the last known season is kept (needed to restore the right setpoint
+          when switching back on).
         - Setpoint memory: learns the cooling target from Z1CoolingTempDesired (ignoring
-          the 99.0 °C sentinel) and the heating target from Z1DayTemp (ignoring the
-          5.0 °C sentinel), so changes made from MiGo Link or MiPro Sense are kept.
+          the 99.0 °C sentinel) and the heating target from Z1ActualRoomTempDesired or
+          Z1DayTemp (ignoring the 5.0 °C sentinel), so changes made from MiGo Link or
+          MiPro Sense are kept.
         """
-        cool_mode, heat_mode = self._read_modes()
-        if cool_mode in COOLING_ACTIVE_MODES:
+        if self._is_cooling_active():
             self._active_season = SEASON_COOLING
-        elif heat_mode in HEATING_ACTIVE_MODES:
+        elif self._is_heating_active():
             self._active_season = SEASON_HEATING
 
         if self._transition_in_progress:
             return
 
-        if cool_mode in COOLING_ACTIVE_MODES:
+        if self._is_cooling_active():
             val = self.coordinator.get_float(
                 CIRCUIT_BASS3, "Z1CoolingTempDesired", "value"
             )
             if val is not None and val < SENTINEL_COOLING_THRESHOLD:
                 self._saved_cooling_target = val
         elif self._active_season == SEASON_HEATING:
-            day_temp = self.coordinator.get_float(CIRCUIT_BASS3, "Z1DayTemp", "value")
-            if day_temp is not None and day_temp > SENTINEL_HEATING_THRESHOLD:
-                self._saved_heating_target = day_temp
+            actual_desired = self.coordinator.get_float(
+                CIRCUIT_BASS3, "Z1ActualRoomTempDesired", "value"
+            )
+            if (
+                actual_desired is not None
+                and actual_desired > SENTINEL_HEATING_THRESHOLD
+            ):
+                self._saved_heating_target = actual_desired
+            else:
+                day_temp = self.coordinator.get_float(
+                    CIRCUIT_BASS3, "Z1DayTemp", "value"
+                )
+                if day_temp is not None and day_temp > SENTINEL_HEATING_THRESHOLD:
+                    self._saved_heating_target = day_temp
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -232,6 +268,11 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             self._transition_in_progress = False
             self._async_refresh_derived_state()
             self.async_write_ha_state()
+
+    @property
+    def hvac_modes(self) -> list[HVACMode]:
+        """Return the list of available HVAC modes."""
+        return self._attr_hvac_modes
 
     @property
     def available(self) -> bool:
@@ -278,14 +319,10 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
     @property
     def hvac_mode(self) -> HVACMode:
         """Return current HVAC mode combining Z1OpMode and Z1OpModeCooling."""
-        cool_mode, heat_mode = self._read_modes()
-
-        if cool_mode in COOLING_ACTIVE_MODES:
-            return HVACMode.AUTO if cool_mode == "auto" else HVACMode.COOL
-
-        if heat_mode in HEATING_ACTIVE_MODES:
-            return HVACMode.AUTO if heat_mode == "auto" else HVACMode.HEAT
-
+        if self._is_cooling_active():
+            return HVACMode.COOL
+        if self._is_heating_active():
+            return HVACMode.HEAT
         return HVACMode.OFF
 
     # -------------------------------------------------------------------------
@@ -308,9 +345,10 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             return PRESET_BOOST
 
         cool_mode, heat_mode = self._read_modes()
-        if heat_mode == "night" or cool_mode == "night":
+        active_op_mode = cool_mode if self._is_cooling_active() else heat_mode
+        if active_op_mode == "night":
             return PRESET_ECO
-        if heat_mode == "day" or cool_mode == "day":
+        if active_op_mode == "day":
             return PRESET_MANUAL
         return PRESET_COMFORT
 
@@ -321,56 +359,74 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
     @property
     def target_temperature(self) -> float | None:
         """Return target temperature while filtering out 99.0 °C (cooling off) and 5.0 °C (heating off) sentinels."""
-        if self._is_cooling_context():
+        if self.hvac_mode == HVACMode.OFF:
+            return None
+
+        if self._is_cooling_active():
             val = self.coordinator.get_float(
                 CIRCUIT_BASS3, "Z1CoolingTempDesired", "value"
             )
             if val is not None and val < SENTINEL_COOLING_THRESHOLD:
-                return val
+                return round(val, 1)
+            if self.preset_mode == PRESET_COMFORT:
+                # Outside cooling schedule slot: idle
+                return None
             return self._saved_cooling_target
 
-        # Heating / Auto (heating) / Off context
+        # Heating context
         current_preset = self.preset_mode
         if current_preset == PRESET_AWAY:
             holiday_temp = self.coordinator.get_float(
                 CIRCUIT_BASS3, "HolidayTemp", "value"
             )
             if holiday_temp is not None and holiday_temp > 5.0:
-                return holiday_temp
+                return round(holiday_temp, 1)
             return DEFAULT_HOLIDAY_TEMP
-
-        day_temp = (
-            self.coordinator.get_float(CIRCUIT_BASS3, "Z1DayTemp", "value")
-            or self._saved_heating_target
-        )
 
         if current_preset == PRESET_BOOST:
             veto_temp = self.coordinator.get_float(
                 CIRCUIT_BASS3, "Z1QuickVetoTemp", "value"
             )
             if veto_temp is not None and veto_temp > 5.0:
-                return veto_temp
-            return day_temp
+                return round(veto_temp, 1)
+            return self._saved_heating_target
 
         if current_preset == PRESET_MANUAL:
             manual_temp = self.coordinator.get_float(
                 CIRCUIT_BASS3, "Z1ManualTemp", "value"
             )
             if manual_temp is not None and manual_temp > 5.0:
-                return manual_temp
-            return day_temp
+                return round(manual_temp, 1)
+            day_temp = self.coordinator.get_float(CIRCUIT_BASS3, "Z1DayTemp", "value")
+            if day_temp is not None and day_temp > SENTINEL_HEATING_THRESHOLD:
+                return round(day_temp, 1)
+            return self._saved_heating_target
 
         if current_preset == PRESET_ECO:
             night_temp = self.coordinator.get_float(
                 CIRCUIT_BASS3, "Z1NightTemp", "value"
             )
             if night_temp is not None and night_temp > 5.0:
-                return night_temp
-            return day_temp
+                return round(night_temp, 1)
+            return self._saved_heating_target
 
-        # PRESET_COMFORT (Scheduled) or fallback: return heating target
+        # PRESET_COMFORT (Scheduled): prioritize real-time desired room temperature
+        actual_desired = self.coordinator.get_float(
+            CIRCUIT_BASS3, "Z1ActualRoomTempDesired", "value"
+        )
+        if actual_desired is not None:
+            if actual_desired > SENTINEL_HEATING_THRESHOLD:
+                return round(actual_desired, 1)
+            # Outside scheduled slot or setback off: return None so HA displays no target during night/idle
+            return None
+
+        # Fallback if Z1ActualRoomTempDesired not available on eBUS
+        day_temp = (
+            self.coordinator.get_float(CIRCUIT_BASS3, "Z1DayTemp", "value")
+            or self._saved_heating_target
+        )
         return (
-            day_temp
+            round(day_temp, 1)
             if day_temp > SENTINEL_HEATING_THRESHOLD
             else self._saved_heating_target
         )
@@ -551,8 +607,14 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             await asyncio.sleep(0.5)
             # Ensure cooling calendar is locked out during heating season
             await self._async_ensure_cooling_lock_closed()
+
+            target_opmode = (
+                "day"
+                if self.preset_mode == PRESET_MANUAL
+                else ("night" if self.preset_mode == PRESET_ECO else "auto")
+            )
             await self.coordinator.async_write_parameter(
-                CIRCUIT_BASS3, "Z1OpMode", "day"
+                CIRCUIT_BASS3, "Z1OpMode", target_opmode
             )
 
             # Auto-restore saved heating setpoint to Z1DayTemp
@@ -585,9 +647,14 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             await asyncio.sleep(0.5)
             # 2. Open Lock 1 automatically (01;01;26 to 01;01;99)
             await self._async_ensure_cooling_lock_open()
-            # 3. Open Lock 2 (manual cooling day mode)
+            # 3. Set cooling mode (preserving preset or default to auto)
+            target_opmode = (
+                "day"
+                if self.preset_mode == PRESET_MANUAL
+                else ("night" if self.preset_mode == PRESET_ECO else "auto")
+            )
             await self.coordinator.async_write_parameter(
-                CIRCUIT_BASS3, "Z1OpModeCooling", "day"
+                CIRCUIT_BASS3, "Z1OpModeCooling", target_opmode
             )
 
             # 4. Auto-restore saved cooling setpoint to Z1DayTemp and Z1CoolingTempDesired
@@ -605,68 +672,6 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
                 CIRCUIT_BASS3, "Z1CoolingTempDesired", cooling_target
             )
             return
-
-        if hvac_mode == HVACMode.AUTO:
-            outside_temp = self.coordinator.get_float(
-                CIRCUIT_BROADCAST, "Outsidetemp", "temp"
-            )
-            if outside_temp is None:
-                outside_temp = self.coordinator.get_float(
-                    CIRCUIT_BASS3, "DisplayedOutsideTemp", "value"
-                )
-
-            if outside_temp is not None:
-                use_heating = outside_temp < 20.0
-            else:
-                use_heating = previous_season != SEASON_COOLING
-            if use_heating:
-                if (
-                    previous_season == SEASON_COOLING
-                    and current_day_temp is not None
-                    and day_temp_valid
-                ):
-                    self._saved_cooling_target = current_day_temp
-                heating_target = self._saved_heating_target
-
-                self._active_season = SEASON_HEATING
-                await self.coordinator.async_write_parameter(
-                    CIRCUIT_BASS3, "Z1OpModeCooling", "off"
-                )
-                await asyncio.sleep(0.5)
-                await self._async_ensure_cooling_lock_closed()
-                await self.coordinator.async_write_parameter(
-                    CIRCUIT_BASS3, "Z1OpMode", "auto"
-                )
-                await asyncio.sleep(0.3)
-                await self.coordinator.async_write_parameter(
-                    CIRCUIT_BASS3, "Z1DayTemp", heating_target
-                )
-            else:
-                if (
-                    previous_season == SEASON_HEATING
-                    and current_day_temp is not None
-                    and day_temp_valid
-                ):
-                    self._saved_heating_target = current_day_temp
-                cooling_target = self._saved_cooling_target
-
-                self._active_season = SEASON_COOLING
-                await self.coordinator.async_write_parameter(
-                    CIRCUIT_BASS3, "Z1OpMode", "off"
-                )
-                await asyncio.sleep(0.5)
-                await self._async_ensure_cooling_lock_open()
-                await self.coordinator.async_write_parameter(
-                    CIRCUIT_BASS3, "Z1OpModeCooling", "auto"
-                )
-                await asyncio.sleep(0.3)
-                await self.coordinator.async_write_parameter(
-                    CIRCUIT_BASS3, "Z1DayTemp", cooling_target
-                )
-                await asyncio.sleep(0.3)
-                await self.coordinator.async_write_parameter(
-                    CIRCUIT_BASS3, "Z1CoolingTempDesired", cooling_target
-                )
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set new target temperature according to active mode and preset, updating seasonal memory."""
@@ -763,9 +768,7 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             )
             await asyncio.sleep(0.5)
 
-        in_cooling = (
-            self.hvac_mode == HVACMode.COOL or self._active_season == SEASON_COOLING
-        )
+        in_cooling = self._is_cooling_active()
 
         if preset_mode == PRESET_ECO:
             await self.coordinator.async_write_parameter(
@@ -781,8 +784,11 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             )
 
     async def async_turn_on(self) -> None:
-        """Turn the climate entity on (restores AUTO mode)."""
-        await self.async_set_hvac_mode(HVACMode.AUTO)
+        """Turn the climate entity on (restores previous active season, defaulting to HEAT)."""
+        target_mode = (
+            HVACMode.COOL if self._active_season == SEASON_COOLING else HVACMode.HEAT
+        )
+        await self.async_set_hvac_mode(target_mode)
 
     async def async_turn_off(self) -> None:
         """Turn the climate entity off."""
