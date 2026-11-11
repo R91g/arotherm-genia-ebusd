@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.3.0] - Unreleased
 
 > [!IMPORTANT]
-> **Action Required:** Please update the configuration files in your `ebusd` folder (`ebusd-configuration/vaillant/`) and restart `ebusd`. This release introduces native support for **Vaillant HMU00 (HW=5103)** outdoor units and **CTLV2 / CTLV3 (sensoHOME / sensoCOMFORT / MiSet)** controllers, expands weekly schedule slots to 3 daily intervals, adds eBUS diagnostic services, ebusd health sensors, and includes critical audit stability fixes.
+> **Action Required:** Please update the configuration files in your `ebusd` folder (`ebusd-configuration/vaillant/`) and restart `ebusd`. This release introduces native support for **Vaillant HMU00 (HW=5103)** outdoor units and **CTLV2 / CTLV3 (sensoHOME / sensoCOMFORT / MiSet)** controllers, persistent **Cooling Quick Veto**, **Anti-Legionella protection**, fast **`r1;u` electric power polling**, 3 daily schedule intervals, eBUS diagnostic services, `ebusd` health sensors, and critical audit stability fixes.
 
 ### Added
 - **Hardware: Vaillant HMU00 (HW5103) & aroTHERM Split Support:**
@@ -25,9 +25,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added active error diagnostic sensors (`hmu_current_error` and `controller_current_error`) decoding `Currenterror` across outdoor units and climate controllers.
 - **Zone 1 Relative Room Humidity (`Z1RoomHumidity`):**
   - Exposed Zone 1 relative humidity (`b524 020003002800`) both as `sensor.z1_room_humidity` (`%`) and directly as `current_humidity` on `SaunierGeniaZone1Climate`, with backward-compatible MQTT aliasing from legacy `Z1MaxFlowTempDesired`.
-- **Weekly Schedule Multi-Slot Expansion (Slots 2 & 3):**
+- **Weekly Schedule Multi-Slot Expansion (Slots 2 & 3) & Silent Mode Timer:**
   - Expanded all daily schedules across heating, cooling, DHW, and circulation from 1 to 3 time slots across all 4 controller CSV configurations.
+  - Added Silent Mode weekly schedule support (`SilentTimer_*` on `b5 55` circuit `04`), including `circuit_type: silent` in `set_weekly_timer` and `sensor.silent_mode_weekly_schedule_summary`.
   - Added passive eavesdropping (`u`) for official MiGo Link app schedule writes, decoding time intervals and target temperatures in real time without polling.
+- **Anti-Legionella Disinfection Schedule Control (`select`, `time` & Action):**
+  - Added `HwcLegionellaDay` (defined with mandatory 2-byte `daysel3` / `UIN` encoding for CTLV2/CTLV3/BASS3 compatibility) and `HwcLegionellaTime` (`HTM`) across all 4 controller CSVs.
+  - Added `select.hwc_legionella_day` (`off`, `monday`..`sunday`), new Home Assistant `Time` platform (`time.hwc_legionella_time`), and `arotherm_genia_ebusd.set_legionella_protection` service.
+- **Quick Veto (Zone 1 Boost) Controls, Cooling Quick Veto & Persistent Recovery:**
+  - Added `number.z1_quick_veto_duration` (`0.5–12.0 h`), `number.z1_quick_veto_boost_delta` (heating boost delta), `number.z1_cooling_quick_veto_boost_delta` (cooling boost delta), and dedicated `arotherm_genia_ebusd.quick_veto` / `arotherm_genia_ebusd.cancel_quick_veto` actions.
+  - Implemented persistent synthetic **Cooling Quick Veto** for scheduled (`auto`) and manual cooling Boost (`PRESET_BOOST` or adjusting temperature in scheduled cooling), backed by Home Assistant `Store` so active timers resume across restarts and expired vetos automatically restore prior operating mode and manual setpoint once eBUS reconnects.
+- **Controller & Hydraulic Telemetry Additions (`76.vwzio` & `15.*`):**
+  - Added passive `StationState` (`b512 0f0613`: hydraulic pressure, primary flow rate, operational state byte) to `76.vwzio.csv`.
+  - Added `MultiInputSetting` (`6a00` PV/cooling/circulation input mode), `CoolingOutsideTempThreshold` (`3800`), `DewPointMonitoring` (`0400`), `DewPointOffset` (`3a00`), and `OffsetOutsideTemp` (`2d00`) across all 4 controller CSVs.
 - **Diagnostic eBUS Services (`read_parameter` & `write_parameter`):**
   - Added actions to read and write symbolic eBUS parameters via MQTT directly from Home Assistant Developer Tools or automations, with automatic circuit alias resolution (`08`, `15`, `outdoor`, `controller`).
 - **Anonymized Dumps & Mode-Specific Community Test Fixtures:**
@@ -36,14 +46,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Physical eBUS Health & Advanced TCP Daemon Diagnostics:**
   - Added `binary_sensor.ebusd_running` and 7 diagnostic sensors attached to the root outdoor unit (uptime, scan status, daemon version, arbitration latency, symbol rate, reconnects, active masters).
   - Disabled unreachable MQTT metrics (`symbol_rate`, `reconnects`, `masters`, `arbitration_latency`) by default in the entity registry (`entity_registry_enabled_default = False`) to prevent `Unknown` entities on pure MQTT setups.
-  - Added optional **Advanced eBUSd TCP Connection** in integration Options Flow (`enable_ebusd_tcp`, `ebusd_tcp_host` default `127.0.0.1`, `ebusd_tcp_port` default `8888`), periodically querying `info` via non-blocking TCP socket to hydrate daemon health metrics.
+  - Added optional **Advanced eBUSd TCP Connection** in integration Options Flow (`enable_ebusd_tcp`, `ebusd_tcp_host` default `127.0.0.1`, `ebusd_tcp_port` default `8888`), periodically querying `info` (and zero-bus-traffic CSV `find` verification) via non-blocking TCP socket to hydrate daemon health metrics and detect outdated CSV files cleanly.
   - Added `sensor.ebusd_missing_csv_devices` diagnostic sensor identifying scanned eBUS devices missing loaded CSV files, with full device inventory attributes (`missing_count`, `missing_devices`, `loaded_devices`, `total_scanned`).
   - Added action buttons `button.ebusd_reload_csv` (reloads CSV definitions on the daemon in real time) and `button.ebusd_restart_scan` (restarts bus device identification).
   - Synchronized entity registry state dynamically: toggling `enable_ebusd_tcp` automatically enables or disables TCP diagnostic entities and action buttons without manual registry intervention.
   - Protected `send_hex_command` behind an explicit security opt-in switch (`enable_send_hex`) in Options Flow, automatically defaulting `host` and `port` to configured integration settings.
 - **Multilingual Support & Complete Translation Parity (EN, ES, DE):**
   - Added complete German (`de.json`) translation suite across all entity platforms, configuration and options flows, device classes, and actions.
-  - Localized all 9 integration actions/services across `strings.json`, `translations/en.json`, `translations/es.json`, and `translations/de.json` with 100% key parity.
+  - Localized all 12 integration actions/services across `strings.json`, `translations/en.json`, `translations/es.json`, and `translations/de.json` with 100% key parity.
   - Migrated `services.yaml` base names and descriptions to standard English.
 - **Release Security Gate in CI:**
   - Hardened GitHub release workflow to require unit tests (Python 3.12 & 3.13), Ruff linter/formatter, Pyright typing, Hassfest, and HACS validation before building and publishing release archives.
@@ -51,12 +61,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Legacy Spanish Device Registry Migration:**
   - Automatically migrates existing device entries in the Home Assistant Device Registry from legacy Spanish default names (`(Unidad Exterior)`, `(Regulador Climático)`, `(Interfaz Hidráulica)`, `(Termostato Inalámbrico)`) to standard English (`(Outdoor Unit)`, `(Climate Controller)`, `(Hydraulic Interface)`, `(Wireless Thermostat)`), preserving any custom user-assigned names (`name_by_user`).
-- **Cumulative Energy, COP/SCOP & Entity Cleanup on `HMU` / `HMU00` (`HW5103`) Units:**
+- **Cumulative Energy, COP/SCOP & 65,535 kWh Overflow Fix on `HMU` / `HMU00` (`HW5103`) Units:**
+  - Fixed 16-bit `UIN` integer overflow at 65,535 kWh in `08.hmu.csv` and `08.hmu.HW5103.csv` by migrating `YieldHc` and `TotalEnergyUsage` to 32-bit `ULG` counters.
   - Fixed cumulative electrical/thermal energy totals, environmental yield (`YieldHc`/`YieldHwc`), per-mode historical COP/EER (`CopHc`/`CopHwc`/`CopCooling` with `1 + Yield/PrEnergySum` fallback), and global system efficiency on `hmu`/`hmu00` units lacking Monobloc `b516` EEPROM registers.
   - Automatically disables the 3 Monobloc-exclusive outdoor per-mode electrical sensors (`energy_electric_hc_outdoor`, `energy_electric_hwc_outdoor`, `energy_electric_cool`) in the Entity Registry when an `hmu`/`hmu00` unit is detected, preserving manual user overrides.
-  - Prioritized `PowerStatus` over `RunDataElectricPowerConsumption` for instantaneous electrical power and live COP across `hmux0` and `hmu`.
-- **Controller Register `2800` & Parameter Range Corrections:**
-  - Corrected mislabeled `Z1MaxFlowTempDesired` (`020003002800` / invalid `w` `020103002800`) across `15.bass3.csv`, `15.basv3.csv`, `15.ctlv2.csv`, and `15.ctlv3.csv` to read-only `Z1RoomHumidity` (`%`).
+- **Dynamic Instantaneous Electric Power Fallback & 10-Minute Expiration Watchdog:**
+  - Configured `RunDataElectricPowerConsumption` (`r1;u`) as the preferred instantaneous electrical power source across `hmux0` and `hmu` while fresh (`<= 180 s`), dynamically falling back to `PowerStatus` if stale, and safely expiring power & active Live COP to `unavailable` after 10 minutes (`600 s`, or `2 × fallback_poll_interval`) without updates.
+- **Controller Register `2800`, Decoupled Cooling Setpoints & Vacation Mode Guards:**
+  - Renamed mislabeled `Z1DayTemp` (`2300`) to `Z1CoolingManualTemp` and `Z1MaxFlowTempDesired` (`2800` / invalid `w`) to read-only `Z1RoomHumidity` (`%`) across all 4 controller CSVs.
+  - Enforced `PRESET_AWAY` (`Z1Status = holidayaway`) priority over active cooling in `SaunierGeniaZone1Climate`, preventing accidental cooling activation or veto overrides while away and keeping `HolidayTemp` exclusively for heating frost protection.
   - Widened `number.compressor_silent_operation_level` range to `30–60 %` and `number.max_cylinder_charge_time` range to `0–180 min` (`0 = Off`) to match field values observed on `basv3`/`hmu` installations.
 - **Schedule Validation & Mutex Safety:**
   - Added chronological ordering validation, overlap rejection, midnight normalization (`24:00`), mutex write locking, and automatic cache recovery on mid-cascade communication errors.
@@ -71,10 +84,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **English Localization for Countdown Duration States:**
   - Standardized coordinator string returns for `sensor.holiday_duration_remaining` and `sensor.cooling_duration_remaining` from Spanish (`Inactivo` / `Final abierto`) to standard English (`Inactive` / `Open-ended`), defined centrally in `const.py` (`STATE_INACTIVE` / `STATE_OPEN_ENDED`).
 - **Compatibility & Code Quality:**
-  - Raised minimum supported Home Assistant version to `2024.12.0` and achieved 100% clean Pyright static typing and Ruff formatting across 129 unit tests.
+  - Raised minimum supported Home Assistant version to `2024.12.0` and achieved 100% clean Pyright static typing and Ruff formatting across 187 unit tests.
 
 ### Changed
-- **Fast Thermodynamic Polling (`r2;u`) for ΔT & Thermal Power:**
+- **Fast Live Electric Power Polling (`r1;u`) & Thermodynamic Polling (`r2;u`):**
+  - Upgraded `RunDataElectricPowerConsumption` (`08.hmux0.csv`, `08.hmu.csv`, `08.hmu.HW5103.csv`) to top-priority `r1;u` active polling (with `PowerStatus` as fallback and 10-minute staleness expiration) so live electrical input updates reliably every ~9–18 seconds.
   - Upgraded `RunDataFlowTemp`, `RunDataReturnTemp`, and `RunDataFlowRate` from slow `r9;u` to prioritized `r2;u` in `08.hmux0.csv`, `08.hmu.csv`, and `08.hmu.HW5103.csv`.
   - Re-evaluates flow and return temperatures every ~18 to 36 seconds, accelerating real-time ΔT and instantaneous thermal power updates while keeping the full poll cycle under 2 minutes.
   - Converted `CompressorAvailability` in `08.hmux0.csv` to passive `u` to resolve the `prepare poll message: ERR: end of input reached` error caused by missing master input arguments during active polling.

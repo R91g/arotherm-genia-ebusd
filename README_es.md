@@ -16,7 +16,7 @@
 
 **aroTHERM & GeniaAir (eBUS)** (`arotherm_genia_ebusd`) es una **integración personalizada 100 % local (`local_push`) e independiente de la nube para Home Assistant**, diseñada para bombas de calor aerotérmicas R290 de **Vaillant** y **Saunier Duval** gobernadas por reguladores **`sensoCOMFORT` (`VRC 720`)** o **`MiPro Sense` (`SRC 720`)** a través de [**eBUSd**](https://github.com/john30/ebusd).
 
-Construida directamente sobre la arquitectura electrónica eBUS compartida por el Grupo Vaillant (`08.hmux0` / `08.hmu`, `15.bass3` / `15.basv3` / `15.ctlv2` / `15.ctlv3`, `76.vwzio`, `04.netx3` / `04.netx2`), sustituye el caos de entidades del auto-descubrimiento MQTT crudo y la dependencia de servidores externos por **177 entidades nativas fuertemente tipadas**, motor termodinámico y cálculo de COP/EER en tiempo real, filtrado de valores centinela de firmware, gestión automática del Doble Cerrojo de refrigeración, diagnósticos físicos TCP y algoritmo inteligente de ACS Puntual (Boost Forzado).
+Construida directamente sobre la arquitectura electrónica eBUS compartida por el Grupo Vaillant (`08.hmux0` / `08.hmu`, `15.bass3` / `15.basv3` / `15.ctlv2` / `15.ctlv3`, `76.vwzio`, `04.netx3` / `04.netx2`), sustituye el caos de entidades del auto-descubrimiento MQTT crudo y la dependencia de servidores externos por **185 entidades nativas fuertemente tipadas**, motor termodinámico y cálculo de COP/EER en tiempo real, filtrado de valores centinela de firmware, gestión automática del Doble Cerrojo de refrigeración, Quick Veto persistente en refrigeración, diagnósticos físicos TCP y algoritmo inteligente de ACS Puntual (Boost Forzado).
 
 ---
 
@@ -99,24 +99,25 @@ Los equipos de aerotermia de Vaillant y Saunier Duval comparten **al 100 % las m
 - **Cola de Hidratación Inicial:** Al arrancar Home Assistant, el coordinador espera `5.0 s` para absorber a coste cero los mensajes `retained` del broker MQTT y solicita secuencialmente (con `0.8 s` de pausa entre tramas) **únicamente los registros que falten**.
 - **Actualización Optimista y Confirmación Selectiva:** Las escrituras sobre registros pasivos `u` (consignas, modos, horarios, fechas) actualizan la interfaz al instante sin disparar lecturas `/get` redundantes que devuelvan valores antiguos en caché, espaciando las secuencias multipaso entre `0.3 s` y `0.6 s`.
 
-### 3. 177 Entidades Nativas Agrupadas en 4 Dispositivos Lógicos
+### 3. 185 Entidades Nativas Agrupadas en 4 Dispositivos Lógicos
 
 | Dispositivo Lógico | Circuito eBUS | Entidades Destacadas |
 | :--- | :---: | :--- |
 | **1. Unidad Exterior** (`<Modelo Exterior>`) | `08.hmux0` / `08.hmu` | Monitor operativo en vivo (52+ estados `S.xx`/`S.xxx`), velocidad (`r/s`) y modulación (`%`) del compresor, alta presión R290, pasos EEV, ventiladores, caudal primario, temperaturas de impulsión/retorno de alta precisión, contadores IEEE 754 (`EXP`) eléctricos, térmicos y de energía ambiental por modo (`Wh`), horas/arranques, niveles de reducción de ruido (modo silencioso) y **sensores termodinámicos y de energía total calculados**. |
-| **2. Controlador de Clima** (`sensoCOMFORT` / `MiPro Sense`) | `15.bass3` / `15.basv3` / `15.ctlv2` / `15.ctlv3` | **Climatización Zona 1 (`climate`)**, **Agua Caliente Sanitaria (`water_heater`)**, curvas climáticas, límites de impulsión, puntos de bivalencia, presión de agua, integral de energía de calefacción (`EnergyIntegral`), contadores de energía por servicio (`PrEnergySumHc` / `PrEnergySumHwc`), resúmenes de programación semanal e interruptores de sistema. |
+| **2. Controlador de Clima** (`sensoCOMFORT` / `MiPro Sense`) | `15.bass3` / `15.basv3` / `15.ctlv2` / `15.ctlv3` | **Climatización Zona 1 (`climate`)**, **Agua Caliente Sanitaria (`water_heater`)**, curvas climáticas, límites de impulsión, puntos de bivalencia, presión de agua, integral de energía de calefacción (`EnergyIntegral`), contadores de energía por servicio (`PrEnergySumHc` / `PrEnergySumHwc`), resúmenes de programación semanal, programación antilegionella e interruptores de sistema. |
 | **3. Interfaz Hidráulica** (`<Modelo Interior>`) | `76.vwzio` | Estado operativo del circuito secundario (calefacción, refrigeración, ACS, postcirculación, reposo), potencia eléctrica instantánea (`W`), contadores de energía `b5 16` (`Wh`), apoyo eléctrico auxiliar, diagnóstico de válvula de 3 vías / bomba secundaria y monitor de errores activos (`OK` o códigos de avería). |
 | **4. Termostato Inalámbrico** *(Opcional)* | `04.netx3` / `04.netx2` / `f6` / `broadcast` | Temperatura en el dial inalámbrico, consigna inalámbrica, temperatura exterior por difusión (`Broadcast`) y fecha/hora del bus eBUS. *(Si no hay termostato inalámbrico instalado, los sensores broadcast se asocian automáticamente al Controlador de Clima).* |
 
-**Desglose por Plataforma (177 entidades en total a través de 9 plataformas):**
-- `climate` (**1**): Termostato unificado Calefacción / Refrigeración / Auto para Zona 1 con modos preestablecidos (`Programado (Confort)`, `Manual continuo`, `Eco (Reducción nocturna)`, `Anulación rápida (Quick Veto)`, `Modo Ausencia / Vacaciones`).
+**Desglose por Plataforma (185 entidades en total a través de 10 plataformas):**
+- `climate` (**1**): Termostato unificado Calefacción / Refrigeración / Auto para Zona 1 con modos preestablecidos (`Programado (Confort)`, `Manual continuo`, `Eco (Reducción nocturna)`, `Anulación rápida (Quick Veto)` en calor y frío, `Modo Ausencia / Vacaciones`).
 - `water_heater` (**1**): Control del depósito de Agua Caliente Sanitaria (ACS) (`Apagado`, `Programación horaria`, `Continuo (24h)`, `Boost`).
-- `sensor` (**123**): Sensores de telemetría, matrices de energía en `Wh` (rendimientos eléctrico, térmico y ambiental en calefacción, frío, ACS y módulo auxiliar), cálculos termodinámicos y COP/EER, diagnósticos físicos del bus, detector de CSV faltantes y 4 sensores resumen de programación semanal.
+- `sensor` (**127**): Sensores de telemetría, matrices de energía en `Wh` (rendimientos eléctrico, térmico y ambiental en calefacción, frío, ACS y módulo auxiliar), cálculos termodinámicos y COP/EER, diagnósticos físicos del bus y de salud MQTT, detector de CSV faltantes y 5 sensores resumen de programación semanal (`heating`, `dhw`, `cooling`, `circulation`, `silent`).
 - `binary_sensor` (**9**): Compresor en marcha, bomba primaria, desescarche activo, integración de energía activa, demanda de calor Zona 1, autorización hardware de refrigeración, ciclo de frío broadcast, señal física eBUS y apoyo eléctrico activo.
-- `number` (**26**): Todos los parámetros numéricos de usuario e instalador (curva climática, sobretemperatura, impulsión mín./máx., corte de verano, consignas día/noche/manual/veto/frío/ausencia, consigna/histéresis/offset/tiempos de ACS, puntos de bivalencia y humedad máxima).
-- `select` (**5**): Modo calefacción Zona 1, modo refrigeración Zona 1, modo ACS, modo reducción nocturna (`eco`/`night`/`off`) y control por temperatura ambiente (`off`/`modulating`/`thermostat`).
+- `number` (**28**): Todos los parámetros numéricos de usuario e instalador (curva climática, sobretemperatura, impulsión mín./máx., corte de verano, consignas día/noche/manual/veto/frío/ausencia, consigna/histéresis/offset/tiempos de ACS, deltas de boost y duración de Quick Veto en calor y frío, puntos de bivalencia y humedad máxima).
+- `select` (**6**): Modo calefacción Zona 1, modo refrigeración Zona 1, modo ACS, modo reducción nocturna (`eco`/`night`/`off`), control por temperatura ambiente (`off`/`modulating`/`thermostat`) y día semanal antilegionella (`off`/`Lunes`–`Domingo`).
 - `switch` (**6**): Modo Ausencia (`Holiday Mode`), ACS Puntual (`Boost`), Autorización temporada de frío (`Cerrojo 1`), Curva de calefacción adaptativa, Carga paralela de ACS y calefacción, y Apagado global del sistema *(deshabilitado por defecto por seguridad)*.
 - `datetime` (**4**): Controles interactivos de interfaz para Fecha/Hora de Inicio y Fin del Modo Ausencia (`datetime`), y Fecha/Hora de Inicio y Fin de Refrigeración Manual (`datetime`).
+- `time` (**1**): Selector horario interactivo para la desinfección térmica semanal antilegionella (`HwcLegionellaTime`).
 - `button` (**2**): Botones de acción en caliente para control del demonio eBUSd (`Recargar configuraciones CSV` y `Reiniciar escaneo de dispositivos`).
 
 ### 4. Climatización Zona 1: Filtro Anti-Centinela y Gestión Dual de Refrigeración
@@ -129,6 +130,9 @@ Los equipos de aerotermia de Vaillant y Saunier Duval comparten **al 100 % las m
   - **Modo Indefinido Abierto (Por Defecto):** Al seleccionar **`Frío` (`Cool`)** en el termostato sin haber configurado fechas previas, la integración apaga calefacción, abre automáticamente el **Cerrojo 1** de forma indefinida (`01;01;26` a `01;01;99`), activa el **Cerrojo 2** (`Z1OpModeCooling = day`) y restaura tu consigna de verano guardada.
   - **Modo por Período de Calendario:** Si introduces fechas personalizadas desde los selectores interactivos `Fecha/Hora Inicio Frío Manual` y `Fecha/Hora Fin Frío Manual` (antes de encender el frío o mientras está activo), la integración programa tu ventana temporal exacta sin forzar el final abierto, limitando la refrigeración activa estrictamente a dicho intervalo.
   - Al volver a **`Calor` (`Heat`)** o **`Apagado` (`Off`)**, cierra automáticamente el **Cerrojo 1** al epoch `01;01;19` (idéntico al comportamiento de las apps oficiales `myVAILLANT` / `MiGo Link`) y restaura la consigna de invierno.
+- **Quick Veto Unificado (Hardware en Calefacción + Persistente en Refrigeración):**
+  - Al seleccionar `Anulación rápida (Quick Veto)` (o llamar a `arotherm_genia_ebusd.quick_veto`), activa el Quick Veto nativo por hardware en calefacción (`Z1QuickVetoStartTime` / `Z1QuickVetoDuration`) y un **Quick Veto sintético persistente** respaldado por almacenamiento en disco (`Store`) entre reinicios cuando la refrigeración está activa.
+  - Ambos modos admiten deltas de boost configurables (`+3.0 °C` en calefacción / `-2.0 °C` en refrigeración por defecto) y restauran automáticamente el modo de funcionamiento y la consigna exactos previos al finalizar o cancelar, mientras que el **Modo Ausencia / Vacaciones** tiene prioridad absoluta, impide activarlo y cancela automáticamente cualquier Quick Veto de frío activo.
 
 ### 5. Agua Caliente Sanitaria (`water_heater`): ACS Boost Forzado Inteligente
 - De fábrica, `sensoCOMFORT` / `MiPro Sense` aplica una histéresis estricta de carga (`CylinderChargeHyst = 5.0 K`). Si tu consigna de ACS es `50.0 °C` y el acumulador está a `47.0 °C`, activar la carga puntual estándar (`HwcSFMode = load`) **no arranca el compresor** porque `47.0 °C > (50.0 - 5.0) °C`.
@@ -345,7 +349,7 @@ Pulsa el botón **Configurar** dentro de la tarjeta de la integración en **Ajus
 
 ## Acciones Personalizadas (Servicios)
 
-La integración registra dos acciones personalizadas bajo el dominio `arotherm_genia_ebusd`, disponibles en **Herramientas para desarrolladores → Acciones** y en Automatizaciones / Scripts.
+La integración registra **12 acciones personalizadas** bajo el dominio `arotherm_genia_ebusd`, disponibles en **Herramientas para desarrolladores → Acciones** y en Automatizaciones / Scripts.
 
 ### 1. `arotherm_genia_ebusd.set_weekly_timer`
 
@@ -359,7 +363,7 @@ Modifica o borra las programaciones horarias semanales nativas (`b5 55`) directa
 | `day` | Sí | `Monday`..`Sunday`, `Weekdays`, `Weekend`, `All`<br>*(o en español: `Lunes`..`Domingo`, `Laborables`, `Fin de semana`, `Todos`)* | Día específico, días laborables L–V (`Weekdays` / `Laborables`), fin de semana S–D (`Weekend` / `Fin de semana`) o toda la semana L–D (`All` / `Todos`). |
 | `action` | No | `set`, `delete`, `clear` *(por defecto: `set`)* | Acción a realizar:<br>• `set`: crea o modifica la franja horaria indicada.<br>• `delete`: elimina la ranura especificada y desplaza las posteriores de forma contigua.<br>• `clear`: vacía el día completo fijando 0 ranuras activas. |
 | `slot` | No | `1`, `2`, `3` *(por defecto: `1`)* | Ranura horaria diaria (`1` a `3`). Se ignora si `action: clear`. |
-| `start_time` | Opcional* | `"HH:MM"` *(ej. `"13:10"`)* | Hora de inicio en formato 24h (resolución de 10 min). *Requerido si `action: set`. |
+| `start_time` | Opcional* | `"HH:MM"` *(ej. `"13:10"`)* | Hora de inicio en formato 24h (resolución de 1 minuto). *Requerido si `action: set`. |
 | `end_time` | Opcional* | `"HH:MM"` *(ej. `"15:30"` o `"24:00"`)* | Hora de fin en formato 24h (utilizar `"24:00"` para programar el día completo). *Requerido si `action: set`. |
 | `temp` | No | `5.0` – `80.0` *(°C)* | Consigna opcional para esa franja. Aplica solo a `heating`, `dhw` y `cooling` (se ignora en `circulation` y `silent`). Si se omite, mantiene la temperatura objetivo activa del circuito (p. ej. 50 °C en ACS o 20 °C en Calefacción). |
 | `reset_remaining` | No | `true`, `false` *(por defecto: `false`)* | Si se activa junto a `slot: 1` en modo `set`, sobrescribe el día fijando exactamente 1 ranura activa (`total_slots = 1`) y elimina las ranuras 2 y 3 existentes, sin requerir lectura previa de telemetría de la línea eBUS. |
@@ -439,12 +443,28 @@ data:
   boost_temp: 60.0
 ```
 
-### 3. `arotherm_genia_ebusd.set_holiday_mode`
+### 3. `arotherm_genia_ebusd.set_legionella_protection`
+Configura la programación semanal de desinfección térmica antilegionella (`HwcLegionellaDay` y `HwcLegionellaTime`) en el regulador climático (`15.bass3` / `15.ctlv2` / `15.ctlv3`).
+
+| Parámetro | Requerido | Valores Permitidos | Descripción |
+| :--- | :---: | :--- | :--- |
+| `day` | Sí | `off`, `Monday`..`Sunday`<br>*(o `desactivado`, `Lunes`..`Domingo`, `'0'`..`'7'`)* | Día de la semana programado para el ciclo semanal antilegionella, o `off` para desactivarlo. |
+| `time` | No | `"HH:MM"` *(ej. `"04:00"`)* | Hora de ejecución en formato 24h. Por defecto `"04:00"` al activar un día válido. |
+
+**Ejemplo de Automatización — Programar ciclo antilegionella todos los domingos a las 03:30:**
+```yaml
+action: arotherm_genia_ebusd.set_legionella_protection
+data:
+  day: Domingo
+  time: "03:30"
+```
+
+### 4. `arotherm_genia_ebusd.set_holiday_mode`
 Activa el Modo Ausencia / Vacaciones (`PRESET_AWAY`) en el regulador `MiPro Sense`, suspendiendo la producción de ACS y reduciendo la calefacción a la temperatura de mantenimiento seleccionada durante una ventana temporal específica o de forma indefinida.
 
 | Parámetro | Requerido | Valores Permitidos | Descripción |
 | :--- | :---: | :--- | :--- |
-| `temperature` | No | `5.0` – `24.0` *(°C)* | Consigna de temperatura ambiente durante la ausencia (por defecto: `12.0 °C`). |
+| `temperature` | No | `5.0` – `24.0` *(°C)* | Consigna de temperatura ambiente durante la ausencia (por defecto: `15.0 °C`). |
 | `start_date` | No | `AAAA-MM-DD` / `DD/MM/AAAA` | Fecha de inicio de la ausencia (por defecto: hoy). |
 | `start_time` | No | `HH:MM` | Hora de inicio de la ausencia (por defecto: hora actual). |
 | `end_date` | No | `AAAA-MM-DD` / `DD/MM/AAAA` | Fecha de regreso. Si se omite, el modo permanece activo indefinidamente hasta su cancelación manual. |
@@ -459,14 +479,37 @@ data:
   end_time: "18:00"
 ```
 
-### 4. `arotherm_genia_ebusd.cancel_holiday_mode`
+### 5. `arotherm_genia_ebusd.cancel_holiday_mode`
 Cancela inmediatamente el Modo Ausencia en `15.bass3` y restablece el funcionamiento automático habitual en calefacción y ACS. No requiere parámetros.
 
 ```yaml
 action: arotherm_genia_ebusd.cancel_holiday_mode
 ```
 
-### 5. `arotherm_genia_ebusd.dump_mqtt_values`
+### 6. `arotherm_genia_ebusd.quick_veto`
+Activa **Quick Veto (Boost)** en Zona 1 (`15.bass3` / `15.basv3` / `15.ctlv2` / `15.ctlv3`) para anular temporalmente la programación, la consigna manual o el estado apagado durante un tiempo limitado. Aplica Quick Veto nativo por hardware en calefacción y Quick Veto sintético persistente (`Store`) cuando la refrigeración está activa.
+
+| Parámetro | Requerido | Valores Permitidos | Descripción |
+| :--- | :---: | :--- | :--- |
+| `temperature` | No | `10.0` – `30.0` *(°C en calor)*<br>`15.0` – `30.0` *(°C en frío)* | Temperatura objetivo temporal opcional. Si se omite, aplica el delta de boost configurado (por defecto: `+3.0 °C` en calefacción, `-2.0 °C` en refrigeración). |
+| `duration` | No | `0.5` – `12.0` *(horas)* | Duración de la anulación en horas. Si se omite, utiliza la duración configurada (`Z1QuickVetoDuration`, por defecto: `3.0 h`). |
+
+**Ejemplo de Automatización — Lanzar un boost de confort de 2.5 horas a 22.5 °C en Zona 1:**
+```yaml
+action: arotherm_genia_ebusd.quick_veto
+data:
+  temperature: 22.5
+  duration: 2.5
+```
+
+### 7. `arotherm_genia_ebusd.cancel_quick_veto`
+Cancela inmediatamente cualquier Quick Veto activo (de calefacción o de refrigeración) en Zona 1 y restaura exactamente el modo de funcionamiento y la consigna anteriores. No requiere parámetros.
+
+```yaml
+action: arotherm_genia_ebusd.cancel_quick_veto
+```
+
+### 8. `arotherm_genia_ebusd.dump_mqtt_values`
 Vuelca directamente en las Herramientas para desarrolladores de Home Assistant (`SupportsResponse.ONLY`) el estado completo de la instalación, circuitos activos, modelos detectados y todas las variables eBUS recibidas. Ideal para adjuntar capturas de estado al abrir incidencias en GitHub o diagnosticar problemas de bus.
 
 | Parámetro | Requerido | Valores Permitidos | Descripción |
@@ -474,7 +517,7 @@ Vuelca directamente en las Herramientas para desarrolladores de Home Assistant (
 | `circuit` | No | Texto *(ej. `"08"`, `"15"`, `"hmu"`)* | Filtro opcional por subcadena para limitar el volcado a circuitos específicos. Si se omite, vuelca todos los circuitos activos. |
 | `anonymize` | No | Booleano *(por defecto: `true`)* | Enmascara automáticamente los números de serie largos de fabricación (28 caracteres) para compartir el volcado de forma segura y privada en incidencias públicas de GitHub. |
 
-### 6. `arotherm_genia_ebusd.record_topic_changes`
+### 9. `arotherm_genia_ebusd.record_topic_changes`
 Graba en vivo todo el tráfico MQTT publicado bajo el prefijo de eBUSd durante una ventana temporal configurable (`SupportsResponse.ONLY`). Registra marcas temporales, tópicos, datos decodificados en JSON y marcas de retención (*retained*), permitiendo trazar interacciones físicas con el regulador sin necesidad de acceder por SSH.
 
 | Parámetro | Requerido | Valores Permitidos | Descripción |
@@ -482,7 +525,7 @@ Graba en vivo todo el tráfico MQTT publicado bajo el prefijo de eBUSd durante u
 | `duration` | No | `5` – `120` *(segundos, por defecto: `30`)* | Intervalo de tiempo para grabar el tráfico MQTT entrante. |
 | `circuit` | No | Texto *(ej. `"08"`, `"15"`)* | Filtro opcional por subcadena para capturar únicamente los mensajes que coincidan con un tópico o circuito. |
 
-### 7. `arotherm_genia_ebusd.send_hex_command`
+### 10. `arotherm_genia_ebusd.send_hex_command`
 Envía un comando hexadecimal en crudo directamente al demonio `ebusd` a través de su socket TCP (puerto 8888) y devuelve los bytes de respuesta (`SupportsResponse.ONLY`). Ideal para explorar y diagnosticar registros no documentados sin editar archivos CSV ni requerir acceso por terminal SSH. Requiere que `ebusd` se haya iniciado con el parámetro de seguridad `--enablehex`.
 
 | Parámetro | Requerido | Valores Permitidos | Descripción |
@@ -492,7 +535,7 @@ Envía un comando hexadecimal en crudo directamente al demonio `ebusd` a través
 | `port` | No | Entero *(por defecto: `8888`)* | Puerto TCP de comandos de `ebusd`. |
 | `timeout` | No | Decimal *(por defecto: `5.0`)* | Tiempo máximo de espera en segundos para conectar y recibir respuesta. |
 
-### 8. `arotherm_genia_ebusd.read_parameter`
+### 11. `arotherm_genia_ebusd.read_parameter`
 Lee un registro simbólico de eBUSd a través de MQTT (`SupportsResponse.ONLY`). Publica un payload vacío a `<prefijo>/<circuito>/<nombre>/get` y espera la respuesta decodificada en JSON. Permite consultar la caché local u obligar a una lectura física activa en el bus.
 
 | Parámetro | Requerido | Valores Permitidos | Descripción |
@@ -502,7 +545,7 @@ Lee un registro simbólico de eBUSd a través de MQTT (`SupportsResponse.ONLY`).
 | `force` | No | Booleano *(por defecto: `false`)* | Si es `true`, fuerza una consulta activa al bus en lugar de devolver el valor en caché. |
 | `timeout` | No | Decimal *(por defecto: `5.0`)* | Tiempo máximo de espera en segundos para recibir la respuesta MQTT. |
 
-### 9. `arotherm_genia_ebusd.write_parameter`
+### 12. `arotherm_genia_ebusd.write_parameter`
 Escribe un valor en un registro simbólico de eBUSd a través de MQTT (`SupportsResponse.OPTIONAL`). Publica el payload a `<prefijo>/<circuito>/<nombre>/set`, aplica una actualización optimista inmediata en la interfaz y aprovecha el enrutamiento inteligente de circuitos y confirmaciones.
 
 | Parámetro | Requerido | Valores Permitidos | Descripción |
@@ -574,7 +617,7 @@ Para consultar el desglose técnico exhaustivo de todo el protocolo eBUS obtenid
 
 Temas clave documentados en detalle:
 - **Topología del Bus y Asignación de Direcciones:** Desglose maestro/esclavo (`03/08`, `10/15`, `71/76`, `f1/f6`).
-- **Telemetría de Energía de Alta Precisión (`b5 16`):** Matriz de acumuladores de por vida (`Hc`, `Hwc`, `Cool` para consumo eléctrico, calor útil y rendimiento ambiental) y potencia instantánea (`PowerStatus` en Vatios).
+- **Telemetría de Energía de Alta Precisión (`b5 16`):** Matriz de acumuladores de por vida (`Hc`, `Hwc`, `Cool` para consumo eléctrico, calor útil y rendimiento ambiental) y potencia instantánea (`RunDataElectricPowerConsumption` con respaldo de `PowerStatus`, en Vatios).
 - **Dinámica del Compresor:** Demostración empírica del divisor `/16` para el tipo de modulación `0x38` y la precisión del $0,8\%$ del calorímetro `0D5E`.
 - **Programación Horaria Semanal (`b5 55`):** Temporizadores de hasta 3 franjas diarias y el requisito del relleno obligatorio `=FFFF`.
 - **Enclavamientos y Cerrojos de Seguridad:** El mecanismo de doble cerrojo en refrigeración, el comportamiento de pestillo (*latch*) de `HwcSFMode = load` y las anulaciones temporales (Quick Veto).
@@ -588,7 +631,7 @@ Temas clave documentados en detalle:
 Este repositorio incluye una batería de tests unitarios offline (ejecutables sin depender de una instancia activa de Home Assistant) y flujos de integración continua en GitHub Actions para **Hassfest**, **Validación HACS** y **Ruff**:
 
 ```bash
-# Ejecutar los 143 tests unitarios (termodinámica, config flow, registro unique_id, servicios de diagnóstico, fixtures comunitarios, paridad de esquemas)
+# Ejecutar los 187 tests unitarios (termodinámica, config flow, registro unique_id, servicios de diagnóstico, fixtures comunitarios, paridad de esquemas)
 python -m unittest discover tests -v
 
 # Verificar estilo y formato con Ruff

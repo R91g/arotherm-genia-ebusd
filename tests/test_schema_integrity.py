@@ -24,6 +24,7 @@ from custom_components.arotherm_genia_ebusd.const import (
     SERVICE_RECORD_TOPIC_CHANGES,
     SERVICE_SEND_HEX_COMMAND,
     SERVICE_SET_HOLIDAY_MODE,
+    SERVICE_SET_LEGIONELLA_PROTECTION,
     SERVICE_SET_WEEKLY_TIMER,
     SERVICE_WRITE_PARAMETER,
 )
@@ -150,6 +151,15 @@ class TestSchemaIntegrity(unittest.TestCase):
         self.assertIn("set_weekly_timer", strings_services)
         self.assertIn("force_dhw_boost", strings_services)
 
+        # Every service declared in services.yaml must also have translations
+        with open(self.services_path, "r", encoding="utf-8") as fp:
+            yaml_services = {
+                line.rstrip(":")
+                for line in fp.read().splitlines()
+                if line and not line[0].isspace() and line.endswith(":")
+            }
+        self.assertEqual(yaml_services, strings_services)
+
         # Check for empty strings in all translation files
         def check_no_empty_strings(obj: dict | list | str, path: str = "") -> None:
             if isinstance(obj, dict):
@@ -179,6 +189,7 @@ class TestSchemaIntegrity(unittest.TestCase):
         # Check that registered service constants are documented in services.yaml
         self.assertIn(f"{SERVICE_SET_WEEKLY_TIMER}:", content)
         self.assertIn(f"{SERVICE_FORCE_DHW_BOOST}:", content)
+        self.assertIn(f"{SERVICE_SET_LEGIONELLA_PROTECTION}:", content)
         self.assertIn(f"{SERVICE_SET_HOLIDAY_MODE}:", content)
         self.assertIn(f"{SERVICE_CANCEL_HOLIDAY_MODE}:", content)
         self.assertIn(f"{SERVICE_QUICK_VETO}:", content)

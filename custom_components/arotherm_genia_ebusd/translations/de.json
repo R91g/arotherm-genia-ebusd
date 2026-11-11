@@ -943,6 +943,24 @@
       "name": "Urlaubs- / Abwesenheitsmodus abbrechen",
       "description": "Beendet den Urlaubs-/Abwesenheitsmodus am Klimaregler (15.bass3 / 15.ctlv2 / 15.ctlv3) sofort und stellt den normalen Automatikbetrieb für Heizung und Warmwasser wieder her."
     },
+    "quick_veto": {
+      "name": "Quick Veto / Temporärer Boost (Zone 1)",
+      "description": "Aktiviert Quick Veto (Boost) für Zone 1 (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3), um den Zeitplan oder manuellen Sollwert für eine festgelegte Dauer temporär zu überschreiben. Nutzt Hardware-Veto beim Heizen und persistentes synthetisches Veto beim Kühlen.",
+      "fields": {
+        "temperature": {
+          "name": "Zieltemperatur (Optional)",
+          "description": "Zieltemperatur in °C während des Veto-Zeitraums (10,0–30,0 °C beim Heizen, 15,0–30,0 °C beim Kühlen). Wenn weggelassen, wird das konfigurierte Boost-Delta verwendet."
+        },
+        "duration": {
+          "name": "Dauer in Stunden (Optional)",
+          "description": "Dauer des Veto-Zeitraums in Stunden (0,5 bis 12,0 Stunden). Wenn weggelassen, wird die konfigurierte Quick-Veto-Dauer verwendet (Standard: 3,0 Stunden)."
+        }
+      }
+    },
+    "cancel_quick_veto": {
+      "name": "Quick Veto abbrechen",
+      "description": "Beendet das aktive Quick Veto (Heizen oder Kühlen) für Zone 1 (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3) sofort und stellt die vorherige Betriebsart und manuelle Solltemperatur wieder her."
+    },
     "dump_mqtt_values": {
       "name": "MQTT-Werte ausgeben (Diagnose)",
       "description": "Gibt den vollständigen Systemzustand und empfangene eBUSd-MQTT-Variablen strukturiert aus, um sie in GitHub-Issues oder zur Fehlersuche anzuhängen.",

@@ -16,7 +16,7 @@
 
 **aroTHERM & GeniaAir (eBUS)** (`arotherm_genia_ebusd`) is a **100% local (`local_push`), cloud-independent Home Assistant custom integration** for **Vaillant** and **Saunier Duval** R290 air-to-water heat pumps managed by **`sensoCOMFORT` (`VRC 720`)** or **`MiPro Sense` (`SRC 720`)** system controllers via [**eBUSd**](https://github.com/john30/ebusd).
 
-Designed directly around the native eBUS protocol shared by Vaillant Group heat pumps (`08.hmux0` / `08.hmu`, `15.bass3` / `15.basv3` / `15.ctlv2` / `15.ctlv3`, `76.vwzio`, `04.netx3` / `04.netx2`), this integration replaces raw MQTT auto-discovery clutter and cloud API dependencies with **177 strongly typed entities**, real-time thermodynamic & COP/EER calculations, firmware sentinel filtering, automatic Double-Lock cooling management, physical TCP diagnostics, and Smart Forced DHW Boost.
+Designed directly around the native eBUS protocol shared by Vaillant Group heat pumps (`08.hmux0` / `08.hmu`, `15.bass3` / `15.basv3` / `15.ctlv2` / `15.ctlv3`, `76.vwzio`, `04.netx3` / `04.netx2`), this integration replaces raw MQTT auto-discovery clutter and cloud API dependencies with **185 strongly typed entities**, real-time thermodynamic & COP/EER calculations, firmware sentinel filtering, automatic Double-Lock cooling management, persistent Cooling Quick Veto, physical TCP diagnostics, and Smart Forced DHW Boost.
 
 ---
 
@@ -99,24 +99,25 @@ Vaillant and Saunier Duval aerothermal heat pumps share **100% identical eBUS el
 - **Startup Hydration Queue:** On Home Assistant startup, the coordinator waits `5.0 s` to absorb retained MQTT payloads at zero bus cost, then requests **only missing registers** sequentially with `0.8 s` spacing.
 - **Optimistic Updates & Selective Confirmation:** Writes to passive `u` registers (setpoints, modes, schedules, dates) apply immediate optimistic UI state updates without triggering redundant `/get` cache rebounds, while multi-step transitions use `0.3 s`–`0.6 s` bus pacing.
 
-### 3. 177 Native Entities Organized into 4 Logical Devices
+### 3. 185 Native Entities Organized into 4 Logical Devices
 
 | Logical Device | eBUS Circuit | Highlights |
 | :--- | :---: | :--- |
 | **1. Outdoor Unit** (`<Outdoor Model>`) | `08.hmux0` / `08.hmu` | Live operating monitor (52+ `S.xx`/`S.xxx` states), compressor speed (`r/s`) & modulation (`%`), R290 high pressure, EEV steps, fan speeds, primary flow rate, high-precision flow/return temps, IEEE 754 (`EXP`) per-mode electrical, thermal & environmental yield counters (`Wh`), runtime hours/starts, low-noise silent operation levels, and **calculated thermodynamic & system energy sensors**. |
-| **2. Climate Controller** (`sensoCOMFORT` / `MiPro Sense`) | `15.bass3` / `15.basv3` / `15.ctlv2` / `15.ctlv3` | **Zone 1 Climate (`climate`)**, **Domestic Hot Water (`water_heater`)**, heating curves, flow temperature limits, bivalence points, water pressure, heating energy integral (`EnergyIntegral`), service energy counters (`PrEnergySumHc` / `PrEnergySumHwc`), weekly schedule summaries, and configuration switches. |
+| **2. Climate Controller** (`sensoCOMFORT` / `MiPro Sense`) | `15.bass3` / `15.basv3` / `15.ctlv2` / `15.ctlv3` | **Zone 1 Climate (`climate`)**, **Domestic Hot Water (`water_heater`)**, heating curves, flow temperature limits, bivalence points, water pressure, heating energy integral (`EnergyIntegral`), service energy counters (`PrEnergySumHc` / `PrEnergySumHwc`), weekly schedule summaries, anti-legionella scheduling, and configuration switches. |
 | **3. Hydraulic Interface** (`<Indoor Model>`) | `76.vwzio` | Secondary circuit operating state (heating, cooling, DHW, overrun, standby), instantaneous electrical power (`W`), `b5 16` auxiliary/secondary energy counters (`Wh`), backup heater state, 3-way diverter valve / secondary pump diagnostics, and active error monitoring (`OK` or fault codes). |
 | **4. Wireless Room Thermostat** *(Optional)* | `04.netx3` / `04.netx2` / `f6` / `broadcast` | Wireless room dial temperature, wireless target setpoint, broadcast outdoor temperature, and eBUS system date/time. *(If no wireless unit is installed, broadcast sensors automatically attach to the Climate Controller).* |
 
-**Platform Breakdown (177 entities total across 9 platforms):**
-- `climate` (**1**): Unified Heating/Cooling/Auto thermostat for Zone 1 with presets (`Scheduled (Comfort)`, `Continuous Manual`, `Eco (Night setback)`, `Quick Veto Override`, `Away / Holiday Mode`).
+**Platform Breakdown (185 entities total across 10 platforms):**
+- `climate` (**1**): Unified Heating/Cooling/Auto thermostat for Zone 1 with presets (`Scheduled (Comfort)`, `Continuous Manual`, `Eco (Night setback)`, `Quick Veto Override` for both heating and cooling, `Away / Holiday Mode`).
 - `water_heater` (**1**): Domestic Hot Water (DHW) cylinder controller (`Off`, `Time-controlled (Schedule)`, `Continuous (24h)`, `Boost`).
-- `sensor` (**123**): Telemetry, `Wh`-precision energy matrices (electrical, thermal, environmental yields across heating, cooling, DHW, and auxiliary modules), calculated thermodynamics & COP/EER, physical bus diagnostics, missing CSV detector, and 4 weekly schedule summary sensors.
+- `sensor` (**127**): Telemetry, `Wh`-precision energy matrices (electrical, thermal, environmental yields across heating, cooling, DHW, and auxiliary modules), calculated thermodynamics & COP/EER, physical bus & MQTT health diagnostics, missing CSV detector, and 5 weekly schedule summary sensors (`heating`, `dhw`, `cooling`, `circulation`, `silent`).
 - `binary_sensor` (**9**): Compressor running, primary pump, defrost active, energy integration active, Zone 1 heating demand, hardware cooling lock release, broadcast cooling cycle, physical eBUS signal, and backup heater active.
-- `number` (**26**): All installer and user numeric parameters (heating curve, excess temp, min/max flow setpoints, summer limit, day/night/manual/veto/cooling/holiday setback setpoints, DHW setpoint & hysteresis/offset/timers, bivalence points, max room humidity).
-- `select` (**5**): Zone 1 heating mode, Zone 1 cooling mode, DHW mode, night lowering mode (`eco`/`night`/`off`), and room temperature modulation mode (`off`/`modulating`/`thermostat`).
+- `number` (**28**): All installer and user numeric parameters (heating curve, excess temp, min/max flow setpoints, summer limit, day/night/manual/veto/cooling/holiday setback setpoints, DHW setpoint & hysteresis/offset/timers, Quick Veto heating/cooling boost deltas and duration, bivalence points, max room humidity).
+- `select` (**6**): Zone 1 heating mode, Zone 1 cooling mode, DHW mode, night lowering mode (`eco`/`night`/`off`), room temperature modulation mode (`off`/`modulating`/`thermostat`), and weekly anti-legionella day (`off`/`Monday`–`Sunday`).
 - `switch` (**6**): Away Mode (`Holiday Mode`), One-Time DHW Charge (`Boost`), Cooling Season Authorization (`Lock 1`), Adaptive Heating Curve, DHW Parallel Loading, and Global System Off *(disabled by default for safety)*.
 - `datetime` (**4**): Interactive UI controls for Away Mode Start (`datetime`), Away Mode End (`datetime`), Manual Cooling Start Date (`datetime`), and Manual Cooling End Date (`datetime`).
+- `time` (**1**): Interactive UI time control for weekly anti-legionella thermal disinfection (`HwcLegionellaTime`).
 - `button` (**2**): Hot-Action buttons for eBUSd daemon control (`Reload CSV Configurations` and `Restart Bus Device Scan`).
 
 ### 4. Zone 1 Climate: Anti-Sentinel Filter & Automatic Double-Lock Cooling
@@ -129,6 +130,9 @@ Vaillant and Saunier Duval aerothermal heat pumps share **100% identical eBUS el
   - **Open-Ended Mode (Default):** Selecting **`Cool`** on the thermostat automatically turns off heating, opens **Lock 1** indefinitely (`01;01;26` to `01;01;99`), activates **Lock 2** (`Z1OpModeCooling = day`), and restores your saved cooling target temperature.
   - **Custom Window Mode:** If you set custom dates via `Manual Cooling Start Date` and `Manual Cooling End Date` (either before switching on or while running), the integration programs your specific date window without forcing indefinite operation, automatically restricting active cooling to that timeframe.
   - Switching back to **`Heat`** or **`Off`** automatically closes **Lock 1** (`01;01;19` epoch, matching the official `myVAILLANT` / `MiGo Link` app behavior) and restores your heating setpoint.
+- **Unified Quick Veto (Heating Hardware + Persistent Cooling Override):**
+  - Selecting `Quick Veto Override` (or calling `arotherm_genia_ebusd.quick_veto`) triggers native hardware Quick Veto in heating (`Z1QuickVetoStartTime` / `Z1QuickVetoDuration`) and a Home Assistant–managed **synthetic Cooling Quick Veto** backed by durable storage (`Store`) across restarts when cooling is active.
+  - Both paths support configurable boost deltas (`+3.0 °C` heating / `-2.0 °C` cooling by default) and automatically restore your exact pre-veto operating mode and setpoint on expiration or cancellation, while **Away / Holiday Mode** takes absolute priority and blocks activation/automatically clears any active Cooling Quick Veto.
 
 ### 5. Domestic Hot Water (`water_heater`): Smart Forced DHW Boost
 - By factory design, `sensoCOMFORT` / `MiPro Sense` enforces a strict charging hysteresis (`CylinderChargeHyst = 5.0 K`). If your DHW setpoint is `50.0 °C` and the tank is currently at `47.0 °C`, activating standard one-time boost (`HwcSFMode = load`) does **not** start the compressor because `47.0 °C > (50.0 - 5.0) °C`.
@@ -345,7 +349,7 @@ Click **Configure** on the integration card in **Settings → Devices & Services
 
 ## Custom Actions (Services)
 
-The integration registers two custom actions under the `arotherm_genia_ebusd` domain, available in **Developer Tools → Actions** and Home Assistant Automations / Scripts.
+The integration registers **12 custom actions** under the `arotherm_genia_ebusd` domain, available in **Developer Tools → Actions** and Home Assistant Automations / Scripts.
 
 ### 1. `arotherm_genia_ebusd.set_weekly_timer`
 
@@ -359,7 +363,7 @@ Modifies or clears native `b5 55` weekly time programs directly inside the `sens
 | `day` | Yes | `Monday`..`Sunday`, `Weekdays`, `Weekend`, `All`<br>*(or in Spanish: `Lunes`..`Domingo`, `Laborables`, `Fin de semana`, `Todos`)* | Single day, Monday–Friday (`Weekdays`), Saturday–Sunday (`Weekend`), or Monday–Sunday (`All`). |
 | `action` | No | `set`, `delete`, `clear` *(default: `set`)* | Action to perform:<br>• `set`: creates or updates the designated slot.<br>• `delete`: removes the specified slot and shifts subsequent slots down.<br>• `clear`: empties the entire day, leaving 0 active slots. |
 | `slot` | No | `1`, `2`, `3` *(default: `1`)* | Daily time slot index (`1` to `3`). Ignored when `action: clear`. |
-| `start_time` | Optional* | `"HH:MM"` *(e.g. `"13:10"`)* | Window start time (24h format, 10-minute resolution). *Required when `action: set`. |
+| `start_time` | Optional* | `"HH:MM"` *(e.g. `"13:10"`)* | Window start time (24h format, 1-minute resolution). *Required when `action: set`. |
 | `end_time` | Optional* | `"HH:MM"` *(e.g. `"15:30"` or `"24:00"`)* | Window end time (24h format, use `"24:00"` for all day). *Required when `action: set`. |
 | `temp` | No | `5.0` – `80.0` *(°C)* | Optional target temperature setpoint for this slot. Applies only to `heating`, `dhw`, and `cooling` (ignored for `circulation` and `silent`). If omitted, uses active circuit setpoint (e.g. 50 °C for DHW, 20 °C for Zone 1). |
 | `reset_remaining` | No | `true`, `false` *(default: `false`)* | When set to `true` with `slot: 1` in `set` mode, overwrites the day to exactly 1 active slot (`total_slots = 1`) and erases previous slots 2 and 3 without requiring prior telemetry from the eBUS line. |
@@ -439,12 +443,28 @@ data:
   boost_temp: 60.0
 ```
 
-### 3. `arotherm_genia_ebusd.set_holiday_mode`
+### 3. `arotherm_genia_ebusd.set_legionella_protection`
+Configures the weekly anti-legionella thermal disinfection schedule (`HwcLegionellaDay` and `HwcLegionellaTime`) on the climate controller (`15.bass3` / `15.ctlv2` / `15.ctlv3`).
+
+| Parameter | Required | Allowed Values | Description |
+| :--- | :---: | :--- | :--- |
+| `day` | Yes | `off`, `Monday`..`Sunday`<br>*(or Spanish: `desactivado`, `Lunes`..`Domingo`, or `'0'`..`'7'`)* | Scheduled weekday for weekly anti-legionella disinfection, or `off` to disable it. |
+| `time` | No | `"HH:MM"` *(e.g. `"04:00"`)* | Target execution time in 24h format. Defaults to `"04:00"` when enabling an active day. |
+
+**Automation Example — Schedule anti-legionella disinfection every Sunday at 03:30:**
+```yaml
+action: arotherm_genia_ebusd.set_legionella_protection
+data:
+  day: Sunday
+  time: "03:30"
+```
+
+### 4. `arotherm_genia_ebusd.set_holiday_mode`
 Activates the Away / Holiday Mode (`PRESET_AWAY`) on the `MiPro Sense` controller, suspending DHW heating and reducing space heating to the selected setback temperature for a specific or open-ended timeframe.
 
 | Parameter | Required | Allowed Values | Description |
 | :--- | :---: | :--- | :--- |
-| `temperature` | No | `5.0` – `24.0` *(°C)* | Setback room temperature during absence (default: `12.0 °C`). |
+| `temperature` | No | `5.0` – `24.0` *(°C)* | Setback room temperature during absence (default: `15.0 °C`). |
 | `start_date` | No | `YYYY-MM-DD` / `DD/MM/YYYY` | Absence start date (default: today). |
 | `start_time` | No | `HH:MM` | Absence start time (default: current time). |
 | `end_date` | No | `YYYY-MM-DD` / `DD/MM/YYYY` | Absence return date. If omitted, mode stays active indefinitely until cancelled. |
@@ -459,14 +479,37 @@ data:
   end_time: "18:00"
 ```
 
-### 4. `arotherm_genia_ebusd.cancel_holiday_mode`
+### 5. `arotherm_genia_ebusd.cancel_holiday_mode`
 Immediately terminates the Away / Holiday Mode on `15.bass3` and restores automatic heating and DHW operation. No parameters required.
 
 ```yaml
 action: arotherm_genia_ebusd.cancel_holiday_mode
 ```
 
-### 5. `arotherm_genia_ebusd.dump_mqtt_values`
+### 6. `arotherm_genia_ebusd.quick_veto`
+Activates **Quick Veto (Boost)** on Zone 1 (`15.bass3` / `15.basv3` / `15.ctlv2` / `15.ctlv3`) to temporarily override the schedule, manual setpoint, or off state for a limited duration. Automatically applies native hardware Quick Veto in heating and persistent synthetic Quick Veto (`Store`-backed) when active cooling is engaged.
+
+| Parameter | Required | Allowed Values | Description |
+| :--- | :---: | :--- | :--- |
+| `temperature` | No | `10.0` – `30.0` *(°C in heating)*<br>`15.0` – `30.0` *(°C in cooling)* | Optional temporary target temperature. If omitted, applies the configured boost delta (default: `+3.0 °C` in heating, `-2.0 °C` in cooling). |
+| `duration` | No | `0.5` – `12.0` *(hours)* | Duration of the override in hours. If omitted, uses `Quick Veto Duration` (`Z1QuickVetoDuration`, default: `3.0 h`). |
+
+**Automation Example — Trigger a 2.5-hour Zone 1 comfort boost to 22.5 °C:**
+```yaml
+action: arotherm_genia_ebusd.quick_veto
+data:
+  temperature: 22.5
+  duration: 2.5
+```
+
+### 7. `arotherm_genia_ebusd.cancel_quick_veto`
+Immediately cancels an active heating or cooling Quick Veto on Zone 1 and restores the exact operating mode and setpoint that were active beforehand. No parameters required.
+
+```yaml
+action: arotherm_genia_ebusd.cancel_quick_veto
+```
+
+### 8. `arotherm_genia_ebusd.dump_mqtt_values`
 Dumps all cached telemetry, active circuits, hardware models, and eBUS state directly in Home Assistant Developer Tools (`SupportsResponse.ONLY`). Ideal for sharing installation snapshots when opening GitHub issues or troubleshooting communication.
 
 | Parameter | Required | Allowed Values | Description |
@@ -474,7 +517,7 @@ Dumps all cached telemetry, active circuits, hardware models, and eBUS state dir
 | `circuit` | No | String *(e.g. `"08"`, `"15"`, `"hmu"`)* | Optional substring filter to restrict the dump to specific circuits. If omitted, dumps all active circuits. |
 | `anonymize` | No | Boolean *(default: `true`)* | Automatically masks long 28-character manufacturing serial numbers so the snapshot can be safely shared publicly on GitHub. |
 
-### 6. `arotherm_genia_ebusd.record_topic_changes`
+### 9. `arotherm_genia_ebusd.record_topic_changes`
 Actively records all live MQTT traffic published under the eBUSd topic prefix for a configurable duration (`SupportsResponse.ONLY`). Captures timestamps, topics, parsed JSON payloads, and retained flags so external users can easily trace physical interactions without SSH access.
 
 | Parameter | Required | Allowed Values | Description |
@@ -482,7 +525,7 @@ Actively records all live MQTT traffic published under the eBUSd topic prefix fo
 | `duration` | No | `5` – `120` *(seconds, default: `30`)* | Time window to record incoming MQTT messages. |
 | `circuit` | No | String *(e.g. `"08"`, `"15"`)* | Optional substring filter to capture messages matching specific topics. |
 
-### 7. `arotherm_genia_ebusd.send_hex_command`
+### 10. `arotherm_genia_ebusd.send_hex_command`
 Sends a raw hexadecimal command directly to the `ebusd` daemon via its TCP socket (port 8888) and returns the raw response bytes (`SupportsResponse.ONLY`). Ideal for diagnostic probing of undocumented registers without modifying CSV configuration files or requiring SSH console access. Requires that `ebusd` was started with the `--enablehex` security argument.
 
 | Parameter | Required | Allowed Values | Description |
@@ -492,7 +535,7 @@ Sends a raw hexadecimal command directly to the `ebusd` daemon via its TCP socke
 | `port` | No | Integer *(default: `8888`)* | TCP command port of `ebusd`. |
 | `timeout` | No | Float *(default: `5.0`)* | Socket connection and response timeout in seconds. |
 
-### 8. `arotherm_genia_ebusd.read_parameter`
+### 11. `arotherm_genia_ebusd.read_parameter`
 Reads a symbolic eBUS register via MQTT (`SupportsResponse.ONLY`). Publishes an empty payload to `<prefix>/<circuit>/<name>/get` and awaits the decoded JSON response. Supports returning cached data or forcing an active bus read.
 
 | Parameter | Required | Allowed Values | Description |
@@ -502,7 +545,7 @@ Reads a symbolic eBUS register via MQTT (`SupportsResponse.ONLY`). Publishes an 
 | `force` | No | Boolean *(default: `false`)* | If `true`, forces an active bus query instead of returning cached values. |
 | `timeout` | No | Float *(default: `5.0`)* | Maximum wait time in seconds for the MQTT response. |
 
-### 9. `arotherm_genia_ebusd.write_parameter`
+### 12. `arotherm_genia_ebusd.write_parameter`
 Writes a symbolic value to an eBUS register via MQTT (`SupportsResponse.OPTIONAL`). Publishes payload to `<prefix>/<circuit>/<name>/set`, applies immediate optimistic local UI updates, and takes advantage of smart circuit routing and confirmation hooks.
 
 | Parameter | Required | Allowed Values | Description |
@@ -574,7 +617,7 @@ A detailed technical breakdown of the reverse-engineered eBUS protocol is docume
 
 Key topics covered in the reference:
 - **eBUS Topology & Address Mapping:** Full breakdown of master/slave pairings (`03/08`, `10/15`, `71/76`, `f1/f6`).
-- **High-Precision Energy Telemetry (`b5 16`):** The lifetime cumulative energy matrix (`Hc`, `Hwc`, `Cool` for electrical, thermal, and environmental yields) and instantaneous power draw (`PowerStatus` in Watts).
+- **High-Precision Energy Telemetry (`b5 16`):** The lifetime cumulative energy matrix (`Hc`, `Hwc`, `Cool` for electrical, thermal, and environmental yields) and instantaneous power draw (`RunDataElectricPowerConsumption` with `PowerStatus` fallback, in Watts).
 - **Compressor Dynamics:** Empirical proof of the `/16` divisor for `0x38` modulation data type and the $0.8\%$ agreement on the `0D5E` water-side heat meter.
 - **Weekly Schedule Programming (`b5 55`):** 3-slot daily multi-timer structure and the `=FFFF` padding requirements.
 - **Hardware Locks & Safety Latches:** The seasonal cooling double-lock mechanism, the `HwcSFMode = load` latch behavior, and quick-veto overrides.
@@ -588,7 +631,7 @@ Key topics covered in the reference:
 This repository includes an offline unit test suite (requiring zero live Home Assistant runtime dependencies) and GitHub Actions workflows for **Hassfest**, **HACS Validation**, and **Ruff** linting:
 
 ```bash
-# Run all 143 unit tests (thermodynamics, config flow, unique_id registry, diagnostic services, community fixtures, schema parity)
+# Run all 187 unit tests (thermodynamics, config flow, unique_id registry, diagnostic services, community fixtures, schema parity)
 python -m unittest discover tests -v
 
 # Run Ruff linter & formatting checks

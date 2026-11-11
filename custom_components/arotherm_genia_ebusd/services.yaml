@@ -231,15 +231,16 @@ cancel_holiday_mode:
 quick_veto:
   name: Quick Veto (Zone 1 Boost)
   description: >
-    Activates Quick Veto on the climate controller (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3)
-    to temporarily override the heating schedule with a target temperature for a specific duration.
-    If heating is off, it turns heating on and restores off when the veto ends or is cancelled.
+    Activates Quick Veto (Boost) on Zone 1 (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3)
+    to temporarily override the schedule or manual setpoint for a specific duration.
+    Automatically applies hardware Quick Veto in heating (or when off, restoring off afterward)
+    and persistent synthetic Quick Veto in cooling.
   fields:
     temperature:
       name: Target Temperature Setpoint (Optional)
       description: >
-        Target temperature in °C during the veto period (10.0 °C to 30.0 °C).
-        If omitted, intelligently applies +3.0 °C if heating is running, or the manual heating setpoint (Z1ManualTemp) if off or in setback.
+        Target temperature in °C during the veto period (10.0 °C to 30.0 °C in heating, 15.0 °C to 30.0 °C in cooling).
+        If omitted, intelligently applies the configured boost delta (e.g. +3.0 °C in heating, -2.0 °C in cooling).
       required: false
       example: 22.5
       selector:
@@ -267,8 +268,8 @@ quick_veto:
 cancel_quick_veto:
   name: Cancel Quick Veto
   description: >
-    Immediately cancels active Quick Veto on the climate controller (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3),
-    resets veto duration to 0, and restores previous operating mode (scheduled, manual, or off).
+    Immediately cancels active heating or cooling Quick Veto on Zone 1 (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3)
+    and restores the previous operating mode and manual setpoint.
 
 dump_mqtt_values:
   name: Dump MQTT Values (Diagnostics)

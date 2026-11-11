@@ -943,6 +943,24 @@
       "name": "Cancel Holiday / Away Mode",
       "description": "Immediately cancels Holiday/Away Mode on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3) and restores automatic schedule operation for heating and domestic hot water."
     },
+    "quick_veto": {
+      "name": "Quick Veto (Zone 1 Boost)",
+      "description": "Activates Quick Veto (Boost) on Zone 1 (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3) to temporarily override the schedule or manual setpoint for a specific duration. Supports hardware Quick Veto in heating and persistent synthetic Quick Veto in cooling.",
+      "fields": {
+        "temperature": {
+          "name": "Target Temperature Setpoint (Optional)",
+          "description": "Target temperature in °C during the veto period (10.0 to 30.0 °C in heating, 15.0 to 30.0 °C in cooling). If omitted, uses configured boost delta."
+        },
+        "duration": {
+          "name": "Duration in Hours (Optional)",
+          "description": "Duration of the veto period in hours (0.5 to 12.0 hours). If omitted, uses the currently configured Quick Veto Duration (default 3.0 hours)."
+        }
+      }
+    },
+    "cancel_quick_veto": {
+      "name": "Cancel Quick Veto",
+      "description": "Immediately cancels active heating or cooling Quick Veto on Zone 1 (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3) and restores the previous operating mode and manual setpoint."
+    },
     "dump_mqtt_values": {
       "name": "Dump MQTT Values (Diagnostics)",
       "description": "Dumps full installation state and eBUSd MQTT telemetry into a structured JSON format suitable for troubleshooting or attaching to GitHub issues.",
