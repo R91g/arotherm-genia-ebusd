@@ -22,6 +22,7 @@ MOCKED_MODULES = [
     "homeassistant.components.select",
     "homeassistant.components.sensor",
     "homeassistant.components.switch",
+    "homeassistant.components.time",
     "homeassistant.components.water_heater",
     "homeassistant.config_entries",
     "homeassistant.const",
@@ -220,6 +221,23 @@ class MockRestoreEntity:
         return getattr(self, "_mock_last_state", None)
 
 
+class MockSelectEntity(MockEntity):
+    """Mock SelectEntity with options property."""
+
+    _attr_options: list[str] | None = None
+
+    @property
+    def options(self) -> list[str]:
+        if self._attr_options is not None:
+            return self._attr_options
+        if (
+            hasattr(self, "entity_description")
+            and getattr(self.entity_description, "options", None) is not None
+        ):
+            return self.entity_description.options
+        return []
+
+
 sys.modules["homeassistant.helpers.entity"].Entity = MockEntity
 sys.modules["homeassistant.helpers"].entity_registry = sys.modules[
     "homeassistant.helpers.entity_registry"
@@ -234,11 +252,12 @@ sys.modules["homeassistant.helpers.device_registry"].DeviceInfo = dict
 sys.modules["homeassistant.components.sensor"].SensorEntity = MockEntity
 sys.modules["homeassistant.components.binary_sensor"].BinarySensorEntity = MockEntity
 sys.modules["homeassistant.components.number"].NumberEntity = MockEntity
-sys.modules["homeassistant.components.select"].SelectEntity = MockEntity
+sys.modules["homeassistant.components.select"].SelectEntity = MockSelectEntity
 sys.modules["homeassistant.components.switch"].SwitchEntity = MockEntity
 sys.modules["homeassistant.components.climate"].ClimateEntity = MockEntity
 sys.modules["homeassistant.components.water_heater"].WaterHeaterEntity = MockEntity
 sys.modules["homeassistant.components.datetime"].DateTimeEntity = MockEntity
+sys.modules["homeassistant.components.time"].TimeEntity = MockEntity
 sys.modules["homeassistant.helpers.restore_state"].RestoreEntity = MockRestoreEntity
 
 
@@ -282,6 +301,9 @@ sys.modules[
 sys.modules[
     "homeassistant.components.datetime"
 ].DateTimeEntityDescription = MockEntityDescription
+sys.modules[
+    "homeassistant.components.time"
+].TimeEntityDescription = MockEntityDescription
 sys.modules[
     "homeassistant.components.button"
 ].ButtonEntityDescription = MockEntityDescription

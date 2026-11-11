@@ -280,6 +280,19 @@
           "modulating": "Aktiv (Modulierend)",
           "thermostat": "Erweitert (Thermostat-Abschaltung)"
         }
+      },
+      "hwc_legionella_day": {
+        "name": "Legionellenschutz Tag",
+        "state": {
+          "off": "Deaktiviert",
+          "monday": "Montag",
+          "tuesday": "Dienstag",
+          "wednesday": "Mittwoch",
+          "thursday": "Donnerstag",
+          "friday": "Freitag",
+          "saturday": "Samstag",
+          "sunday": "Sonntag"
+        }
       }
     },
     "switch": {
@@ -314,6 +327,11 @@
       },
       "cooling_end_datetime": {
         "name": "Enddatum Manueller Kühlbetrieb"
+      }
+    },
+    "time": {
+      "hwc_legionella_time": {
+        "name": "Legionellenschutz Uhrzeit"
       }
     },
     "binary_sensor": {
@@ -878,6 +896,20 @@
         "boost_temp": {
           "name": "Temporäre Boost-Temperatur (Optional - PV-Überschuss)",
           "description": "Optionaler temporärer Sollwert in °C für diesen Ladezyklus (z. B. 60 °C für Solarüberschüsse). Wenn weggelassen, wird automatisch T_aktuell + Hysterese + 1,5 °C berechnet."
+        }
+      }
+    },
+    "set_legionella_protection": {
+      "name": "Legionellenschutz-Zeitplan einstellen",
+      "description": "Konfiguriert den wöchentlichen thermischen Legionellenschutz-Desinfektionszeitplan am Systemregler (15.bass3 / 15.ctlv2 / 15.ctlv3). Legt den Wochentag und die Zielausführungszeit fest.",
+      "fields": {
+        "day": {
+          "name": "Wochentag",
+          "description": "Wochentag zur Durchführung der thermischen Desinfektion ('off' oder Montag bis Sonntag)."
+        },
+        "time": {
+          "name": "Ausführungszeit (Optional)",
+          "description": "Geplante Uhrzeit im Format HH:MM (z. B. 03:00 oder 04:00). Standardmäßig 04:00, wenn ein Tag aktiv ist."
         }
       }
     },

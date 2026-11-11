@@ -135,6 +135,44 @@ force_dhw_boost:
           unit_of_measurement: "°C"
           mode: box
 
+set_legionella_protection:
+  name: Set Anti-Legionella Protection Schedule
+  description: >
+    Configures the weekly anti-legionella thermal disinfection schedule on the climate controller
+    (15.bass3 / 15.ctlv2 / 15.ctlv3). Sets the day of the week and target execution time.
+  fields:
+    day:
+      name: Day of the Week
+      description: Day of the week to run anti-legionella disinfection ('off' or Monday through Sunday).
+      required: true
+      example: "Sunday"
+      selector:
+        select:
+          options:
+            - label: "Disabled / Desactivado (off)"
+              value: "off"
+            - label: "Monday / Lunes"
+              value: "Monday"
+            - label: "Tuesday / Martes"
+              value: "Tuesday"
+            - label: "Wednesday / Miércoles"
+              value: "Wednesday"
+            - label: "Thursday / Jueves"
+              value: "Thursday"
+            - label: "Friday / Viernes"
+              value: "Friday"
+            - label: "Saturday / Sábado"
+              value: "Saturday"
+            - label: "Sunday / Domingo"
+              value: "Sunday"
+    time:
+      name: Execution Time (Optional)
+      description: Scheduled time in HH:MM format (e.g. 03:00 or 04:00). Defaults to 04:00 if day is active.
+      required: false
+      example: "04:00"
+      selector:
+        text:
+
 set_holiday_mode:
   name: Set Holiday / Away Mode
   description: >

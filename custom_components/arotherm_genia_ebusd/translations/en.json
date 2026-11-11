@@ -280,6 +280,19 @@
           "modulating": "Active (Modulating)",
           "thermostat": "Expanded (Thermostat cut-off)"
         }
+      },
+      "hwc_legionella_day": {
+        "name": "Anti-Legionella Protection Day",
+        "state": {
+          "off": "Disabled",
+          "monday": "Monday",
+          "tuesday": "Tuesday",
+          "wednesday": "Wednesday",
+          "thursday": "Thursday",
+          "friday": "Friday",
+          "saturday": "Saturday",
+          "sunday": "Sunday"
+        }
       }
     },
     "switch": {
@@ -314,6 +327,11 @@
       },
       "cooling_end_datetime": {
         "name": "Manual Cooling End Date"
+      }
+    },
+    "time": {
+      "hwc_legionella_time": {
+        "name": "Anti-Legionella Protection Time"
       }
     },
     "binary_sensor": {
@@ -878,6 +896,20 @@
         "boost_temp": {
           "name": "Temporary Boost Temperature (Optional - Solar Surpluses)",
           "description": "Optional temporary setpoint in °C for this specific boost cycle (e.g. 60 °C for PV solar surpluses). If omitted, automatically applies T_current + hysteresis + 1.5 °C."
+        }
+      }
+    },
+    "set_legionella_protection": {
+      "name": "Set Anti-Legionella Protection Schedule",
+      "description": "Configures the weekly anti-legionella thermal disinfection schedule on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3). Sets the day of the week and target execution time.",
+      "fields": {
+        "day": {
+          "name": "Day of the Week",
+          "description": "Day of the week to run anti-legionella disinfection ('off' or Monday through Sunday)."
+        },
+        "time": {
+          "name": "Execution Time (Optional)",
+          "description": "Scheduled time in HH:MM format (e.g. 03:00 or 04:00). Defaults to 04:00 if day is active."
         }
       }
     },

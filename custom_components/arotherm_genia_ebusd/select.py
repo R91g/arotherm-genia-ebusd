@@ -22,6 +22,7 @@ class SaunierGeniaSelectEntityDescription(SelectEntityDescription):
     message: str
     circuit: str = CIRCUIT_BASS3
     field: str = "value"
+    options_map: dict[str, str] | None = None
 
 
 SELECT_DESCRIPTIONS: tuple[SaunierGeniaSelectEntityDescription, ...] = (
@@ -60,6 +61,33 @@ SELECT_DESCRIPTIONS: tuple[SaunierGeniaSelectEntityDescription, ...] = (
         message="Hc1RoomTempSwitchOn",
         field="value",
         options=["off", "modulating", "thermostat"],
+        entity_category=EntityCategory.CONFIG,
+    ),
+    SaunierGeniaSelectEntityDescription(
+        key="hwc_legionella_day",
+        translation_key="hwc_legionella_day",
+        message="HwcLegionellaDay",
+        field="day",
+        options=[
+            "off",
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+        ],
+        options_map={
+            "off": "0",
+            "monday": "1",
+            "tuesday": "2",
+            "wednesday": "3",
+            "thursday": "4",
+            "friday": "5",
+            "saturday": "6",
+            "sunday": "7",
+        },
         entity_category=EntityCategory.CONFIG,
     ),
 )
@@ -117,14 +145,25 @@ class SaunierGeniaSelect(SaunierGeniaEntity, SelectEntity):
         if val is None:
             return None
         val_lower = val.lower()
-        if self.options and val_lower in self.options:
+        options = self.entity_description.options or getattr(self, "options", [])
+        if options and val_lower in options:
             return val_lower
+        if self.entity_description.options_map:
+            rev_map = {v: k for k, v in self.entity_description.options_map.items()}
+            if val in rev_map:
+                return rev_map[val]
         return None
 
     async def async_select_option(self, option: str) -> None:
         """Write the selected option to eBUSd."""
+        write_val = option
+        if (
+            self.entity_description.options_map
+            and option in self.entity_description.options_map
+        ):
+            write_val = self.entity_description.options_map[option]
         await self.coordinator.async_write_parameter(
             self.entity_description.circuit,
             self.entity_description.message,
-            option,
+            write_val,
         )

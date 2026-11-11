@@ -20,6 +20,7 @@ PLATFORMS: list[Platform] = [
     Platform.SELECT,
     Platform.SWITCH,
     Platform.DATETIME,
+    Platform.TIME,
     Platform.BUTTON,
 ]
 
@@ -364,6 +365,7 @@ DEFAULT_CYLINDER_HYST = 5.0
 # Services
 SERVICE_SET_WEEKLY_TIMER = "set_weekly_timer"
 SERVICE_FORCE_DHW_BOOST = "force_dhw_boost"
+SERVICE_SET_LEGIONELLA_PROTECTION = "set_legionella_protection"
 SERVICE_SET_HOLIDAY_MODE = "set_holiday_mode"
 SERVICE_CANCEL_HOLIDAY_MODE = "cancel_holiday_mode"
 SERVICE_QUICK_VETO = "quick_veto"

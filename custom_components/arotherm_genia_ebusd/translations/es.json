@@ -280,6 +280,19 @@
           "modulating": "Activo (Modulación)",
           "thermostat": "Ampliado (Termostato con corte)"
         }
+      },
+      "hwc_legionella_day": {
+        "name": "Día de protección antilegionela",
+        "state": {
+          "off": "Desactivado",
+          "monday": "Lunes",
+          "tuesday": "Martes",
+          "wednesday": "Miércoles",
+          "thursday": "Jueves",
+          "friday": "Viernes",
+          "saturday": "Sábado",
+          "sunday": "Domingo"
+        }
       }
     },
     "switch": {
@@ -314,6 +327,11 @@
       },
       "cooling_end_datetime": {
         "name": "Fecha de fin de refrigeración"
+      }
+    },
+    "time": {
+      "hwc_legionella_time": {
+        "name": "Hora de protección antilegionela"
       }
     },
     "binary_sensor": {
@@ -878,6 +896,20 @@
         "boost_temp": {
           "name": "Temperatura temporal de Boost (Opcional - Excedentes solares)",
           "description": "Consigna temporal opcional en °C para este ciclo concreto (ej. 60 °C para excedentes solares). Si se omite, calcula automáticamente T_actual + histéresis + 1.5 °C."
+        }
+      }
+    },
+    "set_legionella_protection": {
+      "name": "Configurar programación de protección antilegionela",
+      "description": "Configura la programación semanal de desinfección térmica antilegionela en el controlador de climatización (15.bass3 / 15.ctlv2 / 15.ctlv3). Establece el día de la semana y la hora de ejecución objetivo.",
+      "fields": {
+        "day": {
+          "name": "Día de la semana",
+          "description": "Día de la semana para ejecutar la desinfección antilegionela ('off' o de lunes a domingo)."
+        },
+        "time": {
+          "name": "Hora de ejecución (Opcional)",
+          "description": "Hora programada en formato HH:MM (ej. 03:00 o 04:00). Por defecto es 04:00 si el día está activo."
         }
       }
     },

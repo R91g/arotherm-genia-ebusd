@@ -52,8 +52,10 @@ from .const import (
     SERVICE_RECORD_TOPIC_CHANGES,
     SERVICE_SEND_HEX_COMMAND,
     SERVICE_SET_HOLIDAY_MODE,
+    SERVICE_SET_LEGIONELLA_PROTECTION,
     SERVICE_SET_WEEKLY_TIMER,
     SERVICE_WRITE_PARAMETER,
+    SET_CONFIRMATION_DELAY_SECONDS,
     TIMER_CIRCUIT_PREFIXES,
     WEEKDAYS_LIST,
 )
@@ -148,6 +150,13 @@ SET_HOLIDAY_MODE_SCHEMA = vol.Schema(
 )
 
 CANCEL_HOLIDAY_MODE_SCHEMA = vol.Schema({})
+
+SET_LEGIONELLA_PROTECTION_SCHEMA = vol.Schema(
+    {
+        vol.Required("day"): cv.string,
+        vol.Optional("time"): cv.string,
+    }
+)
 
 QUICK_VETO_SCHEMA = vol.Schema(
     {
@@ -402,6 +411,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if not hass.data.get(DOMAIN):
             hass.services.async_remove(DOMAIN, SERVICE_SET_WEEKLY_TIMER)
             hass.services.async_remove(DOMAIN, SERVICE_FORCE_DHW_BOOST)
+            hass.services.async_remove(DOMAIN, SERVICE_SET_LEGIONELLA_PROTECTION)
             hass.services.async_remove(DOMAIN, SERVICE_SET_HOLIDAY_MODE)
             hass.services.async_remove(DOMAIN, SERVICE_CANCEL_HOLIDAY_MODE)
             hass.services.async_remove(DOMAIN, SERVICE_QUICK_VETO)
@@ -1054,6 +1064,73 @@ def _async_register_services(hass: HomeAssistant) -> None:
             SERVICE_FORCE_DHW_BOOST,
             _async_handle_force_dhw_boost,
             schema=FORCE_DHW_BOOST_SCHEMA,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_SET_LEGIONELLA_PROTECTION):
+
+        async def _async_handle_set_legionella_protection(call: ServiceCall) -> None:
+            """Handle arotherm_genia_ebusd.set_legionella_protection service call."""
+            coordinators: dict[str, SaunierGeniaCoordinator] = hass.data.get(DOMAIN, {})
+            if not coordinators:
+                raise HomeAssistantError(f"No configured instances of {DOMAIN} found.")
+
+            raw_day: str = str(call.data["day"]).strip()
+            raw_lower = raw_day.lower()
+
+            day_code: str | None = None
+            if raw_lower in ("off", "disabled", "desactivado", "0"):
+                day_code = "0"
+            elif raw_lower in ("1", "2", "3", "4", "5", "6", "7"):
+                day_code = raw_lower
+            else:
+                canonical_day = DAY_NAME_MAPPING.get(raw_lower)
+                day_to_code = {
+                    "Monday": "1",
+                    "Tuesday": "2",
+                    "Wednesday": "3",
+                    "Thursday": "4",
+                    "Friday": "5",
+                    "Saturday": "6",
+                    "Sunday": "7",
+                }
+                if canonical_day in day_to_code:
+                    day_code = day_to_code[canonical_day]
+
+            if day_code is None:
+                raise HomeAssistantError(
+                    f"Invalid day '{raw_day}'. Must be 'off' or Monday through Sunday."
+                )
+
+            time_raw: str | None = call.data.get("time")
+            time_str: str | None = None
+            if time_raw is not None:
+                t_clean = time_raw.strip()
+                if t_clean:
+                    h, m = _parse_hhmm(t_clean, is_end=False)
+                    time_str = f"{h:02d}:{m:02d}"
+
+            if day_code != "0" and time_str is None:
+                time_str = "04:00"
+
+            for coordinator in coordinators.values():
+                if not coordinator.is_ebus_operational:
+                    raise HomeAssistantError(
+                        "Cannot execute service: eBUS communication is not operational."
+                    )
+                await coordinator.async_write_parameter(
+                    CIRCUIT_BASS3, "HwcLegionellaDay", day_code
+                )
+                if time_str is not None:
+                    await asyncio.sleep(SET_CONFIRMATION_DELAY_SECONDS)
+                    await coordinator.async_write_parameter(
+                        CIRCUIT_BASS3, "HwcLegionellaTime", time_str
+                    )
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SET_LEGIONELLA_PROTECTION,
+            _async_handle_set_legionella_protection,
+            schema=SET_LEGIONELLA_PROTECTION_SCHEMA,
         )
 
     if not hass.services.has_service(DOMAIN, SERVICE_SET_HOLIDAY_MODE):
