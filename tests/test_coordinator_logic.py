@@ -524,6 +524,73 @@ class TestCoordinatorLogic(unittest.TestCase):
         # Sensor native_value returns RunDataElectricPowerConsumption value (1450.0)
         self.assertEqual(sensor.native_value, 1450.0)
 
+        # 5. Stale RunDataElectricPowerConsumption (> 180s) dynamically falls back to newer PowerStatus
+        t_stale = time.time() - 250.0
+        coord._message_timestamps[
+            (CIRCUIT_HMUX0, "rundataelectricpowerconsumption")
+        ] = t_stale
+        coord._message_timestamps[(CIRCUIT_HMU, "rundataelectricpowerconsumption")] = (
+            t_stale
+        )
+
+        # Push fresher PowerStatus (1500.0 W)
+        push_mqtt(
+            "ebusd/hmux0/PowerStatus",
+            '{"status": {"value": "heating"}, "power": {"value": 1500.0}}',
+        )
+        # Live COP recalculates from fresh PowerStatus fallback: 5815 / 1500 = 3.88
+        self.assertEqual(coord.get_float(CALC_CIRCUIT, CALC_LIVE_COP), 3.88)
+        self.assertEqual(coord.get_instantaneous_electric_power(), 1500.0)
+        self.assertEqual(sensor.native_value, 1500.0)
+
+        # 6. Fresh RunDataElectricPowerConsumption immediately reclaims precedence
+        push_mqtt(
+            "ebusd/hmux0/RunDataElectricPowerConsumption",
+            '{"power": {"value": 1163.0}}',
+        )
+        # 5815 / 1163 = 5.00
+        self.assertEqual(coord.get_float(CALC_CIRCUIT, CALC_LIVE_COP), 5.0)
+        self.assertEqual(coord.get_instantaneous_electric_power(), 1163.0)
+        self.assertEqual(sensor.native_value, 1163.0)
+
+    def test_instantaneous_electric_power_staleness_logic(self) -> None:
+        """Unit test get_instantaneous_electric_power across all staleness branches."""
+        entry = MagicMock()
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {}
+        coord = SaunierGeniaCoordinator(MagicMock(), entry)
+
+        t0 = 1000.0
+        # Neither available
+        self.assertIsNone(coord.get_instantaneous_electric_power(now=t0))
+
+        # Only PowerStatus available
+        coord._state[(CIRCUIT_HMUX0, "PowerStatus")] = {"power": 1200.0}
+        coord._message_timestamps[(CIRCUIT_HMUX0, "powerstatus")] = t0
+        self.assertEqual(coord.get_instantaneous_electric_power(now=t0), 1200.0)
+
+        # Both available and RunData is fresh (age 30s <= 180s)
+        coord._state[(CIRCUIT_HMUX0, "RunDataElectricPowerConsumption")] = {
+            "power": 1350.0
+        }
+        coord._message_timestamps[
+            (CIRCUIT_HMUX0, "rundataelectricpowerconsumption")
+        ] = t0 + 50.0
+        # PowerStatus updated at t0 + 60, RunData at t0 + 50, now is t0 + 80
+        coord._message_timestamps[(CIRCUIT_HMUX0, "powerstatus")] = t0 + 60.0
+        self.assertEqual(coord.get_instantaneous_electric_power(now=t0 + 80.0), 1350.0)
+
+        # RunData becomes stale (age 200s > 180s) and PowerStatus is fresher
+        # RunData at t0 + 50 (age = 250 - 50 = 200s > 180s)
+        # PowerStatus at t0 + 220 (age = 250 - 220 = 30s <= 180s, and 220 > 50)
+        coord._message_timestamps[(CIRCUIT_HMUX0, "powerstatus")] = t0 + 220.0
+        self.assertEqual(coord.get_instantaneous_electric_power(now=t0 + 250.0), 1200.0)
+
+        # Both stale (> 180s): RunData at t0 + 50, PowerStatus at t0 + 40, now is t0 + 500
+        # When both are stale, the more recent reading (RunData at 50 vs PS at 40) is kept
+        coord._message_timestamps[(CIRCUIT_HMUX0, "powerstatus")] = t0 + 40.0
+        self.assertEqual(coord.get_instantaneous_electric_power(now=t0 + 500.0), 1350.0)
+
     def test_split_hmu_cumulative_energy_and_efficiency(self) -> None:
         """Verify HMU / HMU00 (HW5103) units calculate energy and COP from 08.hmu + 15.* + 76.vwzio."""
         entry = MagicMock()

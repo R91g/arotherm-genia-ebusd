@@ -355,17 +355,9 @@ def _get_electric_power(coord: SaunierGeniaCoordinator) -> float | None:
     """Return instantaneous electrical power consumption (W).
 
     Prioritizes RunDataElectricPowerConsumption (active high-frequency r1 poll),
-    falling back to PowerStatus (passively refreshed by MiGo Link / gateway f1 or active reads).
+    falling back dynamically to PowerStatus when stale (> 180s) or missing.
     """
-    for circuit in (coord.active_outdoor_circuit, CIRCUIT_HMUX0, CIRCUIT_HMU):
-        val = coord.get_float(circuit, "RunDataElectricPowerConsumption", "power")
-        if val is not None:
-            return val
-    for circuit in (coord.active_outdoor_circuit, CIRCUIT_HMUX0, CIRCUIT_HMU):
-        val = coord.get_float(circuit, "PowerStatus", "power")
-        if val is not None:
-            return val
-    return None
+    return coord.get_instantaneous_electric_power()
 
 
 def _get_thermal_hc_wh(coord: SaunierGeniaCoordinator) -> float | None:

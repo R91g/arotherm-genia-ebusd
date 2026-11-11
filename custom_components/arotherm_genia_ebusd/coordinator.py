@@ -80,6 +80,7 @@ from .const import (
     DHW_BOOST_MAX_TIMEOUT_SECONDS,
     DOMAIN,
     EBUSD_TRAFFIC_TIMEOUT_SECONDS,
+    ELECTRIC_POWER_STALE_TIMEOUT_SECONDS,
     ESSENTIAL_HYDRATION_MESSAGES,
     HMU_HW5103_HYDRATION_MESSAGES,
     HMUX0_CUSTOM_SIGNATURE_MESSAGES,
@@ -304,6 +305,8 @@ class SaunierGeniaCoordinator:
 
         # State storage indexed by (circuit_lower, message_name)
         self._state: dict[tuple[str, str], dict[str, Any]] = {}
+        # Timestamps of last received update indexed by (circuit_lower, message_lower)
+        self._message_timestamps: dict[tuple[str, str], float] = {}
         # Case-insensitive index mapping (circuit_lower, message_lower) -> canonical message_name
         self._canonical_names: dict[tuple[str, str], str] = {}
 
@@ -855,8 +858,10 @@ class SaunierGeniaCoordinator:
             existing[subfield] = sub_val
             parsed = existing
 
+        now = time.time()
         self._canonical_names[(circuit_key, msg_lower)] = message_name
         self._state[(circuit_key, message_name)] = parsed
+        self._message_timestamps[(circuit_key, msg_lower)] = now
 
         # Notify subscribers for this (circuit, message)
         self._async_notify_message_listeners(circuit_key, message_name)
@@ -877,6 +882,7 @@ class SaunierGeniaCoordinator:
                 canonical_alias
             )
             self._state[(circuit_key, canonical_alias)] = alias_parsed
+            self._message_timestamps[(circuit_key, canonical_alias.lower())] = now
             self._async_notify_message_listeners(circuit_key, canonical_alias)
 
             # If passive schedule update carried total_slots, keep active slots in sync
@@ -901,6 +907,7 @@ class SaunierGeniaCoordinator:
                 if alt_circuit != circuit_key:
                     self._canonical_names[(alt_circuit, msg_lower)] = message_name
                     self._state[(alt_circuit, message_name)] = parsed
+                    self._message_timestamps[(alt_circuit, msg_lower)] = now
                     self._async_notify_message_listeners(alt_circuit, message_name)
                     if (
                         canonical_alias
@@ -911,6 +918,9 @@ class SaunierGeniaCoordinator:
                             (alt_circuit, canonical_alias.lower())
                         ] = canonical_alias
                         self._state[(alt_circuit, canonical_alias)] = alias_parsed
+                        self._message_timestamps[
+                            (alt_circuit, canonical_alias.lower())
+                        ] = now
                         self._async_notify_message_listeners(
                             alt_circuit, canonical_alias
                         )
@@ -922,6 +932,7 @@ class SaunierGeniaCoordinator:
                 if alt_circuit != circuit_key:
                     self._canonical_names[(alt_circuit, msg_lower)] = message_name
                     self._state[(alt_circuit, message_name)] = parsed
+                    self._message_timestamps[(alt_circuit, msg_lower)] = now
                     self._async_notify_message_listeners(alt_circuit, message_name)
                     if (
                         canonical_alias
@@ -932,6 +943,9 @@ class SaunierGeniaCoordinator:
                             (alt_circuit, canonical_alias.lower())
                         ] = canonical_alias
                         self._state[(alt_circuit, canonical_alias)] = alias_parsed
+                        self._message_timestamps[
+                            (alt_circuit, canonical_alias.lower())
+                        ] = now
                         self._async_notify_message_listeners(
                             alt_circuit, canonical_alias
                         )
@@ -1376,6 +1390,99 @@ class SaunierGeniaCoordinator:
         if val is None:
             return default
         return str(val).strip()
+
+    def get_message_timestamp(self, circuit: str, message: str) -> float | None:
+        """Return the Unix timestamp when (circuit, message) was last updated, or None."""
+        c_key = self.resolve_circuit(circuit).lower()
+        m_lower = message.lower()
+        ts = self._message_timestamps.get((c_key, m_lower))
+        if ts is not None:
+            return ts
+        canonical = MESSAGE_ALIASES.get(m_lower)
+        if canonical:
+            ts = self._message_timestamps.get((c_key, canonical.lower()))
+            if ts is not None:
+                return ts
+        # Fallback to literal circuit if resolve_circuit changed it
+        lit_key = circuit.lower()
+        if lit_key != c_key:
+            ts = self._message_timestamps.get((lit_key, m_lower))
+            if ts is not None:
+                return ts
+            if canonical:
+                ts = self._message_timestamps.get((lit_key, canonical.lower()))
+                if ts is not None:
+                    return ts
+        return None
+
+    def get_message_age(
+        self, circuit: str, message: str, now: float | None = None
+    ) -> float | None:
+        """Return elapsed seconds since (circuit, message) was last updated, or None if never received."""
+        ts = self.get_message_timestamp(circuit, message)
+        if ts is None:
+            return None
+        current_time = now if now is not None else time.time()
+        return max(0.0, current_time - ts)
+
+    def get_instantaneous_electric_power(
+        self, now: float | None = None
+    ) -> float | None:
+        """Return instantaneous electrical power consumption (W) with dynamic staleness fallback.
+
+        Prioritizes RunDataElectricPowerConsumption (active high-frequency r1 poll) when fresh.
+        If RunDataElectricPowerConsumption is stale (> 180 seconds without an update) and
+        PowerStatus has fresher telemetry, dynamically falls back to PowerStatus.
+        """
+        circuits = tuple(
+            dict.fromkeys([self._active_outdoor_circuit, CIRCUIT_HMUX0, CIRCUIT_HMU])
+        )
+
+        run_val: float | None = None
+        run_age: float | None = None
+        run_ts: float | None = None
+        for circuit in circuits:
+            val = self.get_float(circuit, "RunDataElectricPowerConsumption", "power")
+            if val is not None:
+                run_val = val
+                run_age = self.get_message_age(
+                    circuit, "RunDataElectricPowerConsumption", now=now
+                )
+                run_ts = self.get_message_timestamp(
+                    circuit, "RunDataElectricPowerConsumption"
+                )
+                break
+
+        ps_val: float | None = None
+        ps_age: float | None = None
+        ps_ts: float | None = None
+        for circuit in circuits:
+            val = self.get_float(circuit, "PowerStatus", "power")
+            if val is not None:
+                ps_val = val
+                ps_age = self.get_message_age(circuit, "PowerStatus", now=now)
+                ps_ts = self.get_message_timestamp(circuit, "PowerStatus")
+                break
+
+        if run_val is None:
+            return ps_val
+        if ps_val is None:
+            return run_val
+
+        # Both are present: check staleness
+        is_run_stale = (
+            run_age is not None and run_age > ELECTRIC_POWER_STALE_TIMEOUT_SECONDS
+        )
+        if not is_run_stale:
+            return run_val
+
+        # RunData is stale (> 180s). Fall back to PowerStatus if PowerStatus is newer or fresh.
+        if (ps_ts is not None and run_ts is not None and ps_ts > run_ts) or (
+            ps_age is not None and ps_age <= ELECTRIC_POWER_STALE_TIMEOUT_SECONDS
+        ):
+            return ps_val
+
+        return run_val
 
     # -------------------------------------------------------------------------
     # MQTT Publishing (/set and /get) & Hydration Queue
@@ -2019,19 +2126,7 @@ class SaunierGeniaCoordinator:
             self._set_calculated(CALC_THERMAL_POWER, thermal_power)
 
         # 3. Live Instantaneous COP / EER
-        elec_power = self.get_float(
-            self._active_outdoor_circuit, "RunDataElectricPowerConsumption", "power"
-        )
-        if elec_power is None:
-            elec_power = self.get_float(
-                self._active_outdoor_circuit, "PowerStatus", "power"
-            )
-        if elec_power is None and self._active_outdoor_circuit != CIRCUIT_HMUX0:
-            elec_power = self.get_float(
-                CIRCUIT_HMUX0, "RunDataElectricPowerConsumption", "power"
-            )
-            if elec_power is None:
-                elec_power = self.get_float(CIRCUIT_HMUX0, "PowerStatus", "power")
+        elec_power = self.get_instantaneous_electric_power()
         live_cop, is_active = calculate_live_cop(
             thermal_power, elec_power, hmu_status, frozenset(ACTIVE_COMPRESSOR_STATUSES)
         )

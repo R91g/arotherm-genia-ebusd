@@ -122,27 +122,15 @@ class TestSensorRegistry(unittest.TestCase):
         coord.active_outdoor_circuit = CIRCUIT_HMUX0
 
         # Case 1: Neither exists -> returns None
-        coord.get_float.return_value = None
+        coord.get_instantaneous_electric_power.return_value = None
         self.assertIsNone(_get_electric_power(coord))
 
         # Case 2: Only PowerStatus exists -> returns fallback
-        def mock_get_float_fallback(circuit, message, field):
-            if message == "PowerStatus" and field == "power":
-                return 456.7
-            return None
-
-        coord.get_float.side_effect = mock_get_float_fallback
+        coord.get_instantaneous_electric_power.return_value = 456.7
         self.assertEqual(_get_electric_power(coord), 456.7)
 
         # Case 3: Both exist -> RunDataElectricPowerConsumption (active high-frequency r1) MUST take precedence
-        def mock_get_float_both(circuit, message, field):
-            if message == "RunDataElectricPowerConsumption" and field == "power":
-                return 123.4
-            if message == "PowerStatus" and field == "power":
-                return 456.7
-            return None
-
-        coord.get_float.side_effect = mock_get_float_both
+        coord.get_instantaneous_electric_power.return_value = 123.4
         self.assertEqual(_get_electric_power(coord), 123.4)
 
     def test_binary_sensors_validity(self) -> None:
