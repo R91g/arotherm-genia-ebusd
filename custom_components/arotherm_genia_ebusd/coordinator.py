@@ -16,6 +16,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import async_call_later, async_track_time_interval
+from homeassistant.helpers.storage import Store
 
 from .const import (
     CALC_CIRCUIT,
@@ -352,10 +353,16 @@ class SaunierGeniaCoordinator:
             DEFAULT_COOLING_QUICK_VETO_BOOST_DELTA
         )
         self._cooling_veto_unsub: CALLBACK_TYPE | None = None
+        self._cooling_veto_get_unsub: CALLBACK_TYPE | None = None
+        self._cooling_veto_restore_unsub: CALLBACK_TYPE | None = None
         self._pre_cooling_veto_opmode: str | None = None
         self._pre_cooling_veto_temp: float | None = None
         self._cooling_veto_active_temp: float | None = None
         self._cooling_veto_end_time: datetime | None = None
+        self._pending_cooling_veto_restore: bool = False
+        self._cooling_veto_store: Store[dict[str, Any]] = Store(
+            hass, 1, f"{DOMAIN}_{entry.entry_id}_cooling_veto"
+        )
 
         # Passive hardware and software version detection from ebusd scan.*
         self._device_versions: dict[str, dict[str, str | None]] = {
@@ -675,7 +682,9 @@ class SaunierGeniaCoordinator:
     # -------------------------------------------------------------------------
 
     async def async_setup(self) -> None:
-        """Subscribe to ebusd MQTT topics and schedule initial hydration."""
+        """Subscribe to ebusd MQTT topics, load persisted veto state, and schedule initial hydration."""
+        await self._async_restore_persisted_cooling_veto()
+
         prefix = self.mqtt_prefix
         circuits_to_subscribe = [
             *CONTROLLER_CIRCUITS,
@@ -784,6 +793,14 @@ class SaunierGeniaCoordinator:
         if self._cooling_veto_unsub is not None:
             self._cooling_veto_unsub()
             self._cooling_veto_unsub = None
+
+        if self._cooling_veto_get_unsub is not None:
+            self._cooling_veto_get_unsub()
+            self._cooling_veto_get_unsub = None
+
+        if self._cooling_veto_restore_unsub is not None:
+            self._cooling_veto_restore_unsub()
+            self._cooling_veto_restore_unsub = None
 
         if self._watchdog_unsub is not None:
             self._watchdog_unsub()
@@ -972,6 +989,33 @@ class SaunierGeniaCoordinator:
             "Z1Status",
         ):
             self._async_check_quick_veto_restoration()
+            if message_name == "Z1Status":
+                z1_status_val = (
+                    self.get_str(CIRCUIT_BASS3, "Z1Status", "value") or ""
+                ).lower()
+                if z1_status_val == "holidayaway" and self.cooling_quick_veto_active:
+                    self.hass.async_create_task(
+                        self.async_cancel_cooling_quick_veto(restore=True)
+                    )
+
+        # If a persisted cooling quick veto expired while HA was offline, restore once eBUS becomes operational
+        if (
+            self._pending_cooling_veto_restore
+            and self.is_ebus_operational
+            and (circuit_key in CONTROLLER_CIRCUITS or circuit_key in OUTDOOR_CIRCUITS)
+            and self._cooling_veto_restore_unsub is None
+        ):
+
+            @callback
+            def _async_schedule_pending_cooling_restore(_now: datetime) -> None:
+                self._cooling_veto_restore_unsub = None
+                self.hass.async_create_task(
+                    self._async_execute_pending_cooling_veto_restore()
+                )
+
+            self._cooling_veto_restore_unsub = async_call_later(
+                self.hass, 1.5, _async_schedule_pending_cooling_restore
+            )
 
         # Verify eBUSd CSV compatibility and manage Home Assistant Repair issues
         self._async_check_csv_compatibility_on_message(
@@ -2517,6 +2561,11 @@ class SaunierGeniaCoordinator:
             target_end_time,
         )
 
+        # Ensure any active synthetic cooling quick veto is restored and cancelled cleanly before Holiday takes over
+        if getattr(self, "cooling_quick_veto_active", False):
+            await self.async_cancel_cooling_quick_veto(restore=True)
+            await asyncio.sleep(0.4)
+
         # Step 1: Set setback temperature (EXP float)
         await self.async_write_parameter(CIRCUIT_BASS3, "HolidayTemp", temp)
         await asyncio.sleep(0.4)
@@ -2738,6 +2787,12 @@ class SaunierGeniaCoordinator:
                 "Cannot execute quick veto: eBUS communication is not operational."
             )
 
+        z1_status = (self.get_str(CIRCUIT_BASS3, "Z1Status", "value") or "").lower()
+        if z1_status == "holidayaway":
+            raise HomeAssistantError(
+                "Cannot activate quick veto while Holiday / Away mode is active."
+            )
+
         current_opmode = (
             self.get_str(CIRCUIT_BASS3, "Z1OpMode", "value") or "auto"
         ).lower()
@@ -2844,10 +2899,26 @@ class SaunierGeniaCoordinator:
                 "Cannot execute cooling quick veto: eBUS communication is not operational."
             )
 
-        # Cancel any running countdown timer without resetting pre-veto memory
+        z1_status = (self.get_str(CIRCUIT_BASS3, "Z1Status", "value") or "").lower()
+        if z1_status == "holidayaway":
+            raise HomeAssistantError(
+                "Cannot activate cooling quick veto while Holiday / Away mode is active."
+            )
+
+        # Cancel any running timers without resetting pre-veto memory
         if self._cooling_veto_unsub is not None:
             self._cooling_veto_unsub()
             self._cooling_veto_unsub = None
+
+        if self._cooling_veto_get_unsub is not None:
+            self._cooling_veto_get_unsub()
+            self._cooling_veto_get_unsub = None
+
+        if self._cooling_veto_restore_unsub is not None:
+            self._cooling_veto_restore_unsub()
+            self._cooling_veto_restore_unsub = None
+
+        self._pending_cooling_veto_restore = False
 
         current_opmode = (
             self.get_str(CIRCUIT_BASS3, "Z1OpModeCooling", "value") or "auto"
@@ -2860,7 +2931,7 @@ class SaunierGeniaCoordinator:
         manual_temp = self.get_float(CIRCUIT_BASS3, "Z1CoolingManualTemp", "value")
         desired_temp = self.get_float(CIRCUIT_BASS3, "Z1CoolingTempDesired", "value")
 
-        # Determine current baseline target
+        # Determine current baseline target (only for computing default boost drop)
         if desired_temp is not None and desired_temp < SENTINEL_COOLING_THRESHOLD:
             current_target = desired_temp
         elif manual_temp is not None and 10.0 <= manual_temp <= 30.0:
@@ -2868,8 +2939,17 @@ class SaunierGeniaCoordinator:
         else:
             current_target = DEFAULT_COOLING_TEMP
 
+        # Preserve original Z1CoolingManualTemp separately so active schedule slots
+        # never overwrite the user's configured manual cooling setpoint on restore.
         if self._pre_cooling_veto_temp is None:
-            self._pre_cooling_veto_temp = current_target
+            if manual_temp is not None and 10.0 <= manual_temp <= 30.0:
+                self._pre_cooling_veto_temp = manual_temp
+            elif (
+                current_opmode == "day"
+                and desired_temp is not None
+                and 10.0 <= desired_temp <= 30.0
+            ):
+                self._pre_cooling_veto_temp = desired_temp
 
         # Determine target temperature
         if temperature is not None:
@@ -2908,7 +2988,7 @@ class SaunierGeniaCoordinator:
         dur_val = max(0.5, min(12.0, dur_val))
 
         _LOGGER.info(
-            "Activating Cooling Quick Veto: target_temp=%.1f°C, duration=%.1fh (pre_opmode=%s, pre_temp=%.1f°C)",
+            "Activating Cooling Quick Veto: target_temp=%.1f°C, duration=%.1fh (pre_opmode=%s, pre_temp=%s)",
             target_temp,
             dur_val,
             self._pre_cooling_veto_opmode,
@@ -2943,6 +3023,7 @@ class SaunierGeniaCoordinator:
         self._cooling_veto_unsub = async_call_later(
             self.hass, seconds, _async_on_cooling_veto_timeout
         )
+        await self._async_save_cooling_veto_state()
         self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1CoolingTempDesired")
         self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1OpModeCooling")
         self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1CoolingManualTemp")
@@ -2965,16 +3046,28 @@ class SaunierGeniaCoordinator:
         await self.async_write_parameter(
             CIRCUIT_BASS3, "Z1CoolingTempDesired", target_temp
         )
+        await self._async_save_cooling_veto_state()
         self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1CoolingTempDesired")
         self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1OpModeCooling")
         self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1CoolingManualTemp")
 
-    async def async_cancel_cooling_quick_veto(self, restore: bool = True) -> None:
+    async def async_cancel_cooling_quick_veto(
+        self, restore: bool = True, restore_temp: bool | None = None
+    ) -> None:
         """Cancel Cooling Quick Veto and optionally restore prior operating mode and setpoint."""
         if self._cooling_veto_unsub is not None:
             self._cooling_veto_unsub()
             self._cooling_veto_unsub = None
 
+        if self._cooling_veto_get_unsub is not None:
+            self._cooling_veto_get_unsub()
+            self._cooling_veto_get_unsub = None
+
+        if self._cooling_veto_restore_unsub is not None:
+            self._cooling_veto_restore_unsub()
+            self._cooling_veto_restore_unsub = None
+
+        self._pending_cooling_veto_restore = False
         self._cooling_veto_end_time = None
         self._cooling_veto_active_temp = None
 
@@ -2983,30 +3076,175 @@ class SaunierGeniaCoordinator:
         self._pre_cooling_veto_opmode = None
         self._pre_cooling_veto_temp = None
 
-        if restore and self.is_ebus_operational:
+        await self._async_clear_cooling_veto_store()
+
+        should_restore_temp = restore if restore_temp is None else restore_temp
+
+        if (restore or should_restore_temp) and self.is_ebus_operational:
             _LOGGER.info(
-                "Cancelling Cooling Quick Veto: restoring pre_opmode=%s, pre_temp=%s",
+                "Cancelling Cooling Quick Veto: restore=%s, restore_temp=%s (pre_opmode=%s, pre_temp=%s)",
+                restore,
+                should_restore_temp,
                 pre_opmode,
                 pre_temp,
             )
-            if pre_opmode is not None and pre_opmode != "day":
+            if restore and pre_opmode is not None and pre_opmode != "day":
                 await self.async_write_parameter(
                     CIRCUIT_BASS3, "Z1OpModeCooling", pre_opmode
                 )
                 await asyncio.sleep(0.3)
 
-            if pre_temp is not None and pre_temp < SENTINEL_COOLING_THRESHOLD:
+            if (
+                should_restore_temp
+                and pre_temp is not None
+                and pre_temp < SENTINEL_COOLING_THRESHOLD
+            ):
                 await self.async_write_parameter(
                     CIRCUIT_BASS3, "Z1CoolingManualTemp", pre_temp
                 )
-                await asyncio.sleep(0.3)
-                await self.async_write_parameter(
-                    CIRCUIT_BASS3, "Z1CoolingTempDesired", pre_temp
+                if restore and pre_opmode == "day":
+                    await asyncio.sleep(0.3)
+                    await self.async_write_parameter(
+                        CIRCUIT_BASS3, "Z1CoolingTempDesired", pre_temp
+                    )
+
+            # Returning to auto/night: schedule a confirmation read of Z1CoolingTempDesired
+            # so HA picks up the controller's real schedule/setback setpoint (or 99 °C sentinel).
+            if restore and pre_opmode != "day":
+
+                @callback
+                def _async_refresh_cooling_desired(_now: datetime) -> None:
+                    self._cooling_veto_get_unsub = None
+                    self.hass.async_create_task(
+                        self.async_request_get(CIRCUIT_BASS3, "Z1CoolingTempDesired")
+                    )
+
+                self._cooling_veto_get_unsub = async_call_later(
+                    self.hass,
+                    SET_CONFIRMATION_DELAY_SECONDS,
+                    _async_refresh_cooling_desired,
                 )
 
         self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1CoolingTempDesired")
         self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1OpModeCooling")
         self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1CoolingManualTemp")
+
+    async def _async_save_cooling_veto_state(self) -> None:
+        """Persist active cooling quick veto state across Home Assistant restarts."""
+        if self._cooling_veto_end_time is None:
+            await self._async_clear_cooling_veto_store()
+            return
+        data = {
+            "end_timestamp": self._cooling_veto_end_time.timestamp(),
+            "end_time": self._cooling_veto_end_time.isoformat(),
+            "active_temp": self._cooling_veto_active_temp,
+            "pre_opmode": self._pre_cooling_veto_opmode,
+            "pre_temp": self._pre_cooling_veto_temp,
+        }
+        try:
+            await self._cooling_veto_store.async_save(data)
+        except (OSError, ValueError, TypeError, HomeAssistantError) as err:
+            _LOGGER.warning("Failed to persist cooling quick veto state: %s", err)
+
+    async def _async_clear_cooling_veto_store(self) -> None:
+        """Remove persisted cooling quick veto state from Home Assistant storage."""
+        try:
+            await self._cooling_veto_store.async_remove()
+        except (OSError, ValueError, TypeError, HomeAssistantError) as err:
+            _LOGGER.warning(
+                "Failed to remove persisted cooling quick veto state: %s", err
+            )
+
+    async def _async_restore_persisted_cooling_veto(self) -> None:
+        """Restore or finalize a persisted cooling quick veto after Home Assistant restart."""
+        try:
+            data = await self._cooling_veto_store.async_load()
+        except (OSError, ValueError, TypeError, HomeAssistantError) as err:
+            _LOGGER.warning(
+                "Failed to load persisted cooling quick veto state: %s", err
+            )
+            return
+
+        if not data or not isinstance(data, dict):
+            return
+
+        end_ts_raw = data.get("end_timestamp")
+        end_iso = data.get("end_time")
+        end_ts: float | None = None
+        if isinstance(end_ts_raw, (int, float)):
+            end_ts = float(end_ts_raw)
+        elif isinstance(end_iso, str):
+            with contextlib.suppress(ValueError):
+                end_ts = datetime.fromisoformat(end_iso).timestamp()
+
+        if end_ts is None:
+            await self._async_clear_cooling_veto_store()
+            return
+
+        pre_opmode = data.get("pre_opmode")
+        pre_temp_raw = data.get("pre_temp")
+        active_temp_raw = data.get("active_temp")
+
+        self._pre_cooling_veto_opmode = (
+            str(pre_opmode).lower() if isinstance(pre_opmode, str) else None
+        )
+        self._pre_cooling_veto_temp = (
+            float(pre_temp_raw) if isinstance(pre_temp_raw, (int, float)) else None
+        )
+        self._cooling_veto_active_temp = (
+            float(active_temp_raw)
+            if isinstance(active_temp_raw, (int, float))
+            else None
+        )
+
+        remaining = end_ts - datetime.now().timestamp()
+        if remaining > 0:
+            self._cooling_veto_end_time = datetime.fromtimestamp(end_ts)
+            if self._cooling_veto_unsub is not None:
+                self._cooling_veto_unsub()
+
+            @callback
+            def _async_on_cooling_veto_timeout(_now: datetime) -> None:
+                self._cooling_veto_unsub = None
+                self.hass.async_create_task(
+                    self.async_cancel_cooling_quick_veto(restore=True)
+                )
+
+            self._cooling_veto_unsub = async_call_later(
+                self.hass, remaining, _async_on_cooling_veto_timeout
+            )
+            _LOGGER.info(
+                "Restored active cooling quick veto after restart (%.0fs remaining, active_temp=%s, pre_opmode=%s, pre_temp=%s)",
+                remaining,
+                self._cooling_veto_active_temp,
+                self._pre_cooling_veto_opmode,
+                self._pre_cooling_veto_temp,
+            )
+        else:
+            self._cooling_veto_end_time = None
+            self._cooling_veto_active_temp = None
+            if self.is_ebus_operational:
+                await self.async_cancel_cooling_quick_veto(restore=True)
+            else:
+                self._pending_cooling_veto_restore = True
+                _LOGGER.info(
+                    "Persisted cooling quick veto expired while offline; deferring bus restoration until eBUS is operational (pre_opmode=%s, pre_temp=%s)",
+                    self._pre_cooling_veto_opmode,
+                    self._pre_cooling_veto_temp,
+                )
+
+    async def _async_execute_pending_cooling_veto_restore(self) -> None:
+        """Execute deferred restoration for a persisted cooling veto that expired offline."""
+        if not self._pending_cooling_veto_restore:
+            return
+        if not self.is_ebus_operational:
+            return
+        _LOGGER.info(
+            "Executing deferred restoration of expired cooling quick veto (pre_opmode=%s, pre_temp=%s)",
+            self._pre_cooling_veto_opmode,
+            self._pre_cooling_veto_temp,
+        )
+        await self.async_cancel_cooling_quick_veto(restore=True)
 
     # -------------------------------------------------------------------------
     # Passive Scan & Hardware/Software Version Detection

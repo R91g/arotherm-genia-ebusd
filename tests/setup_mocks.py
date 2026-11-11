@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, Generic, TypeVar
 from unittest.mock import AsyncMock, MagicMock
 
 MOCKED_MODULES = [
@@ -39,6 +39,7 @@ MOCKED_MODULES = [
     "homeassistant.helpers.issue_registry",
     "homeassistant.helpers.restore_state",
     "homeassistant.helpers.selector",
+    "homeassistant.helpers.storage",
     "homeassistant.util",
     "homeassistant.util.dt",
 ]
@@ -238,7 +239,43 @@ class MockSelectEntity(MockEntity):
         return []
 
 
+_StoreT = TypeVar("_StoreT")
+
+
+class MockStore(Generic[_StoreT]):
+    """In-memory mock for homeassistant.helpers.storage.Store."""
+
+    def __init__(self, hass: Any, version: int, key: str) -> None:
+        self.hass = hass
+        self.version = version
+        self.key = key
+        self._fallback_bucket: dict[str, Any] = {}
+
+    def _bucket(self) -> dict[str, Any]:
+        if self.hass is not None and hasattr(self.hass, "__dict__"):
+            bucket = self.hass.__dict__.get("_mock_storage_data")
+            if not isinstance(bucket, dict):
+                bucket = {}
+                self.hass.__dict__["_mock_storage_data"] = bucket
+            return bucket
+        return self._fallback_bucket
+
+    async def async_load(self) -> Any:
+        data = self._bucket().get(self.key)
+        return dict(data) if isinstance(data, dict) else None
+
+    async def async_save(self, data: Any) -> None:
+        if isinstance(data, dict):
+            self._bucket()[self.key] = dict(data)
+        else:
+            self._bucket()[self.key] = data
+
+    async def async_remove(self) -> None:
+        self._bucket().pop(self.key, None)
+
+
 sys.modules["homeassistant.helpers.entity"].Entity = MockEntity
+sys.modules["homeassistant.helpers.storage"].Store = MockStore
 sys.modules["homeassistant.helpers"].entity_registry = sys.modules[
     "homeassistant.helpers.entity_registry"
 ]

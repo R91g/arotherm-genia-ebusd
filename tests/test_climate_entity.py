@@ -11,10 +11,12 @@ from unittest.mock import MagicMock
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 import setup_mocks  # noqa: F401
 from homeassistant.components.climate import HVACMode
+from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.arotherm_genia_ebusd.climate import (
     COOLING_ACTIVE_MODES,
     HEATING_ACTIVE_MODES,
+    PRESET_AWAY,
     PRESET_BOOST,
     PRESET_COMFORT,
     PRESET_ECO,
@@ -49,6 +51,10 @@ class MockCoordinatorForClimate:
         self._cooling_veto_end_time: datetime | None = None
         self._pre_cooling_veto_opmode: str | None = None
         self._pre_cooling_veto_temp: float | None = None
+
+    @property
+    def pre_cooling_veto_temp(self) -> float | None:
+        return self._pre_cooling_veto_temp
 
     @property
     def is_ebus_operational(self) -> bool:
@@ -188,7 +194,14 @@ class MockCoordinatorForClimate:
             current_target = 23.0
 
         if self._pre_cooling_veto_temp is None:
-            self._pre_cooling_veto_temp = current_target
+            if manual_temp is not None and 10.0 <= manual_temp <= 30.0:
+                self._pre_cooling_veto_temp = manual_temp
+            elif (
+                current_opmode == "day"
+                and desired_temp is not None
+                and 10.0 <= desired_temp <= 30.0
+            ):
+                self._pre_cooling_veto_temp = desired_temp
 
         if temperature is not None:
             target_temp = round(float(temperature), 1)
@@ -234,7 +247,9 @@ class MockCoordinatorForClimate:
             CIRCUIT_BASS3, "Z1CoolingTempDesired", target_temp
         )
 
-    async def async_cancel_cooling_quick_veto(self, restore: bool = True) -> None:
+    async def async_cancel_cooling_quick_veto(
+        self, restore: bool = True, restore_temp: bool | None = None
+    ) -> None:
         self.cooling_quick_veto_active = False
         self.cooling_quick_veto_target_temp = None
         self.cooling_quick_veto_remaining_minutes = None
@@ -243,15 +258,16 @@ class MockCoordinatorForClimate:
         self._pre_cooling_veto_opmode = None
         self._pre_cooling_veto_temp = None
 
-        if restore:
-            if pre_opmode is not None and pre_opmode != "day":
-                await self.async_write_parameter(
-                    CIRCUIT_BASS3, "Z1OpModeCooling", pre_opmode
-                )
-            if pre_temp is not None and pre_temp < 40.0:
-                await self.async_write_parameter(
-                    CIRCUIT_BASS3, "Z1CoolingManualTemp", pre_temp
-                )
+        should_restore_temp = restore if restore_temp is None else restore_temp
+        if restore and pre_opmode is not None and pre_opmode != "day":
+            await self.async_write_parameter(
+                CIRCUIT_BASS3, "Z1OpModeCooling", pre_opmode
+            )
+        if should_restore_temp and pre_temp is not None and pre_temp < 40.0:
+            await self.async_write_parameter(
+                CIRCUIT_BASS3, "Z1CoolingManualTemp", pre_temp
+            )
+            if restore and pre_opmode == "day":
                 await self.async_write_parameter(
                     CIRCUIT_BASS3, "Z1CoolingTempDesired", pre_temp
                 )
@@ -864,6 +880,108 @@ class TestClimateEntity(unittest.TestCase):
         )
         self.assertIn(
             (CIRCUIT_BASS3, "Z1CoolingManualTemp", 22.5), self.coordinator.writes
+        )
+
+    def test_holiday_away_prioritized_over_cooling_f3b(self) -> None:
+        """Verify Away mode takes priority over active cooling (writes HolidayTemp, blocks cool activation)."""
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "day"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "off"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1status")] = {
+            "value": "holidayaway"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "holidaytemp")] = {
+            "value": 14.0
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1coolingmanualtemp")] = {
+            "value": 24.0
+        }
+        self.coordinator.writes.clear()
+
+        self.assertEqual(self.climate.preset_mode, PRESET_AWAY)
+        self.assertEqual(self.climate.min_temp, 5.0)
+        self.assertEqual(self.climate.native_target_temperature, 14.0)
+
+        # Adjusting temperature writes HolidayTemp ONLY, never Z1CoolingManualTemp or veto
+        asyncio.run(self.climate.async_set_temperature(temperature=16.0))
+        self.assertIn((CIRCUIT_BASS3, "HolidayTemp", 16.0), self.coordinator.writes)
+        for _, param, _ in self.coordinator.writes:
+            self.assertNotIn("cooling", param.lower())
+        self.assertFalse(self.coordinator.cooling_quick_veto_active)
+
+        # Explicitly trying to switch to COOL while Away is active is rejected
+        with self.assertRaises(HomeAssistantError):
+            asyncio.run(self.climate.async_set_hvac_mode(HVACMode.COOL))
+
+    def test_exiting_cooling_boost_via_comfort_preset_restores_manual_temp(
+        self,
+    ) -> None:
+        """Verify switching from cooling BOOST back to COMFORT restores original Z1CoolingManualTemp."""
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "auto"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "coolingreleasestatus")] = {
+            "value": "on"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "off"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1coolingmanualtemp")] = {
+            "value": 26.0
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1coolingtempdesired")] = {
+            "value": 24.0
+        }
+        self.coordinator.writes.clear()
+
+        # 1. Start cooling veto (sets ManualTemp to 22.5 temporarily, saves 26.0)
+        asyncio.run(self.climate.async_set_temperature(temperature=22.5))
+        self.assertTrue(self.coordinator.cooling_quick_veto_active)
+        self.assertEqual(self.coordinator._pre_cooling_veto_temp, 26.0)
+
+        # 2. Exit Boost early by choosing Preset: Comfort -> restores ManualTemp=26.0 and opmode=auto
+        self.coordinator.writes.clear()
+        asyncio.run(self.climate.async_set_preset_mode(PRESET_COMFORT))
+        self.assertFalse(self.coordinator.cooling_quick_veto_active)
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1CoolingManualTemp", 26.0), self.coordinator.writes
+        )
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1OpModeCooling", "auto"), self.coordinator.writes
+        )
+
+    def test_exiting_cooling_boost_via_manual_preset_restores_manual_temp_and_desired(
+        self,
+    ) -> None:
+        """Verify switching from cooling BOOST (started from Manual) back to MANUAL restores both ManualTemp and TempDesired."""
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "day"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "off"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1coolingmanualtemp")] = {
+            "value": 25.0
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1coolingtempdesired")] = {
+            "value": 25.0
+        }
+        self.coordinator.cooling_quick_veto_boost_delta = 2.0
+        self.coordinator.writes.clear()
+
+        # 1. Start Boost -> lowers temporarily to 23.0
+        asyncio.run(self.climate.async_set_preset_mode(PRESET_BOOST))
+        self.assertTrue(self.coordinator.cooling_quick_veto_active)
+        self.assertEqual(self.climate.native_target_temperature, 23.0)
+
+        # 2. Exit Boost early via Preset: MANUAL -> immediately back to Manual (day) at 25.0 °C
+        self.coordinator.writes.clear()
+        asyncio.run(self.climate.async_set_preset_mode(PRESET_MANUAL))
+        self.assertFalse(self.coordinator.cooling_quick_veto_active)
+        self.assertEqual(self.climate.preset_mode, PRESET_MANUAL)
+        self.assertEqual(self.climate.native_target_temperature, 25.0)
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1CoolingManualTemp", 25.0), self.coordinator.writes
+        )
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1CoolingTempDesired", 25.0), self.coordinator.writes
         )
 
 

@@ -15,6 +15,7 @@ from homeassistant.components.climate import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
@@ -289,7 +290,9 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
 
     @property
     def min_temp(self) -> float:
-        """Return the minimum temperature allowed (15.0 °C in cooling as supported by MiGo Link, 5.0 °C in heating)."""
+        """Return the minimum temperature allowed (15.0 °C in cooling, 5.0 °C in heating or away mode)."""
+        if self.preset_mode == PRESET_AWAY:
+            return 5.0
         if self._is_cooling_context():
             return 15.0
         return 5.0
@@ -373,6 +376,15 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
         if self.hvac_mode == HVACMode.OFF:
             return None
 
+        current_preset = self.preset_mode
+        if current_preset == PRESET_AWAY:
+            holiday_temp = self.coordinator.get_float(
+                CIRCUIT_BASS3, "HolidayTemp", "value"
+            )
+            if holiday_temp is not None and holiday_temp > 5.0:
+                return round(holiday_temp, 1)
+            return DEFAULT_HOLIDAY_TEMP
+
         if (
             self.coordinator.cooling_quick_veto_active
             and self.coordinator.cooling_quick_veto_target_temp is not None
@@ -385,33 +397,24 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             )
             if val is not None and val < SENTINEL_COOLING_THRESHOLD:
                 return round(val, 1)
-            if self.preset_mode == PRESET_MANUAL:
+            if current_preset == PRESET_MANUAL:
                 manual_c = self.coordinator.get_float(
                     CIRCUIT_BASS3, "Z1CoolingManualTemp", "value"
                 )
                 if manual_c is not None and 10.0 <= manual_c <= 30.0:
                     return round(manual_c, 1)
-            if self.preset_mode == PRESET_ECO:
+            if current_preset == PRESET_ECO:
                 eco_c = self.coordinator.get_float(
                     CIRCUIT_BASS3, "Z1CoolingTemp", "value"
                 )
                 if eco_c is not None and 10.0 <= eco_c <= 30.0:
                     return round(eco_c, 1)
-            if self.preset_mode == PRESET_COMFORT:
+            if current_preset == PRESET_COMFORT:
                 # Outside cooling schedule slot: idle
                 return None
             return self._saved_cooling_target
 
         # Heating context
-        current_preset = self.preset_mode
-        if current_preset == PRESET_AWAY:
-            holiday_temp = self.coordinator.get_float(
-                CIRCUIT_BASS3, "HolidayTemp", "value"
-            )
-            if holiday_temp is not None and holiday_temp > 5.0:
-                return round(holiday_temp, 1)
-            return DEFAULT_HOLIDAY_TEMP
-
         if current_preset == PRESET_BOOST:
             veto_temp = self.coordinator.get_float(
                 CIRCUIT_BASS3, "Z1QuickVetoTemp", "value"
@@ -641,6 +644,14 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             return
 
         if hvac_mode == HVACMode.COOL:
+            z1_status = (
+                self.coordinator.get_str(CIRCUIT_BASS3, "Z1Status", "value") or ""
+            ).lower()
+            if z1_status == "holidayaway":
+                raise HomeAssistantError(
+                    "Cannot activate cooling while Holiday / Away mode is active."
+                )
+
             self._active_season = SEASON_COOLING
             # 1. Turn off heating
             await self.coordinator.async_write_parameter(
@@ -680,23 +691,13 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
 
     async def _async_apply_temperature(self, temp_val: float) -> None:
         """Write the eBUS sequence for a new target temperature (runs with learning paused)."""
+        if self.preset_mode == PRESET_AWAY:
+            await self.coordinator.async_write_parameter(
+                CIRCUIT_BASS3, "HolidayTemp", temp_val
+            )
+            return
+
         if self._is_cooling_active():
-            if self.coordinator.cooling_quick_veto_active:
-                await self.coordinator.async_update_cooling_quick_veto_temperature(
-                    temp_val
-                )
-                return
-
-            cool_mode, _ = self._read_modes()
-            if cool_mode == "auto":
-                if self._pre_boost_hvac_mode is None:
-                    self._pre_boost_hvac_mode = self.hvac_mode
-                    self._pre_boost_preset_mode = PRESET_COMFORT
-                await self.coordinator.async_set_cooling_quick_veto(
-                    temperature=temp_val
-                )
-                return
-
             if self.coordinator.cooling_quick_veto_active:
                 await self.coordinator.async_update_cooling_quick_veto_temperature(
                     temp_val
@@ -726,12 +727,6 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             await asyncio.sleep(0.3)
             await self.coordinator.async_write_parameter(
                 CIRCUIT_BASS3, "Z1CoolingTempDesired", temp_val
-            )
-            return
-
-        if self.preset_mode == PRESET_AWAY:
-            await self.coordinator.async_write_parameter(
-                CIRCUIT_BASS3, "HolidayTemp", temp_val
             )
             return
 
@@ -804,9 +799,15 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
                 await self.coordinator.async_set_quick_veto()
             return
 
-        # Clear cooling quick veto if active
-        if self.coordinator.cooling_quick_veto_active:
-            await self.coordinator.async_cancel_cooling_quick_veto(restore=False)
+        # Clear cooling quick veto if active (restoring manual setpoint without fighting preset opmode)
+        was_cooling_veto = self.coordinator.cooling_quick_veto_active
+        pre_cool_temp = getattr(self.coordinator, "pre_cooling_veto_temp", None)
+        if was_cooling_veto:
+            await self.coordinator.async_cancel_cooling_quick_veto(
+                restore=False, restore_temp=True
+            )
+            self._pre_boost_hvac_mode = None
+            self._pre_boost_preset_mode = None
 
         # Clear quick veto if active
         sf_mode = (
@@ -827,6 +828,16 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             await self.coordinator.async_write_parameter(
                 CIRCUIT_BASS3, "Z1OpModeCooling" if in_cooling else "Z1OpMode", "day"
             )
+            if in_cooling and was_cooling_veto:
+                restore_desired = (
+                    pre_cool_temp
+                    if pre_cool_temp is not None
+                    else self._saved_cooling_target
+                )
+                await asyncio.sleep(0.3)
+                await self.coordinator.async_write_parameter(
+                    CIRCUIT_BASS3, "Z1CoolingTempDesired", restore_desired
+                )
         elif preset_mode == PRESET_COMFORT:
             await self.coordinator.async_write_parameter(
                 CIRCUIT_BASS3, "Z1OpModeCooling" if in_cooling else "Z1OpMode", "auto"
