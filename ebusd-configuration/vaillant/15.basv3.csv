@@ -64,6 +64,10 @@ r;u,,,SolarStorageTempBottom,solar storage temperature bottom,,,b524,02000000670
 r;u,,,SolarStorageTempTop,solar storage temperature top,,,b524,020000006800,ign,,IGN:4,,,,value,,EXP,,°C,"solar temperature sensor, top"
 r;u,,,UnknownSettingB6,unknown setting b6 (uninstalled),,,b524,02000000b600,data,,HEX:4,,,
 r;u,,,PrEnergySolarTotal,total solar energy sum,,,b516,1000ffff01000000,ign,,IGN:7,,,,energy,,EXP,,Wh,
+r;u,,,MultiInputSetting,multifunction input setting,,,b524,020000006a00,ign,,IGN:4,,,,value,,UCH,0=off;1=circulation;2=photovoltaic;3=cooling,,multifunction input setting
+w,,,MultiInputSetting,multifunction input setting,,,b524,020100006a00,value,,UCH,0=off;1=circulation;2=photovoltaic;3=cooling,,multifunction input setting
+r;u,,,OffsetOutsideTemp,outside temperature calibration offset,,,b524,020000002d00,ign,,IGN:4,,,,value,,EXP,,K,outside temperature calibration offset
+w,,,OffsetOutsideTemp,outside temperature calibration offset,,,b524,020100002d00,value,,EXP,,K,outside temperature calibration offset
 
 # ==============================================================================
 # 2. DOMESTIC HOT WATER (DHW)
@@ -92,6 +96,10 @@ r;u,,,CylinderChargeOffset,offset cylinder charge,,,b524,020000002900,ign,,IGN:4
 w,,,CylinderChargeOffset,offset cylinder charge,,,b524,020100002900,value,,EXP,,K,cylinder charging offset
 r;u,,,HwcStorageTempTop,hwc storage temperature top,,,b524,020000009d00,ign,,IGN:4,,,,value,,EXP,,°C,"DHW temperature sensor, top"
 r;u,,,HwcStorageTempBottom,storage temperature bottom,,,b524,020000009e00,ign,,IGN:4,,,,value,,EXP,,°C,"DHW temperature sensor, bottom"
+r;u,,,HwcLegionellaDay,legionella protection day,,,b524,020000002b00,ign,,IGN:4,,,,day,,UIN,0=off;1=Monday;2=Tuesday;3=Wednesday;4=Thursday;5=Friday;6=Saturday;7=Sunday,,legionella protection day
+w,,,HwcLegionellaDay,legionella protection day,,,b524,020100002b00,day,,UIN,0=off;1=Monday;2=Tuesday;3=Wednesday;4=Thursday;5=Friday;6=Saturday;7=Sunday,,legionella protection day
+r;u,,,HwcLegionellaTime,legionella protection time,,,b524,020000002a00,ign,,IGN:4,,,,time,,HTM,,,legionella protection time
+w,,,HwcLegionellaTime,legionella protection time,,,b524,020100002a00,time,,HTM,,,legionella protection time
 
 r;u,,,HwcStatus,hwc status,,,b524,020001000f00,ign,,IGN:4,,,,value,,UIN,0=auto;7=holidayaway;9=load;10=off,,
 r;u,,,BufferChargeOffset,offset buffer charge,,,b524,02000000a200,ign,,IGN:4,,,,value,,EXP,,K,
@@ -173,6 +181,12 @@ r;u,,,CoolingFlowTempDesiredMin,cooling min flow temp desired,,,b524,02000200110
 w,,,CoolingFlowTempDesiredMin,cooling min flow temp desired,,,b524,020102001100,value,,EXP,,°C,min flow temperature setpoint for cooling (Circuit 1: 10.0 °C on MiPro Sense)
 r;u,,,CoolingFlowTempDesiredMax,cooling max flow temp desired,,,b524,020000002600,ign,,IGN:4,,,,value,,EXP,,°C,max flow temperature setpoint for cooling
 w,,,CoolingFlowTempDesiredMax,cooling max flow temp desired,,,b524,020100002600,value,,EXP,,°C,max flow temperature setpoint for cooling
+r;u,,,CoolingOutsideTempThreshold,cooling outside temperature threshold,,,b524,020000003800,ign,,IGN:4,,,,value,,EXP,,°C,cooling outside temperature threshold
+w,,,CoolingOutsideTempThreshold,cooling outside temperature threshold,,,b524,020100003800,value,,EXP,,°C,cooling outside temperature threshold
+r;u,,,DewPointOffset,dew point offset,,,b524,020000003a00,ign,,IGN:4,,,,value,,EXP,,K,dew point offset
+w,,,DewPointOffset,dew point offset,,,b524,020100003a00,value,,EXP,,K,dew point offset
+r;u,,,DewPointMonitoring,dew point monitoring,,,b524,020002000400,ign,,IGN:4,,,,value,,UCH,0=off;1=on,,dew point monitoring
+w,,,DewPointMonitoring,dew point monitoring,,,b524,020102000400,value,,UCH,0=off;1=on,,dew point monitoring
 
 
 # ==============================================================================

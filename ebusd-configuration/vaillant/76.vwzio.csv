@@ -21,6 +21,7 @@ r;u,,,SecondaryCircuitStatus,secondary pump and circuit status,,,b512,0f0201,sta
 r;u,,,SecondaryCircuitStatusStandby,secondary pump and circuit status standby,,,b512,0f0001,status,,HEX:7,,,
 r;u,,,SecondaryCircuitStatusHwc,secondary pump and circuit status hwc,,,b512,0f0202,status,,HEX:7,,,
 r;u,,,SecondaryCircuitStatus03,secondary pump and circuit status 03,,,b512,0f0301,status,,HEX:7,,,
+u,,,StationState,hydraulic station pressure flow and operating state,,,b512,0f0613,ign,,IGN:3,,,,pressure,,UCH,10,bar,system pressure,flow,,UIN,,l/h,volumetric flow rate,state,,UCH,,,operating state
 
 # ==============================================================================
 # 3. ENERGY TELEMETRY AND DIAGNOSTICS (b516 - PASSIVE u & ON-DEMAND READ r)

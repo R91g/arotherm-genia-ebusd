@@ -39,7 +39,7 @@ r;u,,,YieldCoolDay,cooling energy yield today,,,b51a,05ff3201,ign,,IGN:3,,,,valu
 r;u,,,YieldHwcDay,domestic hot water energy yield today,,,b51a,05ff3202,ign,,IGN:3,,,,value,,UIN,10,kWh,
 r;u,,,YieldHcMonth,heating energy yield this month,,,b51a,05ff320e,ign,,IGN:3,,,,value,,UIN,10,kWh,
 r;u,,,CopHcMonth,heating COP this month,,,b51a,05ff320f,ign,,IGN:3,,,,value,,UIN,10,,
-r9;u,,,YieldHc,cumulative heating energy yield,,,b51a,05ff3210,ign,,IGN:3,,,,value,,UIN,,kWh,
+r9;u,,,YieldHc,cumulative heating energy yield,,,b51a,05ff3210,ign,,IGN:3,,,,value,,ULG,,kWh,
 r9;u,,,CopHc,cumulative heating COP,,,b51a,05ff3211,ign,,IGN:3,,,,value,,UIN,10,,
 r;u,,,YieldHwcMonth,hot water energy yield this month,,,b51a,05ff3212,ign,,IGN:3,,,,value,,UIN,10,kWh,
 r;u,,,CopHwcMonth,hot water COP this month,,,b51a,05ff3213,ign,,IGN:3,,,,value,,UIN,10,,
@@ -49,7 +49,7 @@ r;u,,,YieldCoolingMonth,cooling energy yield this month,,,b51a,05ff322a,ign,,IGN
 r;u,,,CopCoolingMonth,cooling COP this month,,,b51a,05ff322b,ign,,IGN:3,,,,value,,UIN,10,,
 r9;u,,,YieldCooling,cumulative cooling energy yield,,,b51a,05ff322c,ign,,IGN:3,,,,value,,UIN,10,kWh,
 r9;u,,,CopCooling,cumulative cooling COP,,,b51a,05ff322d,ign,,IGN:3,,,,value,,UIN,10,,
-r9;u,,,TotalEnergyUsage,total electrical energy usage,,,b51a,05ff324d,ign,,IGN:3,,,,value,,UIN,,kWh,
+r9;u,,,TotalEnergyUsage,total electrical energy usage,,,b51a,05ff324d,ign,,IGN:3,,,,value,,ULG,,kWh,
 
 # Power and environmental dynamics (b51a)
 r;u,,,CurrentYieldPower,current yielded energy from the environment,,,b51a,05ff3223,ign,,IGN:3,,,,value,,SCH,10,kW,
