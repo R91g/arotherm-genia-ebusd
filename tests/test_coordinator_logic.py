@@ -588,10 +588,13 @@ class TestCoordinatorLogic(unittest.TestCase):
         coord._message_timestamps[(CIRCUIT_HMUX0, "powerstatus")] = t0 + 220.0
         self.assertEqual(coord.get_instantaneous_electric_power(now=t0 + 250.0), 1200.0)
 
-        # Both stale (> 180s): RunData at t0 + 50, PowerStatus at t0 + 40, now is t0 + 500
-        # When both are stale, the more recent reading (RunData at 50 vs PS at 40) is kept
+        # Both stale (> 180s, <= 600s): RunData at t0 + 50, PowerStatus at t0 + 40, now is t0 + 500
+        # When both are between 180s and 600s, the more recent reading (RunData at 50 vs PS at 40) is kept
         coord._message_timestamps[(CIRCUIT_HMUX0, "powerstatus")] = t0 + 40.0
         self.assertEqual(coord.get_instantaneous_electric_power(now=t0 + 500.0), 1350.0)
+
+        # Both exceed 10 minutes (> 600s): RunData age 650s, PowerStatus age 660s -> None (unavailable)
+        self.assertIsNone(coord.get_instantaneous_electric_power(now=t0 + 700.0))
 
     def test_split_hmu_cumulative_energy_and_efficiency(self) -> None:
         """Verify HMU / HMU00 (HW5103) units calculate energy and COP from 08.hmu + 15.* + 76.vwzio."""
@@ -2371,7 +2374,8 @@ class TestCoordinatorLogic(unittest.TestCase):
             asyncio.run(coord._async_fetch_ebusd_tcp_info())
 
         mock_conn.assert_called_once_with("192.168.1.55", 8889)
-        mock_writer.write.assert_called_once_with(b"info\n")
+        mock_writer.write.assert_any_call(b"info\n")
+        mock_writer.write.assert_any_call(b"quit\n")
         mock_writer.close.assert_called_once()
 
         self.assertTrue(notified_symbol_rate)
@@ -3139,6 +3143,149 @@ class TestCoordinatorLogic(unittest.TestCase):
                 )
 
         asyncio.run(_run())
+
+    def test_instantaneous_electric_power_10min_unavailable_and_watchdog(self) -> None:
+        """Verify 10-minute expiration scales with 2x fallback poll and clears Live COP via watchdog."""
+        from custom_components.arotherm_genia_ebusd.const import (
+            CONF_FALLBACK_POLL_INTERVAL,
+            CONF_HAS_MIGO_LINK,
+        )
+
+        # 1. With has_migo_link=False and fallback_poll_interval=450s -> max age is 900s (2x)
+        entry = MagicMock()
+        entry.data = {"mqtt_prefix": "ebusd", CONF_HAS_MIGO_LINK: False}
+        entry.options = {CONF_FALLBACK_POLL_INTERVAL: 450}
+        coord = SaunierGeniaCoordinator(MagicMock(), entry)
+        t0 = 1000.0
+        coord._state[(CIRCUIT_HMUX0, "PowerStatus")] = {"power": 1100.0}
+        coord._message_timestamps[(CIRCUIT_HMUX0, "powerstatus")] = t0
+        # Age 700s <= 900s -> still valid
+        self.assertEqual(coord.get_instantaneous_electric_power(now=t0 + 700.0), 1100.0)
+        # Age 950s > 900s -> None
+        self.assertIsNone(coord.get_instantaneous_electric_power(now=t0 + 950.0))
+
+        # 2. Active compressor: watchdog clears CALC_LIVE_COP when power exceeds 600s
+        entry2 = MagicMock()
+        entry2.data = {"mqtt_prefix": "ebusd", CONF_HAS_MIGO_LINK: True}
+        entry2.options = {}
+        coord2 = SaunierGeniaCoordinator(MagicMock(), entry2)
+
+        now_real = time.time()
+        coord2._state[(CIRCUIT_HMUX0, "HMUStatusCode")] = {
+            "status": "heat_compressor_active"
+        }
+        coord2._state[(CIRCUIT_HMUX0, "RunDataFlowTemp")] = {"value": 38.0}
+        coord2._state[(CIRCUIT_HMUX0, "RunDataReturnTemp")] = {"value": 33.0}
+        coord2._state[(CIRCUIT_HMUX0, "RunDataFlowRate")] = {"flow_rate": 1000.0}
+        coord2._state[(CIRCUIT_HMUX0, "RunDataElectricPowerConsumption")] = {
+            "power": 1400.0
+        }
+        coord2._message_timestamps[
+            (CIRCUIT_HMUX0, "rundataelectricpowerconsumption")
+        ] = now_real - 10.0
+
+        # Live COP is calculated while power is fresh
+        coord2._async_recalculate_thermodynamics()
+        self.assertIsNotNone(coord2.get_float(CALC_CIRCUIT, CALC_LIVE_COP))
+
+        # Now expire power timestamp past 600s and invoke 60s watchdog
+        coord2._message_timestamps[
+            (CIRCUIT_HMUX0, "rundataelectricpowerconsumption")
+        ] = now_real - 650.0
+        notified: list[tuple[str, str]] = []
+        coord2.async_add_listener(
+            CIRCUIT_HMUX0,
+            "RunDataElectricPowerConsumption",
+            lambda: notified.append((CIRCUIT_HMUX0, "RunDataElectricPowerConsumption")),
+        )
+        coord2._async_check_watchdog(datetime.now())
+        self.assertIn((CIRCUIT_HMUX0, "RunDataElectricPowerConsumption"), notified)
+        self.assertIsNone(coord2.get_float(CALC_CIRCUIT, CALC_LIVE_COP))
+
+        # If in standby, Live COP still reports 0.0 cleanly even when power is unavailable
+        coord2._state[(CIRCUIT_HMUX0, "HMUStatusCode")] = {"status": "standby"}
+        coord2._async_recalculate_thermodynamics()
+        self.assertEqual(coord2.get_float(CALC_CIRCUIT, CALC_LIVE_COP), 0.0)
+
+    def test_ebusd_tcp_find_csv_verification_and_scan_status(self) -> None:
+        """Verify TCP info parses scan status and `find` detects/clears outdated controller & outdoor CSVs."""
+        from custom_components.arotherm_genia_ebusd.const import (
+            CONF_ENABLE_EBUSD_TCP,
+        )
+
+        entry = MagicMock()
+        entry.entry_id = "tcp_find_entry"
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {CONF_ENABLE_EBUSD_TCP: True}
+        coord = SaunierGeniaCoordinator(MagicMock(), entry)
+
+        # 1. Missing definitions in controller & outdoor CSVs -> ERR: element not found
+        tcp_responses_outdated = [
+            b"version: ebusd 26.1.26.1\n",
+            b"scan: finished\n",
+            b'address 08: slave #11, scanned "MF=Vaillant;ID=HMUX0;SW=0407;HW=0504", loaded "vaillant/08.hmux0.csv"\n',
+            b'address 15: slave #12, scanned "MF=Vaillant;ID=BASS3;SW=0708;HW=4304", loaded "vaillant/15.bass3.csv"\n',
+            b"\n",
+            # find HwcLegionellaDay -> missing
+            b"ERR: element not found\n",
+            b"\n",
+            # find SilentTimer_Slots -> missing
+            b"ERR: element not found\n",
+            b"\n",
+            # find CompressorSilentOperationLevel -> missing
+            b"ERR: element not found\n",
+            b"\n",
+            # find RunDataElectricPowerConsumption -> present
+            b"hmux0 RunDataElectricPowerConsumption = 450\n",
+            b"\n",
+        ]
+        mock_reader = AsyncMock()
+        mock_reader.readline = AsyncMock(side_effect=tcp_responses_outdated)
+        mock_writer = MagicMock()
+        mock_writer.drain = AsyncMock()
+        mock_writer.wait_closed = AsyncMock()
+
+        with patch("asyncio.open_connection", return_value=(mock_reader, mock_writer)):
+            asyncio.run(coord._async_fetch_ebusd_tcp_info())
+
+        self.assertEqual(coord.get_str(CIRCUIT_GLOBAL, "scan", "value"), "finished")
+        self.assertIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+        self.assertIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
+        mock_writer.write.assert_any_call(b"find HwcLegionellaDay\n")
+        mock_writer.write.assert_any_call(b"find SilentTimer_Slots\n")
+        mock_writer.write.assert_any_call(b"find CompressorSilentOperationLevel\n")
+        mock_writer.write.assert_any_call(b"find RunDataElectricPowerConsumption\n")
+        mock_writer.write.assert_any_call(b"quit\n")
+
+        # 2. After user updates CSVs -> TCP find returns valid messages -> repairs auto-cleared
+        tcp_responses_updated = [
+            b"version: ebusd 26.1.26.1\n",
+            b"scan: finished\n",
+            b'address 08: slave #11, scanned "MF=Vaillant;ID=HMUX0;SW=0407;HW=0504", loaded "vaillant/08.hmux0.csv"\n',
+            b'address 15: slave #12, scanned "MF=Vaillant;ID=BASS3;SW=0708;HW=4304", loaded "vaillant/15.bass3.csv"\n',
+            b"\n",
+            b"bass3 HwcLegionellaDay = off\n",
+            b"\n",
+            b"bass3 SilentTimer_Slots = 0\n",
+            b"\n",
+            b"hmux0 CompressorSilentOperationLevel = 0\n",
+            b"\n",
+            b"hmux0 RunDataElectricPowerConsumption = 450\n",
+            b"\n",
+        ]
+        mock_reader2 = AsyncMock()
+        mock_reader2.readline = AsyncMock(side_effect=tcp_responses_updated)
+        mock_writer2 = MagicMock()
+        mock_writer2.drain = AsyncMock()
+        mock_writer2.wait_closed = AsyncMock()
+
+        with patch(
+            "asyncio.open_connection", return_value=(mock_reader2, mock_writer2)
+        ):
+            asyncio.run(coord._async_fetch_ebusd_tcp_info())
+
+        self.assertNotIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+        self.assertNotIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
 
 
 if __name__ == "__main__":

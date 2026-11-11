@@ -82,6 +82,7 @@ from .const import (
     DOMAIN,
     EBUSD_TRAFFIC_TIMEOUT_SECONDS,
     ELECTRIC_POWER_STALE_TIMEOUT_SECONDS,
+    ELECTRIC_POWER_UNAVAILABLE_TIMEOUT_SECONDS,
     ESSENTIAL_HYDRATION_MESSAGES,
     HMU_HW5103_HYDRATION_MESSAGES,
     HMUX0_CUSTOM_SIGNATURE_MESSAGES,
@@ -394,6 +395,7 @@ class SaunierGeniaCoordinator:
         # Silence watchdog and last telemetry timestamp
         self._last_telemetry_time: float | None = None
         self._watchdog_unsub: CALLBACK_TYPE | None = None
+        self._last_watchdog_elec_power: float | None = None
 
         # Lock to serialize multi-slot weekly timer operations and prevent bus collisions
         self.timer_write_lock: asyncio.Lock = asyncio.Lock()
@@ -739,13 +741,25 @@ class SaunierGeniaCoordinator:
 
     @callback
     def _async_check_watchdog(self, _now: datetime) -> None:
-        """Periodic watchdog checking for communication silence timeout."""
-        if self._last_telemetry_time is None:
-            return
-        elapsed = time.monotonic() - self._last_telemetry_time
-        if elapsed > EBUSD_TRAFFIC_TIMEOUT_SECONDS:
-            self._async_notify_message_listeners(CIRCUIT_GLOBAL, "running")
-            self._async_notify_message_listeners(CIRCUIT_GLOBAL, "signal")
+        """Periodic watchdog checking for communication silence and stale electric power."""
+        if self._last_telemetry_time is not None:
+            elapsed = time.monotonic() - self._last_telemetry_time
+            if elapsed > EBUSD_TRAFFIC_TIMEOUT_SECONDS:
+                self._async_notify_message_listeners(CIRCUIT_GLOBAL, "running")
+                self._async_notify_message_listeners(CIRCUIT_GLOBAL, "signal")
+
+        # Re-evaluate stale electric power / Live COP every 60s so expired power metrics update cleanly
+        curr_elec = self.get_instantaneous_electric_power()
+        if curr_elec != self._last_watchdog_elec_power:
+            self._last_watchdog_elec_power = curr_elec
+            for circuit in dict.fromkeys(
+                (self._active_outdoor_circuit, CIRCUIT_HMUX0, CIRCUIT_HMU)
+            ):
+                self._async_notify_message_listeners(
+                    circuit, "RunDataElectricPowerConsumption"
+                )
+                self._async_notify_message_listeners(circuit, "PowerStatus")
+            self._async_recalculate_thermodynamics()
 
     @callback
     def async_update_options(self) -> None:
@@ -1475,8 +1489,9 @@ class SaunierGeniaCoordinator:
         """Return instantaneous electrical power consumption (W) with dynamic staleness fallback.
 
         Prioritizes RunDataElectricPowerConsumption (active high-frequency r1 poll) when fresh.
-        If RunDataElectricPowerConsumption is stale (> 180 seconds without an update) and
-        PowerStatus has fresher telemetry, dynamically falls back to PowerStatus.
+        If RunDataElectricPowerConsumption is stale (> 180s) and PowerStatus is fresher,
+        dynamically falls back to PowerStatus. If all available sources exceed 600s (or 2x fallback
+        poll interval) without updates, returns None so power and Live COP show unavailable.
         """
         circuits = tuple(
             dict.fromkeys([self._active_outdoor_circuit, CIRCUIT_HMUX0, CIRCUIT_HMU])
@@ -1508,9 +1523,23 @@ class SaunierGeniaCoordinator:
                 ps_ts = self.get_message_timestamp(circuit, "PowerStatus")
                 break
 
+        unavailable_timeout = ELECTRIC_POWER_UNAVAILABLE_TIMEOUT_SECONDS
+        if not self.has_migo_link:
+            unavailable_timeout = max(
+                unavailable_timeout, float(self.fallback_poll_interval) * 2.0
+            )
+
+        if run_val is None and ps_val is None:
+            return None
+
         if run_val is None:
+            if ps_age is not None and ps_age > unavailable_timeout:
+                return None
             return ps_val
+
         if ps_val is None:
+            if run_age is not None and run_age > unavailable_timeout:
+                return None
             return run_val
 
         # Both are present: check staleness
@@ -1520,13 +1549,15 @@ class SaunierGeniaCoordinator:
         if not is_run_stale:
             return run_val
 
-        # RunData is stale (> 180s). Fall back to PowerStatus if PowerStatus is newer or fresh.
-        if (ps_ts is not None and run_ts is not None and ps_ts > run_ts) or (
+        # RunData is stale (> 180s). Prefer PowerStatus if fresher; invalidate if all stale > unavailable_timeout.
+        ps_is_newer = (ps_ts is not None and run_ts is not None and ps_ts > run_ts) or (
             ps_age is not None and ps_age <= ELECTRIC_POWER_STALE_TIMEOUT_SECONDS
-        ):
-            return ps_val
-
-        return run_val
+        )
+        candidate_val = ps_val if ps_is_newer else run_val
+        candidate_age = ps_age if ps_is_newer else run_age
+        if candidate_age is not None and candidate_age > unavailable_timeout:
+            return None
+        return candidate_val
 
     # -------------------------------------------------------------------------
     # MQTT Publishing (/set and /get) & Hydration Queue
@@ -1941,6 +1972,106 @@ class SaunierGeniaCoordinator:
                         continue
             raise
 
+    async def _async_read_tcp_block(
+        self, reader: asyncio.StreamReader, timeout: float = 3.0
+    ) -> list[str]:
+        """Read lines from an eBUSd TCP command until terminating blank line or EOF."""
+        lines: list[str] = []
+        while True:
+            try:
+                line_bytes = await asyncio.wait_for(reader.readline(), timeout=timeout)
+            except (TimeoutError, StopAsyncIteration, OSError):
+                break
+            if not line_bytes:
+                break
+            line = line_bytes.decode("ascii", errors="replace").strip()
+            if not line:
+                if lines:
+                    break
+                continue
+            lines.append(line)
+        return lines
+
+    async def _async_verify_csvs_via_tcp(
+        self,
+        reader: asyncio.StreamReader,
+        writer: asyncio.StreamWriter,
+        loaded_csv_devices: list[dict[str, str]],
+    ) -> None:
+        """Verify loaded CSV definitions using eBUSd TCP `find` (zero bus traffic)."""
+        has_ctrl_csv = any("15." in d["csv"] for d in loaded_csv_devices)
+        has_outdoor_csv = any("08." in d["csv"] for d in loaded_csv_devices)
+        if not has_ctrl_csv and not has_outdoor_csv:
+            return
+
+        async def _tcp_find(msg_name: str) -> str | None:
+            writer.write(f"find {msg_name}\n".encode("ascii"))
+            await writer.drain()
+            resp = await self._async_read_tcp_block(reader, timeout=2.0)
+            if not resp:
+                return None
+            return resp[0]
+
+        if has_ctrl_csv:
+            ctrl_probes = [
+                await _tcp_find("HwcLegionellaDay"),
+                await _tcp_find("SilentTimer_Slots"),
+            ]
+            if any(r is not None and r.startswith("ERR:") for r in ctrl_probes):
+                self._async_set_repair_issue(ISSUE_OUTDATED_CONTROLLER_CSV, active=True)
+            elif all(r is not None and not r.startswith("ERR:") for r in ctrl_probes):
+                for c in CONTROLLER_CIRCUITS:
+                    self._state.pop((c, "Z1HolidayTemp"), None)
+                    self._state.pop((c, "z1holidaytemp"), None)
+                    self._state.pop((c, "Z1DayTemp"), None)
+                    self._state.pop((c, "z1daytemp"), None)
+                    self._canonical_names.pop((c, "z1holidaytemp"), None)
+                    self._canonical_names.pop((c, "z1daytemp"), None)
+                self._async_set_repair_issue(
+                    ISSUE_OUTDATED_CONTROLLER_CSV, active=False
+                )
+
+        if has_outdoor_csv:
+            is_hmux0_csv = any(
+                "hmux0" in d["csv"].lower() or d["id"].lower() == "hmux0"
+                for d in loaded_csv_devices
+            )
+            outdoor_issue = (
+                ISSUE_OUTDATED_HMUX0_CSV if is_hmux0_csv else ISSUE_OUTDATED_HMU_CSV
+            )
+            out_probes = [
+                await _tcp_find("CompressorSilentOperationLevel"),
+                await _tcp_find("RunDataElectricPowerConsumption"),
+            ]
+            if any(r is not None and r.startswith("ERR:") for r in out_probes):
+                self._async_set_repair_issue(outdoor_issue, active=True)
+            elif all(r is not None and not r.startswith("ERR:") for r in out_probes):
+                if is_hmux0_csv:
+                    sc_msg = self.get_message(CIRCUIT_HMUX0, "StateCompressor") or {}
+                    flow_msg = self.get_message(CIRCUIT_HMUX0, "RunDataFlowRate") or {}
+                    has_legacy = (
+                        isinstance(sc_msg, dict)
+                        and "comp_speed" in sc_msg
+                        and "flow_temp" not in sc_msg
+                    ) or (
+                        isinstance(flow_msg, dict)
+                        and "value" in flow_msg
+                        and "flow_rate" not in flow_msg
+                    )
+                else:
+                    status_msg = (
+                        self.get_message(CIRCUIT_HMU, "Status01")
+                        or self.get_message(CIRCUIT_HMU00, "Status01")
+                        or {}
+                    )
+                    has_legacy = (
+                        isinstance(status_msg, dict)
+                        and "temp_1" in status_msg
+                        and "flow_temp" not in status_msg
+                    )
+                if not has_legacy:
+                    self._async_set_repair_issue(outdoor_issue, active=False)
+
     async def _async_fetch_ebusd_tcp_info(self) -> None:
         """Fetch daemon health, metrics, and loaded CSV status directly from eBUSd TCP socket."""
         if not self.is_ebusd_tcp_enabled:
@@ -1950,25 +2081,103 @@ class SaunierGeniaCoordinator:
         port = self.ebusd_tcp_port
         reader: asyncio.StreamReader | None = None
         writer: asyncio.StreamWriter | None = None
+        lines: list[str] = []
+        loaded_csv_devices: list[dict[str, str]] = []
+        missing_csv_devices: list[dict[str, str]] = []
+        total_scanned = 0
+
         try:
             reader, writer = await self._async_open_tcp_connection(
                 host, port, timeout=3.0
             )
             writer.write(b"info\n")
             await writer.drain()
+            lines = await self._async_read_tcp_block(reader, timeout=3.0)
 
-            lines: list[str] = []
-            while True:
-                try:
-                    line_bytes = await asyncio.wait_for(reader.readline(), timeout=3.0)
-                except (TimeoutError, StopAsyncIteration):
-                    break
-                if not line_bytes:
-                    break
-                line = line_bytes.decode("ascii", errors="replace").strip()
-                if not line:
+            if not lines:
+                return
+
+            for line in lines:
+                if ":" not in line:
                     continue
-                lines.append(line)
+                key, _, val = line.partition(":")
+                key = key.strip().lower()
+                val = val.strip()
+
+                if key == "version":
+                    self._state[(CIRCUIT_GLOBAL, "version")] = {"value": val}
+                    self._async_notify_message_listeners(CIRCUIT_GLOBAL, "version")
+                elif key == "scan":
+                    self._state[(CIRCUIT_GLOBAL, "scan")] = {"value": val}
+                    self._async_notify_message_listeners(CIRCUIT_GLOBAL, "scan")
+                elif key == "symbol rate":
+                    with contextlib.suppress(ValueError):
+                        self._state[(CIRCUIT_GLOBAL, "symbol_rate")] = {
+                            "value": int(val)
+                        }
+                        self._async_notify_message_listeners(
+                            CIRCUIT_GLOBAL, "symbol_rate"
+                        )
+                elif key == "reconnects":
+                    with contextlib.suppress(ValueError):
+                        self._state[(CIRCUIT_GLOBAL, "reconnects")] = {
+                            "value": int(val)
+                        }
+                        self._async_notify_message_listeners(
+                            CIRCUIT_GLOBAL, "reconnects"
+                        )
+                elif key == "masters":
+                    with contextlib.suppress(ValueError):
+                        self._state[(CIRCUIT_GLOBAL, "masters")] = {"value": int(val)}
+                        self._async_notify_message_listeners(CIRCUIT_GLOBAL, "masters")
+                elif key in ("max arbitration micros", "arbitration micros"):
+                    with contextlib.suppress(ValueError):
+                        micros = int(val)
+                        ms = round(micros / 1000.0)
+                        self._state[(CIRCUIT_GLOBAL, "arbitration_latency")] = {
+                            "value": ms
+                        }
+                        self._async_notify_message_listeners(
+                            CIRCUIT_GLOBAL, "arbitration_latency"
+                        )
+                elif key.startswith("address ") and 'scanned "' in val:
+                    total_scanned += 1
+                    addr = key.replace("address", "").strip()
+                    scanned_part = val.partition('scanned "')[2].partition('"')[0]
+                    fields = dict(
+                        item.split("=", 1)
+                        for item in scanned_part.split(";")
+                        if "=" in item
+                    )
+                    dev_id = fields.get("ID", addr)
+                    sw_ver = fields.get("SW", "")
+                    hw_ver = fields.get("HW", "")
+                    if ', loaded "' in val:
+                        csv_file = val.partition(', loaded "')[2].rstrip('"')
+                        loaded_csv_devices.append(
+                            {
+                                "address": addr,
+                                "id": dev_id,
+                                "csv": csv_file,
+                                "sw": sw_ver,
+                                "hw": hw_ver,
+                            }
+                        )
+                    else:
+                        missing_csv_devices.append(
+                            {
+                                "address": addr,
+                                "id": dev_id,
+                                "sw": sw_ver,
+                                "hw": hw_ver,
+                            }
+                        )
+
+            await self._async_verify_csvs_via_tcp(reader, writer, loaded_csv_devices)
+
+            with contextlib.suppress(TimeoutError, OSError):
+                writer.write(b"quit\n")
+                await writer.drain()
         except (TimeoutError, OSError) as err:
             _LOGGER.debug(
                 "Unable to connect to eBUSd TCP socket at %s:%s for info: %s",
@@ -1982,76 +2191,6 @@ class SaunierGeniaCoordinator:
                 writer.close()
                 with contextlib.suppress(OSError):
                     await writer.wait_closed()
-
-        if not lines:
-            return
-
-        missing_csv_devices: list[dict[str, str]] = []
-        loaded_csv_devices: list[dict[str, str]] = []
-        total_scanned = 0
-
-        for line in lines:
-            if ":" not in line:
-                continue
-            key, _, val = line.partition(":")
-            key = key.strip().lower()
-            val = val.strip()
-
-            if key == "version":
-                self._state[(CIRCUIT_GLOBAL, "version")] = {"value": val}
-                self._async_notify_message_listeners(CIRCUIT_GLOBAL, "version")
-            elif key == "symbol rate":
-                with contextlib.suppress(ValueError):
-                    self._state[(CIRCUIT_GLOBAL, "symbol_rate")] = {"value": int(val)}
-                    self._async_notify_message_listeners(CIRCUIT_GLOBAL, "symbol_rate")
-            elif key == "reconnects":
-                with contextlib.suppress(ValueError):
-                    self._state[(CIRCUIT_GLOBAL, "reconnects")] = {"value": int(val)}
-                    self._async_notify_message_listeners(CIRCUIT_GLOBAL, "reconnects")
-            elif key == "masters":
-                with contextlib.suppress(ValueError):
-                    self._state[(CIRCUIT_GLOBAL, "masters")] = {"value": int(val)}
-                    self._async_notify_message_listeners(CIRCUIT_GLOBAL, "masters")
-            elif key in ("max arbitration micros", "arbitration micros"):
-                with contextlib.suppress(ValueError):
-                    micros = int(val)
-                    ms = round(micros / 1000.0)
-                    self._state[(CIRCUIT_GLOBAL, "arbitration_latency")] = {"value": ms}
-                    self._async_notify_message_listeners(
-                        CIRCUIT_GLOBAL, "arbitration_latency"
-                    )
-            elif key.startswith("address ") and 'scanned "' in val:
-                total_scanned += 1
-                addr = key.replace("address", "").strip()
-                scanned_part = val.partition('scanned "')[2].partition('"')[0]
-                fields = dict(
-                    item.split("=", 1)
-                    for item in scanned_part.split(";")
-                    if "=" in item
-                )
-                dev_id = fields.get("ID", addr)
-                sw_ver = fields.get("SW", "")
-                hw_ver = fields.get("HW", "")
-                if ', loaded "' in val:
-                    csv_file = val.partition(', loaded "')[2].rstrip('"')
-                    loaded_csv_devices.append(
-                        {
-                            "address": addr,
-                            "id": dev_id,
-                            "csv": csv_file,
-                            "sw": sw_ver,
-                            "hw": hw_ver,
-                        }
-                    )
-                else:
-                    missing_csv_devices.append(
-                        {
-                            "address": addr,
-                            "id": dev_id,
-                            "sw": sw_ver,
-                            "hw": hw_ver,
-                        }
-                    )
 
         summary_val = (
             ", ".join(d["id"] for d in missing_csv_devices)
@@ -2146,6 +2285,13 @@ class SaunierGeniaCoordinator:
         if prev != value:
             self._async_notify_message_listeners(CALC_CIRCUIT, key)
 
+    def _clear_calculated(self, key: str) -> None:
+        """Remove a calculated metric from state and notify listeners if it existed."""
+        state_key = (CALC_CIRCUIT, key)
+        if state_key in self._state:
+            self._state.pop(state_key, None)
+            self._async_notify_message_listeners(CALC_CIRCUIT, key)
+
     @callback
     def _async_recalculate_thermodynamics(self) -> None:
         """Recalculate Delta T, Thermal Power, Live COP, Mode Totals (Wh), and Historical COP/EER."""
@@ -2171,6 +2317,7 @@ class SaunierGeniaCoordinator:
 
         # 3. Live Instantaneous COP / EER
         elec_power = self.get_instantaneous_electric_power()
+        self._last_watchdog_elec_power = elec_power
         live_cop, is_active = calculate_live_cop(
             thermal_power, elec_power, hmu_status, frozenset(ACTIVE_COMPRESSOR_STATUSES)
         )
@@ -2178,6 +2325,8 @@ class SaunierGeniaCoordinator:
             if is_active:
                 self.last_active_cop = live_cop
             self._set_calculated(CALC_LIVE_COP, live_cop)
+        else:
+            self._clear_calculated(CALC_LIVE_COP)
 
         # 4 & 5. Per-Mode & Combined System Cumulative Electrical Energy (Wh) & Efficiency (COP / EER)
         is_split_hmu = self._active_outdoor_circuit in (CIRCUIT_HMU, CIRCUIT_HMU00)

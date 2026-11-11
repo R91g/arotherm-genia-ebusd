@@ -351,7 +351,12 @@ INITIAL_HYDRATION_WAIT_SECONDS = 5.0
 HYDRATION_STEP_DELAY_SECONDS = 0.8
 SET_CONFIRMATION_DELAY_SECONDS = 1.5
 DHW_BOOST_MAX_TIMEOUT_SECONDS = 3600  # 60 minutes safety timeout
-ELECTRIC_POWER_STALE_TIMEOUT_SECONDS: float = 180.0  # 3 minutes staleness threshold
+ELECTRIC_POWER_STALE_TIMEOUT_SECONDS: float = (
+    180.0  # 3 minutes staleness fallback threshold
+)
+ELECTRIC_POWER_UNAVAILABLE_TIMEOUT_SECONDS: float = (
+    600.0  # 10 minutes max age before marking unavailable
+)
 
 # Firmware Sentinel Thresholds
 SENTINEL_COOLING_OFF_TEMP = 99.0
