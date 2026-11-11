@@ -92,11 +92,15 @@
   "issues": {
     "outdated_hmux0_csv": {
       "title": "Archivo 08.hmux0.csv desactualizado en eBUSd",
-      "description": "Tu instancia de `ebusd` está utilizando una versión antigua de `vaillant/08.hmux0.csv` (con el caudal fijo en 900 l/h o la definición antigua de `StateCompressor`). Sustituye el archivo `vaillant/08.hmux0.csv` en tu carpeta de configuración de `ebusd` por el incluido en la versión v1.2.4+ y reinicia `ebusd` para activar el caudalímetro vórtex en tiempo real (`540200090b`), el tipo `D2C` en `StateCompressor` y las prioridades de sondeo optimizadas. Este aviso desaparecerá automáticamente en cuanto `ebusd` cargue el nuevo CSV."
+      "description": "Tu instancia de `ebusd` está utilizando una versión antigua de `vaillant/08.hmux0.csv` (con el caudal fijo en 900 l/h, la definición antigua de `StateCompressor` o falta de `CompressorSilentOperationLevel`). Sustituye el archivo `vaillant/08.hmux0.csv` en tu carpeta de configuración de `ebusd` por el incluido en la versión v1.3.0+ y reinicia `ebusd` para activar el caudalímetro vórtex en tiempo real (`540200090b`), los niveles del modo silencioso y la telemetría de consumo eléctrico instantáneo (`RunDataElectricPowerConsumption`). Este aviso desaparecerá automáticamente en cuanto `ebusd` cargue el nuevo CSV."
+    },
+    "outdated_hmu_csv": {
+      "title": "Archivo 08.hmu.csv o 08.hmu.HW5103.csv desactualizado en eBUSd",
+      "description": "Tu instancia de `ebusd` está utilizando la versión genérica de ebusd.eu o una versión antigua de `vaillant/08.hmu.csv` o `08.hmu.HW5103.csv` (reporta campos genéricos sin mapear `temp_1..temp_4` en `Status01`, carece de `CompressorSilentOperationLevel` o falta la telemetría de consumo eléctrico instantáneo). Copia `ebusd-configuration/vaillant/08.hmu.csv` o `08.hmu.HW5103.csv` en tu carpeta de configuración de `ebusd` y reinicia `ebusd`. Este aviso desaparecerá automáticamente en cuanto `ebusd` cargue el nuevo CSV."
     },
     "outdated_controller_csv": {
       "title": "Archivo de mando CSV desactualizado en eBUSd",
-      "description": "Tu instancia de `ebusd` está utilizando una versión antigua de `vaillant/15.bass3.csv`, `15.basv3.csv`, `15.ctlv2.csv` o `15.ctlv3.csv` (utiliza el registro heredado `Z1HolidayTemp` en lugar de los registros de Modo Ausencia mapeados a Zona 1). Copia los archivos actualizados `ebusd-configuration/vaillant/*.csv` en la carpeta de configuración de `ebusd` y reinicia `ebusd` para activar la sincronización en tiempo real del Modo Ausencia y los parámetros de temporada de frío. Este aviso desaparecerá automáticamente en cuanto `ebusd` cargue los archivos actualizados."
+      "description": "Tu instancia de `ebusd` está utilizando una versión antigua de `vaillant/15.bass3.csv`, `15.basv3.csv`, `15.ctlv2.csv` o `15.ctlv3.csv` (utiliza registros heredados `Z1HolidayTemp` o `Z1DayTemp`, o carece de soporte para la programación semanal del modo silencioso `SilentTimer`). Copia los archivos actualizados `ebusd-configuration/vaillant/*.csv` en la carpeta de configuración de `ebusd` y reinicia `ebusd` para activar la sincronización en tiempo real del Modo Ausencia, la consigna manual de refrigeración (`Z1CoolingManualTemp`) y las programaciones horarias del modo silencioso. Este aviso desaparecerá automáticamente en cuanto `ebusd` cargue los archivos actualizados."
     },
     "missing_custom_csv": {
       "title": "Archivos CSV no cargados o escaneo incompleto en eBUSd",
@@ -731,6 +735,9 @@
       "circulation_weekly_schedule_summary": {
         "name": "Programación semanal Recirculación"
       },
+      "silent_mode_weekly_schedule_summary": {
+        "name": "Programación semanal de modo silencioso"
+      },
       "ebusd_uptime": {
         "name": "Tiempo activo de ebusd"
       },
@@ -828,11 +835,11 @@
   "services": {
     "set_weekly_timer": {
       "name": "Configurar programación horaria semanal (b5 55)",
-      "description": "Modifica o borra franjas horarias semanales en el regulador climático (15.bass3 / 15.ctlv2 / 15.ctlv3) para Calefacción Zona 1, Agua Caliente Sanitaria (ACS), Refrigeración o Recirculación. Permite configurar ranuras (1, 2, 3), borrar ranuras sueltas o limpiar el día entero.",
+      "description": "Modifica o borra franjas horarias semanales en el regulador climático (15.bass3 / 15.ctlv2 / 15.ctlv3) para Calefacción Zona 1, Agua Caliente Sanitaria (ACS), Refrigeración, Recirculación o Modo silencioso. Permite configurar ranuras (1, 2, 3), borrar ranuras sueltas o limpiar el día entero.",
       "fields": {
         "circuit_type": {
           "name": "Circuito",
-          "description": "Circuito de programación horaria a modificar (Calefacción, ACS, Refrigeración o Recirculación)."
+          "description": "Circuito de programación horaria a modificar: 'heating' (Calefacción), 'dhw' (ACS), 'cooling' (Refrigeración), 'circulation' (Recirculación) o 'silent' (Modo silencioso)."
         },
         "day": {
           "name": "Día de la semana",
@@ -856,7 +863,7 @@
         },
         "temp": {
           "name": "Temperatura objetivo (Opcional)",
-          "description": "Consigna de temperatura en °C para esta franja. Si se omite, utiliza la consigna activa del circuito."
+          "description": "Consigna de temperatura en °C para esta franja. Aplica solo a 'heating', 'dhw' y 'cooling' (se ignora en 'circulation' y 'silent'). Si se omite, utiliza la consigna activa del circuito."
         },
         "reset_remaining": {
           "name": "Sobrescribir y reiniciar franjas restantes",

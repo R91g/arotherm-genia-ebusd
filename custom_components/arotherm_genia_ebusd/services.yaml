@@ -2,12 +2,12 @@ set_weekly_timer:
   name: Set Weekly Schedule Timer (b5 55)
   description: >
     Configures a weekly schedule time slot on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3)
-    for Zone 1 Heating, Domestic Hot Water (DHW), Cooling, or Circulation. Supports configuring slots (1, 2, 3),
+    for Zone 1 Heating, Domestic Hot Water (DHW), Cooling, Circulation, or Silent Mode. Supports configuring slots (1, 2, 3),
     deleting individual slots, or clearing the entire day.
   fields:
     circuit_type:
       name: Circuit Type
-      description: Schedule circuit to modify (Heating, DHW, Cooling, or Circulation).
+      description: "Schedule circuit to modify: 'heating' (Zone 1 Heating), 'dhw' (Domestic Hot Water), 'cooling' (Cooling), 'circulation' (Circulation), or 'silent' (Silent Mode)."
       required: true
       example: "dhw"
       selector:
@@ -21,6 +21,8 @@ set_weekly_timer:
               value: "cooling"
             - label: "Circulation / Recirculación (CirculationTimer)"
               value: "circulation"
+            - label: "Silent Mode / Modo Silencioso (SilentTimer)"
+              value: "silent"
     day:
       name: Day of the Week
       description: Specific day of the week (e.g. Monday / Lunes), Weekdays (Laborables), Weekend (Fin de semana), or All Days (Toda la semana). Accepts English and Spanish names.
@@ -93,7 +95,7 @@ set_weekly_timer:
         text:
     temp:
       name: Target Temperature Setpoint (Optional)
-      description: Optional target temperature setpoint in °C for this slot. If omitted, uses current circuit setpoint (e.g. 50 °C for DHW, 20 °C for Zone 1 Heating).
+      description: "Optional target temperature setpoint in °C for this slot. Applies only to 'heating', 'dhw', and 'cooling' (ignored for 'circulation' and 'silent'). If omitted, uses current circuit setpoint."
       required: false
       example: 50.0
       selector:

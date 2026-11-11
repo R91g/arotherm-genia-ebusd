@@ -115,7 +115,7 @@ def normalize_day_name(day_str: str) -> str:
 SET_WEEKLY_TIMER_SCHEMA = vol.Schema(
     {
         vol.Required("circuit_type"): vol.In(
-            ["heating", "dhw", "cooling", "circulation"]
+            ["heating", "dhw", "cooling", "circulation", "silent"]
         ),
         vol.Required("day"): cv.string,
         vol.Optional("action", default="set"): vol.In(["set", "delete", "clear"]),
@@ -506,7 +506,7 @@ def _get_default_circuit_temp(
             except (ValueError, TypeError):
                 pass
         return 22.0
-    # Circulation uses 20.0 as standard dummy temperature setpoint in eBUS telegrams
+    # Circulation and silent mode do not use temperature in eBUS telegrams
     return 20.0
 
 
@@ -596,7 +596,7 @@ async def _async_collect_day_writes(
             except (ValueError, TypeError):
                 slot_temp = default_temp
 
-        if prefix == "CirculationTimer":
+        if prefix in ("CirculationTimer", "SilentTimer"):
             payload = f"{new_total};{fh};{fm};{th};{tm}"
         else:
             payload = f"{new_total};{fh};{fm};{th};{tm};{slot_temp:.1f}"
@@ -825,7 +825,7 @@ def _async_register_services(hass: HomeAssistant) -> None:
                         if action == "clear":
                             clear_payload = (
                                 "0;0;0;0;0"
-                                if prefix == "CirculationTimer"
+                                if prefix in ("CirculationTimer", "SilentTimer")
                                 else f"0;0;0;0;0;{default_temp:.1f}"
                             )
                             writes = [(f"{prefix}_{day_name}", clear_payload)]
@@ -869,7 +869,7 @@ def _async_register_services(hass: HomeAssistant) -> None:
                         if action == "delete":
                             empty_payload = (
                                 "0;0;0;0;0"
-                                if prefix == "CirculationTimer"
+                                if prefix in ("CirculationTimer", "SilentTimer")
                                 else f"0;0;0;0;0;{default_temp:.1f}"
                             )
                             if active_count == 0 or slot > active_count:
@@ -934,7 +934,7 @@ def _async_register_services(hass: HomeAssistant) -> None:
                                     suffix = "" if new_idx == 1 else f"_Slot{new_idx}"
                                     payload = (
                                         f"{new_total};{fh};{fm};{th};{tm}"
-                                        if prefix == "CirculationTimer"
+                                        if prefix in ("CirculationTimer", "SilentTimer")
                                         else f"{new_total};{fh};{fm};{th};{tm};{st:.1f}"
                                     )
                                     writes.append(

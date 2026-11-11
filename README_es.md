@@ -355,13 +355,13 @@ Modifica o borra las programaciones horarias semanales nativas (`b5 55`) directa
 
 | Parámetro | Obligatorio | Valores Permitidos | Descripción |
 | :--- | :---: | :--- | :--- |
-| `circuit_type` | Sí | `heating`, `dhw`, `cooling`, `circulation` | Circuito horario a modificar (`Z1Timer`, `HwcTimer`, `CoolingTimer` o `CirculationTimer`). |
+| `circuit_type` | Sí | `heating`, `dhw`, `cooling`, `circulation`, `silent` | Circuito horario a modificar: `heating` (Calefacción / `Z1Timer`), `dhw` (ACS / `HwcTimer`), `cooling` (Refrigeración / `CoolingTimer`), `circulation` (Recirculación / `CirculationTimer`) o `silent` (Modo silencioso / `SilentTimer`). |
 | `day` | Sí | `Monday`..`Sunday`, `Weekdays`, `Weekend`, `All`<br>*(o en español: `Lunes`..`Domingo`, `Laborables`, `Fin de semana`, `Todos`)* | Día específico, días laborables L–V (`Weekdays` / `Laborables`), fin de semana S–D (`Weekend` / `Fin de semana`) o toda la semana L–D (`All` / `Todos`). |
 | `action` | No | `set`, `delete`, `clear` *(por defecto: `set`)* | Acción a realizar:<br>• `set`: crea o modifica la franja horaria indicada.<br>• `delete`: elimina la ranura especificada y desplaza las posteriores de forma contigua.<br>• `clear`: vacía el día completo fijando 0 ranuras activas. |
 | `slot` | No | `1`, `2`, `3` *(por defecto: `1`)* | Ranura horaria diaria (`1` a `3`). Se ignora si `action: clear`. |
 | `start_time` | Opcional* | `"HH:MM"` *(ej. `"13:10"`)* | Hora de inicio en formato 24h (resolución de 10 min). *Requerido si `action: set`. |
 | `end_time` | Opcional* | `"HH:MM"` *(ej. `"15:30"` o `"24:00"`)* | Hora de fin en formato 24h (utilizar `"24:00"` para programar el día completo). *Requerido si `action: set`. |
-| `temp` | No | `5.0` – `80.0` *(°C)* | Consigna opcional para esa franja. Si se omite, mantiene la temperatura objetivo activa del circuito (p. ej. 50 °C en ACS o 20 °C en Calefacción). |
+| `temp` | No | `5.0` – `80.0` *(°C)* | Consigna opcional para esa franja. Aplica solo a `heating`, `dhw` y `cooling` (se ignora en `circulation` y `silent`). Si se omite, mantiene la temperatura objetivo activa del circuito (p. ej. 50 °C en ACS o 20 °C en Calefacción). |
 | `reset_remaining` | No | `true`, `false` *(por defecto: `false`)* | Si se activa junto a `slot: 1` en modo `set`, sobrescribe el día fijando exactamente 1 ranura activa (`total_slots = 1`) y elimina las ranuras 2 y 3 existentes, sin requerir lectura previa de telemetría de la línea eBUS. |
 
 #### Ejemplos de Configuración y Automatización

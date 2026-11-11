@@ -60,6 +60,7 @@ from custom_components.arotherm_genia_ebusd.const import (
     ISSUE_MQTTJSON_NOT_ENABLED,
     ISSUE_NO_EBUSD_MQTT_TRAFFIC,
     ISSUE_OUTDATED_CONTROLLER_CSV,
+    ISSUE_OUTDATED_HMU_CSV,
     ISSUE_OUTDATED_HMUX0_CSV,
     MANUFACTURER_SAUNIER_DUVAL,
     MANUFACTURER_VAILLANT,
@@ -464,8 +465,8 @@ class TestCoordinatorLogic(unittest.TestCase):
         )
         self.assertFalse(_check_energy_integration(coord))
 
-    def test_live_cop_prioritizes_powerstatus_over_rundataelectricpower(self) -> None:
-        """Verify Live COP and instant power prioritize PowerStatus over RunDataElectricPowerConsumption."""
+    def test_live_cop_prioritizes_rundataelectricpower_over_powerstatus(self) -> None:
+        """Verify Live COP and instant power prioritize RunDataElectricPowerConsumption over PowerStatus."""
         entry = MagicMock()
         entry.data = {"mqtt_prefix": "ebusd"}
         entry.options = {}
@@ -486,23 +487,23 @@ class TestCoordinatorLogic(unittest.TestCase):
             '{"status": {"value": "heat_compressor_active"}}',
         )
 
-        # 2. Receive legacy / hydration RunDataElectricPowerConsumption (1450 W)
-        push_mqtt(
-            "ebusd/hmux0/RunDataElectricPowerConsumption",
-            '{"power": {"value": 1450.0}}',
-        )
-        # Live COP evaluates from RunDataElectricPowerConsumption: 5815 / 1450 = 4.01
-        self.assertEqual(coord.get_float(CALC_CIRCUIT, CALC_LIVE_COP), 4.01)
-
-        # 3. Receive fresh PowerStatus (e.g. from MiGo Link f1 periodic poll: 2000 W)
+        # 2. Receive fallback PowerStatus (e.g. from MiGo Link f1 periodic poll: 2000 W)
         push_mqtt(
             "ebusd/hmux0/PowerStatus",
             '{"status": {"value": "heating"}, "power": {"value": 2000.0}}',
         )
-        # PowerStatus MUST take precedence over the older RunDataElectricPowerConsumption: 5815 / 2000 = 2.91
+        # Live COP evaluates from PowerStatus fallback: 5815 / 2000 = 2.91
         self.assertEqual(coord.get_float(CALC_CIRCUIT, CALC_LIVE_COP), 2.91)
 
-        # 4. Also verify sensor subscription includes PowerStatus
+        # 3. Receive fresh RunDataElectricPowerConsumption (from high-frequency r1 poll: 1450 W)
+        push_mqtt(
+            "ebusd/hmux0/RunDataElectricPowerConsumption",
+            '{"power": {"value": 1450.0}}',
+        )
+        # RunDataElectricPowerConsumption MUST take precedence over the slower PowerStatus: 5815 / 1450 = 4.01
+        self.assertEqual(coord.get_float(CALC_CIRCUIT, CALC_LIVE_COP), 4.01)
+
+        # 4. Also verify sensor subscription includes both RunDataElectricPowerConsumption and PowerStatus
         from custom_components.arotherm_genia_ebusd.sensor import SaunierGeniaSensor
         from custom_components.arotherm_genia_ebusd.sensor_descriptions import (
             SENSOR_DESCRIPTIONS,
@@ -520,8 +521,8 @@ class TestCoordinatorLogic(unittest.TestCase):
             (CIRCUIT_HMU, "RunDataElectricPowerConsumption"),
         }
         self.assertTrue(expected_subs.issubset(set(sensor._subscriptions)))
-        # Sensor native_value returns PowerStatus value (2000.0)
-        self.assertEqual(sensor.native_value, 2000.0)
+        # Sensor native_value returns RunDataElectricPowerConsumption value (1450.0)
+        self.assertEqual(sensor.native_value, 1450.0)
 
     def test_split_hmu_cumulative_energy_and_efficiency(self) -> None:
         """Verify HMU / HMU00 (HW5103) units calculate energy and COP from 08.hmu + 15.* + 76.vwzio."""
@@ -1725,7 +1726,88 @@ class TestCoordinatorLogic(unittest.TestCase):
         push_mqtt("ebusd/hmux0/RunDataFlowRate", '{"value": {"value": 900}}')
         self.assertIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
         push_mqtt("ebusd/hmux0/RunDataNominalFlowRate", '{"value": {"value": 900}}')
+        push_mqtt("ebusd/hmux0/RunDataFlowRate", '{"flow_rate": {"value": 1450}}')
         self.assertNotIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
+
+        # 6. Legacy controller Z1DayTemp vs Z1CoolingManualTemp and SilentTimer_Slots
+        push_mqtt("ebusd/bass3/Z1DayTemp", '{"temp": {"value": 22.0}}')
+        self.assertIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+
+        push_mqtt("ebusd/bass3/Z1CoolingManualTemp", '{"value": {"value": 22.0}}')
+        self.assertNotIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+
+        # Missing SilentTimer_Slots (ERR: element not found) raises outdated_controller_csv
+        push_mqtt("ebusd/bass3/SilentTimer_Slots", "ERR: element not found")
+        self.assertIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+
+        push_mqtt(
+            "ebusd/bass3/SilentTimer_Slots",
+            '{"mon": {"value": 1}, "tue": {"value": 1}, "wed": {"value": 0}}',
+        )
+        self.assertNotIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+
+        # Missing Z1CoolingManualTemp (ERR: element not found) raises outdated_controller_csv
+        push_mqtt("ebusd/bass3/Z1CoolingManualTemp", "ERR: element not found")
+        self.assertIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+
+        push_mqtt("ebusd/bass3/HolidayTemp", '{"value": {"value": 16.0}}')
+        self.assertNotIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+
+        # 7. CompressorSilentOperationLevel error vs valid on hmux0
+        push_mqtt(
+            "ebusd/hmux0/CompressorSilentOperationLevel", "ERR: element not found"
+        )
+        self.assertIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
+
+        push_mqtt(
+            "ebusd/hmux0/CompressorSilentOperationLevel", '{"value": {"value": 0}}'
+        )
+        self.assertNotIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
+
+        # 8. HMU / HMU00 outdated vs custom detection (outdated_hmu_csv)
+        # 8a. Default upstream Status01 (unmapped temp_1..temp_4) raises outdated_hmu_csv
+        push_mqtt(
+            "ebusd/hmu/Status01",
+            '{"temp_1": {"value": 35.0}, "temp_2": {"value": 30.0}, "temp_3": {"value": 10.0}}',
+        )
+        self.assertIn(ISSUE_OUTDATED_HMU_CSV, coord._active_repair_issues)
+
+        # Custom Status01 with flow_temp clears outdated_hmu_csv
+        push_mqtt(
+            "ebusd/hmu/Status01",
+            '{"flow_temp": {"value": 35.0}, "return_temp": {"value": 30.0}}',
+        )
+        self.assertNotIn(ISSUE_OUTDATED_HMU_CSV, coord._active_repair_issues)
+
+        # 8b. Default upstream ebusd.eu messages (waterthroughput) raise outdated_hmu_csv
+        push_mqtt("ebusd/hmu/waterthroughput", '{"value": {"value": 850}}')
+        self.assertIn(ISSUE_OUTDATED_HMU_CSV, coord._active_repair_issues)
+
+        push_mqtt(
+            "ebusd/hmu/Status01",
+            '{"flow_temp": {"value": 35.0}, "return_temp": {"value": 30.0}}',
+        )
+        self.assertNotIn(ISSUE_OUTDATED_HMU_CSV, coord._active_repair_issues)
+
+        # 8c. CompressorSilentOperationLevel ERR on HMU raises outdated_hmu_csv
+        push_mqtt("ebusd/hmu/CompressorSilentOperationLevel", "ERR: element not found")
+        self.assertIn(ISSUE_OUTDATED_HMU_CSV, coord._active_repair_issues)
+
+        push_mqtt("ebusd/hmu/CompressorSilentOperationLevel", '{"value": {"value": 0}}')
+        self.assertNotIn(ISSUE_OUTDATED_HMU_CSV, coord._active_repair_issues)
+
+        # 8d. Also works on hmu00
+        push_mqtt(
+            "ebusd/hmu00/Status01",
+            '{"temp_1": {"value": 35.0}, "temp_2": {"value": 30.0}}',
+        )
+        self.assertIn(ISSUE_OUTDATED_HMU_CSV, coord._active_repair_issues)
+
+        push_mqtt(
+            "ebusd/hmu00/Status01",
+            '{"flow_temp": {"value": 35.0}, "return_temp": {"value": 30.0}}',
+        )
+        self.assertNotIn(ISSUE_OUTDATED_HMU_CSV, coord._active_repair_issues)
 
     def test_is_ebus_operational_and_running_binary_sensor(self) -> None:
         """Test is_ebus_operational gate and _check_ebusd_running binary sensor."""

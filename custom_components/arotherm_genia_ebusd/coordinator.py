@@ -95,6 +95,7 @@ from .const import (
     ISSUE_MQTTJSON_NOT_ENABLED,
     ISSUE_NO_EBUSD_MQTT_TRAFFIC,
     ISSUE_OUTDATED_CONTROLLER_CSV,
+    ISSUE_OUTDATED_HMU_CSV,
     ISSUE_OUTDATED_HMUX0_CSV,
     MANUFACTURER_VAILLANT,
     MESSAGE_ALIASES,
@@ -1019,23 +1020,49 @@ class SaunierGeniaCoordinator:
             elif ";" in stripped:
                 self._async_set_repair_issue(ISSUE_MQTTJSON_NOT_ENABLED, active=True)
 
-        # 2. Detect legacy vs v1.2.4+ 08.hmux0.csv via StateCompressor & RunDataFlowRate JSON keys
+        # 2. Detect legacy vs modern 08.hmux0.csv via StateCompressor, RunDataFlowRate & CompressorSilentOperationLevel
         if circuit_key == CIRCUIT_HMUX0 and msg_lower == "statecompressor":
-            if "comp_speed" in parsed and "flow_temp" not in parsed:
+            if (
+                isinstance(parsed, dict)
+                and "comp_speed" in parsed
+                and "flow_temp" not in parsed
+            ):
                 self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=True)
-            elif "flow_temp" in parsed:
+            elif isinstance(parsed, dict) and "flow_temp" in parsed:
                 flow_msg = self.get_message(CIRCUIT_HMUX0, "RunDataFlowRate") or {}
-                has_legacy_flow = "value" in flow_msg and "flow_rate" not in flow_msg
-                if not has_legacy_flow:
+                has_legacy_flow = (
+                    isinstance(flow_msg, dict)
+                    and "value" in flow_msg
+                    and "flow_rate" not in flow_msg
+                )
+                silent_msg = self.get_message(
+                    CIRCUIT_HMUX0, "CompressorSilentOperationLevel"
+                )
+                is_silent_err = isinstance(silent_msg, str) and silent_msg.startswith(
+                    "ERR:"
+                )
+                if not has_legacy_flow and not is_silent_err:
                     self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=False)
 
         if circuit_key == CIRCUIT_HMUX0 and msg_lower == "rundataflowrate":
-            if "flow_rate" in parsed:
+            if isinstance(parsed, dict) and "flow_rate" in parsed:
                 sc_msg = self.get_message(CIRCUIT_HMUX0, "StateCompressor") or {}
-                if "comp_speed" not in sc_msg:
+                has_legacy_sc = (
+                    isinstance(sc_msg, dict)
+                    and "comp_speed" in sc_msg
+                    and "flow_temp" not in sc_msg
+                )
+                silent_msg = self.get_message(
+                    CIRCUIT_HMUX0, "CompressorSilentOperationLevel"
+                )
+                is_silent_err = isinstance(silent_msg, str) and silent_msg.startswith(
+                    "ERR:"
+                )
+                if not has_legacy_sc and not is_silent_err:
                     self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=False)
             elif (
-                "value" in parsed
+                isinstance(parsed, dict)
+                and "value" in parsed
                 and "flow_rate" not in parsed
                 and raw_payload.strip().startswith("{")
             ):
@@ -1043,21 +1070,95 @@ class SaunierGeniaCoordinator:
 
         if circuit_key == CIRCUIT_HMUX0 and msg_lower == "rundatanominalflowrate":
             sc_msg = self.get_message(CIRCUIT_HMUX0, "StateCompressor") or {}
-            if "comp_speed" not in sc_msg:
+            has_legacy_sc = (
+                isinstance(sc_msg, dict)
+                and "comp_speed" in sc_msg
+                and "flow_temp" not in sc_msg
+            )
+            if not has_legacy_sc:
                 self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=False)
 
-        # 2b. Detect legacy vs v1.2.4+ 15.bass3.csv / 15.basv3.csv via Z1HolidayTemp vs HolidayTemp / HolidayStartDate
+        if (
+            circuit_key == CIRCUIT_HMUX0
+            and msg_lower == "compressorsilentoperationlevel"
+        ):
+            if raw_payload.strip().startswith("ERR:"):
+                self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=True)
+            elif not raw_payload.strip().startswith("ERR:"):
+                sc_msg = self.get_message(CIRCUIT_HMUX0, "StateCompressor") or {}
+                flow_msg = self.get_message(CIRCUIT_HMUX0, "RunDataFlowRate") or {}
+                has_legacy_sc = (
+                    isinstance(sc_msg, dict)
+                    and "comp_speed" in sc_msg
+                    and "flow_temp" not in sc_msg
+                )
+                has_legacy_flow = (
+                    isinstance(flow_msg, dict)
+                    and "value" in flow_msg
+                    and "flow_rate" not in flow_msg
+                )
+                if not has_legacy_sc and not has_legacy_flow:
+                    self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=False)
+
+        # 2a. Detect legacy/upstream vs custom 08.hmu.csv / 08.hmu.HW5103.csv
+        if circuit_key in (CIRCUIT_HMU, CIRCUIT_HMU00):
+            if msg_lower == "status01":
+                if (
+                    isinstance(parsed, dict)
+                    and "temp_1" in parsed
+                    and "flow_temp" not in parsed
+                ):
+                    self._async_set_repair_issue(ISSUE_OUTDATED_HMU_CSV, active=True)
+                elif isinstance(parsed, dict) and "flow_temp" in parsed:
+                    silent_raw = str(
+                        self.get_message(circuit_key, "CompressorSilentOperationLevel")
+                        or ""
+                    )
+                    if not silent_raw.startswith("ERR:"):
+                        self._async_set_repair_issue(
+                            ISSUE_OUTDATED_HMU_CSV, active=False
+                        )
+
+            elif msg_lower in UPSTREAM_DEFAULT_CSV_MESSAGES:
+                self._async_set_repair_issue(ISSUE_OUTDATED_HMU_CSV, active=True)
+
+            elif msg_lower == "compressorsilentoperationlevel":
+                if raw_payload.strip().startswith("ERR:"):
+                    self._async_set_repair_issue(ISSUE_OUTDATED_HMU_CSV, active=True)
+                elif not raw_payload.strip().startswith("ERR:"):
+                    status_msg = self.get_message(circuit_key, "Status01") or {}
+                    has_legacy_status = (
+                        isinstance(status_msg, dict)
+                        and "temp_1" in status_msg
+                        and "flow_temp" not in status_msg
+                    )
+                    if not has_legacy_status:
+                        self._async_set_repair_issue(
+                            ISSUE_OUTDATED_HMU_CSV, active=False
+                        )
+
+        # 2b. Detect legacy vs modern controller CSVs (Z1HolidayTemp/Z1DayTemp vs HolidayTemp/Z1CoolingManualTemp/SilentTimer)
         if circuit_key in CONTROLLER_CIRCUITS:
-            if msg_lower == "z1holidaytemp":
+            is_err = raw_payload.strip().startswith("ERR:")
+            if (not is_err and msg_lower in ("z1holidaytemp", "z1daytemp")) or (
+                is_err and msg_lower in ("silenttimer_slots", "z1coolingmanualtemp")
+            ):
                 self._async_set_repair_issue(ISSUE_OUTDATED_CONTROLLER_CSV, active=True)
-            elif msg_lower == "holidaytemp" or (
-                msg_lower == "holidaystartdate"
-                and isinstance(parsed, dict)
-                and "year" in parsed
+            elif not is_err and (
+                msg_lower in ("holidaytemp", "z1coolingmanualtemp", "silenttimer_slots")
+                or (
+                    msg_lower == "holidaystartdate"
+                    and isinstance(parsed, dict)
+                    and "year" in parsed
+                )
             ):
                 for c in CONTROLLER_CIRCUITS:
                     self._state.pop((c, "Z1HolidayTemp"), None)
                     self._state.pop((c, "z1holidaytemp"), None)
+                    self._state.pop((c, "Z1DayTemp"), None)
+                    self._state.pop((c, "z1daytemp"), None)
+                    self._canonical_names.pop((c, "z1holidaytemp"), None)
+                    self._canonical_names.pop((c, "z1daytemp"), None)
                 self._async_set_repair_issue(
                     ISSUE_OUTDATED_CONTROLLER_CSV, active=False
                 )
@@ -1919,18 +2020,18 @@ class SaunierGeniaCoordinator:
 
         # 3. Live Instantaneous COP / EER
         elec_power = self.get_float(
-            self._active_outdoor_circuit, "PowerStatus", "power"
+            self._active_outdoor_circuit, "RunDataElectricPowerConsumption", "power"
         )
         if elec_power is None:
             elec_power = self.get_float(
-                self._active_outdoor_circuit, "RunDataElectricPowerConsumption", "power"
+                self._active_outdoor_circuit, "PowerStatus", "power"
             )
         if elec_power is None and self._active_outdoor_circuit != CIRCUIT_HMUX0:
-            elec_power = self.get_float(CIRCUIT_HMUX0, "PowerStatus", "power")
+            elec_power = self.get_float(
+                CIRCUIT_HMUX0, "RunDataElectricPowerConsumption", "power"
+            )
             if elec_power is None:
-                elec_power = self.get_float(
-                    CIRCUIT_HMUX0, "RunDataElectricPowerConsumption", "power"
-                )
+                elec_power = self.get_float(CIRCUIT_HMUX0, "PowerStatus", "power")
         live_cop, is_active = calculate_live_cop(
             thermal_power, elec_power, hmu_status, frozenset(ACTIVE_COMPRESSOR_STATUSES)
         )

@@ -382,6 +382,9 @@
       "circulation_weekly_schedule_summary": {
         "default": "mdi:calendar-clock"
       },
+      "silent_mode_weekly_schedule_summary": {
+        "default": "mdi:volume-mute"
+      },
       "solar_yield_total": {
         "default": "mdi:solar-power"
       },

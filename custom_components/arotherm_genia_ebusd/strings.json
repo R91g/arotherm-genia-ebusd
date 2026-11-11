@@ -92,11 +92,15 @@
   "issues": {
     "outdated_hmux0_csv": {
       "title": "Outdated 08.hmux0.csv file in eBUSd",
-      "description": "Your `ebusd` instance is using an older version of `vaillant/08.hmux0.csv` (reporting a static 900 l/h flow rate or legacy `StateCompressor` fields). Please copy the updated `ebusd-configuration/vaillant/08.hmux0.csv` (v1.2.4+) into your `ebusd` configuration folder and restart `ebusd` to enable the real-time vortex water flow sensor (`540200090b`), the `D2C` fix in `StateCompressor`, and optimized polling priorities. This repair notice will clear automatically once `ebusd` reloads the updated CSV."
+      "description": "Your `ebusd` instance is using an older version of `vaillant/08.hmux0.csv` (reporting a static 900 l/h flow rate, legacy `StateCompressor` fields, or missing `CompressorSilentOperationLevel`). Please copy the updated `ebusd-configuration/vaillant/08.hmux0.csv` (v1.3.0+) into your `ebusd` configuration folder and restart `ebusd` to enable the real-time vortex water flow sensor (`540200090b`), compressor silent mode levels, and high-frequency electric power telemetry (`RunDataElectricPowerConsumption`). This repair notice will clear automatically once `ebusd` reloads the updated CSV."
+    },
+    "outdated_hmu_csv": {
+      "title": "Outdated or default 08.hmu.csv / 08.hmu.HW5103.csv file in eBUSd",
+      "description": "Your `ebusd` instance is using the upstream default or an older version of `vaillant/08.hmu.csv` or `08.hmu.HW5103.csv` (reporting raw unmapped `temp_1..temp_4` fields in `Status01`, missing `CompressorSilentOperationLevel`, or missing real-time power telemetry). Please copy `ebusd-configuration/vaillant/08.hmu.csv` or `08.hmu.HW5103.csv` into your `ebusd` configuration folder and restart `ebusd`. This repair notice will clear automatically once `ebusd` reloads the updated CSV."
     },
     "outdated_controller_csv": {
       "title": "Outdated controller CSV file in eBUSd",
-      "description": "Your `ebusd` instance is using an older version of `vaillant/15.bass3.csv`, `15.basv3.csv`, `15.ctlv2.csv`, or `15.ctlv3.csv` (reporting legacy `Z1HolidayTemp` instead of Zone 1 mapped Holiday Mode registers). Please copy the updated `ebusd-configuration/vaillant/*.csv` into your `ebusd` configuration folder and restart `ebusd` to enable real-time Holiday Mode synchronization and active cooling season parameters. This repair notice will clear automatically once `ebusd` reloads the updated CSV."
+      "description": "Your `ebusd` instance is using an older version of `vaillant/15.bass3.csv`, `15.basv3.csv`, `15.ctlv2.csv`, or `15.ctlv3.csv` (reporting legacy `Z1HolidayTemp` or `Z1DayTemp`, or missing `SilentTimer` weekly schedule programming support). Please copy the updated `ebusd-configuration/vaillant/*.csv` into your `ebusd` configuration folder and restart `ebusd` to enable real-time Holiday Mode synchronization, active cooling manual setpoint (`Z1CoolingManualTemp`), and silent mode weekly schedules. This repair notice will clear automatically once `ebusd` reloads the updated CSV."
     },
     "missing_custom_csv": {
       "title": "Custom eBUSd CSV files not loaded or incomplete scan",
@@ -731,6 +735,9 @@
       "circulation_weekly_schedule_summary": {
         "name": "Circulation Pump Weekly Schedule"
       },
+      "silent_mode_weekly_schedule_summary": {
+        "name": "Silent Mode Weekly Schedule"
+      },
       "ebusd_uptime": {
         "name": "ebusd Uptime"
       },
@@ -828,11 +835,11 @@
   "services": {
     "set_weekly_timer": {
       "name": "Set Weekly Schedule Timer (b5 55)",
-      "description": "Configures a weekly schedule time slot on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3) for Zone 1 Heating, Domestic Hot Water (DHW), Cooling, or Circulation. Supports configuring slots (1, 2, 3), deleting individual slots, or clearing the entire day.",
+      "description": "Configures a weekly schedule time slot on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3) for Zone 1 Heating, Domestic Hot Water (DHW), Cooling, Circulation, or Silent Mode. Supports configuring slots (1, 2, 3), deleting individual slots, or clearing the entire day.",
       "fields": {
         "circuit_type": {
           "name": "Circuit Type",
-          "description": "Schedule circuit to modify (Heating, DHW, Cooling, or Circulation)."
+          "description": "Schedule circuit to modify: 'heating' (Zone 1 Heating), 'dhw' (Domestic Hot Water), 'cooling' (Cooling), 'circulation' (Circulation), or 'silent' (Silent Mode)."
         },
         "day": {
           "name": "Day of the Week",
@@ -856,7 +863,7 @@
         },
         "temp": {
           "name": "Target Temperature Setpoint (Optional)",
-          "description": "Target temperature setpoint in °C for this slot. If omitted, uses current circuit setpoint."
+          "description": "Optional target temperature setpoint in °C for this slot. Applies only to 'heating', 'dhw', and 'cooling' (ignored for 'circulation' and 'silent'). If omitted, uses current circuit setpoint."
         },
         "reset_remaining": {
           "name": "Reset Remaining Slots (Overwrite Day)",

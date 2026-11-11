@@ -355,13 +355,13 @@ Modifies or clears native `b5 55` weekly time programs directly inside the `sens
 
 | Parameter | Required | Allowed Values | Description |
 | :--- | :---: | :--- | :--- |
-| `circuit_type` | Yes | `heating`, `dhw`, `cooling`, `circulation` | Target weekly schedule (`Z1Timer`, `HwcTimer`, `CoolingTimer`, or `CirculationTimer`). |
+| `circuit_type` | Yes | `heating`, `dhw`, `cooling`, `circulation`, `silent` | Target weekly schedule: `heating` (Zone 1 Heating / `Z1Timer`), `dhw` (Domestic Hot Water / `HwcTimer`), `cooling` (Cooling / `CoolingTimer`), `circulation` (Circulation / `CirculationTimer`), or `silent` (Silent Mode / `SilentTimer`). |
 | `day` | Yes | `Monday`..`Sunday`, `Weekdays`, `Weekend`, `All`<br>*(or in Spanish: `Lunes`..`Domingo`, `Laborables`, `Fin de semana`, `Todos`)* | Single day, Monday–Friday (`Weekdays`), Saturday–Sunday (`Weekend`), or Monday–Sunday (`All`). |
 | `action` | No | `set`, `delete`, `clear` *(default: `set`)* | Action to perform:<br>• `set`: creates or updates the designated slot.<br>• `delete`: removes the specified slot and shifts subsequent slots down.<br>• `clear`: empties the entire day, leaving 0 active slots. |
 | `slot` | No | `1`, `2`, `3` *(default: `1`)* | Daily time slot index (`1` to `3`). Ignored when `action: clear`. |
 | `start_time` | Optional* | `"HH:MM"` *(e.g. `"13:10"`)* | Window start time (24h format, 10-minute resolution). *Required when `action: set`. |
 | `end_time` | Optional* | `"HH:MM"` *(e.g. `"15:30"` or `"24:00"`)* | Window end time (24h format, use `"24:00"` for all day). *Required when `action: set`. |
-| `temp` | No | `5.0` – `80.0` *(°C)* | Optional target temperature setpoint for this slot. If omitted, uses active circuit setpoint (e.g. 50 °C for DHW, 20 °C for Zone 1). |
+| `temp` | No | `5.0` – `80.0` *(°C)* | Optional target temperature setpoint for this slot. Applies only to `heating`, `dhw`, and `cooling` (ignored for `circulation` and `silent`). If omitted, uses active circuit setpoint (e.g. 50 °C for DHW, 20 °C for Zone 1). |
 | `reset_remaining` | No | `true`, `false` *(default: `false`)* | When set to `true` with `slot: 1` in `set` mode, overwrites the day to exactly 1 active slot (`total_slots = 1`) and erases previous slots 2 and 3 without requiring prior telemetry from the eBUS line. |
 
 #### Configuration & Automation Examples

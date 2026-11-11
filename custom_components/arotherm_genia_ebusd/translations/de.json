@@ -92,11 +92,15 @@
   "issues": {
     "outdated_hmux0_csv": {
       "title": "Veraltete Datei 08.hmux0.csv in eBUSd",
-      "description": "Deine `ebusd`-Instanz verwendet eine veraltete Version von `vaillant/08.hmux0.csv` (mit festem Durchfluss von 900 l/h oder alter `StateCompressor`-Definition). Ersetze die Datei `vaillant/08.hmux0.csv` in deinem eBUSd-Konfigurationsordner durch die in Version v1.2.4+ enthaltene Version und starte `ebusd` neu, um den Vortex-Durchflusssensor in Echtzeit (`540200090b`), den Typ `D2C` in `StateCompressor` und optimierte Polling-Prioritäten zu aktivieren. Dieser Hinweis verschwindet automatisch, sobald `ebusd` die neue CSV lädt."
+      "description": "Deine `ebusd`-Instanz verwendet eine veraltete Version von `vaillant/08.hmux0.csv` (mit festem Durchfluss von 900 l/h, alter `StateCompressor`-Definition oder fehlendem `CompressorSilentOperationLevel`). Ersetze die Datei `vaillant/08.hmux0.csv` in deinem eBUSd-Konfigurationsordner durch die in Version v1.3.0+ enthaltene Version und starte `ebusd` neu, um den Vortex-Durchflusssensor in Echtzeit (`540200090b`), die Flüstermodus-Stufen und die hochfrequente Stromverbrauchstelemetrie (`RunDataElectricPowerConsumption`) zu aktivieren. Dieser Hinweis verschwindet automatisch, sobald `ebusd` die neue CSV lädt."
+    },
+    "outdated_hmu_csv": {
+      "title": "Veraltete oder Standard-Datei 08.hmu.csv / 08.hmu.HW5103.csv in eBUSd",
+      "description": "Deine `ebusd`-Instanz verwendet die standardmäßige ebusd.eu- oder eine veraltete Version von `vaillant/08.hmu.csv` oder `08.hmu.HW5103.csv` (unzugeordnete `temp_1..temp_4`-Felder in `Status01`, fehlende `CompressorSilentOperationLevel`-Unterstützung oder fehlende Echtzeit-Verbrauchswerte). Bitte kopiere `ebusd-configuration/vaillant/08.hmu.csv` oder `08.hmu.HW5103.csv` in dein eBUSd-Konfigurationsverzeichnis und starte `ebusd` neu. Dieser Hinweis verschwindet automatisch, sobald `ebusd` die neue CSV lädt."
     },
     "outdated_controller_csv": {
-      "title": "Veraltete Regler-Konfigurationsdatei (15.720.csv / 15.ctlv2.csv)",
-      "description": "Deine Regler-Konfigurationsdatei (`15.720.csv` oder `15.ctlv2.csv`) enthält noch nicht die neuen Schreibnachrichten für erweiterte Timer (`Timer*`), Flüstermodus-Leistungsstufen (`SilentMode*`), Warmwasser-Hysterese (`HwcTempMargin`) oder Einmal-Warmwasserladung (`SetModeQuickVetoHwc`). Ersetze die CSV-Datei durch die in diesem Repository mitgelieferte Version und starte `ebusd` neu, um alle Funktionen freizuschalten."
+      "title": "Veraltete Regler-Konfigurationsdatei (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3)",
+      "description": "Deine `ebusd`-Instanz verwendet eine veraltete Version von `vaillant/15.bass3.csv`, `15.basv3.csv`, `15.ctlv2.csv` oder `15.ctlv3.csv` (meldet veraltete `Z1HolidayTemp`- oder `Z1DayTemp`-Register oder fehlende Unterstützung für Wochen-Zeitpläne des Flüstermodus `SilentTimer`). Bitte kopiere die aktualisierten Dateien `ebusd-configuration/vaillant/*.csv` in dein eBUSd-Konfigurationsverzeichnis und starte `ebusd` neu, um die Abwesenheitsmodus-Synchronisation, die manuelle Kühlsollwert-Vorgabe (`Z1CoolingManualTemp`) und die Zeitpläne des Flüstermodus zu aktivieren. Dieser Hinweis verschwindet automatisch, sobald `ebusd` die neue CSV lädt."
     },
     "missing_custom_csv": {
       "title": "Angepasste eBUSd-Konfigurationsdateien nicht gefunden",
@@ -731,6 +735,9 @@
       "circulation_weekly_schedule_summary": {
         "name": "Wochenplan Zirkulationspumpe"
       },
+      "silent_mode_weekly_schedule_summary": {
+        "name": "Wochenplan Flüstermodus"
+      },
       "ebusd_uptime": {
         "name": "ebusd Betriebszeit (Uptime)"
       },
@@ -828,11 +835,11 @@
   "services": {
     "set_weekly_timer": {
       "name": "Wöchentlichen Zeitplan konfigurieren (b5 55)",
-      "description": "Konfiguriert oder löscht wöchentliche Zeitfenster am Klimaregler (15.bass3 / 15.ctlv2 / 15.ctlv3) für Heizkreis Zone 1, Warmwasser (DHW), Kühlung oder Zirkulation. Unterstützt Zeitfenster (1, 2, 3), das Löschen einzelner Zeitfenster oder das Leeren des gesamten Tages.",
+      "description": "Konfiguriert oder löscht wöchentliche Zeitfenster am Klimaregler (15.bass3 / 15.ctlv2 / 15.ctlv3) für Heizkreis Zone 1, Warmwasser (DHW), Kühlung, Zirkulation oder Flüstermodus. Unterstützt Zeitfenster (1, 2, 3), das Löschen einzelner Zeitfenster oder das Leeren des gesamten Tages.",
       "fields": {
         "circuit_type": {
           "name": "Schaltkreis",
-          "description": "Zu ändernder Zeitplan-Schaltkreis (Heizung, Warmwasser, Kühlung oder Zirkulation)."
+          "description": "Zu ändernder Zeitplan: 'heating' (Heizung), 'dhw' (Warmwasser), 'cooling' (Kühlung), 'circulation' (Zirkulation) oder 'silent' (Flüstermodus)."
         },
         "day": {
           "name": "Wochentag",
@@ -856,7 +863,7 @@
         },
         "temp": {
           "name": "Zieltemperatur-Sollwert (Optional)",
-          "description": "Zieltemperatur-Sollwert in °C für dieses Fenster. Bei Auslassung wird der aktive Kreis-Sollwert verwendet."
+          "description": "Zieltemperatur-Sollwert in °C für dieses Fenster. Gilt nur für 'heating', 'dhw' und 'cooling' (wird für 'circulation' und 'silent' ignoriert). Bei Auslassung wird der aktive Kreis-Sollwert verwendet."
         },
         "reset_remaining": {
           "name": "Verbleibende Fenster zurücksetzen",

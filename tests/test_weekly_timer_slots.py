@@ -901,6 +901,142 @@ class TestWeeklyTimerSlots(unittest.TestCase):
             (CIRCUIT_BASS3, "CirculationTimer_Monday", "0;0;0;0;0"),
         )
 
+    def test_service_silent_mode_writes_payload_without_temp(self) -> None:
+        """Verify silent mode timer writes 5-field payload (total;fh;fm;th;tm) without temperature."""
+        hass = MagicMock()
+        services: dict[str, Any] = {}
+        hass.services.has_service.return_value = False
+        hass.services.async_register.side_effect = (
+            lambda d, s, h, schema=None, *args, **kwargs: services.update({s: h})
+        )
+
+        coord = SaunierGeniaCoordinator(hass, MagicMock(data={"mqtt_prefix": "ebusd"}))
+        coord._state[("hmux0", "status01")] = {"temp1": 35.0}
+
+        written_params: list[tuple[str, str, str]] = []
+
+        async def record_write(circuit: str, message: str, payload: str) -> None:
+            written_params.append((circuit, message, payload))
+
+        coord.async_write_parameter = AsyncMock(side_effect=record_write)
+        hass.data = {DOMAIN: {"entry_id": coord}}
+        _async_register_services(hass)
+
+        # 1. Set slot 1 with reset_remaining: true
+        call = MagicMock()
+        call.data = {
+            "circuit_type": "silent",
+            "day": "Monday",
+            "action": "set",
+            "slot": 1,
+            "start_time": "22:00",
+            "end_time": "24:00",
+            "reset_remaining": True,
+        }
+        asyncio.run(services[SERVICE_SET_WEEKLY_TIMER](call))
+
+        self.assertEqual(len(written_params), 1)
+        self.assertEqual(
+            written_params[0],
+            (CIRCUIT_BASS3, "SilentTimer_Monday", "1;22;0;24;0"),
+        )
+        self.assertEqual(_get_active_slot_count(coord, "SilentTimer", "Monday"), 1)
+
+        # 2. Set slot 1 with optional temp passed: temp is ignored for silent mode
+        written_params.clear()
+        call_with_temp = MagicMock()
+        call_with_temp.data = {
+            "circuit_type": "silent",
+            "day": "Tuesday",
+            "action": "set",
+            "slot": 1,
+            "start_time": "13:00",
+            "end_time": "15:00",
+            "temp": 22.5,
+            "reset_remaining": True,
+        }
+        asyncio.run(services[SERVICE_SET_WEEKLY_TIMER](call_with_temp))
+        self.assertEqual(
+            written_params[0],
+            (CIRCUIT_BASS3, "SilentTimer_Tuesday", "1;13;0;15;0"),
+        )
+
+        # 3. Clear action for silent mode writes 0;0;0;0;0
+        call_clear = MagicMock()
+        call_clear.data = {
+            "circuit_type": "silent",
+            "day": "Monday",
+            "action": "clear",
+        }
+        written_params.clear()
+        asyncio.run(services[SERVICE_SET_WEEKLY_TIMER](call_clear))
+        self.assertEqual(
+            written_params[0],
+            (CIRCUIT_BASS3, "SilentTimer_Monday", "0;0;0;0;0"),
+        )
+
+        # 4. Delete slot 1 when 2 active slots exist: slot 2 shifts down with 5 fields
+        coord._state[(CIRCUIT_BASS3, "SilentTimer_Slots")] = {"wed": 2}
+        coord._state[(CIRCUIT_BASS3, "SilentTimer_Wednesday")] = _slot(8, 0, 12, 0)
+        coord._state[(CIRCUIT_BASS3, "SilentTimer_Wednesday_Slot2")] = _slot(
+            20, 0, 23, 0
+        )
+        call_del = MagicMock()
+        call_del.data = {
+            "circuit_type": "silent",
+            "day": "Wednesday",
+            "action": "delete",
+            "slot": 1,
+        }
+        written_params.clear()
+        asyncio.run(services[SERVICE_SET_WEEKLY_TIMER](call_del))
+        self.assertEqual(len(written_params), 1)
+        self.assertEqual(
+            written_params[0],
+            (CIRCUIT_BASS3, "SilentTimer_Wednesday", "1;20;0;23;0"),
+        )
+
+    def test_silent_mode_weekly_schedule_sensor_formatting(self) -> None:
+        """Verify silent mode schedule sensor formats windows cleanly without temperature."""
+        from custom_components.arotherm_genia_ebusd.sensor import (
+            SaunierGeniaWeeklyScheduleSensor,
+        )
+
+        coord = FakeCoordinator(
+            {
+                "SilentTimer_Slots": {"mon": 2, "tue": 0},
+                "SilentTimer_Monday": {
+                    "from_hour": 22,
+                    "from_min": 0,
+                    "to_hour": 24,
+                    "to_min": 0,
+                },
+                "SilentTimer_Monday_Slot2": {
+                    "from_hour": 13,
+                    "from_min": 0,
+                    "to_hour": 15,
+                    "to_min": 0,
+                },
+            }
+        )
+        coord.entry = MagicMock(entry_id="mock_entry")
+        coord.manufacturer = "Saunier Duval"
+        coord.has_wireless_room_unit = False
+
+        sensor = SaunierGeniaWeeklyScheduleSensor(
+            coord, "silent_mode_weekly_schedule_summary", "SilentTimer"
+        )
+        self.assertEqual(sensor._format_slot("Monday", 1), "22:00 - 24:00")
+        self.assertEqual(sensor._format_slot("Monday", 2), "13:00 - 15:00")
+        self.assertIsNone(sensor._format_slot("Tuesday", 1))
+
+        attrs = sensor.extra_state_attributes
+        self.assertEqual(attrs["timer_prefix"], "SilentTimer")
+        self.assertEqual(attrs["weekly_schedule"]["Monday"]["active_slots"], 2)
+        self.assertEqual(attrs["weekly_schedule"]["Monday"]["Slot 1"], "22:00 - 24:00")
+        self.assertEqual(attrs["weekly_schedule"]["Monday"]["Slot 2"], "13:00 - 15:00")
+        self.assertIsNone(attrs["weekly_schedule"]["Monday"]["Slot 3"])
+
 
 if __name__ == "__main__":
     unittest.main()

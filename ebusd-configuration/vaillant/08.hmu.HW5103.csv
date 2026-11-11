@@ -30,7 +30,7 @@ r9;u,,,RunDataHighPressure,high pressure sensor,,,b509,5402006a09,ign,,IGN:4,,,,
 # ==============================================================================
 # 2. ELECTRICAL POWER AND ENERGY REGISTERS
 # ==============================================================================
-r;u,,,RunDataElectricPowerConsumption,current electrical power consumption,,,b509,5402005b0d,ign,,IGN:4,,,,power,,EXP,,W,"current electrical power consumption (Watt)"
+r1;u,,,RunDataElectricPowerConsumption,current electrical power consumption,,,b509,5402005b0d,ign,,IGN:4,,,,power,,EXP,,W,"current electrical power consumption (Watt)"
 r;u,,,PowerStatus,instantaneous power consumption and active mode,,,b516,14,status,,UCH,0=standby;1=heating;2=hwc;3=cooling,,active energy integration mode,power,,EXP,,W,"instantaneous electrical power",fuel_power,,EXP,,W,"instantaneous fuel power"
 
 # Daily, monthly, and cumulative yield / COP registers (b51a)

@@ -45,7 +45,7 @@ r;u,,,RunDataEEVPositionAbs,(EEV Position in different scale?),,,b509,540200280a
 r;u,,,RunDataFan1Speed,,,,b509,540200470a,ign,,IGN:4,,,,value,,EXP,,rpm,
 r;u,,,RunDataFan2Speed,,,,b509,540200490a,ign,,IGN:4,,,,value,,EXP,,rpm,
 r;u,,,RunDataUnsupported530d,unsupported status register on HMUX0,,,b509,540200530d,data,,HEX:4,,,HMU Status code (use HMUStatusCode b503 0003)
-r;u,,,RunDataElectricPowerConsumption,,,,b509,5402005b0d,ign,,IGN:4,,,,power,,EXP,,W,current electrical power consumption (Watt)
+r1;u,,,RunDataElectricPowerConsumption,,,,b509,5402005b0d,ign,,IGN:4,,,,power,,EXP,,W,current electrical power consumption (Watt)
 r9;u,,,RunDataHighPressure,,,,b509,5402006a09,ign,,IGN:4,,,,press,,EXP,,bar,pressure
 r9;u,,,RunDataCompressorInletTemp,,,,b509,5402009808,ign,,IGN:4,,,,value,,EXP,,°C,temperature
 r9;u,,,RunDataCompressorOutletTemp,,,,b509,540200a208,ign,,IGN:4,,,,value,,EXP,,°C,temperature

@@ -103,13 +103,13 @@ class TestSensorRegistry(unittest.TestCase):
         self.assertEqual(desc.unique_id_suffix, "hmux0_rundataflowrate_value")
 
     def test_electric_power_consumption_alignment_and_unique_id(self) -> None:
-        """Electric power consumption prioritizes PowerStatus while preserving legacy unique_id."""
+        """Electric power consumption prioritizes RunDataElectricPowerConsumption while preserving legacy unique_id."""
         desc = next(
             d for d in SENSOR_DESCRIPTIONS if d.key == "electric_power_consumption"
         )
-        self.assertEqual(desc.message, "PowerStatus")
+        self.assertEqual(desc.message, "RunDataElectricPowerConsumption")
         self.assertEqual(desc.field, "power")
-        self.assertEqual(desc.fallback_message, "RunDataElectricPowerConsumption")
+        self.assertEqual(desc.fallback_message, "PowerStatus")
         self.assertEqual(desc.fallback_field, "power")
         self.assertEqual(
             desc.unique_id_suffix, "hmux0_rundataelectricpowerconsumption_power"
@@ -125,25 +125,25 @@ class TestSensorRegistry(unittest.TestCase):
         coord.get_float.return_value = None
         self.assertIsNone(_get_electric_power(coord))
 
-        # Case 2: Only RunDataElectricPowerConsumption exists -> returns fallback
+        # Case 2: Only PowerStatus exists -> returns fallback
         def mock_get_float_fallback(circuit, message, field):
-            if message == "RunDataElectricPowerConsumption" and field == "power":
-                return 123.4
+            if message == "PowerStatus" and field == "power":
+                return 456.7
             return None
 
         coord.get_float.side_effect = mock_get_float_fallback
-        self.assertEqual(_get_electric_power(coord), 123.4)
+        self.assertEqual(_get_electric_power(coord), 456.7)
 
-        # Case 3: Both exist -> PowerStatus MUST take precedence
+        # Case 3: Both exist -> RunDataElectricPowerConsumption (active high-frequency r1) MUST take precedence
         def mock_get_float_both(circuit, message, field):
-            if message == "PowerStatus" and field == "power":
-                return 456.7
             if message == "RunDataElectricPowerConsumption" and field == "power":
                 return 123.4
+            if message == "PowerStatus" and field == "power":
+                return 456.7
             return None
 
         coord.get_float.side_effect = mock_get_float_both
-        self.assertEqual(_get_electric_power(coord), 456.7)
+        self.assertEqual(_get_electric_power(coord), 123.4)
 
     def test_binary_sensors_validity(self) -> None:
         """Verify binary sensors have valid circuits and unique ID suffixes."""

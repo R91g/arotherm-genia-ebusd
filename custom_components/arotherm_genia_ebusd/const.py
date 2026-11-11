@@ -417,6 +417,7 @@ TIMER_CIRCUIT_PREFIXES: dict[str, str] = {
     "dhw": "HwcTimer",
     "cooling": "CoolingTimer",
     "circulation": "CirculationTimer",
+    "silent": "SilentTimer",
 }
 
 # Essential eBUSd messages for Initial Staggered Hydration (/get queue)
@@ -441,6 +442,14 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
         CIRCUIT_BASS3,
         "Z1HolidayTemp",
     ),  # Probes for legacy pre-v1.2.4 CSV compatibility check
+    (
+        CIRCUIT_BASS3,
+        "Z1DayTemp",
+    ),  # Probes for legacy pre-v1.3.0 CSV compatibility check (replaced by Z1CoolingManualTemp)
+    (
+        CIRCUIT_BASS3,
+        "SilentTimer_Slots",
+    ),  # Probes for modern v1.3.0+ weekly schedule timer support
     (CIRCUIT_BASS3, "CoolingReleaseStatus"),
     (CIRCUIT_BASS3, "HwcSFMode"),
     (CIRCUIT_BASS3, "HwcFlowTemp"),
@@ -652,6 +661,7 @@ VWZIO_SECONDARY_HWC_OPTIONS: list[str] = [
 
 # Home Assistant Repairs (issue_registry) Identifiers
 ISSUE_OUTDATED_HMUX0_CSV = "outdated_hmux0_csv"
+ISSUE_OUTDATED_HMU_CSV = "outdated_hmu_csv"
 ISSUE_OUTDATED_CONTROLLER_CSV = "outdated_controller_csv"
 ISSUE_MISSING_CUSTOM_CSV = "missing_custom_csv"
 ISSUE_NO_EBUSD_MQTT_TRAFFIC = "no_ebusd_mqtt_traffic"

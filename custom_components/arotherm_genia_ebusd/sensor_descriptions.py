@@ -354,15 +354,15 @@ def _get_hydraulic_heater_hwc_hours(coord: SaunierGeniaCoordinator) -> float | N
 def _get_electric_power(coord: SaunierGeniaCoordinator) -> float | None:
     """Return instantaneous electrical power consumption (W).
 
-    Prioritizes PowerStatus (passively refreshed by MiGo Link / gateway f1 or active reads),
-    falling back to RunDataElectricPowerConsumption.
+    Prioritizes RunDataElectricPowerConsumption (active high-frequency r1 poll),
+    falling back to PowerStatus (passively refreshed by MiGo Link / gateway f1 or active reads).
     """
     for circuit in (coord.active_outdoor_circuit, CIRCUIT_HMUX0, CIRCUIT_HMU):
-        val = coord.get_float(circuit, "PowerStatus", "power")
+        val = coord.get_float(circuit, "RunDataElectricPowerConsumption", "power")
         if val is not None:
             return val
     for circuit in (coord.active_outdoor_circuit, CIRCUIT_HMUX0, CIRCUIT_HMU):
-        val = coord.get_float(circuit, "RunDataElectricPowerConsumption", "power")
+        val = coord.get_float(circuit, "PowerStatus", "power")
         if val is not None:
             return val
     return None
@@ -474,10 +474,10 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         translation_key="electric_power_consumption",
         device_key=DEVICE_OUTDOOR_UNIT,
         circuit=CIRCUIT_HMUX0,
-        message="PowerStatus",
+        message="RunDataElectricPowerConsumption",
         field="power",
         fallback_circuit=CIRCUIT_HMUX0,
-        fallback_message="RunDataElectricPowerConsumption",
+        fallback_message="PowerStatus",
         fallback_field="power",
         unique_id_suffix="hmux0_rundataelectricpowerconsumption_power",
         value_fn=_get_electric_power,
@@ -2009,4 +2009,5 @@ WEEKLY_SCHEDULE_SENSORS: tuple[tuple[str, str], ...] = (
     ("hwc_weekly_schedule_summary", "HwcTimer"),
     ("cooling_weekly_schedule_summary", "CoolingTimer"),
     ("circulation_weekly_schedule_summary", "CirculationTimer"),
+    ("silent_mode_weekly_schedule_summary", "SilentTimer"),
 )
