@@ -255,11 +255,15 @@ def _async_cleanup_deprecated_entities(hass: HomeAssistant, entry: ConfigEntry) 
                 reg_entry.unique_id,
             )
             ent_reg.async_remove(reg_entry.entity_id)
-        elif reg_entry.entity_id.endswith(
-            "_consigna_confort_calefaccion_zona_1_dia"
-        ) or reg_entry.entity_id.endswith("_zone_1_comfort_heating_setpoint_day"):
+        elif (
+            reg_entry.entity_id.endswith("_consigna_confort_calefaccion_zona_1_dia")
+            or reg_entry.entity_id.endswith("_consigna_dia_zona_1")
+            or reg_entry.entity_id.endswith("_zone_1_comfort_heating_setpoint_day")
+            or reg_entry.entity_id.endswith("_zone_1_day_comfort_setpoint")
+            or reg_entry.entity_id.endswith("_zone_1_day_setpoint")
+        ):
             _LOGGER.info(
-                "Purging legacy entity %s to regenerate entity ID without 'calefaccion/heating'",
+                "Purging legacy day setpoint entity %s (Z1DayTemp replaced by Z1CoolingManualTemp)",
                 reg_entry.entity_id,
             )
             ent_reg.async_remove(reg_entry.entity_id)
@@ -482,7 +486,7 @@ def _get_default_circuit_temp(
                 pass
         return 50.0
     if circuit_type == "heating":
-        msg = coordinator.get_message(CIRCUIT_BASS3, "Z1DayTemp") or {}
+        msg = coordinator.get_message(CIRCUIT_BASS3, "Z1ManualTemp") or {}
         raw = msg.get("temp", msg.get("value"))
         if raw is not None:
             try:
@@ -491,8 +495,11 @@ def _get_default_circuit_temp(
                 pass
         return 20.0
     if circuit_type == "cooling":
-        msg = coordinator.get_message(CIRCUIT_BASS3, "Z1CoolingTempDesired") or {}
+        msg = coordinator.get_message(CIRCUIT_BASS3, "Z1CoolingManualTemp") or {}
         raw = msg.get("temp", msg.get("value"))
+        if raw is None:
+            msg = coordinator.get_message(CIRCUIT_BASS3, "Z1CoolingTempDesired") or {}
+            raw = msg.get("temp", msg.get("value"))
         if raw is not None:
             try:
                 return float(raw)

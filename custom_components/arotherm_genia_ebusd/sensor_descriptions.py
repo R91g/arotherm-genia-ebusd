@@ -265,8 +265,8 @@ def _get_z1_actual_desired_filtered(
     if val <= SENTINEL_HEATING_THRESHOLD:
         op_mode = (coord.get_str(CIRCUIT_BASS3, "Z1OpMode", "value") or "").lower()
         if op_mode == "off":
-            day_temp = coord.get_float(CIRCUIT_BASS3, "Z1DayTemp", "value")
-            return day_temp if day_temp is not None else DEFAULT_COMFORT_TEMP
+            manual_temp = coord.get_float(CIRCUIT_BASS3, "Z1ManualTemp", "value")
+            return manual_temp if manual_temp is not None else DEFAULT_COMFORT_TEMP
     return round(val, 2)
 
 
@@ -1871,9 +1871,9 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         device_key=DEVICE_WIRELESS_THERMOSTAT,
         # The NETX3 thermostat does not publish its own target on the bus
         # (04.netx3.csv / f6.netx3.csv only define RoomTempDial). This sensor
-        # mirrors the climate controller's Zone 1 day setpoint (Z1DayTemp).
+        # mirrors the climate controller's Zone 1 manual heating setpoint (Z1ManualTemp).
         circuit=CIRCUIT_BASS3,
-        message="Z1DayTemp",
+        message="Z1ManualTemp",
         field="value",
         # Preserve the historical unique_id (was circuit 04 / RoomTargetTemp / temp)
         unique_id_suffix="04_roomtargettemp_temp",

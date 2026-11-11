@@ -80,7 +80,7 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
             subs.extend(
                 [
                     (CIRCUIT_BASS3, "Z1OpMode"),
-                    (CIRCUIT_BASS3, "Z1DayTemp"),
+                    (CIRCUIT_BASS3, "Z1ManualTemp"),
                 ]
             )
         elif description.key == "holiday_duration_remaining":

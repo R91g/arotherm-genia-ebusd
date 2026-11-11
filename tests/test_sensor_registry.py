@@ -85,12 +85,12 @@ class TestSensorRegistry(unittest.TestCase):
             duplicates, {}, f"Duplicate sensor unique_ids found: {duplicates}"
         )
 
-    def test_wireless_room_target_is_stable_mirror_of_z1daytemp(self) -> None:
-        """The thermostat target sensor mirrors Z1DayTemp and keeps its legacy unique_id."""
+    def test_wireless_room_target_is_stable_mirror_of_z1manualtemp(self) -> None:
+        """The thermostat target sensor mirrors Z1ManualTemp and keeps its legacy unique_id."""
         desc = next(
             d for d in SENSOR_DESCRIPTIONS if d.key == "wireless_room_target_temp"
         )
-        self.assertEqual(desc.message, "Z1DayTemp")
+        self.assertEqual(desc.message, "Z1ManualTemp")
         self.assertIsNone(desc.fallback_message)
         self.assertEqual(desc.unique_id_suffix, "04_roomtargettemp_temp")
 

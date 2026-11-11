@@ -170,9 +170,6 @@
       "cooling_flow_temp_desired_max": {
         "name": "Maximum Cooling Flow Setpoint"
       },
-      "z1_day_temp": {
-        "name": "Zone 1 Day Comfort Setpoint"
-      },
       "z1_night_temp": {
         "name": "Zone 1 Night Setback Temperature (Night)"
       },

@@ -25,11 +25,9 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from .const import (
     CIRCUIT_BASS3,
     CIRCUIT_HMUX0,
-    DEFAULT_COMFORT_TEMP,
     DEVICE_CLIMATE_CONTROLLER,
     DEVICE_OUTDOOR_UNIT,
     DOMAIN,
-    SENTINEL_COOLING_THRESHOLD,
 )
 from .coordinator import SaunierGeniaCoordinator
 from .entity import SaunierGeniaEntity
@@ -43,7 +41,6 @@ class SaunierGeniaNumberEntityDescription(NumberEntityDescription):
     circuit: str = CIRCUIT_BASS3
     field: str = "value"
     is_integer: bool = False
-    filter_cooling_sentinel: bool = False
     device_key: str = DEVICE_CLIMATE_CONTROLLER
     mode: NumberMode = NumberMode.BOX
 
@@ -131,17 +128,6 @@ NUMBER_DESCRIPTIONS: tuple[SaunierGeniaNumberEntityDescription, ...] = (
         entity_category=EntityCategory.CONFIG,
     ),
     SaunierGeniaNumberEntityDescription(
-        key="z1_day_temp",
-        translation_key="z1_day_temp",
-        message="Z1DayTemp",
-        field="value",
-        native_min_value=15.0,
-        native_max_value=30.0,
-        native_step=0.5,
-        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-        device_class=NumberDeviceClass.TEMPERATURE,
-    ),
-    SaunierGeniaNumberEntityDescription(
         key="z1_night_temp",
         translation_key="z1_night_temp",
         message="Z1NightTemp",
@@ -199,14 +185,13 @@ NUMBER_DESCRIPTIONS: tuple[SaunierGeniaNumberEntityDescription, ...] = (
     SaunierGeniaNumberEntityDescription(
         key="z1_cooling_temp_manual",
         translation_key="z1_cooling_temp_manual",
-        message="Z1CoolingTempDesired",
+        message="Z1CoolingManualTemp",
         field="value",
         native_min_value=15.0,
         native_max_value=30.0,
         native_step=0.5,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=NumberDeviceClass.TEMPERATURE,
-        filter_cooling_sentinel=True,
     ),
     SaunierGeniaNumberEntityDescription(
         key="holiday_temp",
@@ -412,11 +397,10 @@ class SaunierGeniaNumber(SaunierGeniaEntity, NumberEntity):
         )
         self.entity_description = description
         self._attr_mode = description.mode
-        self._last_valid_cooling_value: float = DEFAULT_COMFORT_TEMP
 
     @property
     def native_value(self) -> float | None:
-        """Return the current number value with anti-sentinel protection for Z1CoolingTempDesired."""
+        """Return the current number value."""
         val = self.coordinator.get_float(
             self.entity_description.circuit,
             self.entity_description.message,
@@ -425,21 +409,12 @@ class SaunierGeniaNumber(SaunierGeniaEntity, NumberEntity):
         if val is None:
             return None
 
-        if self.entity_description.filter_cooling_sentinel:
-            if val < SENTINEL_COOLING_THRESHOLD:
-                self._last_valid_cooling_value = val
-                return val
-            return self._last_valid_cooling_value
-
         if self.entity_description.is_integer:
             return float(round(val))
         return round(val, 2)
 
     async def async_set_native_value(self, value: float) -> None:
         """Write the new numeric value to eBUSd."""
-        if self.entity_description.filter_cooling_sentinel:
-            self._last_valid_cooling_value = value
-
         payload_val: int | float = (
             round(value) if self.entity_description.is_integer else value
         )

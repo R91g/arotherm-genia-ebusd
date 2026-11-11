@@ -143,7 +143,7 @@ class TestCoordinatorLogic(unittest.TestCase):
         self.assertEqual(_multi_field_layout("CustomMsg", {"a": 1, "b": 2}), ("a", "b"))
 
         # Non-multi-field messages
-        self.assertIsNone(_multi_field_layout("Z1DayTemp", {}))
+        self.assertIsNone(_multi_field_layout("Z1CoolingManualTemp", {}))
         self.assertIsNone(_multi_field_layout("HwcTempDesired", {}))
 
     def test_apply_optimistic_update(self) -> None:
@@ -188,8 +188,10 @@ class TestCoordinatorLogic(unittest.TestCase):
         )
 
         # 4. Standard scalar (temperature)
-        coord._apply_optimistic_update("bass3", "Z1DayTemp", 22.5)
-        self.assertEqual(coord._state[("bass3", "Z1DayTemp")], {"value": 22.5})
+        coord._apply_optimistic_update("bass3", "Z1CoolingManualTemp", 22.5)
+        self.assertEqual(
+            coord._state[("bass3", "Z1CoolingManualTemp")], {"value": 22.5}
+        )
 
         # 5. String enum mode
         coord._apply_optimistic_update("bass3", "HwcOpMode", "day")
@@ -721,6 +723,16 @@ class TestCoordinatorLogic(unittest.TestCase):
         old_bin_comp.entity_id = "binary_sensor.old_comp_active"
         old_bin_comp.unique_id = "entry123_binary_hmux0_statecompressor_comp_speed"
 
+        old_day_temp = MagicMock()
+        old_day_temp.entity_id = "number.mipro_sense_controlador_de_clima_consigna_confort_calefaccion_zona_1_dia"
+        old_day_temp.unique_id = "entry123_number_bass3_z1daytemp_value"
+
+        old_cooling_desired = MagicMock()
+        old_cooling_desired.entity_id = "number.mipro_sense_cooling_desired"
+        old_cooling_desired.unique_id = (
+            "entry123_number_bass3_z1coolingtempdesired_value"
+        )
+
         active_entry = MagicMock()
         active_entry.entity_id = "sensor.new_system_total"
         active_entry.unique_id = (
@@ -732,6 +744,8 @@ class TestCoordinatorLogic(unittest.TestCase):
             old_cop,
             old_rpm,
             old_bin_comp,
+            old_day_temp,
+            old_cooling_desired,
             active_entry,
         ]
 
@@ -743,7 +757,11 @@ class TestCoordinatorLogic(unittest.TestCase):
         ent_reg.async_remove.assert_any_call("sensor.old_daily_cop")
         ent_reg.async_remove.assert_any_call("sensor.old_comp_speed_rpm")
         ent_reg.async_remove.assert_any_call("binary_sensor.old_comp_active")
-        self.assertEqual(ent_reg.async_remove.call_count, 4)
+        ent_reg.async_remove.assert_any_call(
+            "number.mipro_sense_controlador_de_clima_consigna_confort_calefaccion_zona_1_dia"
+        )
+        ent_reg.async_remove.assert_any_call("number.mipro_sense_cooling_desired")
+        self.assertEqual(ent_reg.async_remove.call_count, 6)
 
     def test_compressor_active_ignores_comp_speed_and_uses_modulation_or_rps(
         self,
@@ -1032,16 +1050,22 @@ class TestCoordinatorLogic(unittest.TestCase):
             nonlocal rev_callback_called
             rev_callback_called = True
 
-        coord.async_add_listener(CIRCUIT_BASV3, "Z1DayTemp", on_day_temp_updated)
+        coord.async_add_listener(
+            CIRCUIT_BASV3, "Z1CoolingManualTemp", on_day_temp_updated
+        )
 
-        push_mqtt("ebusd/bass3/Z1DayTemp", '{"temp": {"value": 22.0}}')
+        push_mqtt("ebusd/bass3/Z1CoolingManualTemp", '{"temp": {"value": 22.0}}')
         self.assertTrue(rev_callback_called)
-        self.assertEqual(coord.get_float(CIRCUIT_BASS3, "Z1DayTemp", "temp"), 22.0)
-        self.assertEqual(coord.get_float(CIRCUIT_BASV3, "Z1DayTemp", "temp"), 22.0)
+        self.assertEqual(
+            coord.get_float(CIRCUIT_BASS3, "Z1CoolingManualTemp", "temp"), 22.0
+        )
+        self.assertEqual(
+            coord.get_float(CIRCUIT_BASV3, "Z1CoolingManualTemp", "temp"), 22.0
+        )
         self.assertEqual(coord.active_controller_circuit, CIRCUIT_BASS3)
 
         # Switch back to basv3
-        push_mqtt("ebusd/basv3/Z1DayTemp", '{"temp": {"value": 22.5}}')
+        push_mqtt("ebusd/basv3/Z1CoolingManualTemp", '{"temp": {"value": 22.5}}')
         self.assertEqual(coord.active_controller_circuit, CIRCUIT_BASV3)
 
         # 3. Parameter writing and active /get routing
@@ -1051,16 +1075,22 @@ class TestCoordinatorLogic(unittest.TestCase):
                 new=AsyncMock(),
             ) as mock_pub:
                 # When active circuit is basv3, calling async_write_parameter with CIRCUIT_BASS3 routes to basv3 topic
-                await coord.async_write_parameter(CIRCUIT_BASS3, "Z1DayTemp", 23.0)
+                await coord.async_write_parameter(
+                    CIRCUIT_BASS3, "Z1CoolingManualTemp", 23.0
+                )
                 mock_pub.assert_called_with(
-                    hass, "ebusd/basv3/Z1DayTemp/set", "23.0", qos=0, retain=False
+                    hass,
+                    "ebusd/basv3/Z1CoolingManualTemp/set",
+                    "23.0",
+                    qos=0,
+                    retain=False,
                 )
                 # Both circuits reflect optimistic update
                 self.assertEqual(
-                    coord.get_float(CIRCUIT_BASS3, "Z1DayTemp", "temp"), 23.0
+                    coord.get_float(CIRCUIT_BASS3, "Z1CoolingManualTemp", "temp"), 23.0
                 )
                 self.assertEqual(
-                    coord.get_float(CIRCUIT_BASV3, "Z1DayTemp", "temp"), 23.0
+                    coord.get_float(CIRCUIT_BASV3, "Z1CoolingManualTemp", "temp"), 23.0
                 )
 
                 # async_request_get with CIRCUIT_BASS3 routes to basv3 topic
@@ -1130,15 +1160,21 @@ class TestCoordinatorLogic(unittest.TestCase):
                 "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
                 new=AsyncMock(),
             ) as mock_pub:
-                await coord.async_write_parameter(CIRCUIT_BASS3, "Z1DayTemp", 21.5)
+                await coord.async_write_parameter(
+                    CIRCUIT_BASS3, "Z1CoolingManualTemp", 21.5
+                )
                 mock_pub.assert_called_with(
-                    hass, "ebusd/ctlv3/Z1DayTemp/set", "21.5", qos=0, retain=False
+                    hass,
+                    "ebusd/ctlv3/Z1CoolingManualTemp/set",
+                    "21.5",
+                    qos=0,
+                    retain=False,
                 )
                 self.assertEqual(
-                    coord.get_float(CIRCUIT_BASS3, "Z1DayTemp", "temp"), 21.5
+                    coord.get_float(CIRCUIT_BASS3, "Z1CoolingManualTemp", "temp"), 21.5
                 )
                 self.assertEqual(
-                    coord.get_float(CIRCUIT_CTLV3, "Z1DayTemp", "temp"), 21.5
+                    coord.get_float(CIRCUIT_CTLV3, "Z1CoolingManualTemp", "temp"), 21.5
                 )
 
                 await coord.async_request_get(CIRCUIT_BASS3, "Z1NightTemp")
@@ -1613,7 +1649,7 @@ class TestCoordinatorLogic(unittest.TestCase):
 
         # Only 08.hmux0 and 15.bass3 loaded (e.g. scan config 76 timed out) -> still active
         push_mqtt("ebusd/hmux0/RunDataFlowTemp", '{"value": {"value": 35.5}}')
-        push_mqtt("ebusd/bass3/Z1DayTemp", '{"value": {"value": 21.0}}')
+        push_mqtt("ebusd/bass3/Z1CoolingManualTemp", '{"value": {"value": 21.0}}')
         self.assertIn(ISSUE_MISSING_CUSTOM_CSV, coord._active_repair_issues)
 
         # Once 76.vwzio also reports telemetry, missing_custom_csv clears automatically
@@ -1633,7 +1669,7 @@ class TestCoordinatorLogic(unittest.TestCase):
 
         # Ingestion of custom 08.hmu.HW5103, 15.ctlv2, and 76.vwzio clears missing_custom_csv
         push_mqtt("ebusd/hmu/RunDataFlowTemp", '{"value": {"value": 36.5}}')
-        push_mqtt("ebusd/ctlv2/Z1DayTemp", '{"value": {"value": 21.0}}')
+        push_mqtt("ebusd/ctlv2/Z1CoolingManualTemp", '{"value": {"value": 21.0}}')
         push_mqtt("ebusd/vwzio/Status01", '{"temp1": {"value": 36.0}}')
         self.assertNotIn(ISSUE_MISSING_CUSTOM_CSV, coord._active_repair_issues)
 
@@ -1647,7 +1683,7 @@ class TestCoordinatorLogic(unittest.TestCase):
 
         # Ingestion of custom 08.hmu.HW5103, 15.ctlv3, and 76.vwzio clears missing_custom_csv
         push_mqtt("ebusd/hmu/RunDataFlowTemp", '{"value": {"value": 36.5}}')
-        push_mqtt("ebusd/ctlv3/Z1DayTemp", '{"value": {"value": 21.0}}')
+        push_mqtt("ebusd/ctlv3/Z1CoolingManualTemp", '{"value": {"value": 21.0}}')
         push_mqtt("ebusd/vwzio/Status01", '{"temp1": {"value": 36.0}}')
         self.assertNotIn(ISSUE_MISSING_CUSTOM_CSV, coord._active_repair_issues)
 

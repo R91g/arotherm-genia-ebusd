@@ -257,7 +257,9 @@ class TestClimateEntity(unittest.TestCase):
             "value": "off"
         }
         self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "auto"}
-        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1daytemp")] = {"value": 24.0}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1manualtemp")] = {
+            "value": 24.0
+        }
 
         # During active schedule slot (e.g. 21.0 °C desired)
         self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1actualroomtempdesired")] = {
@@ -395,7 +397,9 @@ class TestClimateEntity(unittest.TestCase):
             "value": "off"
         }
         self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1sfmode")] = {"value": "auto"}
-        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1daytemp")] = {"value": 20.0}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1manualtemp")] = {
+            "value": 20.0
+        }
 
         written: list[tuple[str, str, Any]] = []
 
@@ -413,9 +417,11 @@ class TestClimateEntity(unittest.TestCase):
         self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoTemp", 23.5), written)
         self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoDuration", 3.0), written)
         self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "veto"), written)
-        # Must NOT have written Z1DayTemp
-        day_temp_writes = [w for w in written if w[1] == "Z1DayTemp"]
-        self.assertEqual(len(day_temp_writes), 0)
+        # Must NOT have written Z1DayTemp or Z1CoolingManualTemp
+        unwanted_writes = [
+            w for w in written if w[1] in ("Z1DayTemp", "Z1CoolingManualTemp")
+        ]
+        self.assertEqual(len(unwanted_writes), 0)
 
     def test_boost_preset_while_heating_runs_boosts_3_degrees(self) -> None:
         """Verify entering Boost while heating is active adds +3.0 °C to active target temperature."""
@@ -465,6 +471,133 @@ class TestClimateEntity(unittest.TestCase):
         self.assertEqual(water_heater.current_temperature, 52.3)
         self.assertEqual(water_heater.native_target_temperature, 55.0)
         self.assertEqual(water_heater.target_temperature, 55.0)
+
+    def test_set_temperature_in_cooling_writes_cooling_setpoints_only(self) -> None:
+        """Verify setting temperature in cooling writes Z1CoolingManualTemp and Z1CoolingTempDesired only."""
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "day"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "off"}
+        self.coordinator.writes.clear()
+
+        asyncio.run(self.climate.async_set_temperature(temperature=23.5))
+
+        # Must write Z1CoolingManualTemp and Z1CoolingTempDesired
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1CoolingManualTemp", 23.5), self.coordinator.writes
+        )
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1CoolingTempDesired", 23.5), self.coordinator.writes
+        )
+
+        # Must NOT write heating setpoint Z1ManualTemp or legacy Z1DayTemp
+        for _, param, _ in self.coordinator.writes:
+            self.assertNotIn(param, ("Z1ManualTemp", "Z1DayTemp"))
+
+    def test_set_temperature_in_heating_manual_writes_heating_setpoint_only(
+        self,
+    ) -> None:
+        """Verify setting temperature in heating manual writes Z1ManualTemp only."""
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "off"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "day"}
+        self.coordinator.writes.clear()
+
+        asyncio.run(self.climate.async_set_temperature(temperature=21.5))
+
+        # Must write Z1ManualTemp
+        self.assertIn((CIRCUIT_BASS3, "Z1ManualTemp", 21.5), self.coordinator.writes)
+
+        # Must NOT write cooling setpoints or legacy Z1DayTemp
+        for _, param, _ in self.coordinator.writes:
+            self.assertNotIn(
+                param, ("Z1CoolingManualTemp", "Z1CoolingTempDesired", "Z1DayTemp")
+            )
+
+    def test_cooling_target_temperature_resolution(self) -> None:
+        """Verify cooling target temperature anti-sentinel resolution and fallbacks."""
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "day"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "off"}
+
+        # 1. Active cooling running (< 40.0) -> returns active setpoint
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1coolingtempdesired")] = {
+            "value": 22.0
+        }
+        self.assertEqual(self.climate.native_target_temperature, 22.0)
+
+        # 2. Cooling idle / off sentinel (99.0) in PRESET_MANUAL -> returns Z1CoolingManualTemp
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1coolingtempdesired")] = {
+            "value": 99.0
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1coolingmanualtemp")] = {
+            "value": 24.0
+        }
+        self.assertEqual(self.climate.native_target_temperature, 24.0)
+
+        # 3. Cooling idle / off sentinel (99.0) in PRESET_COMFORT -> returns None (idle outside slot)
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "auto"
+        }
+        self.assertEqual(self.climate.preset_mode, PRESET_COMFORT)
+        self.assertIsNone(self.climate.native_target_temperature)
+
+        # 4. Cooling idle / off sentinel (99.0) in PRESET_ECO -> returns Z1CoolingTemp
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "night"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1coolingtemp")] = {
+            "value": 28.0
+        }
+        self.assertEqual(self.climate.preset_mode, PRESET_ECO)
+        self.assertEqual(self.climate.native_target_temperature, 28.0)
+
+    def test_set_temperature_in_cooling_eco_writes_z1coolingtemp(self) -> None:
+        """Verify setting temperature in cooling PRESET_ECO writes Z1CoolingTemp and Z1CoolingTempDesired."""
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "night"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "off"}
+        self.coordinator.writes.clear()
+
+        asyncio.run(self.climate.async_set_temperature(temperature=26.0))
+
+        # Must write Z1CoolingTemp and Z1CoolingTempDesired
+        self.assertIn((CIRCUIT_BASS3, "Z1CoolingTemp", 26.0), self.coordinator.writes)
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1CoolingTempDesired", 26.0), self.coordinator.writes
+        )
+        self.assertNotIn(
+            (CIRCUIT_BASS3, "Z1CoolingManualTemp", 26.0), self.coordinator.writes
+        )
+
+    def test_hvac_mode_switch_cooling_heating_decoupled(self) -> None:
+        """Verify switching between COOL and HEAT never contaminates opposite setpoints."""
+        # 1. Start in HEAT, saved cooling target is 23.0
+        self.climate._saved_cooling_target = 23.0
+        self.climate._saved_heating_target = 21.0
+        self.coordinator.writes.clear()
+
+        # Switch to COOL
+        asyncio.run(self.climate.async_set_hvac_mode(HVACMode.COOL))
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1CoolingManualTemp", 23.0), self.coordinator.writes
+        )
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1CoolingTempDesired", 23.0), self.coordinator.writes
+        )
+        self.assertNotIn((CIRCUIT_BASS3, "Z1ManualTemp", 23.0), self.coordinator.writes)
+
+        # 2. Switch back to HEAT (preset manual)
+        self.coordinator.writes.clear()
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "day"}
+        asyncio.run(self.climate.async_set_hvac_mode(HVACMode.HEAT))
+        self.assertIn((CIRCUIT_BASS3, "Z1ManualTemp", 21.0), self.coordinator.writes)
+        self.assertNotIn(
+            (CIRCUIT_BASS3, "Z1CoolingManualTemp", 21.0), self.coordinator.writes
+        )
 
 
 if __name__ == "__main__":

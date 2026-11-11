@@ -20,7 +20,6 @@ from custom_components.arotherm_genia_ebusd.const import (
     DEVICE_OUTDOOR_UNIT,
     DOMAIN,
     MANUFACTURER_VAILLANT,
-    SENTINEL_COOLING_THRESHOLD,
 )
 from custom_components.arotherm_genia_ebusd.coordinator import SaunierGeniaCoordinator
 from custom_components.arotherm_genia_ebusd.number import (
@@ -50,7 +49,7 @@ class TestNumberPlatform(unittest.IsolatedAsyncioTestCase):
 
     def test_number_descriptions_structure(self) -> None:
         """Verify that NUMBER_DESCRIPTIONS contains valid and expected definitions."""
-        self.assertEqual(len(NUMBER_DESCRIPTIONS), 27)
+        self.assertEqual(len(NUMBER_DESCRIPTIONS), 26)
 
         keys = [d.key for d in NUMBER_DESCRIPTIONS]
         self.assertEqual(
@@ -117,7 +116,7 @@ class TestNumberPlatform(unittest.IsolatedAsyncioTestCase):
             added_entities.extend(entities)
 
         await async_setup_entry(self.hass, self.entry, mock_add_entities)
-        self.assertEqual(len(added_entities), 28)
+        self.assertEqual(len(added_entities), 27)
 
         # Check boost delta entity setup
         boost_delta_entity = next(
@@ -288,7 +287,7 @@ class TestNumberPlatform(unittest.IsolatedAsyncioTestCase):
         self.coordinator._async_on_mqtt_message(msg)
         self.assertEqual(hc_entity.native_value, 1.25)
 
-        # 2. Cooling manual temp anti-sentinel
+        # 2. Cooling manual temp
         cooling_desc = next(
             d for d in NUMBER_DESCRIPTIONS if d.key == "z1_cooling_temp_manual"
         )
@@ -296,15 +295,9 @@ class TestNumberPlatform(unittest.IsolatedAsyncioTestCase):
 
         # Valid temperature
         msg = MagicMock()
-        msg.topic = "ebusd/bass3/Z1CoolingTempDesired"
+        msg.topic = "ebusd/bass3/Z1CoolingManualTemp"
         msg.payload = '{"value": {"value": 24.5}}'
         self.coordinator._async_on_mqtt_message(msg)
-        self.assertEqual(cooling_entity.native_value, 24.5)
-
-        # Sentinel value (>= SENTINEL_COOLING_THRESHOLD, e.g. 99.0)
-        msg.payload = f'{{"value": {{"value": {SENTINEL_COOLING_THRESHOLD}}}}}'
-        self.coordinator._async_on_mqtt_message(msg)
-        # Must retain last valid cooling value
         self.assertEqual(cooling_entity.native_value, 24.5)
 
     async def test_quick_veto_duration_in_veto_mode_rearms_veto(self) -> None:

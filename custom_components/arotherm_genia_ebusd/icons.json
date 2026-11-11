@@ -444,9 +444,6 @@
       "hwc_temp_desired": {
         "default": "mdi:thermometer-water"
       },
-      "z1_day_temp": {
-        "default": "mdi:sun-snowflake-variant"
-      },
       "z1_night_temp": {
         "default": "mdi:weather-night"
       },

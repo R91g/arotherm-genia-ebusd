@@ -309,6 +309,14 @@ STATE_OPEN_ENDED = "Open-ended"
 
 # Deprecated unique_id suffixes automatically removed from entity_registry on setup
 DEPRECATED_UNIQUE_ID_SUFFIXES: tuple[str, ...] = (
+    "number_bass3_z1daytemp_value",
+    "number_bass3_z1coolingtempdesired_value",
+    "number_basv3_z1daytemp_value",
+    "number_basv3_z1coolingtempdesired_value",
+    "number_ctlv2_z1daytemp_value",
+    "number_ctlv2_z1coolingtempdesired_value",
+    "number_ctlv3_z1daytemp_value",
+    "number_ctlv3_z1coolingtempdesired_value",
     "calculated_calculated_daily_cop_value",
     "calculated_calculated_monthly_cop_value",
     "calculated_calculated_total_cop_value",
@@ -416,6 +424,8 @@ TIMER_CIRCUIT_PREFIXES: dict[str, str] = {
 # automatically via retained MQTT topics and periodic master broadcasts (f1 / 10).
 ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     # Climate Controller (15.bass3) - Actively readable setpoints, offsets & energy counters (r / r9)
+    (CIRCUIT_BASS3, "Z1ManualTemp"),
+    (CIRCUIT_BASS3, "Z1CoolingManualTemp"),
     (CIRCUIT_BASS3, "Z1NightTemp"),
     (CIRCUIT_BASS3, "Z1QuickVetoTemp"),
     (CIRCUIT_BASS3, "Z1QuickVetoDuration"),

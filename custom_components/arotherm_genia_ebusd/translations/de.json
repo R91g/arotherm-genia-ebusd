@@ -170,9 +170,6 @@
       "cooling_flow_temp_desired_max": {
         "name": "Maximale Vorlauf-Solltemperatur Kühlen"
       },
-      "z1_day_temp": {
-        "name": "Komfort-Raumtemperatur Zone 1 (Tag)"
-      },
       "z1_night_temp": {
         "name": "Absenk-Raumtemperatur Zone 1 (Nacht)"
       },

@@ -151,8 +151,8 @@ r;u,,,Z1Status,zone 1 status,,,b524,020003001b00,ign,,IGN:4,,,,value,,UIN,0=auto
 r;u,,,Z1HeatingState,zone 1 heating demand state,,,b524,020003002c00,ign,,IGN:4,,,,value,,UCH,0=off;1=on,,heating demand status
 r;u,,,Z1ManualTemp,manual heating setpoint zone 1,,,b524,020003002200,ign,,IGN:4,,,,value,,EXP,,°C,temperature
 w,,,Z1ManualTemp,manual heating setpoint zone 1,,,b524,020103002200,value,,EXP,,°C,temperature
-r;u,,,Z1DayTemp,desired day temperature zone 1,,,b524,020003002300,ign,,IGN:4,,,,value,,EXP,,°C,day comfort setpoint for zone 1
-w,,,Z1DayTemp,desired day temperature zone 1,,,b524,020103002300,value,,EXP,,°C,day comfort setpoint for zone 1
+r;u,,,Z1CoolingManualTemp,manual cooling setpoint zone 1,,,b524,020003002300,ign,,IGN:4,,,,value,,EXP,,°C,desired cooling manual setpoint for zone 1
+w,,,Z1CoolingManualTemp,manual cooling setpoint zone 1,,,b524,020103002300,value,,EXP,,°C,desired cooling manual setpoint for zone 1
 r;u,,,Z1RoomHumidity,room relative humidity zone 1,,,b524,020003002800,ign,,IGN:4,,,,value,,EXP,,%,current relative room humidity in zone 1
 
 # ==============================================================================
