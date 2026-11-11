@@ -132,6 +132,42 @@ class MockEntity:
         return self._attr_available
 
     @property
+    def current_temperature(self) -> float | None:
+        """Mock delegation to native_current_temperature if defined."""
+        if hasattr(self, "native_current_temperature"):
+            return self.native_current_temperature
+        return getattr(self, "_attr_current_temperature", None)
+
+    @property
+    def target_temperature(self) -> float | None:
+        """Mock delegation to native_target_temperature if defined."""
+        if hasattr(self, "native_target_temperature"):
+            return self.native_target_temperature
+        return getattr(self, "_attr_target_temperature", None)
+
+    @property
+    def native_current_temperature(self) -> float | None:
+        """Mock native_current_temperature."""
+        return getattr(self, "_attr_native_current_temperature", None)
+
+    @property
+    def native_target_temperature(self) -> float | None:
+        """Mock native_target_temperature."""
+        return getattr(self, "_attr_native_target_temperature", None)
+
+    @property
+    def temperature_unit(self) -> str:
+        """Mock delegation to native_temperature_unit."""
+        if hasattr(self, "_attr_native_temperature_unit"):
+            return self._attr_native_temperature_unit
+        return getattr(self, "_attr_temperature_unit", "°C")
+
+    @property
+    def native_temperature_unit(self) -> str:
+        """Mock native_temperature_unit."""
+        return getattr(self, "_attr_native_temperature_unit", "°C")
+
+    @property
     def mode(self) -> Any:
         """Mock mode property for number entities."""
         return self._attr_mode

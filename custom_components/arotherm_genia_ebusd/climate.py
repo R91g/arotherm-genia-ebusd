@@ -65,7 +65,7 @@ async def async_setup_entry(
 class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity):
     """Representation of MiPro Sense Climate Zone 1 with Double-Lock and Sentinel Filtering."""
 
-    _attr_temperature_unit = UnitOfTemperature.CELSIUS
+    _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_target_temperature_step = 0.5
     _attr_max_temp = 30.0
 
@@ -309,7 +309,7 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
     # -------------------------------------------------------------------------
 
     @property
-    def current_temperature(self) -> float | None:
+    def native_current_temperature(self) -> float | None:
         """Return the current room temperature (Priority 1: Z1RoomTemp, Priority 2: RoomTempDial)."""
         temp = self.coordinator.get_float(CIRCUIT_BASS3, "Z1RoomTemp", "value")
         if temp is not None:
@@ -375,7 +375,7 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
     # -------------------------------------------------------------------------
 
     @property
-    def target_temperature(self) -> float | None:
+    def native_target_temperature(self) -> float | None:
         """Return target temperature while filtering out 99.0 °C (cooling off) and 5.0 °C (heating off) sentinels."""
         if self.hvac_mode == HVACMode.OFF:
             return None
@@ -841,3 +841,14 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
     async def async_turn_off(self) -> None:
         """Turn the climate entity off."""
         await self.async_set_hvac_mode(HVACMode.OFF)
+
+
+# Backward compatibility for HA versions older than 2026.11
+if not hasattr(ClimateEntity, "native_current_temperature"):
+    SaunierGeniaZone1Climate.current_temperature = property(  # type: ignore[attr-defined]
+        lambda self: self.native_current_temperature
+    )
+    SaunierGeniaZone1Climate.target_temperature = property(  # type: ignore[attr-defined]
+        lambda self: self.native_target_temperature
+    )
+    SaunierGeniaZone1Climate._attr_temperature_unit = UnitOfTemperature.CELSIUS  # type: ignore[attr-defined]

@@ -264,12 +264,19 @@ class TestClimateEntity(unittest.TestCase):
             "value": 21.0
         }
         self.assertEqual(self.climate.target_temperature, 21.0)
+        self.assertEqual(self.climate.native_target_temperature, 21.0)
+
+        # Room temperature telemetry
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1roomtemp")] = {"value": 20.5}
+        self.assertEqual(self.climate.current_temperature, 20.5)
+        self.assertEqual(self.climate.native_current_temperature, 20.5)
 
         # Outside schedule slot at night (0.0 °C reported, idle)
         self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1actualroomtempdesired")] = {
             "value": 0.0
         }
         self.assertIsNone(self.climate.target_temperature)
+        self.assertIsNone(self.climate.native_target_temperature)
 
     def test_cooling_release_off_with_both_auto_defaults_to_heat(self) -> None:
         """Verify that when both modes are auto but CoolingReleaseStatus=off, heating is active (Issue #7)."""
@@ -439,6 +446,25 @@ class TestClimateEntity(unittest.TestCase):
         self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoTemp", 23.0), written)
         self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoDuration", 3.0), written)
         self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "veto"), written)
+
+    def test_water_heater_native_temperatures(self) -> None:
+        """Verify water heater exposes native_current_temperature and native_target_temperature."""
+        from custom_components.arotherm_genia_ebusd.water_heater import (
+            SaunierGeniaWaterHeater,
+        )
+
+        water_heater = SaunierGeniaWaterHeater(self.coordinator)
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "hwcstoragetemp")] = {
+            "value": 52.3
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "hwctempdesired")] = {
+            "value": 55.0
+        }
+
+        self.assertEqual(water_heater.native_current_temperature, 52.3)
+        self.assertEqual(water_heater.current_temperature, 52.3)
+        self.assertEqual(water_heater.native_target_temperature, 55.0)
+        self.assertEqual(water_heater.target_temperature, 55.0)
 
 
 if __name__ == "__main__":
