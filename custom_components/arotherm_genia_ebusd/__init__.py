@@ -44,8 +44,10 @@ from .const import (
     OUTDOOR_MODEL_SPECS,
     PLATFORMS,
     SERVICE_CANCEL_HOLIDAY_MODE,
+    SERVICE_CANCEL_QUICK_VETO,
     SERVICE_DUMP_MQTT_VALUES,
     SERVICE_FORCE_DHW_BOOST,
+    SERVICE_QUICK_VETO,
     SERVICE_READ_PARAMETER,
     SERVICE_RECORD_TOPIC_CHANGES,
     SERVICE_SEND_HEX_COMMAND,
@@ -146,6 +148,19 @@ SET_HOLIDAY_MODE_SCHEMA = vol.Schema(
 )
 
 CANCEL_HOLIDAY_MODE_SCHEMA = vol.Schema({})
+
+QUICK_VETO_SCHEMA = vol.Schema(
+    {
+        vol.Optional("temperature"): vol.All(
+            vol.Coerce(float), vol.Range(min=10.0, max=30.0)
+        ),
+        vol.Optional("duration"): vol.All(
+            vol.Coerce(float), vol.Range(min=0.5, max=24.0)
+        ),
+    }
+)
+
+CANCEL_QUICK_VETO_SCHEMA = vol.Schema({})
 
 DUMP_MQTT_VALUES_SCHEMA = vol.Schema(
     {
@@ -385,6 +400,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             hass.services.async_remove(DOMAIN, SERVICE_FORCE_DHW_BOOST)
             hass.services.async_remove(DOMAIN, SERVICE_SET_HOLIDAY_MODE)
             hass.services.async_remove(DOMAIN, SERVICE_CANCEL_HOLIDAY_MODE)
+            hass.services.async_remove(DOMAIN, SERVICE_QUICK_VETO)
+            hass.services.async_remove(DOMAIN, SERVICE_CANCEL_QUICK_VETO)
             hass.services.async_remove(DOMAIN, SERVICE_DUMP_MQTT_VALUES)
             hass.services.async_remove(DOMAIN, SERVICE_RECORD_TOPIC_CHANGES)
             hass.services.async_remove(DOMAIN, SERVICE_SEND_HEX_COMMAND)
@@ -1086,6 +1103,48 @@ def _async_register_services(hass: HomeAssistant) -> None:
             SERVICE_CANCEL_HOLIDAY_MODE,
             _async_handle_cancel_holiday_mode,
             schema=CANCEL_HOLIDAY_MODE_SCHEMA,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_QUICK_VETO):
+
+        async def _async_handle_quick_veto(call: ServiceCall) -> None:
+            """Handle arotherm_genia_ebusd.quick_veto service call."""
+            coordinators: dict[str, SaunierGeniaCoordinator] = hass.data.get(DOMAIN, {})
+            if not coordinators:
+                raise HomeAssistantError(f"No configured instances of {DOMAIN} found.")
+
+            temperature: float | None = call.data.get("temperature")
+            duration: float | None = call.data.get("duration")
+
+            for coordinator in coordinators.values():
+                await coordinator.async_set_quick_veto(
+                    temperature=temperature,
+                    duration=duration,
+                )
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_QUICK_VETO,
+            _async_handle_quick_veto,
+            schema=QUICK_VETO_SCHEMA,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_CANCEL_QUICK_VETO):
+
+        async def _async_handle_cancel_quick_veto(call: ServiceCall) -> None:
+            """Handle arotherm_genia_ebusd.cancel_quick_veto service call."""
+            coordinators: dict[str, SaunierGeniaCoordinator] = hass.data.get(DOMAIN, {})
+            if not coordinators:
+                raise HomeAssistantError(f"No configured instances of {DOMAIN} found.")
+
+            for coordinator in coordinators.values():
+                await coordinator.async_cancel_quick_veto()
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_CANCEL_QUICK_VETO,
+            _async_handle_cancel_quick_veto,
+            schema=CANCEL_QUICK_VETO_SCHEMA,
         )
 
     if not hass.services.has_service(DOMAIN, SERVICE_DUMP_MQTT_VALUES):

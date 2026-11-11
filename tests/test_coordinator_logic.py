@@ -65,7 +65,9 @@ from custom_components.arotherm_genia_ebusd.const import (
     MANUFACTURER_VAILLANT,
     OUTDOOR_CIRCUITS,
     SERVICE_CANCEL_HOLIDAY_MODE,
+    SERVICE_CANCEL_QUICK_VETO,
     SERVICE_FORCE_DHW_BOOST,
+    SERVICE_QUICK_VETO,
     SERVICE_SET_HOLIDAY_MODE,
     SERVICE_SET_WEEKLY_TIMER,
 )
@@ -826,6 +828,7 @@ class TestCoordinatorLogic(unittest.TestCase):
         mock_device = MagicMock()
         mock_device.id = "mock_device_outdoor_id"
         dev_reg.async_get_device.return_value = mock_device
+        dev_reg.async_get_device_by_identifier.return_value = mock_device
 
         coord = SaunierGeniaCoordinator(hass, entry)
 
@@ -1814,6 +1817,99 @@ class TestCoordinatorLogic(unittest.TestCase):
 
         with self.assertRaises(HomeAssistantError):
             asyncio.run(registered_services[SERVICE_CANCEL_HOLIDAY_MODE](call))
+
+        with self.assertRaises(HomeAssistantError):
+            asyncio.run(registered_services[SERVICE_QUICK_VETO](call))
+
+        with self.assertRaises(HomeAssistantError):
+            asyncio.run(registered_services[SERVICE_CANCEL_QUICK_VETO](call))
+
+    def test_quick_veto_services_and_coordinator_integration(self) -> None:
+        """Verify quick_veto and cancel_quick_veto actions and coordinator parameter cascade."""
+        from custom_components.arotherm_genia_ebusd import _async_register_services
+
+        registered_services: dict[str, Any] = {}
+
+        def mock_register(
+            domain: str, service: str, handler: Any, *args: Any, **kwargs: Any
+        ) -> None:
+            registered_services[service] = handler
+
+        hass = MagicMock()
+        hass.services.has_service = lambda domain, s: s in registered_services
+        hass.services.async_register = mock_register
+        hass.data = {}
+
+        entry = MagicMock()
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {}
+        coord = SaunierGeniaCoordinator(hass, entry)
+        hass.data = {DOMAIN: {"entry_id": coord}}
+
+        writes: list[tuple[str, str, Any]] = []
+
+        async def mock_write(circuit: str, param: str, val: Any) -> bool:
+            writes.append((circuit, param, val))
+            coord._state[(circuit.lower(), param.lower())] = {"value": val}
+            return True
+
+        coord.async_write_parameter = mock_write
+        # Make operational
+        coord._state[("global", "signal")] = {"value": "true"}
+        coord._state[("global", "running")] = {"value": "on"}
+        coord._state[("hmux0", "status01")] = {"temp1": 35.0}
+
+        _async_register_services(hass)
+        self.assertIn(SERVICE_QUICK_VETO, registered_services)
+        self.assertIn(SERVICE_CANCEL_QUICK_VETO, registered_services)
+
+        # 1. Starting from heating OFF
+        coord._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "off"}
+        coord._state[(CIRCUIT_BASS3.lower(), "z1manualtemp")] = {"value": 21.5}
+
+        call = MagicMock()
+        call.data = {"temperature": 23.5, "duration": 2.0}
+        asyncio.run(registered_services[SERVICE_QUICK_VETO](call))
+
+        # Expected writes: Z1OpMode auto -> Z1QuickVetoTemp 23.5 -> Z1QuickVetoDuration 2.0 -> Z1SFMode veto
+        self.assertEqual(coord.pre_veto_opmode, "off")
+        self.assertIn((CIRCUIT_BASS3, "Z1OpMode", "auto"), writes)
+        self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoTemp", 23.5), writes)
+        self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoDuration", 2.0), writes)
+        self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "veto"), writes)
+
+        # 2. Cancel quick veto: should restore off
+        writes.clear()
+        call.data = {}
+        asyncio.run(registered_services[SERVICE_CANCEL_QUICK_VETO](call))
+        self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "auto"), writes)
+        self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoDuration", 0.0), writes)
+        self.assertIn((CIRCUIT_BASS3, "Z1OpMode", "off"), writes)
+        self.assertIsNone(coord.pre_veto_opmode)
+
+        # 3. Starting from heating AUTO with default parameters
+        writes.clear()
+        coord._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "auto"}
+        coord._state[(CIRCUIT_BASS3.lower(), "z1actualroomtempdesired")] = {
+            "value": 20.0
+        }
+        coord._state[(CIRCUIT_BASS3.lower(), "z1quickvetoduration")] = {"value": 3.0}
+
+        call.data = {}
+        asyncio.run(registered_services[SERVICE_QUICK_VETO](call))
+        # Default temperature is current + 3.0 = 23.0, default duration is 3.0
+        self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoTemp", 23.0), writes)
+        self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoDuration", 3.0), writes)
+        self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "veto"), writes)
+
+        # 4. Starting from heating AUTO with custom quick_veto_boost_delta
+        writes.clear()
+        coord.quick_veto_boost_delta = 4.5
+        asyncio.run(registered_services[SERVICE_QUICK_VETO](call))
+        # Custom delta 4.5 -> 20.0 + 4.5 = 24.5
+        self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoTemp", 24.5), writes)
+        self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoDuration", 3.0), writes)
+        self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "veto"), writes)
 
     def test_currenterror_sensors_outdoor_controller_and_vwzio(self) -> None:
         """Verify Currenterror diagnostic sensor parsing, fallback and subscriptions across all 3 devices."""

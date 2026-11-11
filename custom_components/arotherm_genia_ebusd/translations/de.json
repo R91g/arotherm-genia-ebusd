@@ -103,8 +103,8 @@
       "description": "Es wurden noch nicht alle optimierten CSV-Dateien für dein System erkannt. Bitte kopiere die entsprechenden Dateien aus dem Ordner `ebusd-configuration` dieses Projekts in dein eBUSd-Verzeichnis."
     },
     "no_ebusd_mqtt_traffic": {
-      "title": "Kein MQTT-Verkehr von eBUSd erkannt",
-      "description": "Es wurden keine MQTT-Nachrichten unter dem konfigurierten Präfix empfangen. Prüfe, ob der eBUSd-Dienst läuft und mit dem MQTT-Broker verbunden ist."
+      "title": "Kein MQTT-Verkehr unter Präfix {mqtt_prefix}",
+      "description": "Home Assistant hat keine Nachrichten von `ebusd` unter dem konfigurierten MQTT-Themenpräfix `{mqtt_prefix}/#` empfangen. Bitte stelle sicher, dass: (1) das MQTT-Präfix mit deiner `ebusd`-Konfiguration übereinstimmt (`--mqtttopic=ebusd/%circuit/%name`) und (2) das `ebusd`-Add-on oder der Dienst läuft und mit deinem MQTT-Broker verbunden ist. Dieser Hinweis wird automatisch gelöscht, sobald die erste Nachricht eingeht."
     },
     "mqttjson_not_enabled": {
       "title": "eBUSd --mqttjson ist nicht aktiviert",
@@ -181,6 +181,12 @@
       },
       "z1_quick_veto_temp": {
         "name": "Schnell-Veto Solltemperatur Zone 1"
+      },
+      "z1_quick_veto_duration": {
+        "name": "Schnell-Veto Dauer Zone 1"
+      },
+      "z1_quick_veto_boost_delta": {
+        "name": "Temperaturerhöhung Schnell-Veto Zone 1"
       },
       "z1_cooling_temp_time_controlled": {
         "name": "Zeitgesteuerte Kühl-Solltemperatur Zone 1 (Absenkung)"

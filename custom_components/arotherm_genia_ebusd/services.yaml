@@ -188,6 +188,48 @@ cancel_holiday_mode:
     Immediately cancels Holiday/Away Mode on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3)
     and restores automatic schedule operation for heating and domestic hot water.
 
+quick_veto:
+  name: Quick Veto (Zone 1 Boost)
+  description: >
+    Activates Quick Veto on the climate controller (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3)
+    to temporarily override the heating schedule with a target temperature for a specific duration.
+    If heating is off, it turns heating on and restores off when the veto ends or is cancelled.
+  fields:
+    temperature:
+      name: Target Temperature Setpoint (Optional)
+      description: >
+        Target temperature in °C during the veto period (10.0 °C to 30.0 °C).
+        If omitted, intelligently applies +3.0 °C if heating is running, or the manual heating setpoint (Z1ManualTemp) if off or in setback.
+      required: false
+      example: 22.5
+      selector:
+        number:
+          min: 10.0
+          max: 30.0
+          step: 0.5
+          unit_of_measurement: "°C"
+          mode: box
+    duration:
+      name: Duration in Hours (Optional)
+      description: >
+        Duration of the veto period in hours (0.5 to 24.0 hours).
+        If omitted, uses the currently configured Quick Veto Duration (default 3.0 hours).
+      required: false
+      example: 2.5
+      selector:
+        number:
+          min: 0.5
+          max: 24.0
+          step: 0.5
+          unit_of_measurement: "h"
+          mode: box
+
+cancel_quick_veto:
+  name: Cancel Quick Veto
+  description: >
+    Immediately cancels active Quick Veto on the climate controller (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3),
+    resets veto duration to 0, and restores previous operating mode (scheduled, manual, or off).
+
 dump_mqtt_values:
   name: Dump MQTT Values (Diagnostics)
   description: >

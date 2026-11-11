@@ -12,6 +12,7 @@ from homeassistant.components.number import NumberMode
 from homeassistant.const import PERCENTAGE, EntityCategory
 
 from custom_components.arotherm_genia_ebusd.const import (
+    CIRCUIT_BASS3,
     CIRCUIT_HMUX0,
     CONF_MANUFACTURER,
     CONF_MQTT_PREFIX,
@@ -25,6 +26,7 @@ from custom_components.arotherm_genia_ebusd.coordinator import SaunierGeniaCoord
 from custom_components.arotherm_genia_ebusd.number import (
     NUMBER_DESCRIPTIONS,
     SaunierGeniaNumber,
+    SaunierGeniaQuickVetoBoostDeltaNumber,
     async_setup_entry,
 )
 
@@ -48,12 +50,13 @@ class TestNumberPlatform(unittest.IsolatedAsyncioTestCase):
 
     def test_number_descriptions_structure(self) -> None:
         """Verify that NUMBER_DESCRIPTIONS contains valid and expected definitions."""
-        self.assertEqual(len(NUMBER_DESCRIPTIONS), 26)
+        self.assertEqual(len(NUMBER_DESCRIPTIONS), 27)
 
         keys = [d.key for d in NUMBER_DESCRIPTIONS]
         self.assertEqual(
             len(keys), len(set(keys)), "Duplicate keys in NUMBER_DESCRIPTIONS"
         )
+        self.assertIn("z1_quick_veto_duration", keys)
 
         # Verify compressor_silent_operation_level specifics
         silent_desc = next(
@@ -114,7 +117,34 @@ class TestNumberPlatform(unittest.IsolatedAsyncioTestCase):
             added_entities.extend(entities)
 
         await async_setup_entry(self.hass, self.entry, mock_add_entities)
-        self.assertEqual(len(added_entities), 26)
+        self.assertEqual(len(added_entities), 28)
+
+        # Check boost delta entity setup
+        boost_delta_entity = next(
+            (
+                e
+                for e in added_entities
+                if isinstance(e, SaunierGeniaQuickVetoBoostDeltaNumber)
+            ),
+            None,
+        )
+        self.assertIsNotNone(boost_delta_entity)
+        assert boost_delta_entity is not None
+        self.assertEqual(boost_delta_entity.native_value, 3.0)
+
+        # Check veto duration entity setup
+        veto_dur_entity = next(
+            (
+                e
+                for e in added_entities
+                if e.entity_description.key == "z1_quick_veto_duration"
+            ),
+            None,
+        )
+        self.assertIsNotNone(veto_dur_entity)
+        self.assertEqual(
+            veto_dur_entity.entity_description.message, "Z1QuickVetoDuration"
+        )
 
         # Check silent level entity setup
         silent_entity = next(
@@ -276,6 +306,60 @@ class TestNumberPlatform(unittest.IsolatedAsyncioTestCase):
         self.coordinator._async_on_mqtt_message(msg)
         # Must retain last valid cooling value
         self.assertEqual(cooling_entity.native_value, 24.5)
+
+    async def test_quick_veto_duration_in_veto_mode_rearms_veto(self) -> None:
+        """Verify that changing quick veto duration while in veto re-arms veto mode."""
+        dur_desc = next(
+            d for d in NUMBER_DESCRIPTIONS if d.key == "z1_quick_veto_duration"
+        )
+        dur_entity = SaunierGeniaNumber(self.coordinator, dur_desc)
+
+        written: list[tuple[str, str, Any]] = []
+
+        async def mock_write(circuit: str, param: str, val: Any) -> bool:
+            written.append((circuit, param, val))
+            self.coordinator._state[(circuit.lower(), param.lower())] = {"value": val}
+            return True
+
+        self.coordinator.async_write_parameter = mock_write
+
+        # 1. When NOT in veto: simply writes duration parameter
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "Z1SFMode")] = {"value": "auto"}
+        await dur_entity.async_set_native_value(2.0)
+        self.assertEqual(written, [(CIRCUIT_BASS3, "Z1QuickVetoDuration", 2.0)])
+
+        # 2. When in veto: writes duration AND re-affirms Z1SFMode = veto
+        written.clear()
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "Z1SFMode")] = {"value": "veto"}
+        await dur_entity.async_set_native_value(4.5)
+        self.assertEqual(
+            written,
+            [
+                (CIRCUIT_BASS3, "Z1QuickVetoDuration", 4.5),
+                (CIRCUIT_BASS3, "Z1SFMode", "veto"),
+            ],
+        )
+
+    async def test_quick_veto_boost_delta_entity(self) -> None:
+        """Verify SaunierGeniaQuickVetoBoostDeltaNumber functionality and state restoration."""
+        delta_entity = SaunierGeniaQuickVetoBoostDeltaNumber(self.coordinator)
+        self.assertEqual(delta_entity.native_value, 3.0)
+        self.assertEqual(delta_entity.native_min_value, 0.5)
+        self.assertEqual(delta_entity.native_max_value, 10.0)
+        self.assertEqual(delta_entity.native_step, 0.5)
+
+        # Set new value
+        await delta_entity.async_set_native_value(5.0)
+        self.assertEqual(delta_entity.native_value, 5.0)
+        self.assertEqual(self.coordinator.quick_veto_boost_delta, 5.0)
+
+        # State restoration
+        mock_state = MagicMock()
+        mock_state.state = "4.5"
+        delta_entity._mock_last_state = mock_state
+        await delta_entity.async_added_to_hass()
+        self.assertEqual(delta_entity.native_value, 4.5)
+        self.assertEqual(self.coordinator.quick_veto_boost_delta, 4.5)
 
 
 if __name__ == "__main__":

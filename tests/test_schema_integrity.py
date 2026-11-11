@@ -16,8 +16,10 @@ import setup_mocks  # noqa: F401
 from custom_components.arotherm_genia_ebusd.const import (
     DOMAIN,
     SERVICE_CANCEL_HOLIDAY_MODE,
+    SERVICE_CANCEL_QUICK_VETO,
     SERVICE_DUMP_MQTT_VALUES,
     SERVICE_FORCE_DHW_BOOST,
+    SERVICE_QUICK_VETO,
     SERVICE_READ_PARAMETER,
     SERVICE_RECORD_TOPIC_CHANGES,
     SERVICE_SEND_HEX_COMMAND,
@@ -179,6 +181,8 @@ class TestSchemaIntegrity(unittest.TestCase):
         self.assertIn(f"{SERVICE_FORCE_DHW_BOOST}:", content)
         self.assertIn(f"{SERVICE_SET_HOLIDAY_MODE}:", content)
         self.assertIn(f"{SERVICE_CANCEL_HOLIDAY_MODE}:", content)
+        self.assertIn(f"{SERVICE_QUICK_VETO}:", content)
+        self.assertIn(f"{SERVICE_CANCEL_QUICK_VETO}:", content)
         self.assertIn(f"{SERVICE_DUMP_MQTT_VALUES}:", content)
         self.assertIn(f"{SERVICE_RECORD_TOPIC_CHANGES}:", content)
         self.assertIn(f"{SERVICE_SEND_HEX_COMMAND}:", content)

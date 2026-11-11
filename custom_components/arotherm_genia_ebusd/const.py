@@ -357,11 +357,16 @@ SERVICE_SET_WEEKLY_TIMER = "set_weekly_timer"
 SERVICE_FORCE_DHW_BOOST = "force_dhw_boost"
 SERVICE_SET_HOLIDAY_MODE = "set_holiday_mode"
 SERVICE_CANCEL_HOLIDAY_MODE = "cancel_holiday_mode"
+SERVICE_QUICK_VETO = "quick_veto"
+SERVICE_CANCEL_QUICK_VETO = "cancel_quick_veto"
 SERVICE_DUMP_MQTT_VALUES = "dump_mqtt_values"
 SERVICE_RECORD_TOPIC_CHANGES = "record_topic_changes"
 SERVICE_SEND_HEX_COMMAND = "send_hex_command"
 SERVICE_READ_PARAMETER = "read_parameter"
 SERVICE_WRITE_PARAMETER = "write_parameter"
+
+DEFAULT_QUICK_VETO_DURATION = 3.0
+DEFAULT_QUICK_VETO_BOOST_DELTA = 3.0
 
 # Presets
 PRESET_COMFORT = "comfort"
@@ -413,6 +418,7 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     # Climate Controller (15.bass3) - Actively readable setpoints, offsets & energy counters (r / r9)
     (CIRCUIT_BASS3, "Z1NightTemp"),
     (CIRCUIT_BASS3, "Z1QuickVetoTemp"),
+    (CIRCUIT_BASS3, "Z1QuickVetoDuration"),
     (CIRCUIT_BASS3, "HolidayTemp"),
     (CIRCUIT_BASS3, "HolidayStartDate"),
     (CIRCUIT_BASS3, "HolidayStartTime"),

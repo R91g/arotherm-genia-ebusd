@@ -56,6 +56,7 @@ from .const import (
     CONTROLLER_CIRCUITS,
     DAY_SHORT_KEYS,
     DEFAULT_AUTO_COOLING_LOCK_BYPASS,
+    DEFAULT_COMFORT_TEMP,
     DEFAULT_CYLINDER_HYST,
     DEFAULT_DEVICE_VERSIONS,
     DEFAULT_EBUSD_TCP_HOST,
@@ -70,6 +71,8 @@ from .const import (
     DEFAULT_MANUFACTURER,
     DEFAULT_MQTT_PREFIX,
     DEFAULT_OUTDOOR_MODEL,
+    DEFAULT_QUICK_VETO_BOOST_DELTA,
+    DEFAULT_QUICK_VETO_DURATION,
     DEVICE_OUTDOOR_UNIT,
     DHW_BOOST_HYST_MARGIN,
     DHW_BOOST_MAX_TIMEOUT_SECONDS,
@@ -331,6 +334,12 @@ class SaunierGeniaCoordinator:
         self._preselected_holiday_start_datetime: datetime | None = None
         self._preselected_holiday_end_datetime: datetime | None = None
 
+        # Pre-veto operating mode memory (to restore 'off' when veto ends)
+        self._pre_veto_opmode: str | None = None
+
+        # Configured heating boost delta in °C (default +3.0 °C)
+        self._quick_veto_boost_delta: float = DEFAULT_QUICK_VETO_BOOST_DELTA
+
         # Passive hardware and software version detection from ebusd scan.*
         self._device_versions: dict[str, dict[str, str | None]] = {
             k: dict(v) for k, v in DEFAULT_DEVICE_VERSIONS.items()
@@ -523,7 +532,10 @@ class SaunierGeniaCoordinator:
         dev_reg = dr.async_get(self.hass)
         entry_id = self.entry.entry_id
         outdoor_id = f"{entry_id}_{DEVICE_OUTDOOR_UNIT}"
-        device = dev_reg.async_get_device(identifiers={(DOMAIN, outdoor_id)})
+        if hasattr(dev_reg, "async_get_device_by_identifier"):
+            device = dev_reg.async_get_device_by_identifier((DOMAIN, outdoor_id))
+        else:
+            device = dev_reg.async_get_device(identifiers={(DOMAIN, outdoor_id)})
         if device:
             self._outdoor_device_id = device.id
             return device.id
@@ -583,6 +595,24 @@ class SaunierGeniaCoordinator:
     @preselected_holiday_end_datetime.setter
     def preselected_holiday_end_datetime(self, val: datetime | None) -> None:
         self._preselected_holiday_end_datetime = val
+
+    @property
+    def pre_veto_opmode(self) -> str | None:
+        """Return operating mode before veto was triggered, if any."""
+        return self._pre_veto_opmode
+
+    @pre_veto_opmode.setter
+    def pre_veto_opmode(self, val: str | None) -> None:
+        self._pre_veto_opmode = val
+
+    @property
+    def quick_veto_boost_delta(self) -> float:
+        """Return configured temperature elevation for quick veto boost."""
+        return self._quick_veto_boost_delta
+
+    @quick_veto_boost_delta.setter
+    def quick_veto_boost_delta(self, val: float) -> None:
+        self._quick_veto_boost_delta = max(0.5, min(10.0, round(float(val), 1)))
 
     # -------------------------------------------------------------------------
     # Lifecycle Setup & Unload
@@ -865,6 +895,13 @@ class SaunierGeniaCoordinator:
         ):
             self._async_check_dhw_boost_restoration()
 
+        # Check Quick Veto restoration conditions when controller Z1SFMode or Z1Status updates
+        if circuit_key in CONTROLLER_CIRCUITS and message_name in (
+            "Z1SFMode",
+            "Z1Status",
+        ):
+            self._async_check_quick_veto_restoration()
+
         # Verify eBUSd CSV compatibility and manage Home Assistant Repair issues
         self._async_check_csv_compatibility_on_message(
             circuit_key, msg_lower, parsed, raw_payload
@@ -1066,7 +1103,7 @@ class SaunierGeniaCoordinator:
         c_key = circuit.lower()
         m_lower = message.lower()
         canonical = self._canonical_names.get((c_key, m_lower), message)
-        return (c_key, canonical) in self._state
+        return (c_key, canonical) in self._state or (c_key, m_lower) in self._state
 
     def get_message(self, circuit: str, message: str) -> dict[str, Any] | None:
         """Return the full normalized dict for (circuit, message), or None."""
@@ -1076,11 +1113,21 @@ class SaunierGeniaCoordinator:
         res = self._state.get((c_key, canonical))
         if res is not None:
             return res
+        if canonical != m_lower:
+            res = self._state.get((c_key, m_lower))
+            if res is not None:
+                return res
         # Fallback to literal circuit if resolve_circuit changed it but data was keyed by literal
         lit_key = circuit.lower()
         if lit_key != c_key:
             canonical_lit = self._canonical_names.get((lit_key, m_lower), message)
-            return self._state.get((lit_key, canonical_lit))
+            res = self._state.get((lit_key, canonical_lit))
+            if res is not None:
+                return res
+            if canonical_lit != m_lower:
+                res = self._state.get((lit_key, m_lower))
+                if res is not None:
+                    return res
         return None
 
     def get_field(
@@ -2416,6 +2463,105 @@ class SaunierGeniaCoordinator:
         # Step 5: Fire cancel execution trigger flag (UCH 01)
         await self.async_write_parameter(CIRCUIT_BASS3, "HolidayCancel", 1)
 
+    @callback
+    def _async_check_quick_veto_restoration(self) -> None:
+        """Check whether hardware countdown timer ended quick veto and restore prior state."""
+        if self._pre_veto_opmode != "off":
+            return
+        sf_mode = (self.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or "").lower()
+        if sf_mode != "veto":
+            self._pre_veto_opmode = None
+            self.hass.async_create_task(
+                self.async_write_parameter(CIRCUIT_BASS3, "Z1OpMode", "off")
+            )
+
+    async def async_set_quick_veto(
+        self,
+        temperature: float | None = None,
+        duration: float | None = None,
+    ) -> None:
+        """Activate Quick Veto on Zone 1 with target temperature and duration."""
+        if not self.is_ebus_operational:
+            raise HomeAssistantError(
+                "Cannot execute quick veto: eBUS communication is not operational."
+            )
+
+        current_opmode = (
+            self.get_str(CIRCUIT_BASS3, "Z1OpMode", "value") or "auto"
+        ).lower()
+        if current_opmode == "off":
+            self._pre_veto_opmode = "off"
+            await self.async_write_parameter(CIRCUIT_BASS3, "Z1OpMode", "auto")
+            await asyncio.sleep(0.3)
+        elif self._pre_veto_opmode is None:
+            self._pre_veto_opmode = current_opmode
+
+        # Determine target temperature
+        if temperature is not None:
+            target_temp = round(float(temperature), 1)
+        else:
+            # Fallback logic: if heating was off, use Z1ManualTemp;
+            # if running, use current target + 3.0 °C
+            current_target = self.get_float(
+                CIRCUIT_BASS3, "Z1ActualRoomTempDesired", "value"
+            )
+            manual_temp = self.get_float(CIRCUIT_BASS3, "Z1ManualTemp", "value")
+            if (
+                current_target is not None
+                and current_target > 5.5
+                and self._pre_veto_opmode != "off"
+            ):
+                target_temp = round(current_target + self.quick_veto_boost_delta, 1)
+            elif manual_temp is not None and manual_temp > 5.0:
+                target_temp = round(manual_temp, 1)
+            else:
+                target_temp = DEFAULT_COMFORT_TEMP
+
+        target_temp = max(10.0, min(30.0, target_temp))
+
+        # Determine duration
+        if duration is not None:
+            dur_val = round(float(duration), 1)
+        else:
+            configured_dur = self.get_float(
+                CIRCUIT_BASS3, "Z1QuickVetoDuration", "value"
+            )
+            dur_val = (
+                configured_dur
+                if configured_dur and configured_dur > 0
+                else DEFAULT_QUICK_VETO_DURATION
+            )
+
+        dur_val = max(0.5, min(24.0, dur_val))
+
+        _LOGGER.info(
+            "Activating Quick Veto: target_temp=%.1f°C, duration=%.1fh",
+            target_temp,
+            dur_val,
+        )
+        await self.async_write_parameter(CIRCUIT_BASS3, "Z1QuickVetoTemp", target_temp)
+        await asyncio.sleep(0.3)
+        await self.async_write_parameter(CIRCUIT_BASS3, "Z1QuickVetoDuration", dur_val)
+        await asyncio.sleep(0.3)
+        await self.async_write_parameter(CIRCUIT_BASS3, "Z1SFMode", "veto")
+
+    async def async_cancel_quick_veto(self) -> None:
+        """Cancel Quick Veto and restore prior operating mode."""
+        if not self.is_ebus_operational:
+            raise HomeAssistantError(
+                "Cannot cancel quick veto: eBUS communication is not operational."
+            )
+
+        _LOGGER.info("Cancelling Quick Veto and restoring auto operation")
+        await self.async_write_parameter(CIRCUIT_BASS3, "Z1SFMode", "auto")
+        await asyncio.sleep(0.3)
+        await self.async_write_parameter(CIRCUIT_BASS3, "Z1QuickVetoDuration", 0.0)
+
+        if self._pre_veto_opmode == "off":
+            await asyncio.sleep(0.3)
+            await self.async_write_parameter(CIRCUIT_BASS3, "Z1OpMode", "off")
+        self._pre_veto_opmode = None
+
     # -------------------------------------------------------------------------
     # Passive Scan & Hardware/Software Version Detection
     # -------------------------------------------------------------------------
@@ -2632,7 +2778,10 @@ class SaunierGeniaCoordinator:
             dev_reg = dr.async_get(self.hass)
             entry_id = self.entry.entry_id
             device_id_key = f"{entry_id}_{device_key}"
-            device = dev_reg.async_get_device(identifiers={(DOMAIN, device_id_key)})
+            if hasattr(dev_reg, "async_get_device_by_identifier"):
+                device = dev_reg.async_get_device_by_identifier((DOMAIN, device_id_key))
+            else:
+                device = dev_reg.async_get_device(identifiers={(DOMAIN, device_id_key)})
             if not device:
                 return
 

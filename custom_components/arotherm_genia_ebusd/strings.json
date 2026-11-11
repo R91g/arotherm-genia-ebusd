@@ -182,6 +182,12 @@
       "z1_quick_veto_temp": {
         "name": "Zone 1 Quick Veto Setpoint"
       },
+      "z1_quick_veto_duration": {
+        "name": "Zone 1 Quick Veto Duration"
+      },
+      "z1_quick_veto_boost_delta": {
+        "name": "Zone 1 Quick Veto Boost Temperature Delta"
+      },
       "z1_cooling_temp_time_controlled": {
         "name": "Zone 1 Time-Controlled Cooling Setpoint (Setback)"
       },

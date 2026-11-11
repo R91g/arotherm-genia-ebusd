@@ -14,6 +14,7 @@ from homeassistant.components.climate import HVACMode
 from custom_components.arotherm_genia_ebusd.climate import (
     COOLING_ACTIVE_MODES,
     HEATING_ACTIVE_MODES,
+    PRESET_BOOST,
     PRESET_COMFORT,
     PRESET_ECO,
     PRESET_MANUAL,
@@ -83,6 +84,61 @@ class MockCoordinatorForClimate:
     ) -> None:
         self.writes.append((circuit, message, value))
         self._state[(circuit.lower(), message.lower())] = {"value": value}
+
+    async def async_set_quick_veto(
+        self,
+        temperature: float | None = None,
+        duration: float | None = None,
+    ) -> None:
+        current_opmode = (
+            self.get_str(CIRCUIT_BASS3, "Z1OpMode", "value") or "auto"
+        ).lower()
+        if current_opmode == "off":
+            self._pre_veto_opmode = "off"
+            await self.async_write_parameter(CIRCUIT_BASS3, "Z1OpMode", "auto")
+        elif getattr(self, "_pre_veto_opmode", None) is None:
+            self._pre_veto_opmode = current_opmode
+
+        if temperature is not None:
+            target_temp = round(float(temperature), 1)
+        else:
+            current_target = self.get_float(
+                CIRCUIT_BASS3, "Z1ActualRoomTempDesired", "value"
+            )
+            manual_temp = self.get_float(CIRCUIT_BASS3, "Z1ManualTemp", "value")
+            if (
+                current_target is not None
+                and current_target > 5.5
+                and getattr(self, "_pre_veto_opmode", None) != "off"
+            ):
+                target_temp = round(current_target + 3.0, 1)
+            elif manual_temp is not None and manual_temp > 5.0:
+                target_temp = round(manual_temp, 1)
+            else:
+                target_temp = 22.0
+
+        target_temp = max(10.0, min(30.0, target_temp))
+
+        if duration is not None:
+            dur_val = round(float(duration), 1)
+        else:
+            configured_dur = self.get_float(
+                CIRCUIT_BASS3, "Z1QuickVetoDuration", "value"
+            )
+            dur_val = configured_dur if configured_dur and configured_dur > 0 else 3.0
+
+        dur_val = max(0.5, min(24.0, dur_val))
+
+        await self.async_write_parameter(CIRCUIT_BASS3, "Z1QuickVetoTemp", target_temp)
+        await self.async_write_parameter(CIRCUIT_BASS3, "Z1QuickVetoDuration", dur_val)
+        await self.async_write_parameter(CIRCUIT_BASS3, "Z1SFMode", "veto")
+
+    async def async_cancel_quick_veto(self) -> None:
+        await self.async_write_parameter(CIRCUIT_BASS3, "Z1SFMode", "auto")
+        await self.async_write_parameter(CIRCUIT_BASS3, "Z1QuickVetoDuration", 0.0)
+        if getattr(self, "_pre_veto_opmode", None) == "off":
+            await self.async_write_parameter(CIRCUIT_BASS3, "Z1OpMode", "off")
+        self._pre_veto_opmode = None
 
 
 class TestClimateEntity(unittest.TestCase):
@@ -280,6 +336,109 @@ class TestClimateEntity(unittest.TestCase):
             "value": 105.0
         }
         self.assertIsNone(self.climate.current_humidity)
+
+    def test_quick_veto_activation_from_off_restores_off(self) -> None:
+        """Verify selecting Boost while OFF activates heating, then restores OFF when cancelled."""
+        import asyncio
+
+        # Initial state: Climate OFF, manual temp 21.5
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "off"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1manualtemp")] = {
+            "value": 21.5
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1quickvetoduration")] = {
+            "value": 0.0
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1sfmode")] = {"value": "auto"}
+
+        written: list[tuple[str, str, Any]] = []
+
+        async def mock_write(circuit: str, param: str, val: Any) -> bool:
+            written.append((circuit, param, val))
+            self.coordinator._state[(circuit.lower(), param.lower())] = {"value": val}
+            return True
+
+        self.coordinator.async_write_parameter = mock_write
+
+        # 1. Activate Boost
+        asyncio.run(self.climate.async_set_preset_mode(PRESET_BOOST))
+
+        # Must have written Z1OpMode auto, Z1QuickVetoTemp 21.5, Z1QuickVetoDuration 3.0, Z1SFMode veto
+        self.assertIn((CIRCUIT_BASS3, "Z1OpMode", "auto"), written)
+        self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoTemp", 21.5), written)
+        self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoDuration", 3.0), written)
+        self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "veto"), written)
+
+        # 2. Cancel Boost by selecting Comfort
+        written.clear()
+        asyncio.run(self.climate.async_set_preset_mode(PRESET_COMFORT))
+
+        # Must clear veto, duration to 0, and restore Z1OpMode to off
+        self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "auto"), written)
+        self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoDuration", 0.0), written)
+        self.assertIn((CIRCUIT_BASS3, "Z1OpMode", "off"), written)
+
+    def test_adjust_temperature_in_comfort_triggers_quick_veto(self) -> None:
+        """Verify adjusting target temperature while in scheduled mode triggers Quick Veto."""
+        import asyncio
+
+        # State: In heating scheduled mode
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "auto"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "off"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1sfmode")] = {"value": "auto"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1daytemp")] = {"value": 20.0}
+
+        written: list[tuple[str, str, Any]] = []
+
+        async def mock_write(circuit: str, param: str, val: Any) -> bool:
+            written.append((circuit, param, val))
+            self.coordinator._state[(circuit.lower(), param.lower())] = {"value": val}
+            return True
+
+        self.coordinator.async_write_parameter = mock_write
+
+        # Set temperature to 23.5 on climate dial
+        asyncio.run(self.climate.async_set_temperature(temperature=23.5))
+
+        # Must write Z1QuickVetoTemp 23.5, Z1QuickVetoDuration 3.0, Z1SFMode veto
+        self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoTemp", 23.5), written)
+        self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoDuration", 3.0), written)
+        self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "veto"), written)
+        # Must NOT have written Z1DayTemp
+        day_temp_writes = [w for w in written if w[1] == "Z1DayTemp"]
+        self.assertEqual(len(day_temp_writes), 0)
+
+    def test_boost_preset_while_heating_runs_boosts_3_degrees(self) -> None:
+        """Verify entering Boost while heating is active adds +3.0 °C to active target temperature."""
+        import asyncio
+
+        # State: Active slot at 20.0 °C
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "auto"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "off"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1actualroomtempdesired")] = {
+            "value": 20.0
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1sfmode")] = {"value": "auto"}
+
+        written: list[tuple[str, str, Any]] = []
+
+        async def mock_write(circuit: str, param: str, val: Any) -> bool:
+            written.append((circuit, param, val))
+            self.coordinator._state[(circuit.lower(), param.lower())] = {"value": val}
+            return True
+
+        self.coordinator.async_write_parameter = mock_write
+
+        asyncio.run(self.climate.async_set_preset_mode(PRESET_BOOST))
+
+        # 20.0 + 3.0 = 23.0 °C
+        self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoTemp", 23.0), written)
+        self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoDuration", 3.0), written)
+        self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "veto"), written)
 
 
 if __name__ == "__main__":

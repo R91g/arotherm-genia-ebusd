@@ -109,6 +109,8 @@ r;u,,,Z1SFMode,SF mode zone 1,,,b524,020003000e00,ign,,IGN:4,,,,value,,UCH,0=aut
 w,,,Z1SFMode,SF mode zone 1,,,b524,020103000e00,value,,UCH,0=auto;1=ventilation;2=party;3=veto;4=onedayaway;5=onedayathome;6=load,,
 r9;u,,,Z1QuickVetoTemp,quick veto temperature zone 1,,,b524,020003000800,ign,,IGN:4,,,,value,,EXP,,°C,manual override setpoint for zone 1
 w,,,Z1QuickVetoTemp,quick veto temperature zone 1,,,b524,020103000800,value,,EXP,,°C,manual override setpoint for zone 1
+r9;u,,,Z1QuickVetoDuration,quick veto duration zone 1,,,b524,020003002600,ign,,IGN:4,,,,value,,EXP,,h,quick veto duration for zone 1
+w,,,Z1QuickVetoDuration,quick veto duration zone 1,,,b524,020103002600,value,,EXP,,h,quick veto duration for zone 1
 r;u,,,Z1NightTemp,night temperature zone 1,,,b524,020003000900,ign,,IGN:4,,,,value,,EXP,,°C,night setpoint for zone 1
 w,,,Z1NightTemp,night temperature zone 1,,,b524,020103000900,value,,EXP,,°C,night setpoint for zone 1
 r;u,,,Hc1FlowTemp,FlowTemp heating circuit 1,,,b524,020002000800,ign,,IGN:4,,,,value,,EXP,,°C,current flow temperature of Hc1

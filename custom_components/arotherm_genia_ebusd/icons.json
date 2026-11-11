@@ -3,7 +3,9 @@
     "set_weekly_timer": "mdi:calendar-clock",
     "force_dhw_boost": "mdi:water-boiler-alert",
     "set_holiday_mode": "mdi:bag-suitcase",
-    "cancel_holiday_mode": "mdi:bag-suitcase-off"
+    "cancel_holiday_mode": "mdi:bag-suitcase-off",
+    "quick_veto": "mdi:timer-plus-outline",
+    "cancel_quick_veto": "mdi:timer-off-outline"
   },
   "entity": {
     "climate": {
@@ -453,6 +455,12 @@
       },
       "z1_quick_veto_temp": {
         "default": "mdi:lightning-bolt"
+      },
+      "z1_quick_veto_duration": {
+        "default": "mdi:timer-outline"
+      },
+      "z1_quick_veto_boost_delta": {
+        "default": "mdi:thermometer-chevron-up"
       },
       "z1_cooling_temp_manual": {
         "default": "mdi:snowflake"

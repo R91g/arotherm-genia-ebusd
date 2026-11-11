@@ -181,7 +181,7 @@ class MockRestoreEntity:
     """Mock base class for restore state."""
 
     async def async_get_last_state(self) -> Any:
-        return None
+        return getattr(self, "_mock_last_state", None)
 
 
 sys.modules["homeassistant.helpers.entity"].Entity = MockEntity
@@ -294,6 +294,7 @@ sys.modules["homeassistant.util"].dt.utcnow.side_effect = lambda: datetime.now(U
 sys.modules["homeassistant.util.dt"].utcnow.side_effect = lambda: datetime.now(UTC)
 
 sys.modules["homeassistant.const"].PERCENTAGE = "%"
+sys.modules["homeassistant.const"].ATTR_TEMPERATURE = "temperature"
 sys.modules["homeassistant.const"].UnitOfTemperature = MagicMock(CELSIUS="°C")
 sys.modules["homeassistant.const"].UnitOfPressure = MagicMock(BAR="bar")
 sys.modules["homeassistant.const"].UnitOfPower = MagicMock(WATT="W", KILO_WATT="kW")

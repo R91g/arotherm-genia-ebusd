@@ -100,6 +100,7 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             (CIRCUIT_BASS3, "Z1NightTemp"),
             (CIRCUIT_BASS3, "Z1ManualTemp"),
             (CIRCUIT_BASS3, "Z1QuickVetoTemp"),
+            (CIRCUIT_BASS3, "Z1QuickVetoDuration"),
             (CIRCUIT_BASS3, "Z1OpMode"),
             (CIRCUIT_BASS3, "Z1OpModeCooling"),
             (CIRCUIT_BASS3, "Z1SFMode"),
@@ -137,6 +138,8 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
         self._saved_heating_target: float = DEFAULT_COMFORT_TEMP
         self._saved_cooling_target: float = DEFAULT_COOLING_TEMP
         self._active_season: str = SEASON_HEATING
+        self._pre_boost_hvac_mode: HVACMode | None = None
+        self._pre_boost_preset_mode: str | None = None
         # True while a multi-step write sequence (mode/setpoint/preset) is in progress:
         # seasonal setpoint learning is paused so that intermediate optimistic states
         # (e.g. Z1DayTemp still holding the previous season value) are never memorized.
@@ -257,6 +260,21 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
     def _handle_coordinator_update(self) -> None:
         """Refresh derived season/setpoint memory, then write the new HA state."""
         self._async_refresh_derived_state()
+        if (
+            not self._transition_in_progress
+            and self._pre_boost_hvac_mode == HVACMode.OFF
+        ):
+            sf_mode = (
+                self.coordinator.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or ""
+            ).lower()
+            if sf_mode != "veto":
+                self._pre_boost_hvac_mode = None
+                self._pre_boost_preset_mode = None
+                self.hass.async_create_task(
+                    self.coordinator.async_write_parameter(
+                        CIRCUIT_BASS3, "Z1OpMode", "off"
+                    )
+                )
         super()._handle_coordinator_update()
 
     async def _async_run_transition(self, sequence: Awaitable[None]) -> None:
@@ -582,6 +600,15 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             # Automatic Lock 1 closure when turning off
             await self._async_ensure_cooling_lock_closed()
 
+            # Clear quick veto if it was active
+            sf_mode = (
+                self.coordinator.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or ""
+            ).lower()
+            if sf_mode == "veto":
+                await self.coordinator.async_cancel_quick_veto()
+            self._pre_boost_hvac_mode = None
+            self._pre_boost_preset_mode = None
+
             # If switching off from cooling, restore heating setpoint to baseline Z1DayTemp
             if previous_season == SEASON_COOLING:
                 await asyncio.sleep(0.3)
@@ -713,6 +740,25 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             await self.coordinator.async_write_parameter(
                 CIRCUIT_BASS3, "Z1QuickVetoTemp", temp_val
             )
+            duration = self.coordinator.get_float(
+                CIRCUIT_BASS3, "Z1QuickVetoDuration", "value"
+            )
+            if not duration or duration <= 0:
+                await asyncio.sleep(0.3)
+                await self.coordinator.async_write_parameter(
+                    CIRCUIT_BASS3, "Z1QuickVetoDuration", 3.0
+                )
+            return
+
+        if self.preset_mode == PRESET_COMFORT and not self._is_cooling_active():
+            # In scheduled heating, adjusting target temperature triggers Quick Veto
+            # for that exact target temperature (just like the physical thermostat and official app).
+            # Permanent schedule comfort setpoint remains configurable via number.z1_day_temp.
+            if self._pre_boost_hvac_mode is None:
+                self._pre_boost_hvac_mode = self.hvac_mode
+                self._pre_boost_preset_mode = PRESET_COMFORT
+
+            await self.coordinator.async_set_quick_veto(temperature=temp_val)
             return
 
         if self.preset_mode == PRESET_ECO:
@@ -753,9 +799,12 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             return
 
         if preset_mode == PRESET_BOOST:
-            await self.coordinator.async_write_parameter(
-                CIRCUIT_BASS3, "Z1SFMode", "veto"
-            )
+            current_preset = self.preset_mode
+            if current_preset != PRESET_BOOST:
+                self._pre_boost_hvac_mode = self.hvac_mode
+                self._pre_boost_preset_mode = current_preset
+
+            await self.coordinator.async_set_quick_veto()
             return
 
         # Clear quick veto if active
@@ -763,10 +812,9 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             self.coordinator.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or ""
         ).lower()
         if sf_mode == "veto":
-            await self.coordinator.async_write_parameter(
-                CIRCUIT_BASS3, "Z1SFMode", "auto"
-            )
-            await asyncio.sleep(0.5)
+            await self.coordinator.async_cancel_quick_veto()
+            self._pre_boost_hvac_mode = None
+            self._pre_boost_preset_mode = None
 
         in_cooling = self._is_cooling_active()
 
