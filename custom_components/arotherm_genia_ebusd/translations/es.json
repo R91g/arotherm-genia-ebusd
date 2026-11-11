@@ -185,6 +185,9 @@
       "z1_quick_veto_boost_delta": {
         "name": "Incremento de temperatura Quick Veto Zona 1"
       },
+      "z1_cooling_quick_veto_boost_delta": {
+        "name": "Reducción de temperatura Quick Veto Refrigeración Zona 1"
+      },
       "z1_cooling_temp_time_controlled": {
         "name": "Consigna refrigeración tiempo-controlada (Reducción)"
       },

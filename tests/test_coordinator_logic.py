@@ -1947,6 +1947,33 @@ class TestCoordinatorLogic(unittest.TestCase):
         self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoDuration", 3.0), writes)
         self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "veto"), writes)
 
+        # 5. Over-limit duration requested: clamped to 12.0 hours (hardware maximum)
+        writes.clear()
+        asyncio.run(coord.async_set_quick_veto(temperature=21.0, duration=20.0))
+        self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoDuration", 12.0), writes)
+
+        # 6. Cooling Quick Veto: in cooling AUTO, outside slot (desired=99) -> takes manual temp (23.5), sets day
+        writes.clear()
+        coord._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {"value": "auto"}
+        coord._state[(CIRCUIT_BASS3.lower(), "coolingreleasestatus")] = {"value": "on"}
+        coord._state[(CIRCUIT_BASS3.lower(), "z1coolingmanualtemp")] = {"value": 23.5}
+        coord._state[(CIRCUIT_BASS3.lower(), "z1coolingtempdesired")] = {"value": 99.0}
+        self.assertTrue(coord.is_cooling_active())
+
+        call.data = {}
+        asyncio.run(registered_services[SERVICE_QUICK_VETO](call))
+        self.assertTrue(coord.cooling_quick_veto_active)
+        self.assertEqual(coord.cooling_quick_veto_target_temp, 23.5)
+        self.assertIn((CIRCUIT_BASS3, "Z1OpModeCooling", "day"), writes)
+        self.assertIn((CIRCUIT_BASS3, "Z1CoolingManualTemp", 23.5), writes)
+        self.assertIn((CIRCUIT_BASS3, "Z1CoolingTempDesired", 23.5), writes)
+
+        # 7. Cancel cooling quick veto via service
+        writes.clear()
+        asyncio.run(registered_services[SERVICE_CANCEL_QUICK_VETO](call))
+        self.assertFalse(coord.cooling_quick_veto_active)
+        self.assertIn((CIRCUIT_BASS3, "Z1OpModeCooling", "auto"), writes)
+
     def test_currenterror_sensors_outdoor_controller_and_vwzio(self) -> None:
         """Verify Currenterror diagnostic sensor parsing, fallback and subscriptions across all 3 devices."""
         from custom_components.arotherm_genia_ebusd.sensor import SaunierGeniaSensor

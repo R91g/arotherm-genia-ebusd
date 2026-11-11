@@ -119,9 +119,9 @@ def _check_z1_heating_demand(coord: SaunierGeniaCoordinator) -> bool | None:
 def _check_cooling_release(coord: SaunierGeniaCoordinator) -> bool | None:
     """Check literal hardware cooling authorization from BASS3 CoolingReleaseStatus.
 
-    Returns True (Unlocked) ONLY when the heat pump firmware physically authorizes cooling
+    Returns True (Authorized) ONLY when the heat pump firmware physically authorizes cooling
     (which requires both active calendar dates AND outdoor temperature >= 15 °C).
-    Returns False (Locked) if blocked by calendar dates or cold outdoor temperature.
+    Returns False (Blocked) if blocked by calendar dates or cold outdoor temperature.
     """
     status = coord.get_str(CIRCUIT_BASS3, "CoolingReleaseStatus", "value")
     if status is None:
@@ -208,7 +208,6 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[SaunierGeniaBinarySensorEntityDescription, ...
         circuit=CIRCUIT_BASS3,
         message="CoolingReleaseStatus",
         field="value",
-        device_class=BinarySensorDeviceClass.LOCK,
         is_on_fn=_check_cooling_release,
     ),
     SaunierGeniaBinarySensorEntityDescription(

@@ -4,6 +4,7 @@ import asyncio
 import os
 import sys
 import unittest
+from datetime import datetime
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -41,6 +42,13 @@ class MockCoordinatorForClimate:
         self.auto_cooling_lock_bypass = True
         self.custom_cooling_start_date: str | None = None
         self.custom_cooling_end_date: str | None = None
+        self.cooling_quick_veto_boost_delta = 2.0
+        self.cooling_quick_veto_active = False
+        self.cooling_quick_veto_target_temp: float | None = None
+        self.cooling_quick_veto_remaining_minutes: int | None = None
+        self._cooling_veto_end_time: datetime | None = None
+        self._pre_cooling_veto_opmode: str | None = None
+        self._pre_cooling_veto_temp: float | None = None
 
     @property
     def is_ebus_operational(self) -> bool:
@@ -127,7 +135,7 @@ class MockCoordinatorForClimate:
             )
             dur_val = configured_dur if configured_dur and configured_dur > 0 else 3.0
 
-        dur_val = max(0.5, min(24.0, dur_val))
+        dur_val = max(0.5, min(12.0, dur_val))
 
         await self.async_write_parameter(CIRCUIT_BASS3, "Z1QuickVetoTemp", target_temp)
         await self.async_write_parameter(CIRCUIT_BASS3, "Z1QuickVetoDuration", dur_val)
@@ -139,6 +147,114 @@ class MockCoordinatorForClimate:
         if getattr(self, "_pre_veto_opmode", None) == "off":
             await self.async_write_parameter(CIRCUIT_BASS3, "Z1OpMode", "off")
         self._pre_veto_opmode = None
+
+    def is_cooling_active(self) -> bool:
+        cool_mode = (
+            self.get_str(CIRCUIT_BASS3, "Z1OpModeCooling", "value") or ""
+        ).lower()
+        heat_mode = (self.get_str(CIRCUIT_BASS3, "Z1OpMode", "value") or "").lower()
+        if cool_mode not in ("auto", "day", "night"):
+            return False
+        if cool_mode == "day":
+            return True
+        cooling_release = (
+            self.get_str(CIRCUIT_BASS3, "CoolingReleaseStatus", "value") or ""
+        ).lower()
+        if cooling_release == "on":
+            return True
+        if cooling_release == "off":
+            return False
+        return heat_mode not in ("auto", "day", "night")
+
+    async def async_set_cooling_quick_veto(
+        self,
+        temperature: float | None = None,
+        duration: float | None = None,
+    ) -> None:
+        current_opmode = (
+            self.get_str(CIRCUIT_BASS3, "Z1OpModeCooling", "value") or "auto"
+        ).lower()
+        if self._pre_cooling_veto_opmode is None:
+            self._pre_cooling_veto_opmode = current_opmode
+
+        manual_temp = self.get_float(CIRCUIT_BASS3, "Z1CoolingManualTemp", "value")
+        desired_temp = self.get_float(CIRCUIT_BASS3, "Z1CoolingTempDesired", "value")
+
+        if desired_temp is not None and desired_temp < 40.0:
+            current_target = desired_temp
+        elif manual_temp is not None and 10.0 <= manual_temp <= 30.0:
+            current_target = manual_temp
+        else:
+            current_target = 23.0
+
+        if self._pre_cooling_veto_temp is None:
+            self._pre_cooling_veto_temp = current_target
+
+        if temperature is not None:
+            target_temp = round(float(temperature), 1)
+        else:
+            if current_opmode == "auto" and (
+                desired_temp is None or desired_temp >= 40.0
+            ):
+                target_temp = (
+                    manual_temp
+                    if (manual_temp is not None and 10.0 <= manual_temp <= 30.0)
+                    else 23.0
+                )
+            else:
+                target_temp = round(
+                    current_target - self.cooling_quick_veto_boost_delta, 1
+                )
+
+        target_temp = max(15.0, min(30.0, target_temp))
+
+        if current_opmode != "day":
+            await self.async_write_parameter(CIRCUIT_BASS3, "Z1OpModeCooling", "day")
+
+        await self.async_write_parameter(
+            CIRCUIT_BASS3, "Z1CoolingManualTemp", target_temp
+        )
+        await self.async_write_parameter(
+            CIRCUIT_BASS3, "Z1CoolingTempDesired", target_temp
+        )
+
+        self.cooling_quick_veto_active = True
+        self.cooling_quick_veto_target_temp = target_temp
+        self.cooling_quick_veto_remaining_minutes = int((duration or 3.0) * 60)
+
+    async def async_update_cooling_quick_veto_temperature(
+        self, temperature: float
+    ) -> None:
+        target_temp = max(15.0, min(30.0, round(float(temperature), 1)))
+        self.cooling_quick_veto_target_temp = target_temp
+        await self.async_write_parameter(
+            CIRCUIT_BASS3, "Z1CoolingManualTemp", target_temp
+        )
+        await self.async_write_parameter(
+            CIRCUIT_BASS3, "Z1CoolingTempDesired", target_temp
+        )
+
+    async def async_cancel_cooling_quick_veto(self, restore: bool = True) -> None:
+        self.cooling_quick_veto_active = False
+        self.cooling_quick_veto_target_temp = None
+        self.cooling_quick_veto_remaining_minutes = None
+        pre_opmode = self._pre_cooling_veto_opmode
+        pre_temp = self._pre_cooling_veto_temp
+        self._pre_cooling_veto_opmode = None
+        self._pre_cooling_veto_temp = None
+
+        if restore:
+            if pre_opmode is not None and pre_opmode != "day":
+                await self.async_write_parameter(
+                    CIRCUIT_BASS3, "Z1OpModeCooling", pre_opmode
+                )
+            if pre_temp is not None and pre_temp < 40.0:
+                await self.async_write_parameter(
+                    CIRCUIT_BASS3, "Z1CoolingManualTemp", pre_temp
+                )
+                await self.async_write_parameter(
+                    CIRCUIT_BASS3, "Z1CoolingTempDesired", pre_temp
+                )
 
 
 class TestClimateEntity(unittest.TestCase):
@@ -292,6 +408,33 @@ class TestClimateEntity(unittest.TestCase):
 
         self.assertEqual(self.climate.hvac_mode, HVACMode.HEAT)
         self.assertEqual(self.climate.preset_mode, PRESET_COMFORT)
+
+    def test_cooling_release_off_with_both_auto_set_temperature_writes_heating(
+        self,
+    ) -> None:
+        """Verify adjusting temperature when cooling is blocked routes to heating (F1 fix)."""
+        import asyncio
+
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "auto"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "auto"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "coolingreleasestatus")] = {
+            "value": "off"
+        }
+        self.coordinator.writes.clear()
+
+        asyncio.run(self.climate.async_set_temperature(temperature=21.5))
+
+        cooling_regs = {"Z1CoolingManualTemp", "Z1CoolingTempDesired", "Z1CoolingTemp"}
+        heating_regs = {"Z1ManualTemp", "Z1QuickVetoTemp", "Z1NightTemp"}
+
+        touched_cooling = [w for w in self.coordinator.writes if w[1] in cooling_regs]
+        touched_heating = [w for w in self.coordinator.writes if w[1] in heating_regs]
+
+        self.assertEqual(touched_cooling, [])
+        self.assertTrue(len(touched_heating) > 0)
+        self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoTemp", 21.5), self.coordinator.writes)
 
     def test_climate_and_water_heater_availability(self) -> None:
         """Verify climate and DHW entities availability gates on is_ebus_operational."""
@@ -597,6 +740,130 @@ class TestClimateEntity(unittest.TestCase):
         self.assertIn((CIRCUIT_BASS3, "Z1ManualTemp", 21.0), self.coordinator.writes)
         self.assertNotIn(
             (CIRCUIT_BASS3, "Z1CoolingManualTemp", 21.0), self.coordinator.writes
+        )
+
+    def test_boost_preset_from_off_triggers_heating_veto(self) -> None:
+        """Verify selecting Boost while OFF activates heating quick veto (never cooling)."""
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "off"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "off"
+        }
+        self.coordinator.writes.clear()
+
+        asyncio.run(self.climate.async_set_preset_mode(PRESET_BOOST))
+
+        written = self.coordinator.writes
+        self.assertIn((CIRCUIT_BASS3, "Z1OpMode", "auto"), written)
+        self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "veto"), written)
+        # Cooling must never be touched
+        for circuit, param, _ in written:
+            self.assertNotIn("cooling", param.lower())
+
+    def test_cooling_quick_veto_in_manual_cooling(self) -> None:
+        """Verify activating Boost in manual cooling lowers temperature and restores on cancel."""
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "day"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "off"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1coolingmanualtemp")] = {
+            "value": 24.0
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1coolingtempdesired")] = {
+            "value": 24.0
+        }
+        self.coordinator.cooling_quick_veto_boost_delta = 2.0
+        self.coordinator.writes.clear()
+
+        # 1. Activate Boost: 24.0 - 2.0 = 22.0 °C
+        asyncio.run(self.climate.async_set_preset_mode(PRESET_BOOST))
+        self.assertTrue(self.coordinator.cooling_quick_veto_active)
+        self.assertEqual(self.climate.preset_mode, PRESET_BOOST)
+        self.assertEqual(self.climate.native_target_temperature, 22.0)
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1CoolingManualTemp", 22.0), self.coordinator.writes
+        )
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1CoolingTempDesired", 22.0), self.coordinator.writes
+        )
+
+        # 2. Adjust temperature during active veto to 21.5 °C
+        self.coordinator.writes.clear()
+        asyncio.run(self.climate.async_set_temperature(temperature=21.5))
+        self.assertEqual(self.climate.native_target_temperature, 21.5)
+        self.assertEqual(self.coordinator.cooling_quick_veto_target_temp, 21.5)
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1CoolingManualTemp", 21.5), self.coordinator.writes
+        )
+
+        # 3. Cancel / switch away: restores manual setpoint
+        self.coordinator.writes.clear()
+        asyncio.run(self.coordinator.async_cancel_cooling_quick_veto(restore=True))
+        self.assertFalse(self.coordinator.cooling_quick_veto_active)
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1CoolingManualTemp", 24.0), self.coordinator.writes
+        )
+
+    def test_cooling_quick_veto_in_scheduled_cooling_outside_slot(self) -> None:
+        """Verify activating Boost outside scheduled cooling slot uses manual setpoint and temporarily sets day mode."""
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "auto"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "coolingreleasestatus")] = {
+            "value": "on"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "off"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1coolingmanualtemp")] = {
+            "value": 23.0
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1coolingtempdesired")] = {
+            "value": 99.0
+        }  # outside slot sentinel
+        self.coordinator.writes.clear()
+
+        # Activate Boost
+        asyncio.run(self.climate.async_set_preset_mode(PRESET_BOOST))
+        self.assertTrue(self.coordinator.cooling_quick_veto_active)
+        self.assertEqual(self.climate.preset_mode, PRESET_BOOST)
+        self.assertEqual(self.climate.native_target_temperature, 23.0)
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1OpModeCooling", "day"), self.coordinator.writes
+        )
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1CoolingManualTemp", 23.0), self.coordinator.writes
+        )
+
+        # On cancellation / timeout, restores auto
+        self.coordinator.writes.clear()
+        asyncio.run(self.coordinator.async_cancel_cooling_quick_veto(restore=True))
+        self.assertFalse(self.coordinator.cooling_quick_veto_active)
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1OpModeCooling", "auto"), self.coordinator.writes
+        )
+
+    def test_cooling_scheduled_set_temperature_triggers_cooling_veto(self) -> None:
+        """Verify setting temperature in scheduled cooling triggers a cooling quick veto."""
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "auto"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "coolingreleasestatus")] = {
+            "value": "on"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "off"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1coolingtempdesired")] = {
+            "value": 24.0
+        }
+        self.coordinator.writes.clear()
+
+        asyncio.run(self.climate.async_set_temperature(temperature=22.5))
+
+        self.assertTrue(self.coordinator.cooling_quick_veto_active)
+        self.assertEqual(self.climate.preset_mode, PRESET_BOOST)
+        self.assertEqual(self.climate.native_target_temperature, 22.5)
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1OpModeCooling", "day"), self.coordinator.writes
+        )
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1CoolingManualTemp", 22.5), self.coordinator.writes
         )
 
 

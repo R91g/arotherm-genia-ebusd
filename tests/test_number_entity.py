@@ -3,6 +3,7 @@
 import os
 import sys
 import unittest
+from datetime import datetime, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -24,6 +25,7 @@ from custom_components.arotherm_genia_ebusd.const import (
 from custom_components.arotherm_genia_ebusd.coordinator import SaunierGeniaCoordinator
 from custom_components.arotherm_genia_ebusd.number import (
     NUMBER_DESCRIPTIONS,
+    SaunierGeniaCoolingQuickVetoBoostDeltaNumber,
     SaunierGeniaNumber,
     SaunierGeniaQuickVetoBoostDeltaNumber,
     async_setup_entry,
@@ -116,9 +118,9 @@ class TestNumberPlatform(unittest.IsolatedAsyncioTestCase):
             added_entities.extend(entities)
 
         await async_setup_entry(self.hass, self.entry, mock_add_entities)
-        self.assertEqual(len(added_entities), 27)
+        self.assertEqual(len(added_entities), 28)
 
-        # Check boost delta entity setup
+        # Check boost delta entity setup (heating)
         boost_delta_entity = next(
             (
                 e
@@ -130,6 +132,19 @@ class TestNumberPlatform(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(boost_delta_entity)
         assert boost_delta_entity is not None
         self.assertEqual(boost_delta_entity.native_value, 3.0)
+
+        # Check cooling boost delta entity setup
+        cooling_boost_delta_entity = next(
+            (
+                e
+                for e in added_entities
+                if isinstance(e, SaunierGeniaCoolingQuickVetoBoostDeltaNumber)
+            ),
+            None,
+        )
+        self.assertIsNotNone(cooling_boost_delta_entity)
+        assert cooling_boost_delta_entity is not None
+        self.assertEqual(cooling_boost_delta_entity.native_value, 2.0)
 
         # Check veto duration entity setup
         veto_dur_entity = next(
@@ -144,6 +159,8 @@ class TestNumberPlatform(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             veto_dur_entity.entity_description.message, "Z1QuickVetoDuration"
         )
+        self.assertEqual(veto_dur_entity.entity_description.native_min_value, 0.5)
+        self.assertEqual(veto_dur_entity.entity_description.native_max_value, 12.0)
 
         # Check silent level entity setup
         silent_entity = next(
@@ -333,6 +350,18 @@ class TestNumberPlatform(unittest.IsolatedAsyncioTestCase):
             ],
         )
 
+        # 3. When in cooling veto: writes duration AND re-arms cooling quick veto
+        written.clear()
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "Z1SFMode")] = {"value": "auto"}
+        self.coordinator.async_set_cooling_quick_veto = AsyncMock()
+        self.coordinator._cooling_veto_end_time = datetime.now() + timedelta(hours=2)
+        self.coordinator._cooling_veto_active_temp = 21.0
+        await dur_entity.async_set_native_value(3.5)
+        self.assertEqual(written, [(CIRCUIT_BASS3, "Z1QuickVetoDuration", 3.5)])
+        self.coordinator.async_set_cooling_quick_veto.assert_awaited_once_with(
+            temperature=21.0, duration=3.5
+        )
+
     async def test_quick_veto_boost_delta_entity(self) -> None:
         """Verify SaunierGeniaQuickVetoBoostDeltaNumber functionality and state restoration."""
         delta_entity = SaunierGeniaQuickVetoBoostDeltaNumber(self.coordinator)
@@ -353,6 +382,27 @@ class TestNumberPlatform(unittest.IsolatedAsyncioTestCase):
         await delta_entity.async_added_to_hass()
         self.assertEqual(delta_entity.native_value, 4.5)
         self.assertEqual(self.coordinator.quick_veto_boost_delta, 4.5)
+
+    async def test_cooling_quick_veto_boost_delta_entity(self) -> None:
+        """Verify SaunierGeniaCoolingQuickVetoBoostDeltaNumber functionality and state restoration."""
+        delta_entity = SaunierGeniaCoolingQuickVetoBoostDeltaNumber(self.coordinator)
+        self.assertEqual(delta_entity.native_value, 2.0)
+        self.assertEqual(delta_entity.native_min_value, 0.5)
+        self.assertEqual(delta_entity.native_max_value, 5.0)
+        self.assertEqual(delta_entity.native_step, 0.5)
+
+        # Set new value
+        await delta_entity.async_set_native_value(3.5)
+        self.assertEqual(delta_entity.native_value, 3.5)
+        self.assertEqual(self.coordinator.cooling_quick_veto_boost_delta, 3.5)
+
+        # State restoration
+        mock_state = MagicMock()
+        mock_state.state = "1.5"
+        delta_entity._mock_last_state = mock_state
+        await delta_entity.async_added_to_hass()
+        self.assertEqual(delta_entity.native_value, 1.5)
+        self.assertEqual(self.coordinator.cooling_quick_veto_boost_delta, 1.5)
 
 
 if __name__ == "__main__":

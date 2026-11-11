@@ -57,6 +57,8 @@ from .const import (
     DAY_SHORT_KEYS,
     DEFAULT_AUTO_COOLING_LOCK_BYPASS,
     DEFAULT_COMFORT_TEMP,
+    DEFAULT_COOLING_QUICK_VETO_BOOST_DELTA,
+    DEFAULT_COOLING_TEMP,
     DEFAULT_CYLINDER_HYST,
     DEFAULT_DEVICE_VERSIONS,
     DEFAULT_EBUSD_TCP_HOST,
@@ -99,6 +101,7 @@ from .const import (
     OUTDOOR_CIRCUITS,
     SCAN_ADDRESS_TO_DEVICE_KEY,
     SCAN_TOPIC_CIRCUITS,
+    SENTINEL_COOLING_THRESHOLD,
     SET_CONFIRMATION_DELAY_SECONDS,
     STATE_INACTIVE,
     STATE_OPEN_ENDED,
@@ -339,6 +342,16 @@ class SaunierGeniaCoordinator:
 
         # Configured heating boost delta in °C (default +3.0 °C)
         self._quick_veto_boost_delta: float = DEFAULT_QUICK_VETO_BOOST_DELTA
+
+        # Configured cooling boost delta in °C (default 2.0 °C) and cooling veto state
+        self._cooling_quick_veto_boost_delta: float = (
+            DEFAULT_COOLING_QUICK_VETO_BOOST_DELTA
+        )
+        self._cooling_veto_unsub: CALLBACK_TYPE | None = None
+        self._pre_cooling_veto_opmode: str | None = None
+        self._pre_cooling_veto_temp: float | None = None
+        self._cooling_veto_active_temp: float | None = None
+        self._cooling_veto_end_time: datetime | None = None
 
         # Passive hardware and software version detection from ebusd scan.*
         self._device_versions: dict[str, dict[str, str | None]] = {
@@ -614,6 +627,45 @@ class SaunierGeniaCoordinator:
     def quick_veto_boost_delta(self, val: float) -> None:
         self._quick_veto_boost_delta = max(0.5, min(10.0, round(float(val), 1)))
 
+    @property
+    def cooling_quick_veto_boost_delta(self) -> float:
+        """Return configured temperature reduction for cooling quick veto boost."""
+        return self._cooling_quick_veto_boost_delta
+
+    @cooling_quick_veto_boost_delta.setter
+    def cooling_quick_veto_boost_delta(self, val: float) -> None:
+        self._cooling_quick_veto_boost_delta = max(0.5, min(5.0, round(float(val), 1)))
+
+    @property
+    def cooling_quick_veto_active(self) -> bool:
+        """Return True if cooling quick veto is currently active."""
+        if self._cooling_veto_end_time is None:
+            return False
+        return datetime.now() < self._cooling_veto_end_time
+
+    @property
+    def cooling_quick_veto_remaining_minutes(self) -> int | None:
+        """Return remaining minutes of active cooling quick veto."""
+        if not self.cooling_quick_veto_active or self._cooling_veto_end_time is None:
+            return None
+        diff = (self._cooling_veto_end_time - datetime.now()).total_seconds()
+        return max(0, int(diff // 60))
+
+    @property
+    def cooling_quick_veto_target_temp(self) -> float | None:
+        """Return active target temperature of cooling quick veto."""
+        return self._cooling_veto_active_temp
+
+    @property
+    def pre_cooling_veto_opmode(self) -> str | None:
+        """Return operating mode before cooling veto was triggered."""
+        return self._pre_cooling_veto_opmode
+
+    @property
+    def pre_cooling_veto_temp(self) -> float | None:
+        """Return target temperature before cooling veto was triggered."""
+        return self._pre_cooling_veto_temp
+
     # -------------------------------------------------------------------------
     # Lifecycle Setup & Unload
     # -------------------------------------------------------------------------
@@ -724,6 +776,10 @@ class SaunierGeniaCoordinator:
         if self._dhw_boost_timeout_unsub is not None:
             self._dhw_boost_timeout_unsub()
             self._dhw_boost_timeout_unsub = None
+
+        if self._cooling_veto_unsub is not None:
+            self._cooling_veto_unsub()
+            self._cooling_veto_unsub = None
 
         if self._watchdog_unsub is not None:
             self._watchdog_unsub()
@@ -2532,7 +2588,7 @@ class SaunierGeniaCoordinator:
                 else DEFAULT_QUICK_VETO_DURATION
             )
 
-        dur_val = max(0.5, min(24.0, dur_val))
+        dur_val = max(0.5, min(12.0, dur_val))
 
         _LOGGER.info(
             "Activating Quick Veto: target_temp=%.1f°C, duration=%.1fh",
@@ -2561,6 +2617,200 @@ class SaunierGeniaCoordinator:
             await asyncio.sleep(0.3)
             await self.async_write_parameter(CIRCUIT_BASS3, "Z1OpMode", "off")
         self._pre_veto_opmode = None
+
+    def is_cooling_active(self) -> bool:
+        """Return True if Zone 1 cooling mode is currently physically/logically active."""
+        cool_mode = (
+            self.get_str(CIRCUIT_BASS3, "Z1OpModeCooling", "value") or ""
+        ).lower()
+        heat_mode = (self.get_str(CIRCUIT_BASS3, "Z1OpMode", "value") or "").lower()
+        if cool_mode not in ("auto", "day", "night"):
+            return False
+        if cool_mode == "day":
+            return True
+        cooling_release = (
+            self.get_str(CIRCUIT_BASS3, "CoolingReleaseStatus", "value") or ""
+        ).lower()
+        if cooling_release == "on":
+            return True
+        if cooling_release == "off":
+            return False
+        return heat_mode not in ("auto", "day", "night")
+
+    async def async_set_cooling_quick_veto(
+        self,
+        temperature: float | None = None,
+        duration: float | None = None,
+    ) -> None:
+        """Activate Cooling Quick Veto on Zone 1 with target temperature and duration."""
+        if not self.is_ebus_operational:
+            raise HomeAssistantError(
+                "Cannot execute cooling quick veto: eBUS communication is not operational."
+            )
+
+        # Cancel any running countdown timer without resetting pre-veto memory
+        if self._cooling_veto_unsub is not None:
+            self._cooling_veto_unsub()
+            self._cooling_veto_unsub = None
+
+        current_opmode = (
+            self.get_str(CIRCUIT_BASS3, "Z1OpModeCooling", "value") or "auto"
+        ).lower()
+
+        # Capture pre-veto operating mode if starting fresh
+        if self._pre_cooling_veto_opmode is None:
+            self._pre_cooling_veto_opmode = current_opmode
+
+        manual_temp = self.get_float(CIRCUIT_BASS3, "Z1CoolingManualTemp", "value")
+        desired_temp = self.get_float(CIRCUIT_BASS3, "Z1CoolingTempDesired", "value")
+
+        # Determine current baseline target
+        if desired_temp is not None and desired_temp < SENTINEL_COOLING_THRESHOLD:
+            current_target = desired_temp
+        elif manual_temp is not None and 10.0 <= manual_temp <= 30.0:
+            current_target = manual_temp
+        else:
+            current_target = DEFAULT_COOLING_TEMP
+
+        if self._pre_cooling_veto_temp is None:
+            self._pre_cooling_veto_temp = current_target
+
+        # Determine target temperature
+        if temperature is not None:
+            target_temp = round(float(temperature), 1)
+        else:
+            if current_opmode == "auto" and (
+                desired_temp is None or desired_temp >= SENTINEL_COOLING_THRESHOLD
+            ):
+                # Outside scheduled cooling slot: take manual setpoint
+                target_temp = (
+                    manual_temp
+                    if (manual_temp is not None and 10.0 <= manual_temp <= 30.0)
+                    else DEFAULT_COOLING_TEMP
+                )
+            else:
+                # In manual or actively cooling in slot: apply cooling boost delta (lower temp)
+                target_temp = round(
+                    current_target - self.cooling_quick_veto_boost_delta, 1
+                )
+
+        target_temp = max(15.0, min(30.0, target_temp))
+
+        # Determine duration
+        if duration is not None:
+            dur_val = round(float(duration), 1)
+        else:
+            configured_dur = self.get_float(
+                CIRCUIT_BASS3, "Z1QuickVetoDuration", "value"
+            )
+            dur_val = (
+                configured_dur
+                if configured_dur and configured_dur > 0
+                else DEFAULT_QUICK_VETO_DURATION
+            )
+
+        dur_val = max(0.5, min(12.0, dur_val))
+
+        _LOGGER.info(
+            "Activating Cooling Quick Veto: target_temp=%.1f°C, duration=%.1fh (pre_opmode=%s, pre_temp=%.1f°C)",
+            target_temp,
+            dur_val,
+            self._pre_cooling_veto_opmode,
+            self._pre_cooling_veto_temp,
+        )
+
+        # If from auto (or not day), switch Z1OpModeCooling to "day" so heat pump produces cooling continuously
+        if current_opmode != "day":
+            await self.async_write_parameter(CIRCUIT_BASS3, "Z1OpModeCooling", "day")
+            await asyncio.sleep(0.3)
+
+        await self.async_write_parameter(
+            CIRCUIT_BASS3, "Z1CoolingManualTemp", target_temp
+        )
+        await asyncio.sleep(0.3)
+        await self.async_write_parameter(
+            CIRCUIT_BASS3, "Z1CoolingTempDesired", target_temp
+        )
+
+        self._cooling_veto_active_temp = target_temp
+        self._cooling_veto_end_time = datetime.now() + timedelta(hours=dur_val)
+
+        seconds = dur_val * 3600.0
+
+        @callback
+        def _async_on_cooling_veto_timeout(_now: datetime) -> None:
+            self._cooling_veto_unsub = None
+            self.hass.async_create_task(
+                self.async_cancel_cooling_quick_veto(restore=True)
+            )
+
+        self._cooling_veto_unsub = async_call_later(
+            self.hass, seconds, _async_on_cooling_veto_timeout
+        )
+        self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1CoolingTempDesired")
+        self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1OpModeCooling")
+        self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1CoolingManualTemp")
+
+    async def async_update_cooling_quick_veto_temperature(
+        self, temperature: float
+    ) -> None:
+        """Update target temperature of active cooling quick veto without altering remaining duration."""
+        if not self.cooling_quick_veto_active:
+            await self.async_set_cooling_quick_veto(temperature=temperature)
+            return
+
+        target_temp = max(15.0, min(30.0, round(float(temperature), 1)))
+        self._cooling_veto_active_temp = target_temp
+
+        await self.async_write_parameter(
+            CIRCUIT_BASS3, "Z1CoolingManualTemp", target_temp
+        )
+        await asyncio.sleep(0.3)
+        await self.async_write_parameter(
+            CIRCUIT_BASS3, "Z1CoolingTempDesired", target_temp
+        )
+        self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1CoolingTempDesired")
+        self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1OpModeCooling")
+        self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1CoolingManualTemp")
+
+    async def async_cancel_cooling_quick_veto(self, restore: bool = True) -> None:
+        """Cancel Cooling Quick Veto and optionally restore prior operating mode and setpoint."""
+        if self._cooling_veto_unsub is not None:
+            self._cooling_veto_unsub()
+            self._cooling_veto_unsub = None
+
+        self._cooling_veto_end_time = None
+        self._cooling_veto_active_temp = None
+
+        pre_opmode = self._pre_cooling_veto_opmode
+        pre_temp = self._pre_cooling_veto_temp
+        self._pre_cooling_veto_opmode = None
+        self._pre_cooling_veto_temp = None
+
+        if restore and self.is_ebus_operational:
+            _LOGGER.info(
+                "Cancelling Cooling Quick Veto: restoring pre_opmode=%s, pre_temp=%s",
+                pre_opmode,
+                pre_temp,
+            )
+            if pre_opmode is not None and pre_opmode != "day":
+                await self.async_write_parameter(
+                    CIRCUIT_BASS3, "Z1OpModeCooling", pre_opmode
+                )
+                await asyncio.sleep(0.3)
+
+            if pre_temp is not None and pre_temp < SENTINEL_COOLING_THRESHOLD:
+                await self.async_write_parameter(
+                    CIRCUIT_BASS3, "Z1CoolingManualTemp", pre_temp
+                )
+                await asyncio.sleep(0.3)
+                await self.async_write_parameter(
+                    CIRCUIT_BASS3, "Z1CoolingTempDesired", pre_temp
+                )
+
+        self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1CoolingTempDesired")
+        self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1OpModeCooling")
+        self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1CoolingManualTemp")
 
     # -------------------------------------------------------------------------
     # Passive Scan & Hardware/Software Version Detection

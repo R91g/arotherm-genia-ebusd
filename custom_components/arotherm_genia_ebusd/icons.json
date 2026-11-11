@@ -459,6 +459,9 @@
       "z1_quick_veto_boost_delta": {
         "default": "mdi:thermometer-chevron-up"
       },
+      "z1_cooling_quick_veto_boost_delta": {
+        "default": "mdi:thermometer-chevron-down"
+      },
       "z1_cooling_temp_manual": {
         "default": "mdi:snowflake"
       },

@@ -166,7 +166,7 @@ NUMBER_DESCRIPTIONS: tuple[SaunierGeniaNumberEntityDescription, ...] = (
         message="Z1QuickVetoDuration",
         field="value",
         native_min_value=0.5,
-        native_max_value=24.0,
+        native_max_value=12.0,
         native_step=0.5,
         native_unit_of_measurement=UnitOfTime.HOURS,
         device_class=NumberDeviceClass.DURATION,
@@ -367,6 +367,7 @@ async def async_setup_entry(
         for description in NUMBER_DESCRIPTIONS
     ]
     entities.append(SaunierGeniaQuickVetoBoostDeltaNumber(coordinator))
+    entities.append(SaunierGeniaCoolingQuickVetoBoostDeltaNumber(coordinator))
     async_add_entities(entities)
 
 
@@ -423,6 +424,21 @@ class SaunierGeniaNumber(SaunierGeniaEntity, NumberEntity):
             and self.coordinator.dhw_boost_forced_active
         ):
             self.coordinator.cancel_dhw_boost_tracking(float(payload_val))
+
+        if (
+            self.entity_description.message == "Z1QuickVetoDuration"
+            and self.coordinator.cooling_quick_veto_active
+        ):
+            await self.coordinator.async_write_parameter(
+                self.entity_description.circuit,
+                self.entity_description.message,
+                payload_val,
+            )
+            await self.coordinator.async_set_cooling_quick_veto(
+                temperature=self.coordinator.cooling_quick_veto_target_temp,
+                duration=float(payload_val),
+            )
+            return
 
         if (
             self.entity_description.message == "Z1QuickVetoDuration"
@@ -493,4 +509,51 @@ class SaunierGeniaQuickVetoBoostDeltaNumber(
     async def async_set_native_value(self, value: float) -> None:
         """Update the configured boost delta."""
         self.coordinator.quick_veto_boost_delta = round(float(value), 1)
+        self.async_write_ha_state()
+
+
+class SaunierGeniaCoolingQuickVetoBoostDeltaNumber(
+    SaunierGeniaEntity, NumberEntity, RestoreEntity
+):
+    """Number entity to configure the Quick Veto cooling boost delta."""
+
+    _attr_mode = NumberMode.BOX
+    _attr_native_min_value = 0.5
+    _attr_native_max_value = 5.0
+    _attr_native_step = 0.5
+    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+    _attr_device_class = NumberDeviceClass.TEMPERATURE
+    _attr_entity_category = EntityCategory.CONFIG
+    _gate_availability_on_ebus = True
+
+    def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
+        """Initialize the cooling boost delta number entity."""
+        super().__init__(
+            coordinator=coordinator,
+            device_key=DEVICE_CLIMATE_CONTROLLER,
+            translation_key="z1_cooling_quick_veto_boost_delta",
+            subscriptions=[],
+            unique_id_suffix="number_z1_cooling_quick_veto_boost_delta",
+        )
+
+    async def async_added_to_hass(self) -> None:
+        """Restore last configured cooling boost delta on restart."""
+        await super().async_added_to_hass()
+        last_state = await self.async_get_last_state()
+        if last_state and last_state.state not in (None, "unknown", "unavailable"):
+            try:
+                val = float(last_state.state)
+                if 0.5 <= val <= 5.0:
+                    self.coordinator.cooling_quick_veto_boost_delta = val
+            except (ValueError, TypeError):
+                pass
+
+    @property
+    def native_value(self) -> float:
+        """Return the current configured cooling boost delta."""
+        return self.coordinator.cooling_quick_veto_boost_delta
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Update the configured cooling boost delta."""
+        self.coordinator.cooling_quick_veto_boost_delta = round(float(value), 1)
         self.async_write_ha_state()

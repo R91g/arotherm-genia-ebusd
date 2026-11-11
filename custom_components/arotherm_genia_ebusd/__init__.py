@@ -155,7 +155,7 @@ QUICK_VETO_SCHEMA = vol.Schema(
             vol.Coerce(float), vol.Range(min=10.0, max=30.0)
         ),
         vol.Optional("duration"): vol.All(
-            vol.Coerce(float), vol.Range(min=0.5, max=24.0)
+            vol.Coerce(float), vol.Range(min=0.5, max=12.0)
         ),
     }
 )
@@ -1124,10 +1124,16 @@ def _async_register_services(hass: HomeAssistant) -> None:
             duration: float | None = call.data.get("duration")
 
             for coordinator in coordinators.values():
-                await coordinator.async_set_quick_veto(
-                    temperature=temperature,
-                    duration=duration,
-                )
+                if coordinator.is_cooling_active():
+                    await coordinator.async_set_cooling_quick_veto(
+                        temperature=temperature,
+                        duration=duration,
+                    )
+                else:
+                    await coordinator.async_set_quick_veto(
+                        temperature=temperature,
+                        duration=duration,
+                    )
 
         hass.services.async_register(
             DOMAIN,
@@ -1145,7 +1151,10 @@ def _async_register_services(hass: HomeAssistant) -> None:
                 raise HomeAssistantError(f"No configured instances of {DOMAIN} found.")
 
             for coordinator in coordinators.values():
-                await coordinator.async_cancel_quick_veto()
+                if coordinator.cooling_quick_veto_active:
+                    await coordinator.async_cancel_cooling_quick_veto(restore=True)
+                else:
+                    await coordinator.async_cancel_quick_veto()
 
         hass.services.async_register(
             DOMAIN,
