@@ -177,9 +177,12 @@ class SaunierGeniaWaterHeater(SaunierGeniaEntity, WaterHeaterEntity):
         if temperature is None:
             return
         temp_val = round(float(temperature) * 2.0) / 2.0
-        # If boost was active, user manual setpoint overrides it
-        if self.coordinator.dhw_boost_forced_active:
-            self.coordinator.cancel_dhw_boost_tracking(temp_val)
+        # If boost was active or pending restore, user manual setpoint overrides it
+        if (
+            self.coordinator.dhw_boost_forced_active
+            or self.coordinator.pending_dhw_boost_restore
+        ):
+            await self.coordinator.async_cancel_dhw_boost_tracking(temp_val)
         await self.coordinator.async_write_parameter(
             CIRCUIT_BASS3, "HwcTempDesired", temp_val
         )

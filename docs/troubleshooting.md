@@ -12,6 +12,8 @@ For shareable snapshots, the [`dump_mqtt_values`](services.md#8-arotherm_genia_e
 
 If **eBUSd TCP Diagnostics** is enabled in [runtime options](configuration.md#runtime-options-configure), the coordinator also runs zero-bus-traffic `info` and CSV `find` checks over TCP, populates physical bus latency/symbol metrics, and updates **eBUS Missing CSV Devices** whenever a scanned bus address has no matching CSV file loaded.
 
+> **Note:** Recent `ebusd` versions (24.x / 26.x) log decoding errors internally instead of publishing `ERR:` payloads onto MQTT topics, so **eBUSd TCP Diagnostics** (`find`) is the reliable way to detect missing or incompatible CSV definitions.
+
 ## Frequently Asked Questions
 
 <details>

@@ -3342,6 +3342,404 @@ class TestCoordinatorLogic(unittest.TestCase):
         self.assertNotIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
         self.assertNotIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
 
+    def test_real_coordinator_dhw_boost_persistence_across_restart(self) -> None:
+        """Verify forced DHW boost elevation persists across restarts, updates on manual override, and restores offline expiry."""
+
+        async def _run() -> None:
+            import time as _time
+
+            hass = MagicMock()
+            tasks: list[asyncio.Task[Any]] = []
+            hass.async_create_task.side_effect = lambda coro: (
+                tasks.append(asyncio.get_running_loop().create_task(coro)) or tasks[-1]
+            )
+            entry = MagicMock(entry_id="dhw_persist_entry")
+            entry.data = {"mqtt_prefix": "ebusd"}
+            entry.options = {"force_dhw_boost": True}
+
+            # --- Phase 1: Coordinator 1 triggers forced boost, then restarts ---
+            coord1 = SaunierGeniaCoordinator(hass, entry)
+            c = CIRCUIT_BASS3.lower()
+            coord1._state[(c, "HwcStorageTemp")] = {"value": 55.0}
+            coord1._state[(c, "HwcTempDesired")] = {"value": 50.0}
+            coord1._state[(c, "CylinderChargeHyst")] = {"value": 5.0}
+            coord1._state[(c, "HwcSFMode")] = {"value": "auto"}
+            coord1._last_telemetry_time = _time.monotonic()
+
+            pub1: list[tuple[str, str]] = []
+
+            async def _fake_pub1(_h: Any, t: str, p: str, **kw: Any) -> None:
+                pub1.append((t, str(p)))
+
+            with (
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                    side_effect=_fake_pub1,
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.async_call_later",
+                    return_value=MagicMock(),
+                ),
+                patch("asyncio.sleep", new_callable=AsyncMock),
+            ):
+                await coord1.async_trigger_dhw_boost()
+                await coord1.async_cancel_dhw_boost_tracking(52.5)
+                await coord1.async_unload()
+
+            self.assertIn(("ebusd/bass3/HwcTempDesired/set", "61.5"), pub1)
+            saved = await coord1._dhw_boost_store.async_load()
+            self.assertIsNotNone(saved)
+            self.assertEqual(saved["saved_target_temp"], 52.5)
+
+            # --- Phase 2: Coordinator 2 boots -> active boost resumed -> finishes on bus ---
+            coord2 = SaunierGeniaCoordinator(hass, entry)
+            timers_p2: list[tuple[float, Any]] = []
+            pub2: list[tuple[str, str]] = []
+
+            async def _fake_pub2(_h: Any, t: str, p: str, **kw: Any) -> None:
+                pub2.append((t, str(p)))
+
+            with (
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_subscribe",
+                    new_callable=AsyncMock,
+                    return_value=MagicMock(),
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                    side_effect=_fake_pub2,
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.async_call_later",
+                    side_effect=lambda _h, d, cb: (
+                        timers_p2.append((d, cb)) or MagicMock()
+                    ),
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.async_track_time_interval",
+                    return_value=MagicMock(),
+                ),
+            ):
+                await coord2.async_setup()
+                self.assertTrue(coord2.dhw_boost_forced_active)
+                self.assertEqual(coord2.saved_dhw_target_temp, 52.5)
+                self.assertTrue(any(d > 3500.0 for d, _ in timers_p2))
+
+                msg_load = MagicMock()
+                msg_load.topic = "ebusd/bass3/HwcSFMode"
+                msg_load.payload = b'{"value": {"value": "load"}}'
+                coord2._async_on_mqtt_message(msg_load)
+
+                msg_auto = MagicMock()
+                msg_auto.topic = "ebusd/bass3/HwcSFMode"
+                msg_auto.payload = b'{"value": {"value": "auto"}}'
+                coord2._async_on_mqtt_message(msg_auto)
+
+                if tasks:
+                    await asyncio.gather(*tasks)
+                    tasks.clear()
+                await coord2.async_unload()
+
+            self.assertFalse(coord2.dhw_boost_forced_active)
+            self.assertIn(("ebusd/bass3/HwcTempDesired/set", "52.5"), pub2)
+            self.assertIsNone(await coord2._dhw_boost_store.async_load())
+
+            # --- Phase 3: Expired 60m boost while offline -> boots offline -> restores once operational ---
+            await coord2._dhw_boost_store.async_save(
+                {
+                    "started_timestamp": datetime.now().timestamp() - 3720.0,
+                    "end_timestamp": datetime.now().timestamp() - 120.0,
+                    "end_time": (datetime.now() - timedelta(minutes=2)).isoformat(),
+                    "saved_target_temp": 50.0,
+                    "goal_temp": 50.0,
+                    "seen_load": False,
+                }
+            )
+            coord3 = SaunierGeniaCoordinator(hass, entry)
+            timers_p3: list[tuple[float, Any]] = []
+            pub3: list[tuple[str, str]] = []
+
+            async def _fake_pub3(_h: Any, t: str, p: str, **kw: Any) -> None:
+                pub3.append((t, str(p)))
+
+            with (
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_subscribe",
+                    new_callable=AsyncMock,
+                    return_value=MagicMock(),
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                    side_effect=_fake_pub3,
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.async_call_later",
+                    side_effect=lambda _h, d, cb: (
+                        timers_p3.append((d, cb)) or MagicMock()
+                    ),
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.async_track_time_interval",
+                    return_value=MagicMock(),
+                ),
+            ):
+                await coord3.async_setup()
+                self.assertFalse(coord3.dhw_boost_forced_active)
+                self.assertTrue(coord3.pending_dhw_boost_restore)
+                self.assertEqual(pub3, [])
+
+                msg_op = MagicMock()
+                msg_op.topic = "ebusd/bass3/HwcStorageTemp"
+                msg_op.payload = b'{"value": {"value": 60.0}}'
+                coord3._async_on_mqtt_message(msg_op)
+
+                restore_timers = [t for t in timers_p3 if abs(t[0] - 1.5) < 0.01]
+                self.assertEqual(len(restore_timers), 1)
+                restore_timers[0][1](datetime.now())
+                if tasks:
+                    await asyncio.gather(*tasks)
+                    tasks.clear()
+
+                self.assertFalse(coord3.pending_dhw_boost_restore)
+                self.assertIn(("ebusd/bass3/HwcTempDesired/set", "50.0"), pub3)
+                self.assertIsNone(await coord3._dhw_boost_store.async_load())
+                await coord3.async_unload()
+
+        asyncio.run(_run())
+
+    def test_real_coordinator_heating_veto_off_persistence_across_restart(
+        self,
+    ) -> None:
+        """Verify heating quick veto from 'off' persists across restarts and guards Z1Status startup race."""
+
+        async def _run() -> None:
+            import time as _time
+
+            hass = MagicMock()
+            tasks: list[asyncio.Task[Any]] = []
+            hass.async_create_task.side_effect = lambda coro: (
+                tasks.append(asyncio.get_running_loop().create_task(coro)) or tasks[-1]
+            )
+            entry = MagicMock(entry_id="heating_persist_entry")
+            entry.data = {"mqtt_prefix": "ebusd"}
+            entry.options = {}
+
+            # --- Phase 1: Zone starts OFF, activates quick veto, then HA restarts ---
+            coord1 = SaunierGeniaCoordinator(hass, entry)
+            c = CIRCUIT_BASS3.lower()
+            coord1._state[(c, "Z1OpMode")] = {"value": "off"}
+            coord1._state[(c, "Z1Status")] = {"value": "day"}
+            coord1._state[(c, "Z1ManualTemp")] = {"value": 19.0}
+            coord1._state[(c, "Z1SFMode")] = {"value": "auto"}
+            coord1._last_telemetry_time = _time.monotonic()
+
+            with (
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                    new_callable=AsyncMock,
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.async_call_later",
+                    return_value=MagicMock(),
+                ),
+                patch("asyncio.sleep", new_callable=AsyncMock),
+            ):
+                await coord1.async_set_quick_veto(temperature=21.0, duration=2.0)
+                await coord1.async_unload()
+
+            saved = await coord1._heating_veto_store.async_load()
+            self.assertIsNotNone(saved)
+            self.assertEqual(saved["pre_opmode"], "off")
+
+            # --- Phase 2: Coordinator 2 boots -> Z1Status arrives before Z1SFMode (must NOT kill active veto) ---
+            coord2 = SaunierGeniaCoordinator(hass, entry)
+            timers_p2: list[tuple[float, Any]] = []
+            pub2: list[tuple[str, str]] = []
+
+            async def _fake_pub2(_h: Any, t: str, p: str, **kw: Any) -> None:
+                pub2.append((t, str(p)))
+
+            with (
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_subscribe",
+                    new_callable=AsyncMock,
+                    return_value=MagicMock(),
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                    side_effect=_fake_pub2,
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.async_call_later",
+                    side_effect=lambda _h, d, cb: (
+                        timers_p2.append((d, cb)) or MagicMock()
+                    ),
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.async_track_time_interval",
+                    return_value=MagicMock(),
+                ),
+            ):
+                await coord2.async_setup()
+                self.assertEqual(coord2.pre_veto_opmode, "off")
+                self.assertTrue(any(d > 7100.0 for d, _ in timers_p2))
+
+                msg_status = MagicMock()
+                msg_status.topic = "ebusd/bass3/Z1Status"
+                msg_status.payload = b'{"value": {"value": "day"}}'
+                coord2._async_on_mqtt_message(msg_status)
+                if tasks:
+                    await asyncio.gather(*tasks)
+                    tasks.clear()
+                self.assertEqual(pub2, [])
+                self.assertEqual(coord2.pre_veto_opmode, "off")
+
+                msg_veto = MagicMock()
+                msg_veto.topic = "ebusd/bass3/Z1SFMode"
+                msg_veto.payload = b'{"value": {"value": "veto"}}'
+                coord2._async_on_mqtt_message(msg_veto)
+                if tasks:
+                    await asyncio.gather(*tasks)
+                    tasks.clear()
+                self.assertEqual(pub2, [])
+
+                msg_auto = MagicMock()
+                msg_auto.topic = "ebusd/bass3/Z1SFMode"
+                msg_auto.payload = b'{"value": {"value": "auto"}}'
+                coord2._async_on_mqtt_message(msg_auto)
+                if tasks:
+                    await asyncio.gather(*tasks)
+                    tasks.clear()
+                await coord2.async_unload()
+
+            self.assertIsNone(coord2.pre_veto_opmode)
+            self.assertIn(("ebusd/bass3/Z1OpMode/set", "off"), pub2)
+            self.assertIsNone(await coord2._heating_veto_store.async_load())
+
+            # --- Phase 3: Expired veto while offline -> boots offline -> restores once operational ---
+            await coord2._heating_veto_store.async_save(
+                {
+                    "pre_opmode": "off",
+                    "end_timestamp": datetime.now().timestamp() - 120.0,
+                    "end_time": (datetime.now() - timedelta(minutes=2)).isoformat(),
+                }
+            )
+            coord3 = SaunierGeniaCoordinator(hass, entry)
+            timers_p3: list[tuple[float, Any]] = []
+            pub3: list[tuple[str, str]] = []
+
+            async def _fake_pub3(_h: Any, t: str, p: str, **kw: Any) -> None:
+                pub3.append((t, str(p)))
+
+            with (
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_subscribe",
+                    new_callable=AsyncMock,
+                    return_value=MagicMock(),
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                    side_effect=_fake_pub3,
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.async_call_later",
+                    side_effect=lambda _h, d, cb: (
+                        timers_p3.append((d, cb)) or MagicMock()
+                    ),
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.async_track_time_interval",
+                    return_value=MagicMock(),
+                ),
+            ):
+                await coord3.async_setup()
+                self.assertTrue(coord3._pending_heating_veto_restore)
+                self.assertEqual(pub3, [])
+
+                msg_op = MagicMock()
+                msg_op.topic = "ebusd/bass3/Z1OpMode"
+                msg_op.payload = b'{"value": {"value": "auto"}}'
+                coord3._async_on_mqtt_message(msg_op)
+
+                restore_timers = [t for t in timers_p3 if abs(t[0] - 1.5) < 0.01]
+                self.assertEqual(len(restore_timers), 1)
+                restore_timers[0][1](datetime.now())
+                if tasks:
+                    await asyncio.gather(*tasks)
+                    tasks.clear()
+
+                self.assertFalse(coord3._pending_heating_veto_restore)
+                self.assertIn(("ebusd/bass3/Z1OpMode/set", "off"), pub3)
+                self.assertIsNone(await coord3._heating_veto_store.async_load())
+                await coord3.async_unload()
+
+            # --- Phase 4: Deadline passed offline, but wall controller reports Z1SFMode=veto still active ---
+            await coord3._heating_veto_store.async_save(
+                {
+                    "pre_opmode": "off",
+                    "end_timestamp": datetime.now().timestamp() - 60.0,
+                    "end_time": (datetime.now() - timedelta(minutes=1)).isoformat(),
+                }
+            )
+            coord4 = SaunierGeniaCoordinator(hass, entry)
+            timers_p4: list[tuple[float, Any]] = []
+            pub4: list[tuple[str, str]] = []
+
+            async def _fake_pub4(_h: Any, t: str, p: str, **kw: Any) -> None:
+                pub4.append((t, str(p)))
+
+            with (
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_subscribe",
+                    new_callable=AsyncMock,
+                    return_value=MagicMock(),
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                    side_effect=_fake_pub4,
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.async_call_later",
+                    side_effect=lambda _h, d, cb: (
+                        timers_p4.append((d, cb)) or MagicMock()
+                    ),
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.async_track_time_interval",
+                    return_value=MagicMock(),
+                ),
+            ):
+                await coord4.async_setup()
+                msg_still_veto = MagicMock()
+                msg_still_veto.topic = "ebusd/bass3/Z1SFMode"
+                msg_still_veto.payload = b'{"value": {"value": "veto"}}'
+                coord4._async_on_mqtt_message(msg_still_veto)
+
+                restore_timers4 = [t for t in timers_p4 if abs(t[0] - 1.5) < 0.01]
+                self.assertEqual(len(restore_timers4), 1)
+                restore_timers4[0][1](datetime.now())
+                if tasks:
+                    await asyncio.gather(*tasks)
+                    tasks.clear()
+
+                self.assertFalse(coord4._pending_heating_veto_restore)
+                self.assertEqual(coord4.pre_veto_opmode, "off")
+                self.assertEqual(pub4, [])
+
+                msg_end = MagicMock()
+                msg_end.topic = "ebusd/bass3/Z1SFMode"
+                msg_end.payload = b'{"value": {"value": "auto"}}'
+                coord4._async_on_mqtt_message(msg_end)
+                if tasks:
+                    await asyncio.gather(*tasks)
+                    tasks.clear()
+
+                self.assertIn(("ebusd/bass3/Z1OpMode/set", "off"), pub4)
+                self.assertIsNone(await coord4._heating_veto_store.async_load())
+                await coord4.async_unload()
+
+        asyncio.run(_run())
+
 
 if __name__ == "__main__":
     unittest.main()

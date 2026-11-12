@@ -12,6 +12,8 @@ Para capturas compartibles, las acciones [`dump_mqtt_values`](services_es.md#8-a
 
 Si tienes activado **Activar Diagnóstico TCP de eBUSd** en las [opciones en caliente](configuration_es.md#opciones-en-caliente-configurar), el coordinador también ejecuta consultas `info` y verificaciones CSV `find` por TCP sin tráfico en el bus eBUS, rellena las métricas físicas de latencia/símbolos y actualiza **Dispositivos eBUS con CSV pendiente** si detecta algún equipo escaneado sin archivo CSV cargado.
 
+> **Nota:** Las versiones recientes de `ebusd` (24.x / 26.x) registran los errores de decodificación en su log interno sin publicar mensajes `ERR:` en los topics MQTT, por lo que **Activar Diagnóstico TCP de eBUSd** (`find`) es el mecanismo fiable para detectar definiciones CSV ausentes o incompatibles.
+
 ## Preguntas Frecuentes
 
 <details>

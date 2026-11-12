@@ -419,11 +419,11 @@ class SaunierGeniaNumber(SaunierGeniaEntity, NumberEntity):
         payload_val: int | float = (
             round(value) if self.entity_description.is_integer else value
         )
-        if (
-            self.entity_description.message == "HwcTempDesired"
-            and self.coordinator.dhw_boost_forced_active
+        if self.entity_description.message == "HwcTempDesired" and (
+            self.coordinator.dhw_boost_forced_active
+            or self.coordinator.pending_dhw_boost_restore
         ):
-            self.coordinator.cancel_dhw_boost_tracking(float(payload_val))
+            await self.coordinator.async_cancel_dhw_boost_tracking(float(payload_val))
 
         if (
             self.entity_description.message == "Z1QuickVetoDuration"
@@ -456,6 +456,10 @@ class SaunierGeniaNumber(SaunierGeniaEntity, NumberEntity):
             await self.coordinator.async_write_parameter(
                 CIRCUIT_BASS3, "Z1SFMode", "veto"
             )
+            if self.coordinator.pre_veto_opmode == "off":
+                await self.coordinator.async_refresh_heating_veto_duration(
+                    float(payload_val)
+                )
             return
 
         await self.coordinator.async_write_parameter(

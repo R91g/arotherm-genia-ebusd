@@ -332,8 +332,15 @@ class SaunierGeniaCoordinator:
         self._dhw_boost_goal_temp: float | None = None
         self._dhw_boost_active: bool = False
         self._dhw_boost_started_at: float = 0.0
+        self._dhw_boost_started_ts: float | None = None
+        self._dhw_boost_end_time: datetime | None = None
         self._dhw_boost_seen_load: bool = False
         self._dhw_boost_timeout_unsub: CALLBACK_TYPE | None = None
+        self._dhw_boost_restore_unsub: CALLBACK_TYPE | None = None
+        self._pending_dhw_boost_restore: bool = False
+        self._dhw_boost_store: Store[dict[str, Any]] = Store(
+            hass, 1, f"{DOMAIN}_{entry.entry_id}_dhw_boost"
+        )
 
         # Custom cooling season window state
         self._custom_cooling_start_date: str | None = None
@@ -343,8 +350,15 @@ class SaunierGeniaCoordinator:
         self._preselected_holiday_start_datetime: datetime | None = None
         self._preselected_holiday_end_datetime: datetime | None = None
 
-        # Pre-veto operating mode memory (to restore 'off' when veto ends)
+        # Pre-veto operating mode memory (to restore 'off' when heating veto ends)
         self._pre_veto_opmode: str | None = None
+        self._heating_veto_end_time: datetime | None = None
+        self._heating_veto_unsub: CALLBACK_TYPE | None = None
+        self._heating_veto_restore_unsub: CALLBACK_TYPE | None = None
+        self._pending_heating_veto_restore: bool = False
+        self._heating_veto_store: Store[dict[str, Any]] = Store(
+            hass, 1, f"{DOMAIN}_{entry.entry_id}_heating_veto"
+        )
 
         # Configured heating boost delta in °C (default +3.0 °C)
         self._quick_veto_boost_delta: float = DEFAULT_QUICK_VETO_BOOST_DELTA
@@ -585,6 +599,11 @@ class SaunierGeniaCoordinator:
         return self._dhw_boost_active
 
     @property
+    def pending_dhw_boost_restore(self) -> bool:
+        """Return True if an expired forced DHW boost is awaiting bus restoration."""
+        return self._pending_dhw_boost_restore
+
+    @property
     def custom_cooling_start_date(self) -> str | None:
         """Return custom cooling start date if configured."""
         return self._custom_cooling_start_date
@@ -687,8 +706,10 @@ class SaunierGeniaCoordinator:
     # -------------------------------------------------------------------------
 
     async def async_setup(self) -> None:
-        """Subscribe to ebusd MQTT topics, load persisted veto state, and schedule initial hydration."""
+        """Subscribe to ebusd MQTT topics, load persisted state, and schedule initial hydration."""
         await self._async_restore_persisted_cooling_veto()
+        await self._async_restore_persisted_heating_veto()
+        await self._async_restore_persisted_dhw_boost()
 
         prefix = self.mqtt_prefix
         circuits_to_subscribe = [
@@ -806,6 +827,18 @@ class SaunierGeniaCoordinator:
         if self._dhw_boost_timeout_unsub is not None:
             self._dhw_boost_timeout_unsub()
             self._dhw_boost_timeout_unsub = None
+
+        if self._dhw_boost_restore_unsub is not None:
+            self._dhw_boost_restore_unsub()
+            self._dhw_boost_restore_unsub = None
+
+        if self._heating_veto_unsub is not None:
+            self._heating_veto_unsub()
+            self._heating_veto_unsub = None
+
+        if self._heating_veto_restore_unsub is not None:
+            self._heating_veto_restore_unsub()
+            self._heating_veto_restore_unsub = None
 
         if self._cooling_veto_unsub is not None:
             self._cooling_veto_unsub()
@@ -1015,24 +1048,11 @@ class SaunierGeniaCoordinator:
                         self.async_cancel_cooling_quick_veto(restore=True)
                     )
 
-        # If a persisted cooling quick veto expired while HA was offline, restore once eBUS becomes operational
-        if (
-            self._pending_cooling_veto_restore
-            and self.is_ebus_operational
-            and (circuit_key in CONTROLLER_CIRCUITS or circuit_key in OUTDOOR_CIRCUITS)
-            and self._cooling_veto_restore_unsub is None
+        # If any persisted transient override expired while HA/eBUS was offline, restore once operational
+        if self.is_ebus_operational and (
+            circuit_key in CONTROLLER_CIRCUITS or circuit_key in OUTDOOR_CIRCUITS
         ):
-
-            @callback
-            def _async_schedule_pending_cooling_restore(_now: datetime) -> None:
-                self._cooling_veto_restore_unsub = None
-                self.hass.async_create_task(
-                    self._async_execute_pending_cooling_veto_restore()
-                )
-
-            self._cooling_veto_restore_unsub = async_call_later(
-                self.hass, 1.5, _async_schedule_pending_cooling_restore
-            )
+            self._async_schedule_pending_restores()
 
         # Verify eBUSd CSV compatibility and manage Home Assistant Repair issues
         self._async_check_csv_compatibility_on_message(
@@ -2553,6 +2573,12 @@ class SaunierGeniaCoordinator:
                 temp_setpoint,
             )
 
+            if self._dhw_boost_restore_unsub is not None:
+                self._dhw_boost_restore_unsub()
+                self._dhw_boost_restore_unsub = None
+            self._pending_dhw_boost_restore = False
+
+            now_wall = datetime.now()
             self._dhw_boost_active = True
             self._dhw_boost_goal_temp = (
                 override_boost_temp
@@ -2560,6 +2586,10 @@ class SaunierGeniaCoordinator:
                 else self._saved_dhw_target_temp
             )
             self._dhw_boost_started_at = time.monotonic()
+            self._dhw_boost_started_ts = now_wall.timestamp()
+            self._dhw_boost_end_time = now_wall + timedelta(
+                seconds=DHW_BOOST_MAX_TIMEOUT_SECONDS
+            )
             self._dhw_boost_seen_load = False
 
             # Schedule 60-minute safety restoration timer
@@ -2574,6 +2604,7 @@ class SaunierGeniaCoordinator:
             await self.async_write_parameter(
                 CIRCUIT_BASS3, "HwcTempDesired", temp_setpoint
             )
+            await self._async_save_dhw_boost_state()
             # Physical eBUS pacing: 1.0s delay allows the controller to accept the new setpoint
             # before sending the one-time load trigger command over the 2400-baud bus.
             await asyncio.sleep(1.0)
@@ -2586,21 +2617,61 @@ class SaunierGeniaCoordinator:
             )
             await self.async_write_parameter(CIRCUIT_BASS3, "HwcSFMode", "load")
 
-    def cancel_dhw_boost_tracking(self, new_target: float | None = None) -> None:
-        """Cancel or update boost tracking if user manually adjusts temperature."""
+    def _apply_dhw_boost_tracking_update(
+        self, new_target: float | None = None
+    ) -> tuple[bool, bool]:
+        """Update or cancel in-memory DHW boost tracking; return (should_save, should_clear)."""
         if self._dhw_boost_active:
             if new_target is not None:
                 self._saved_dhw_target_temp = new_target
                 self._dhw_boost_goal_temp = new_target
-            else:
-                self._dhw_boost_active = False
-                self._saved_dhw_target_temp = None
-                self._dhw_boost_goal_temp = None
+                return True, False
+            self._dhw_boost_active = False
+            self._saved_dhw_target_temp = None
+            self._dhw_boost_goal_temp = None
+            self._dhw_boost_started_ts = None
+            self._dhw_boost_end_time = None
+            self._dhw_boost_seen_load = False
+            if self._dhw_boost_timeout_unsub is not None:
+                self._dhw_boost_timeout_unsub()
+                self._dhw_boost_timeout_unsub = None
+            return False, True
+        if self._pending_dhw_boost_restore:
+            self._pending_dhw_boost_restore = False
+            self._saved_dhw_target_temp = None
+            self._dhw_boost_goal_temp = None
+            if self._dhw_boost_restore_unsub is not None:
+                self._dhw_boost_restore_unsub()
+                self._dhw_boost_restore_unsub = None
+            return False, True
+        return False, False
+
+    def cancel_dhw_boost_tracking(self, new_target: float | None = None) -> None:
+        """Cancel or update boost tracking if user manually adjusts temperature."""
+        should_save, should_clear = self._apply_dhw_boost_tracking_update(new_target)
+        if should_save:
+            self.hass.async_create_task(self._async_save_dhw_boost_state())
+        elif should_clear:
+            self.hass.async_create_task(
+                self._async_clear_store(self._dhw_boost_store, "DHW boost")
+            )
+
+    async def async_cancel_dhw_boost_tracking(
+        self, new_target: float | None = None
+    ) -> None:
+        """Async variant to cancel or update boost tracking and persist store safely."""
+        should_save, should_clear = self._apply_dhw_boost_tracking_update(new_target)
+        if should_save:
+            await self._async_save_dhw_boost_state()
+        elif should_clear:
+            await self._async_clear_store(self._dhw_boost_store, "DHW boost")
 
     async def async_cancel_dhw_boost(self) -> None:
         """Cancel DHW One-Time Boost (HwcSFMode=auto) and restore original setpoint if elevated."""
         await self.async_write_parameter(CIRCUIT_BASS3, "HwcSFMode", "auto")
-        if self._dhw_boost_active and self._saved_dhw_target_temp is not None:
+        if (
+            self._dhw_boost_active or self._pending_dhw_boost_restore
+        ) and self._saved_dhw_target_temp is not None:
             await self._async_restore_dhw_target_temp("user cancelled boost")
 
     @callback
@@ -2608,9 +2679,18 @@ class SaunierGeniaCoordinator:
         """Handle 60-minute safety timeout for forced DHW boost."""
         self._dhw_boost_timeout_unsub = None
         if self._dhw_boost_active and self._saved_dhw_target_temp is not None:
-            self.hass.async_create_task(
-                self._async_restore_dhw_target_temp("60-minute safety timeout")
-            )
+            if self.is_ebus_operational:
+                self._dhw_boost_active = False
+                self.hass.async_create_task(
+                    self._async_restore_dhw_target_temp("60-minute safety timeout")
+                )
+            else:
+                self._dhw_boost_active = False
+                self._dhw_boost_goal_temp = None
+                self._dhw_boost_started_ts = None
+                self._dhw_boost_end_time = None
+                self._dhw_boost_seen_load = False
+                self._pending_dhw_boost_restore = True
 
     @callback
     def _async_check_dhw_boost_restoration(self) -> None:
@@ -2627,29 +2707,42 @@ class SaunierGeniaCoordinator:
 
         elapsed = time.monotonic() - self._dhw_boost_started_at
 
+        restore_reason: str | None = None
         # Condition 1: HwcSFMode returned to "auto" (after either seeing "load" or 15s grace period)
         if sf_mode == "auto" and (self._dhw_boost_seen_load or elapsed > 15.0):
-            self.hass.async_create_task(
-                self._async_restore_dhw_target_temp("HwcSFMode returned to auto")
+            restore_reason = "HwcSFMode returned to auto"
+        else:
+            # Condition 2: Storage temperature exceeded goal target + 1.0 °C
+            goal_temp = (
+                self._dhw_boost_goal_temp
+                if self._dhw_boost_goal_temp is not None
+                else self._saved_dhw_target_temp
             )
+            if (
+                storage_temp is not None
+                and storage_temp >= (goal_temp + 1.0)
+                and elapsed > 10.0
+            ):
+                restore_reason = f"HwcStorageTemp ({storage_temp:.1f}°C) reached target ({goal_temp:.1f}°C) + 1.0°C"
+
+        if restore_reason is None:
             return
 
-        # Condition 2: Storage temperature exceeded goal target + 1.0 °C
-        goal_temp = (
-            self._dhw_boost_goal_temp
-            if self._dhw_boost_goal_temp is not None
-            else self._saved_dhw_target_temp
-        )
-        if (
-            storage_temp is not None
-            and storage_temp >= (goal_temp + 1.0)
-            and elapsed > 10.0
-        ):
+        self._dhw_boost_active = False
+        if self._dhw_boost_timeout_unsub is not None:
+            self._dhw_boost_timeout_unsub()
+            self._dhw_boost_timeout_unsub = None
+
+        if self.is_ebus_operational:
             self.hass.async_create_task(
-                self._async_restore_dhw_target_temp(
-                    f"HwcStorageTemp ({storage_temp:.1f}°C) reached target ({goal_temp:.1f}°C) + 1.0°C"
-                )
+                self._async_restore_dhw_target_temp(restore_reason)
             )
+        else:
+            self._dhw_boost_goal_temp = None
+            self._dhw_boost_started_ts = None
+            self._dhw_boost_end_time = None
+            self._dhw_boost_seen_load = False
+            self._pending_dhw_boost_restore = True
 
     async def _async_restore_dhw_target_temp(self, reason: str) -> None:
         """Restore HwcTempDesired to its pre-boost setpoint and clear boost state."""
@@ -2657,11 +2750,19 @@ class SaunierGeniaCoordinator:
         self._dhw_boost_active = False
         self._saved_dhw_target_temp = None
         self._dhw_boost_goal_temp = None
+        self._dhw_boost_started_ts = None
+        self._dhw_boost_end_time = None
         self._dhw_boost_seen_load = False
+        self._pending_dhw_boost_restore = False
 
         if self._dhw_boost_timeout_unsub is not None:
             self._dhw_boost_timeout_unsub()
             self._dhw_boost_timeout_unsub = None
+        if self._dhw_boost_restore_unsub is not None:
+            self._dhw_boost_restore_unsub()
+            self._dhw_boost_restore_unsub = None
+
+        await self._async_clear_store(self._dhw_boost_store, "DHW boost")
 
         if saved_temp is not None:
             _LOGGER.info(
@@ -2917,16 +3018,76 @@ class SaunierGeniaCoordinator:
         await self.async_write_parameter(CIRCUIT_BASS3, "HolidayCancel", 1)
 
     @callback
+    def _async_on_heating_veto_timeout(self, _now: datetime) -> None:
+        """Handle backup timeout when a heating quick veto from 'off' expires."""
+        self._heating_veto_unsub = None
+        if self._pre_veto_opmode != "off":
+            return
+        if self.is_ebus_operational:
+            self._pre_veto_opmode = None
+            self.hass.async_create_task(
+                self._async_finish_heating_veto_off_restore(
+                    "heating veto duration timeout"
+                )
+            )
+        else:
+            self._heating_veto_end_time = None
+            self._pending_heating_veto_restore = True
+
+    @callback
     def _async_check_quick_veto_restoration(self) -> None:
         """Check whether hardware countdown timer ended quick veto and restore prior state."""
         if self._pre_veto_opmode != "off":
             return
         sf_mode = (self.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or "").lower()
-        if sf_mode != "veto":
-            self._pre_veto_opmode = None
-            self.hass.async_create_task(
-                self.async_write_parameter(CIRCUIT_BASS3, "Z1OpMode", "off")
-            )
+        if not sf_mode or sf_mode == "veto":
+            return
+        if self._heating_veto_unsub is not None:
+            self._heating_veto_unsub()
+            self._heating_veto_unsub = None
+        if not self.is_ebus_operational:
+            self._heating_veto_end_time = None
+            self._pending_heating_veto_restore = True
+            return
+        self._pre_veto_opmode = None
+        self.hass.async_create_task(
+            self._async_finish_heating_veto_off_restore(f"Z1SFMode={sf_mode}")
+        )
+
+    async def _async_finish_heating_veto_off_restore(self, reason: str) -> None:
+        """Clear heating veto store and write Z1OpMode='off'."""
+        if self._heating_veto_unsub is not None:
+            self._heating_veto_unsub()
+            self._heating_veto_unsub = None
+        if self._heating_veto_restore_unsub is not None:
+            self._heating_veto_restore_unsub()
+            self._heating_veto_restore_unsub = None
+        self._pending_heating_veto_restore = False
+        self._heating_veto_end_time = None
+        self._pre_veto_opmode = None
+
+        await self._async_clear_store(self._heating_veto_store, "heating quick veto")
+        _LOGGER.info(
+            "Restoring Z1OpMode to 'off' after heating quick veto (%s)", reason
+        )
+        await self.async_write_parameter(CIRCUIT_BASS3, "Z1OpMode", "off")
+
+    def _arm_heating_veto_timer(self, delay_seconds: float) -> None:
+        """Arm backup timer to restore Zone 1 heating to 'off' if veto expires unseen."""
+        if self._heating_veto_unsub is not None:
+            self._heating_veto_unsub()
+        self._heating_veto_unsub = async_call_later(
+            self.hass, delay_seconds, self._async_on_heating_veto_timeout
+        )
+
+    async def async_refresh_heating_veto_duration(self, duration: float) -> None:
+        """Update persisted heating quick veto deadline when duration changes mid-veto."""
+        if self._pre_veto_opmode != "off":
+            return
+        dur_val = max(0.5, min(12.0, round(float(duration), 1)))
+        self._heating_veto_end_time = datetime.now() + timedelta(hours=dur_val)
+        self._arm_heating_veto_timer(dur_val * 3600.0)
+        await self._async_save_heating_veto_state()
 
     async def async_set_quick_veto(
         self,
@@ -2944,6 +3105,14 @@ class SaunierGeniaCoordinator:
             raise HomeAssistantError(
                 "Cannot activate quick veto while Holiday / Away mode is active."
             )
+
+        if self._heating_veto_unsub is not None:
+            self._heating_veto_unsub()
+            self._heating_veto_unsub = None
+        if self._heating_veto_restore_unsub is not None:
+            self._heating_veto_restore_unsub()
+            self._heating_veto_restore_unsub = None
+        self._pending_heating_veto_restore = False
 
         current_opmode = (
             self.get_str(CIRCUIT_BASS3, "Z1OpMode", "value") or "auto"
@@ -3004,12 +3173,31 @@ class SaunierGeniaCoordinator:
         await asyncio.sleep(0.3)
         await self.async_write_parameter(CIRCUIT_BASS3, "Z1SFMode", "veto")
 
+        if self._pre_veto_opmode == "off":
+            self._heating_veto_end_time = datetime.now() + timedelta(hours=dur_val)
+            self._arm_heating_veto_timer(dur_val * 3600.0)
+            await self._async_save_heating_veto_state()
+        else:
+            self._heating_veto_end_time = None
+            await self._async_clear_store(
+                self._heating_veto_store, "heating quick veto"
+            )
+
     async def async_cancel_quick_veto(self) -> None:
         """Cancel Quick Veto and restore prior operating mode."""
         if not self.is_ebus_operational:
             raise HomeAssistantError(
                 "Cannot cancel quick veto: eBUS communication is not operational."
             )
+
+        if self._heating_veto_unsub is not None:
+            self._heating_veto_unsub()
+            self._heating_veto_unsub = None
+        if self._heating_veto_restore_unsub is not None:
+            self._heating_veto_restore_unsub()
+            self._heating_veto_restore_unsub = None
+        self._pending_heating_veto_restore = False
+        self._heating_veto_end_time = None
 
         _LOGGER.info("Cancelling Quick Veto and restoring auto operation")
         await self.async_write_parameter(CIRCUIT_BASS3, "Z1SFMode", "auto")
@@ -3020,6 +3208,7 @@ class SaunierGeniaCoordinator:
             await asyncio.sleep(0.3)
             await self.async_write_parameter(CIRCUIT_BASS3, "Z1OpMode", "off")
         self._pre_veto_opmode = None
+        await self._async_clear_store(self._heating_veto_store, "heating quick veto")
 
     def is_cooling_active(self) -> bool:
         """Return True if Zone 1 cooling mode is currently physically/logically active."""
@@ -3281,6 +3470,97 @@ class SaunierGeniaCoordinator:
         self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1OpModeCooling")
         self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1CoolingManualTemp")
 
+    @staticmethod
+    def _parse_persisted_end_timestamp(data: dict[str, Any]) -> float | None:
+        """Extract Unix timestamp from persisted 'end_timestamp' or ISO 'end_time'."""
+        end_ts_raw = data.get("end_timestamp")
+        if isinstance(end_ts_raw, (int, float)):
+            return float(end_ts_raw)
+        end_iso = data.get("end_time")
+        if isinstance(end_iso, str):
+            with contextlib.suppress(ValueError):
+                return datetime.fromisoformat(end_iso).timestamp()
+        return None
+
+    async def _async_save_store(
+        self, store: Store[dict[str, Any]], data: dict[str, Any], label: str
+    ) -> None:
+        """Persist state dictionary to Home Assistant storage with warning on error."""
+        try:
+            await store.async_save(data)
+        except (OSError, ValueError, TypeError, HomeAssistantError) as err:
+            _LOGGER.warning("Failed to persist %s state: %s", label, err)
+
+    async def _async_clear_store(
+        self, store: Store[dict[str, Any]], label: str
+    ) -> None:
+        """Remove persisted state dictionary from Home Assistant storage."""
+        try:
+            await store.async_remove()
+        except (OSError, ValueError, TypeError, HomeAssistantError) as err:
+            _LOGGER.warning("Failed to remove persisted %s state: %s", label, err)
+
+    async def _async_load_store(
+        self, store: Store[dict[str, Any]], label: str
+    ) -> dict[str, Any] | None:
+        """Load persisted state dictionary from Home Assistant storage."""
+        try:
+            data = await store.async_load()
+        except (OSError, ValueError, TypeError, HomeAssistantError) as err:
+            _LOGGER.warning("Failed to load persisted %s state: %s", label, err)
+            return None
+        if not data or not isinstance(data, dict):
+            return None
+        return data
+
+    @callback
+    def _async_schedule_pending_restores(self) -> None:
+        """Schedule deferred restores for overrides that expired while HA/eBUS was offline."""
+        if (
+            self._pending_cooling_veto_restore
+            and self._cooling_veto_restore_unsub is None
+        ):
+
+            @callback
+            def _async_schedule_pending_cooling_restore(_now: datetime) -> None:
+                self._cooling_veto_restore_unsub = None
+                self.hass.async_create_task(
+                    self._async_execute_pending_cooling_veto_restore()
+                )
+
+            self._cooling_veto_restore_unsub = async_call_later(
+                self.hass, 1.5, _async_schedule_pending_cooling_restore
+            )
+
+        if (
+            self._pending_heating_veto_restore
+            and self._heating_veto_restore_unsub is None
+        ):
+
+            @callback
+            def _async_schedule_pending_heating_restore(_now: datetime) -> None:
+                self._heating_veto_restore_unsub = None
+                self.hass.async_create_task(
+                    self._async_execute_pending_heating_veto_restore()
+                )
+
+            self._heating_veto_restore_unsub = async_call_later(
+                self.hass, 1.5, _async_schedule_pending_heating_restore
+            )
+
+        if self._pending_dhw_boost_restore and self._dhw_boost_restore_unsub is None:
+
+            @callback
+            def _async_schedule_pending_dhw_restore(_now: datetime) -> None:
+                self._dhw_boost_restore_unsub = None
+                self.hass.async_create_task(
+                    self._async_execute_pending_dhw_boost_restore()
+                )
+
+            self._dhw_boost_restore_unsub = async_call_later(
+                self.hass, 1.5, _async_schedule_pending_dhw_restore
+            )
+
     async def _async_save_cooling_veto_state(self) -> None:
         """Persist active cooling quick veto state across Home Assistant restarts."""
         if self._cooling_veto_end_time is None:
@@ -3293,42 +3573,23 @@ class SaunierGeniaCoordinator:
             "pre_opmode": self._pre_cooling_veto_opmode,
             "pre_temp": self._pre_cooling_veto_temp,
         }
-        try:
-            await self._cooling_veto_store.async_save(data)
-        except (OSError, ValueError, TypeError, HomeAssistantError) as err:
-            _LOGGER.warning("Failed to persist cooling quick veto state: %s", err)
+        await self._async_save_store(
+            self._cooling_veto_store, data, "cooling quick veto"
+        )
 
     async def _async_clear_cooling_veto_store(self) -> None:
         """Remove persisted cooling quick veto state from Home Assistant storage."""
-        try:
-            await self._cooling_veto_store.async_remove()
-        except (OSError, ValueError, TypeError, HomeAssistantError) as err:
-            _LOGGER.warning(
-                "Failed to remove persisted cooling quick veto state: %s", err
-            )
+        await self._async_clear_store(self._cooling_veto_store, "cooling quick veto")
 
     async def _async_restore_persisted_cooling_veto(self) -> None:
         """Restore or finalize a persisted cooling quick veto after Home Assistant restart."""
-        try:
-            data = await self._cooling_veto_store.async_load()
-        except (OSError, ValueError, TypeError, HomeAssistantError) as err:
-            _LOGGER.warning(
-                "Failed to load persisted cooling quick veto state: %s", err
-            )
+        data = await self._async_load_store(
+            self._cooling_veto_store, "cooling quick veto"
+        )
+        if data is None:
             return
 
-        if not data or not isinstance(data, dict):
-            return
-
-        end_ts_raw = data.get("end_timestamp")
-        end_iso = data.get("end_time")
-        end_ts: float | None = None
-        if isinstance(end_ts_raw, (int, float)):
-            end_ts = float(end_ts_raw)
-        elif isinstance(end_iso, str):
-            with contextlib.suppress(ValueError):
-                end_ts = datetime.fromisoformat(end_iso).timestamp()
-
+        end_ts = self._parse_persisted_end_timestamp(data)
         if end_ts is None:
             await self._async_clear_cooling_veto_store()
             return
@@ -3397,6 +3658,176 @@ class SaunierGeniaCoordinator:
             self._pre_cooling_veto_temp,
         )
         await self.async_cancel_cooling_quick_veto(restore=True)
+
+    async def _async_save_heating_veto_state(self) -> None:
+        """Persist heating quick veto from 'off' across Home Assistant restarts."""
+        if self._pre_veto_opmode != "off" or self._heating_veto_end_time is None:
+            await self._async_clear_store(
+                self._heating_veto_store, "heating quick veto"
+            )
+            return
+        data = {
+            "pre_opmode": "off",
+            "end_timestamp": self._heating_veto_end_time.timestamp(),
+            "end_time": self._heating_veto_end_time.isoformat(),
+        }
+        await self._async_save_store(
+            self._heating_veto_store, data, "heating quick veto"
+        )
+
+    async def _async_restore_persisted_heating_veto(self) -> None:
+        """Restore or finalize a persisted heating quick veto from 'off' after restart."""
+        data = await self._async_load_store(
+            self._heating_veto_store, "heating quick veto"
+        )
+        if data is None:
+            return
+        if data.get("pre_opmode") != "off":
+            await self._async_clear_store(
+                self._heating_veto_store, "heating quick veto"
+            )
+            return
+
+        end_ts = self._parse_persisted_end_timestamp(data)
+        if end_ts is None:
+            await self._async_clear_store(
+                self._heating_veto_store, "heating quick veto"
+            )
+            return
+
+        self._pre_veto_opmode = "off"
+        remaining = end_ts - datetime.now().timestamp()
+        if remaining > 0:
+            self._heating_veto_end_time = datetime.fromtimestamp(end_ts)
+            self._arm_heating_veto_timer(remaining)
+            _LOGGER.info(
+                "Restored active heating quick veto from 'off' after restart (%.0fs remaining)",
+                remaining,
+            )
+        else:
+            self._heating_veto_end_time = None
+            sf_mode = (self.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or "").lower()
+            if sf_mode == "veto":
+                return
+            if self.is_ebus_operational:
+                await self._async_finish_heating_veto_off_restore(
+                    "persisted veto expired during restart"
+                )
+            else:
+                self._pending_heating_veto_restore = True
+                _LOGGER.info(
+                    "Persisted heating quick veto from 'off' expired while offline; deferring bus restoration until eBUS is operational"
+                )
+
+    async def _async_execute_pending_heating_veto_restore(self) -> None:
+        """Execute deferred restoration for a persisted heating veto from 'off'."""
+        if not self._pending_heating_veto_restore or not self.is_ebus_operational:
+            return
+        sf_mode = (self.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or "").lower()
+        if sf_mode == "veto":
+            # Controller still actively running veto (e.g. extended on wall unit);
+            # let Z1SFMode transition handle restoration instead of forcing 'off' early.
+            self._pending_heating_veto_restore = False
+            _LOGGER.info(
+                "Deferred heating quick veto restore paused: controller reports Z1SFMode=veto still active"
+            )
+            return
+        await self._async_finish_heating_veto_off_restore(
+            "persisted heating quick veto expired while offline"
+        )
+
+    async def _async_save_dhw_boost_state(self) -> None:
+        """Persist active forced DHW boost state across Home Assistant restarts."""
+        if (
+            not self._dhw_boost_active
+            or self._dhw_boost_end_time is None
+            or self._saved_dhw_target_temp is None
+        ):
+            await self._async_clear_store(self._dhw_boost_store, "DHW boost")
+            return
+        data = {
+            "started_timestamp": self._dhw_boost_started_ts,
+            "end_timestamp": self._dhw_boost_end_time.timestamp(),
+            "end_time": self._dhw_boost_end_time.isoformat(),
+            "saved_target_temp": self._saved_dhw_target_temp,
+            "goal_temp": self._dhw_boost_goal_temp,
+            "seen_load": self._dhw_boost_seen_load,
+        }
+        await self._async_save_store(self._dhw_boost_store, data, "DHW boost")
+
+    async def _async_restore_persisted_dhw_boost(self) -> None:
+        """Restore or finalize a persisted forced DHW boost after Home Assistant restart."""
+        data = await self._async_load_store(self._dhw_boost_store, "DHW boost")
+        if data is None:
+            return
+
+        saved_raw = data.get("saved_target_temp")
+        end_ts = self._parse_persisted_end_timestamp(data)
+        if not isinstance(saved_raw, (int, float)) or end_ts is None:
+            await self._async_clear_store(self._dhw_boost_store, "DHW boost")
+            return
+
+        saved_temp = float(saved_raw)
+        goal_raw = data.get("goal_temp")
+        goal_temp = (
+            float(goal_raw) if isinstance(goal_raw, (int, float)) else saved_temp
+        )
+        started_raw = data.get("started_timestamp")
+        started_ts = (
+            float(started_raw)
+            if isinstance(started_raw, (int, float))
+            else end_ts - DHW_BOOST_MAX_TIMEOUT_SECONDS
+        )
+        seen_load = bool(data.get("seen_load", False))
+
+        now_ts = datetime.now().timestamp()
+        remaining = end_ts - now_ts
+        if remaining > 0:
+            self._saved_dhw_target_temp = saved_temp
+            self._dhw_boost_goal_temp = goal_temp
+            self._dhw_boost_active = True
+            self._dhw_boost_started_ts = started_ts
+            self._dhw_boost_end_time = datetime.fromtimestamp(end_ts)
+            self._dhw_boost_seen_load = seen_load
+            elapsed_since_start = max(0.0, now_ts - started_ts)
+            self._dhw_boost_started_at = time.monotonic() - elapsed_since_start
+
+            if self._dhw_boost_timeout_unsub is not None:
+                self._dhw_boost_timeout_unsub()
+            self._dhw_boost_timeout_unsub = async_call_later(
+                self.hass, remaining, self._async_on_dhw_boost_timeout
+            )
+            _LOGGER.info(
+                "Restored active forced DHW boost after restart (%.0fs remaining, saved_target=%.1f°C, goal=%.1f°C)",
+                remaining,
+                saved_temp,
+                goal_temp,
+            )
+        else:
+            self._saved_dhw_target_temp = saved_temp
+            self._dhw_boost_goal_temp = goal_temp
+            self._dhw_boost_active = False
+            self._dhw_boost_started_ts = None
+            self._dhw_boost_end_time = None
+            self._dhw_boost_seen_load = False
+            if self.is_ebus_operational:
+                await self._async_restore_dhw_target_temp(
+                    "persisted 60-minute boost timeout expired during restart"
+                )
+            else:
+                self._pending_dhw_boost_restore = True
+                _LOGGER.info(
+                    "Persisted forced DHW boost expired while offline; deferring restoration of HwcTempDesired=%.1f°C until eBUS is operational",
+                    saved_temp,
+                )
+
+    async def _async_execute_pending_dhw_boost_restore(self) -> None:
+        """Execute deferred restoration of pre-boost HwcTempDesired after restart/offline expiry."""
+        if not self._pending_dhw_boost_restore or not self.is_ebus_operational:
+            return
+        await self._async_restore_dhw_target_temp(
+            "deferred DHW boost setpoint restoration"
+        )
 
     # -------------------------------------------------------------------------
     # Passive Scan & Hardware/Software Version Detection

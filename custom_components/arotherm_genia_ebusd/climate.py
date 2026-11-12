@@ -258,14 +258,17 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             sf_mode = (
                 self.coordinator.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or ""
             ).lower()
-            if sf_mode != "veto":
+            if sf_mode and sf_mode != "veto":
                 self._pre_boost_hvac_mode = None
                 self._pre_boost_preset_mode = None
-                self.hass.async_create_task(
-                    self.coordinator.async_write_parameter(
-                        CIRCUIT_BASS3, "Z1OpMode", "off"
+                # Coordinator owns authoritative pre-veto 'off' restore & Store cleanup;
+                # only fall back here when pre_veto_opmode is not already tracked there.
+                if getattr(self.coordinator, "pre_veto_opmode", None) != "off":
+                    self.hass.async_create_task(
+                        self.coordinator.async_write_parameter(
+                            CIRCUIT_BASS3, "Z1OpMode", "off"
+                        )
                     )
-                )
         super()._handle_coordinator_update()
 
     async def _async_run_transition(self, sequence: Awaitable[None]) -> None:
