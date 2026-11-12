@@ -94,6 +94,7 @@ from .const import (
     HOLIDAY_RESET_TIME,
     HYDRATION_STEP_DELAY_SECONDS,
     INITIAL_HYDRATION_WAIT_SECONDS,
+    ISSUE_EBUSD_SLOW_POLLING_SEED,
     ISSUE_MISSING_CUSTOM_CSV,
     ISSUE_MQTTJSON_NOT_ENABLED,
     ISSUE_NO_EBUSD_MQTT_TRAFFIC,
@@ -107,6 +108,7 @@ from .const import (
     SCAN_TOPIC_CIRCUITS,
     SENTINEL_COOLING_THRESHOLD,
     SET_CONFIRMATION_DELAY_SECONDS,
+    SLOW_POLLING_WARNING_THRESHOLD_SECONDS,
     STATE_INACTIVE,
     STATE_OPEN_ENDED,
     UPSTREAM_DEFAULT_CSV_MESSAGES,
@@ -131,7 +133,6 @@ _OUTDOOR_THERMO_TRIGGER_NAMES: tuple[str, ...] = (
     "rundataflowrate",
     "rundataelectricpowerconsumption",
     "powerstatus",
-    "energyyieldprecision",
     "hmustatuscode",
     "prenergyelectrichc",
     "prenergyelectrichwc",
@@ -410,6 +411,7 @@ class SaunierGeniaCoordinator:
         self._last_telemetry_time: float | None = None
         self._watchdog_unsub: CALLBACK_TYPE | None = None
         self._last_watchdog_elec_power: float | None = None
+        self._last_power_consumption_receive_time: float | None = None
 
         # Lock to serialize multi-slot weekly timer operations and prevent bus collisions
         self.timer_write_lock: asyncio.Lock = asyncio.Lock()
@@ -785,6 +787,35 @@ class SaunierGeniaCoordinator:
                 self._async_notify_message_listeners(circuit, "PowerStatus")
             self._async_recalculate_thermodynamics()
 
+        # Check for slow power telemetry / seed_mqtt_cfg issue:
+        # If RunDataElectricPowerConsumption has been seen at least once, but its age exceeds threshold
+        # while general bus traffic is actively arriving (telemetry within last 60s and operational bus)
+        if (
+            self._last_power_consumption_receive_time is not None
+            and self.is_ebus_operational
+        ):
+            power_age = time.monotonic() - self._last_power_consumption_receive_time
+            slow_thresh = (
+                SLOW_POLLING_WARNING_THRESHOLD_SECONDS
+                if self.has_migo_link
+                else max(
+                    SLOW_POLLING_WARNING_THRESHOLD_SECONDS,
+                    float(self.fallback_poll_interval) * 1.5,
+                )
+            )
+            if power_age >= slow_thresh:
+                bus_active = (
+                    self._last_telemetry_time is not None
+                    and (time.monotonic() - self._last_telemetry_time) <= 60.0
+                )
+                if bus_active:
+                    minutes_str = f"{round(power_age / 60.0, 1)}"
+                    self._async_set_repair_issue(
+                        ISSUE_EBUSD_SLOW_POLLING_SEED,
+                        active=True,
+                        placeholders={"interval": minutes_str},
+                    )
+
     @callback
     def async_update_options(self) -> None:
         """Reconfigure runtime timers when OptionsFlow is updated."""
@@ -1024,6 +1055,35 @@ class SaunierGeniaCoordinator:
             canonical_msg_lower,
         ) in THERMO_TRIGGER_MESSAGES:
             self._async_recalculate_thermodynamics()
+
+        # Monitor high-priority electrical power update interval to detect slow polling / seed_mqtt_cfg
+        if (
+            circuit_key in OUTDOOR_CIRCUITS
+            and msg_lower == "rundataelectricpowerconsumption"
+        ):
+            now_mono = time.monotonic()
+            if self._last_power_consumption_receive_time is not None:
+                interval = now_mono - self._last_power_consumption_receive_time
+                slow_thresh = (
+                    SLOW_POLLING_WARNING_THRESHOLD_SECONDS
+                    if self.has_migo_link
+                    else max(
+                        SLOW_POLLING_WARNING_THRESHOLD_SECONDS,
+                        float(self.fallback_poll_interval) * 1.5,
+                    )
+                )
+                if interval <= 60.0:
+                    self._async_set_repair_issue(
+                        ISSUE_EBUSD_SLOW_POLLING_SEED, active=False
+                    )
+                elif interval >= slow_thresh and self.is_ebus_operational:
+                    minutes_str = f"{round(interval / 60.0, 1)}"
+                    self._async_set_repair_issue(
+                        ISSUE_EBUSD_SLOW_POLLING_SEED,
+                        active=True,
+                        placeholders={"interval": minutes_str},
+                    )
+            self._last_power_consumption_receive_time = now_mono
 
         # Check DHW boost restoration conditions when bass3/basv3 HwcSFMode or HwcStorageTemp updates
         if circuit_key in CONTROLLER_CIRCUITS and message_name in (
@@ -2321,7 +2381,7 @@ class SaunierGeniaCoordinator:
         # 1. Primary Flow and Return Temperatures -> Delta T (K)
         flow_temp = self.get_float(CIRCUIT_HMUX0, "RunDataFlowTemp", "value")
         if flow_temp is None:
-            flow_temp = self.get_float(CIRCUIT_HMUX0, "Status01", "temp1")
+            flow_temp = self.get_float(CIRCUIT_HMUX0, "Status01", "flow_temp")
 
         return_temp = self.get_float(CIRCUIT_HMUX0, "RunDataReturnTemp", "value")
         if return_temp is None:

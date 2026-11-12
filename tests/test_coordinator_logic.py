@@ -7,7 +7,7 @@ import time
 import unittest
 from datetime import datetime, timedelta
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 # Ensure tests/ directory is on path to load setup_mocks
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
@@ -58,6 +58,7 @@ from custom_components.arotherm_genia_ebusd.const import (
     EBUSD_TRAFFIC_TIMEOUT_SECONDS,
     HMU_HW5103_HYDRATION_MESSAGES,
     HMUX0_EXCLUSIVE_MESSAGES,
+    ISSUE_EBUSD_SLOW_POLLING_SEED,
     ISSUE_MISSING_CUSTOM_CSV,
     ISSUE_MQTTJSON_NOT_ENABLED,
     ISSUE_NO_EBUSD_MQTT_TRAFFIC,
@@ -1935,6 +1936,82 @@ class TestCoordinatorLogic(unittest.TestCase):
             '{"flow_temp": {"value": 35.0}, "return_temp": {"value": 30.0}}',
         )
         self.assertNotIn(ISSUE_OUTDATED_HMU_CSV, coord._active_repair_issues)
+
+    def test_repair_issue_ebusd_slow_polling_seed(self) -> None:
+        """Test detection and auto-clearing of slow polling issue (seed_mqtt_cfg)."""
+        import sys
+
+        ir_mod = sys.modules["homeassistant.helpers.issue_registry"]
+        ir_mod.async_create_issue.reset_mock()
+        ir_mod.async_delete_issue.reset_mock()
+
+        hass = MagicMock()
+        entry = MagicMock()
+        entry.entry_id = "test_slow_polling"
+        entry.data = {"mqtt_prefix": "ebusd", CONF_HAS_MIGO_LINK: True}
+        entry.options = {}
+        coord = SaunierGeniaCoordinator(hass, entry)
+
+        def push_mqtt(topic: str, payload: str) -> None:
+            msg = MagicMock()
+            msg.topic = topic
+            msg.payload = payload.encode("utf-8")
+            coord._async_on_mqtt_message(msg)
+
+        # Make ebus operational
+        push_mqtt("ebusd/global/signal", '{"value": {"value": true}}')
+        push_mqtt("ebusd/hmux0/Status01", '{"flow_temp": {"value": 35.0}}')
+        self.assertTrue(coord.is_ebus_operational)
+
+        # 1. First arrival of RunDataElectricPowerConsumption sets initial timestamp
+        t0 = 1000.0
+        with patch("time.monotonic", return_value=t0):
+            push_mqtt(
+                "ebusd/hmux0/RunDataElectricPowerConsumption",
+                '{"energy": {"value": 450}}',
+            )
+        self.assertEqual(coord._last_power_consumption_receive_time, t0)
+        self.assertNotIn(ISSUE_EBUSD_SLOW_POLLING_SEED, coord._active_repair_issues)
+
+        # 2. Arrival after 350s (>= 300s threshold) triggers slow polling issue
+        t1 = t0 + 350.0
+        with patch("time.monotonic", return_value=t1):
+            push_mqtt(
+                "ebusd/hmux0/RunDataElectricPowerConsumption",
+                '{"energy": {"value": 460}}',
+            )
+        self.assertIn(ISSUE_EBUSD_SLOW_POLLING_SEED, coord._active_repair_issues)
+        ir_mod.async_create_issue.assert_called_with(
+            hass,
+            DOMAIN,
+            ISSUE_EBUSD_SLOW_POLLING_SEED,
+            is_fixable=False,
+            severity=ANY,
+            translation_key=ISSUE_EBUSD_SLOW_POLLING_SEED,
+            translation_placeholders={"interval": "5.8"},
+            learn_more_url="https://github.com/R91g/arotherm-genia-ebusd#step-1-deploy-optimized-ebusd-csv-configuration",
+        )
+
+        # 3. Fast arrival (interval <= 60s) clears the issue automatically
+        t2 = t1 + 20.0
+        with patch("time.monotonic", return_value=t2):
+            push_mqtt(
+                "ebusd/hmux0/RunDataElectricPowerConsumption",
+                '{"energy": {"value": 470}}',
+            )
+        self.assertNotIn(ISSUE_EBUSD_SLOW_POLLING_SEED, coord._active_repair_issues)
+        ir_mod.async_delete_issue.assert_called_with(
+            hass, DOMAIN, ISSUE_EBUSD_SLOW_POLLING_SEED
+        )
+
+        # 4. Watchdog trigger: power message is stale (>= 300s) while bus telemetry is active (<= 60s)
+        ir_mod.async_create_issue.reset_mock()
+        t3 = t2 + 350.0
+        with patch("time.monotonic", return_value=t3):
+            coord._last_telemetry_time = t3 - 10.0
+            coord._async_check_watchdog(datetime.now())
+        self.assertIn(ISSUE_EBUSD_SLOW_POLLING_SEED, coord._active_repair_issues)
+        ir_mod.async_create_issue.assert_called_once()
 
     def test_is_ebus_operational_and_running_binary_sensor(self) -> None:
         """Test is_ebus_operational gate and _check_ebusd_running binary sensor."""

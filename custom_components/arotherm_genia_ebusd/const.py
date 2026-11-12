@@ -674,6 +674,11 @@ ISSUE_OUTDATED_CONTROLLER_CSV = "outdated_controller_csv"
 ISSUE_MISSING_CUSTOM_CSV = "missing_custom_csv"
 ISSUE_NO_EBUSD_MQTT_TRAFFIC = "no_ebusd_mqtt_traffic"
 ISSUE_MQTTJSON_NOT_ENABLED = "mqttjson_not_enabled"
+ISSUE_EBUSD_SLOW_POLLING_SEED = "ebusd_slow_polling_seed"
+
+SLOW_POLLING_WARNING_THRESHOLD_SECONDS: float = (
+    300.0  # 5 minutes without r1 power updates
+)
 
 # Signature messages proving our custom 08.hmux0.csv is loaded in ebusd
 HMUX0_CUSTOM_SIGNATURE_MESSAGES: tuple[str, ...] = (

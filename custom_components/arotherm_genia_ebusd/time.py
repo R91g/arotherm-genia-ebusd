@@ -45,10 +45,6 @@ class SaunierGeniaHwcLegionellaTime(SaunierGeniaEntity, TimeEntity):
     def native_value(self) -> time | None:
         """Return the scheduled anti-legionella execution time."""
         raw_val = self.coordinator.get_str(CIRCUIT_BASS3, "HwcLegionellaTime", "time")
-        if raw_val is None:
-            raw_val = self.coordinator.get_str(
-                CIRCUIT_BASS3, "HwcLegionellaTime", "value"
-            )
 
         if raw_val and ":" in raw_val:
             parts = raw_val.split(":")

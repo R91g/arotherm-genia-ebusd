@@ -103,8 +103,6 @@ def _check_defrost_active(coord: SaunierGeniaCoordinator) -> bool | None:
 def _check_energy_integration(coord: SaunierGeniaCoordinator) -> bool | None:
     status = coord.get_str(CIRCUIT_HMUX0, "PowerStatus", "status")
     if status is None:
-        status = coord.get_str(CIRCUIT_HMUX0, "EnergyYieldPrecision", "status")
-    if status is None:
         return None
     return status.lower() in ("active", "heating", "hwc", "cooling", "1", "2", "3")
 
@@ -275,8 +273,6 @@ class SaunierGeniaBinarySensor(SaunierGeniaEntity, BinarySensorEntity):
         if description.key == "compressor_active":
             subs.append((CIRCUIT_HMUX0, "RunDataCompressorSpeed"))
             subs.append((CIRCUIT_HMUX0, "HMUStatusCode"))
-        elif description.key == "energy_integration_active":
-            subs.append((CIRCUIT_HMUX0, "EnergyYieldPrecision"))
 
         c = description.circuit.lower()
         m = description.message.lower()

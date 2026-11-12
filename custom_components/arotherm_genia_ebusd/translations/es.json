@@ -113,6 +113,10 @@
     "mqttjson_not_enabled": {
       "title": "El parámetro --mqttjson no está activado en eBUSd",
       "description": "Tu instancia de `ebusd` está publicando valores en texto plano separados por punto y coma en lugar de objetos JSON. Añade `--mqttjson` a los argumentos de arranque de `ebusd` y reinícialo para que los mensajes multicampo (estado del compresor, programaciones horarias, fechas y potencia en vivo) puedan decodificarse correctamente. Este aviso desaparecerá automáticamente al recibir mensajes en formato JSON."
+    },
+    "ebusd_slow_polling_seed": {
+      "title": "Frecuencia de telemetría de eBUSd muy lenta (posible problema con seed_mqtt_cfg)",
+      "description": "La telemetría de consumo eléctrico de alta prioridad (`RunDataElectricPowerConsumption`) se está actualizando muy lentamente ({interval} minutos entre lecturas en lugar de ~10–20 segundos) mientras el eBUS está activo. Si utilizas el Add-on de Home Assistant eBUSd ([LukasGrebe/ha-addons](https://github.com/LukasGrebe/ha-addons)), esto ocurre habitualmente cuando la opción **\"Seed HA MQTT integration config (only needed once)\"** está activada (`seed_mqtt_cfg: true`), la cual inyecta una configuración obsoleta que sondea más de 160 registros cada 16 minutos saturando el bus. (Si usas ebusd de forma independiente o en Docker sin este add-on, este ajuste no aplica; revisa los tiempos de sondeo de tu daemon). Por favor: (1) Ve a **Ajustes → Complementos → eBUSd → Configuración** y desactiva **Seed HA MQTT integration config**, (2) Verifica que `--mqttjson` esté presente en `commandline_options`, y (3) Reinicia el add-on. Esta advertencia desaparecerá automáticamente en cuanto se restablezca la telemetría frecuente."
     }
   },
   "entity": {

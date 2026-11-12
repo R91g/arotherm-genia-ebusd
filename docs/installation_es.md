@@ -66,7 +66,7 @@ Copia los archivos CSV en el directorio de configuración de `ebusd` respetando 
     └── f6.netx3.csv           <-- Tramas RF pasivas del termostato inalámbrico
 ```
 
-### Opción A: Add-on eBUSd de Home Assistant
+### Opción A: Add-on eBUSd de Home Assistant ([LukasGrebe/ha-addons](https://github.com/LukasGrebe/ha-addons))
 
 1. Copia `ebusd-configuration/broadcast.csv` a:
    `/addon_configs/b4d7ad18_ebusd/ebusd-configuration/en/broadcast.csv`

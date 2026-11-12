@@ -10,97 +10,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.3.0] - Unreleased
 
 > [!IMPORTANT]
-> **Action Required:** Please update the configuration files in your `ebusd` folder (`ebusd-configuration/vaillant/`) and restart `ebusd`. This release introduces native support for **Vaillant HMU00 (HW=5103)** outdoor units and **CTLV2 / CTLV3 (sensoHOME / sensoCOMFORT / MiSet)** controllers, persistent **Cooling Quick Veto**, **Anti-Legionella protection**, fast **`r1;u` electric power polling**, 3 daily schedule intervals, eBUS diagnostic services, `ebusd` health sensors, and critical audit stability fixes.
+> **Action required when updating:**
+> 1. Update **all** CSV files in your `ebusd` folder (`ebusd-configuration/vaillant/`): controller (`15.*`) and outdoor unit (`08.*`) definitions changed, then restart `ebusd`. Outdated files are flagged by the built-in Repair checks.
+> 2. **If using the Home Assistant eBUSd Add-on ([LukasGrebe/ha-addons](https://github.com/LukasGrebe/ha-addons)):** Ensure **"Seed HA MQTT integration config"** is turned **OFF** (`seed_mqtt_cfg: false`) in the add-on configuration and `--mqttjson` is present in `commandline_options`. (This setting is exclusive to this add-on; standalone eBUSd or Docker setups are unaffected). A legacy seeded configuration queries 160+ registers every 16 minutes, saturating the eBUS and starving high-frequency telemetry. The integration now includes an automatic Repair issue (`ebusd_slow_polling_seed`) that warns you if power telemetry updates abnormally slowly.
+> 3. **Home Assistant 2024.12.0 or newer is now required** (up from 2024.4.0).
+> 4. The old `Z1DayTemp` setpoint entity is removed automatically; the cooling manual setpoint now lives in a new entity (`Z1CoolingManualTemp`). If your automations, scripts or dashboards referenced the old one, point them to the new entity.
+> 5. `Z1MaxFlowTempDesired` was actually Zone 1 room humidity; it now appears as the "Zone 1 Room Humidity" sensor and as `current_humidity` on the climate entity.
+> 6. Default device names migrate from Spanish to English automatically; any names you customized are preserved.
 
 ### Added
-- **Hardware: Vaillant HMU00 (HW5103) & aroTHERM Split Support:**
-  - Added dedicated configuration template `ebusd-configuration/vaillant/08.hmu.HW5103.csv` with automatic circuit aliasing (`hmux0` <-> `hmu`/`hmu00`), Split water pressure (`FlowPressure`), silent mode levels, compressor hours/starts fallbacks (`CompressorHours`/`CompressorStarts`), native COP registers (`CopHc`, `CopHwc`, `CopCooling`), and legacy energy yield registers.
-- **Hardware: sensoCOMFORT & sensoHOME Controllers (`CTLV2` & `CTLV3`):**
-  - Added configuration templates `15.ctlv2.csv` and `15.ctlv3.csv` with automatic scan detection, bidirectional aliasing (`bass3`/`basv3` <-> `ctlv2`/`ctlv3`), and updated repair checks.
-  - Added UK `aroTHERM pro 7.1` and `aroTHERM plus 8.1` models to the outdoor unit catalog.
-- **Refrigeration Cycle, Per-Mode Compressor & Auxiliary Heater Diagnostics:**
-  - Added refrigeration thermodynamics and compressor control sensors (`evaporation_temp`, `condensation_temp`, `condensate_temp`, `superheat`, synthetic `subcooling`, `energy_integral`, `compressor_flow_temp_desired`, and `heat_output_internal`).
-  - Added per-mode compressor operating hours and starts (`stats_compressor_hc_hours`, `stats_compressor_hc_starts`, `stats_compressor_hwc_hours`, `stats_compressor_hwc_starts`, `stats_compressor_cool_hours`, `stats_compressor_cool_starts`) with cross-circuit `hmux0`/`hmu` fallbacks.
-  - Added hydraulic auxiliary immersion heater telemetry and statistics on `76.vwzio` (`vwzio_heater_energy`, `vwzio_heater_flow_temp`, and heating/DHW operating hours and starts).
-  - Added active error diagnostic sensors (`hmu_current_error` and `controller_current_error`) decoding `Currenterror` across outdoor units and climate controllers.
-- **Zone 1 Relative Room Humidity (`Z1RoomHumidity`):**
-  - Exposed Zone 1 relative humidity (`b524 020003002800`) both as `sensor.z1_room_humidity` (`%`) and directly as `current_humidity` on `SaunierGeniaZone1Climate`, with backward-compatible MQTT aliasing from legacy `Z1MaxFlowTempDesired`.
-- **Weekly Schedule Multi-Slot Expansion (Slots 2 & 3) & Silent Mode Timer:**
-  - Expanded all daily schedules across heating, cooling, DHW, and circulation from 1 to 3 time slots across all 4 controller CSV configurations.
-  - Added Silent Mode weekly schedule support (`SilentTimer_*` on `b5 55` circuit `04`), including `circuit_type: silent` in `set_weekly_timer` and `sensor.silent_mode_weekly_schedule_summary`.
-  - Added passive eavesdropping (`u`) for official MiGo Link app schedule writes, decoding time intervals and target temperatures in real time without polling.
-- **Anti-Legionella Disinfection Schedule Control (`select`, `time` & Action):**
-  - Added `HwcLegionellaDay` (defined with mandatory 2-byte `daysel3` / `UIN` encoding for CTLV2/CTLV3/BASS3 compatibility) and `HwcLegionellaTime` (`HTM`) across all 4 controller CSVs.
-  - Added `select.hwc_legionella_day` (`off`, `monday`..`sunday`), new Home Assistant `Time` platform (`time.hwc_legionella_time`), and `arotherm_genia_ebusd.set_legionella_protection` service.
-- **Quick Veto (Zone 1 Boost) Controls, Cooling Quick Veto & Persistent Recovery:**
-  - Added `number.z1_quick_veto_duration` (`0.5–12.0 h`), `number.z1_quick_veto_boost_delta` (heating boost delta), `number.z1_cooling_quick_veto_boost_delta` (cooling boost delta), and dedicated `arotherm_genia_ebusd.quick_veto` / `arotherm_genia_ebusd.cancel_quick_veto` actions.
-  - Implemented persistent synthetic **Cooling Quick Veto** for scheduled (`auto`) and manual cooling Boost (`PRESET_BOOST` or adjusting temperature in scheduled cooling), backed by Home Assistant `Store` so active timers resume across restarts and expired vetos automatically restore prior operating mode and manual setpoint once eBUS reconnects.
-- **Controller & Hydraulic Telemetry Additions (`76.vwzio` & `15.*`):**
-  - Added passive `StationState` (`b512 0f0613`: hydraulic pressure, primary flow rate, operational state byte) to `76.vwzio.csv`.
-  - Added `MultiInputSetting` (`6a00` PV/cooling/circulation input mode), `CoolingOutsideTempThreshold` (`3800`), `DewPointMonitoring` (`0400`), `DewPointOffset` (`3a00`), and `OffsetOutsideTemp` (`2d00`) across all 4 controller CSVs.
-- **Diagnostic eBUS Services (`read_parameter` & `write_parameter`):**
-  - Added actions to read and write symbolic eBUS parameters via MQTT directly from Home Assistant Developer Tools or automations, with automatic circuit alias resolution (`08`, `15`, `outdoor`, `controller`).
-- **Anonymized Dumps & Mode-Specific Community Test Fixtures:**
-  - Added automatic serial number and barcode masking to `dump_mqtt_values` and `record_topic_changes` services for safe troubleshooting sharing.
-  - Organized Saunier Duval GeniaAir Max community test fixtures by distinct operating modes (`saunier_geniaair_max_heating.json`, `saunier_geniaair_max_acs.json`, and `saunier_geniaair_max_standby.json`), verifying entity stability, primary hydraulic thermodynamics, and humidity sensors across real-world operational states.
-- **Physical eBUS Health & Advanced TCP Daemon Diagnostics:**
-  - Added `binary_sensor.ebusd_running` and 7 diagnostic sensors attached to the root outdoor unit (uptime, scan status, daemon version, arbitration latency, symbol rate, reconnects, active masters).
-  - Disabled unreachable MQTT metrics (`symbol_rate`, `reconnects`, `masters`, `arbitration_latency`) by default in the entity registry (`entity_registry_enabled_default = False`) to prevent `Unknown` entities on pure MQTT setups.
-  - Added optional **Advanced eBUSd TCP Connection** in integration Options Flow (`enable_ebusd_tcp`, `ebusd_tcp_host` default `127.0.0.1`, `ebusd_tcp_port` default `8888`), periodically querying `info` (and zero-bus-traffic CSV `find` verification) via non-blocking TCP socket to hydrate daemon health metrics and detect outdated CSV files cleanly.
-  - Added `sensor.ebusd_missing_csv_devices` diagnostic sensor identifying scanned eBUS devices missing loaded CSV files, with full device inventory attributes (`missing_count`, `missing_devices`, `loaded_devices`, `total_scanned`).
-  - Added action buttons `button.ebusd_reload_csv` (reloads CSV definitions on the daemon in real time) and `button.ebusd_restart_scan` (restarts bus device identification).
-  - Synchronized entity registry state dynamically: toggling `enable_ebusd_tcp` automatically enables or disables TCP diagnostic entities and action buttons without manual registry intervention.
-  - Protected `send_hex_command` behind an explicit security opt-in switch (`enable_send_hex`) in Options Flow, automatically defaulting `host` and `port` to configured integration settings.
-- **Multilingual Support & Complete Translation Parity (EN, ES, DE):**
-  - Added complete German (`de.json`) translation suite across all entity platforms, configuration and options flows, device classes, and actions.
-  - Localized all 12 integration actions/services across `strings.json`, `translations/en.json`, `translations/es.json`, and `translations/de.json` with 100% key parity.
-  - Migrated `services.yaml` base names and descriptions to standard English.
-- **Release Security Gate in CI:**
-  - Hardened GitHub release workflow to require unit tests (Python 3.12 & 3.13), Ruff linter/formatter, Pyright typing, Hassfest, and HACS validation before building and publishing release archives.
-
-### Fixed
-- **Legacy Spanish Device Registry Migration:**
-  - Automatically migrates existing device entries in the Home Assistant Device Registry from legacy Spanish default names (`(Unidad Exterior)`, `(Regulador Climático)`, `(Interfaz Hidráulica)`, `(Termostato Inalámbrico)`) to standard English (`(Outdoor Unit)`, `(Climate Controller)`, `(Hydraulic Interface)`, `(Wireless Thermostat)`), preserving any custom user-assigned names (`name_by_user`).
-- **Cumulative Energy, COP/SCOP & 65,535 kWh Overflow Fix on `HMU` / `HMU00` (`HW5103`) Units:**
-  - Fixed 16-bit `UIN` integer overflow at 65,535 kWh in `08.hmu.csv` and `08.hmu.HW5103.csv` by migrating `YieldHc` and `TotalEnergyUsage` to 32-bit `ULG` counters.
-  - Fixed cumulative electrical/thermal energy totals, environmental yield (`YieldHc`/`YieldHwc`), per-mode historical COP/EER (`CopHc`/`CopHwc`/`CopCooling` with `1 + Yield/PrEnergySum` fallback), and global system efficiency on `hmu`/`hmu00` units lacking Monobloc `b516` EEPROM registers.
-  - Automatically disables the 3 Monobloc-exclusive outdoor per-mode electrical sensors (`energy_electric_hc_outdoor`, `energy_electric_hwc_outdoor`, `energy_electric_cool`) in the Entity Registry when an `hmu`/`hmu00` unit is detected, preserving manual user overrides.
-- **Dynamic Instantaneous Electric Power Fallback & 10-Minute Expiration Watchdog:**
-  - Configured `RunDataElectricPowerConsumption` (`r1;u`) as the preferred instantaneous electrical power source across `hmux0` and `hmu` while fresh (`<= 180 s`), dynamically falling back to `PowerStatus` if stale, and safely expiring power & active Live COP to `unavailable` after 10 minutes (`600 s`, or `2 × fallback_poll_interval`) without updates.
-- **Controller Register `2800`, Decoupled Cooling Setpoints & Vacation Mode Guards:**
-  - Renamed mislabeled `Z1DayTemp` (`2300`) to `Z1CoolingManualTemp` and `Z1MaxFlowTempDesired` (`2800` / invalid `w`) to read-only `Z1RoomHumidity` (`%`) across all 4 controller CSVs.
-  - Enforced `PRESET_AWAY` (`Z1Status = holidayaway`) priority over active cooling in `SaunierGeniaZone1Climate`, preventing accidental cooling activation or veto overrides while away and keeping `HolidayTemp` exclusively for heating frost protection.
-  - Widened `number.compressor_silent_operation_level` range to `30–60 %` and `number.max_cylinder_charge_time` range to `0–180 min` (`0 = Off`) to match field values observed on `basv3`/`hmu` installations.
-- **Schedule Validation & Mutex Safety:**
-  - Added chronological ordering validation, overlap rejection, midnight normalization (`24:00`), mutex write locking, and automatic cache recovery on mid-cascade communication errors.
-- **Thermostat & Climate Symmetrical Operation:**
-  - Fixed cooling season ECO preset to write `Z1OpModeCooling = "night"`, added dynamic season evaluation in `HVACMode.AUTO`, and corrected `select.hc1_auto_off_mode` options.
-- **Thermodynamic Responsiveness:**
-  - Evaluated thermal calculations against all canonical message aliases, immediately updating thermal power and live COP upon telemetry arrival.
-- **Connection Loss Watchdog:**
-  - Added a 10-minute communication watchdog that safely marks control entities unavailable when bus telemetry ceases, keeping historical sensors available.
-- **CSV Header Compliance, Parity & Clean Hydration:**
-  - Moved CSV column definitions to line 1 to comply with ebusd 26.1 C++ parser, filtered incompatible `b516` queries on HMU units, and enforced byte-for-byte parity and Unix `LF` line endings across `15.*.csv` and `08.hmu*.csv`.
-- **English Localization for Countdown Duration States:**
-  - Standardized coordinator string returns for `sensor.holiday_duration_remaining` and `sensor.cooling_duration_remaining` from Spanish (`Inactivo` / `Final abierto`) to standard English (`Inactive` / `Open-ended`), defined centrally in `const.py` (`STATE_INACTIVE` / `STATE_OPEN_ENDED`).
-- **Compatibility & Code Quality:**
-  - Fixed Home Assistant Core 2026.8+ Device Registry compatibility by passing `config_entry_id` to `async_get_device_by_identifier` via a unified registry lookup helper (retaining `async_get_device` fallback for earlier releases).
-  - Raised minimum supported Home Assistant version to `2024.12.0` and achieved 100% clean Pyright static typing and Ruff formatting across 188 unit tests.
+- **New hardware: CTLV2 / CTLV3 controllers (`sensoHOME` / `sensoCOMFORT` / `MiSet`) and Vaillant HMU00 (HW5103) / aroTHERM Split outdoor units.** New ebusd CSV templates (`15.ctlv2.csv`, `15.ctlv3.csv`, `08.hmu.HW5103.csv`) with automatic scan detection and circuit aliasing; Split water pressure, silent mode levels, compressor hours/starts fallbacks and native COP registers. Also added UK `aroTHERM pro 7.1` and `aroTHERM plus 8.1` models. Developed with the help of community testers and not yet validated on every model; please report any mismatch in GitHub issues.
+- **Persistent overrides across restarts (Store):**
+  - **Cooling Quick Veto:** Timed synthetic cooling veto for scheduled and manual cooling, stored in Home Assistant so active vetos resume after a restart and restore the previous operating mode and setpoint.
+  - **Heating Quick Veto from Off:** Preserves and restores `Z1OpMode = "off"` upon veto expiration even if Home Assistant restarts mid-veto or if the eBUS daemon is offline.
+  - **Smart Forced DHW Boost:** Preserves original `HwcTempDesired` across restarts, automatically restoring the setpoint upon charge completion or 60-minute timeout.
+- **Quick veto controls.** Adjustable veto duration (0.5–12 h), heating and cooling boost deltas, and `quick_veto` / `cancel_quick_veto` actions.
+- **Anti-legionella control.** Day selector, time entity and `set_legionella_protection` action across all controller CSVs.
+- **Weekly schedules: 3 slots per day + silent mode.** Heating, cooling, DHW and circulation expand from 1 to 3 daily slots; new silent mode weekly schedule (with its own summary sensor); passive decoding of schedule writes made from the official app, without polling.
+- **New telemetry sensors.** Refrigeration cycle (evaporation, condensation, superheat, subcooling and more), per-mode compressor hours and starts, hydraulic auxiliary heater statistics, active error sensors for the outdoor unit and the controller, and Zone 1 relative humidity.
+- **100% explicit MDI icon coverage.** Added missing entity icons across all platforms in `icons.json` for full UI consistency without relying on fallback icons.
+- **ebusd daemon health.** A daemon status binary sensor plus an optional advanced TCP connection (Options Flow) that reports daemon info, verifies loaded CSV files, detects devices missing CSV definitions, and adds reload-CSV and restart-scan buttons. Metrics that ebusd does not publish over MQTT stay disabled by default.
+- **Slow eBUS telemetry repair issue (`ebusd_slow_polling_seed`):** Automatically detects if high-priority power telemetry (`RunDataElectricPowerConsumption`) updates abnormally slowly (≥ 5 minutes while eBUS is active), alerting users running the Home Assistant eBUSd Add-on ([LukasGrebe/ha-addons](https://github.com/LukasGrebe/ha-addons)) to disable the legacy `seed_mqtt_cfg` option that overloads the bus.
+- **Diagnostic actions.** Symbolic `read_parameter` / `write_parameter`; `dump_mqtt_values` and `record_topic_changes` mask serial numbers and barcodes by default (still review the output before sharing it); `send_hex_command` is now behind an explicit opt-in switch.
+- **German translation** and full EN/ES/DE parity across all 12 actions.
+- **Restructured documentation:** shorter README plus modular English and Spanish guides under `docs/` (installation, configuration, hardware, services, troubleshooting).
 
 ### Changed
-- **Fast Live Electric Power Polling (`r1;u`) & Thermodynamic Polling (`r2;u`):**
-  - Upgraded `RunDataElectricPowerConsumption` (`08.hmux0.csv`, `08.hmu.csv`, `08.hmu.HW5103.csv`) to top-priority `r1;u` active polling (with `PowerStatus` as fallback and 10-minute staleness expiration) so live electrical input updates reliably every ~9–18 seconds.
-  - Upgraded `RunDataFlowTemp`, `RunDataReturnTemp`, and `RunDataFlowRate` from slow `r9;u` to prioritized `r2;u` in `08.hmux0.csv`, `08.hmu.csv`, and `08.hmu.HW5103.csv`.
-  - Re-evaluates flow and return temperatures every ~18 to 36 seconds, accelerating real-time ΔT and instantaneous thermal power updates while keeping the full poll cycle under 2 minutes.
-  - Converted `CompressorAvailability` in `08.hmux0.csv` to passive `u` to resolve the `prepare poll message: ERR: end of input reached` error caused by missing master input arguments during active polling.
-- **eBUSd Add-on Setup & Collision Prevention:**
-  - Updated documentation to instruct users to disable **"Seed HA MQTT integration config (only needed once)"** (`seed_mqtt_cfg: false`), preventing ebusd from injecting `mqtt-hassio.cfg` with `filter-seen = 5` which polled 160+ registers every 16 minutes, caused 2400-baud bus collisions, and created hundreds of duplicate MQTT entities.
-  - Explicitly documented the requirement to add `--mqttjson` to `commandline_options` when `seed_mqtt_cfg` is disabled (as the add-on previously auto-injected `--mqttjson` only when `seed_mqtt_cfg` was active).
-- **HACS Official Default Repository Indexing:**
-  - Updated README documentation and badges from `HACS-Custom` to `HACS-Default`. With official inclusion in the default HACS store catalog, users can install directly via standard HACS search without configuring a custom repository URL.
-- **Selective Low-Priority `r9;u` Polling & Conservative Register Naming:**
-  - Assigned gentle `r9;u` background polling exclusively to registers not queried passively by `MiGo Link` (`0xf1`) across `08.hmux0.csv`, `08.hmu.csv` / `08.hmu.HW5103.csv`, and `15.*.csv`, keeping unpolled counters, COPs, and diagnostics fresh without saturating the bus.
-  - Conservatively re-labeled unverified hourly diagnostic registers (`RunDataDiagxxxx`) across `08.hmux0.csv`, `08.hmu*.csv`, and `76.vwzio.csv`.
+- **Faster live electric power:** moved to ebusd's highest polling priority (`r1`), with `PowerStatus` as fallback when the primary source goes stale and a 10-minute expiration to `unavailable` when updates stop.
+- **Faster thermal telemetry:** flow temperature, return temperature and flow rate moved from the slowest to the second polling priority (`r2`), so thermal power and live COP refresh sooner.
+- **Install from the HACS default catalog:** no custom repository URL needed anymore.
+- **Limited background polling:** low-priority (`r9`) reads are restricted to registers the official gateway never queries, and unverified registers carry conservative names.
+- **ebusd add-on setup docs updated:** Added explicit instructions for the Home Assistant eBUSd Add-on ([LukasGrebe/ha-addons](https://github.com/LukasGrebe/ha-addons)) regarding `seed_mqtt_cfg` and `--mqttjson` after a known configuration caused heavy polling and duplicate MQTT entities.
+- Minimum supported Home Assistant version raised from 2024.4.0 to **2024.12.0**.
+
+### Fixed
+- **State persistence across Home Assistant restarts:** fixed elevated `HwcTempDesired` becoming permanent when restarting during a forced DHW boost, and fixed Zone 1 staying in `auto` instead of reverting to `off` when restarting during a heating quick veto started from off. Also fixed a startup race condition where `Z1Status` could cancel an active heating veto before `Z1SFMode` arrived.
+- **Dead references and CSV field cleanup:** removed obsolete `EnergyYieldPrecision` fallbacks, purged redundant `"value"` fallback in `HwcLegionellaTime`, and aligned `Status01` flow temperature with canonical CSV field `flow_temp`.
+- **Heating and cooling setpoints decoupled:** register `2300` was mislabeled as `Z1DayTemp`; it is the cooling manual setpoint (`Z1CoolingManualTemp`), while heating uses `2200`. This fixes cases where changing the heating temperature wrote cooling setpoints and where Boost from cooling armed the heating quick veto.
+- **Energy counters on HMU / Split units:** fixed the 65,535 kWh 16-bit overflow (now 32-bit) and restored cumulative energy, environmental yield and per-mode COP/EER on units without Monobloc EEPROM registers.
+- **Weekly schedule writing hardened:** validates every day before writing anything, rejects overlaps and slots crossing midnight, serializes writes with a lock, and safely invalidates the cached schedule state if a write fails midway.
+- **Climate behavior:** holiday/away mode now takes priority over cooling, `AUTO` picks the season dynamically, and the cooling ECO preset behaves symmetrically to heating.
+- **Instantaneous power staleness:** prefers the primary power register while it is fresh (up to 3 minutes old), falls back to `PowerStatus` when stale, and expires power and live COP to `unavailable` after 10 minutes without updates instead of showing obsolete values.
+- **Connection watchdog:** control entities go unavailable after 10 minutes without bus telemetry, while historical sensors stay available.
+- **CSV compliance:** headers on line 1 for the ebusd 26.1 parser, byte-for-byte parity across controller CSVs, and incompatible queries filtered on HMU units.
+- **Home Assistant 2026.8+ compatibility** in the device registry, and automatic migration of legacy Spanish device names.
 
 ---
 

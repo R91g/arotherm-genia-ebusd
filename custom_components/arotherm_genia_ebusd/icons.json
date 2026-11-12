@@ -569,6 +569,96 @@
       },
       "hc1_pump_status": {
         "default": "mdi:pump"
+      },
+      "flow_temp_precision": {
+        "default": "mdi:thermometer-water"
+      },
+      "return_temp_precision": {
+        "default": "mdi:thermometer-water"
+      },
+      "air_inlet_temp": {
+        "default": "mdi:thermometer"
+      },
+      "compressor_inlet_temp": {
+        "default": "mdi:thermometer-low"
+      },
+      "compressor_outlet_temp": {
+        "default": "mdi:thermometer-high"
+      },
+      "eev_outlet_temp": {
+        "default": "mdi:thermometer-minus"
+      },
+      "condenser_out_temp": {
+        "default": "mdi:thermometer-chevron-down"
+      },
+      "displayed_outside_temp": {
+        "default": "mdi:thermometer"
+      },
+      "outside_temp_avg": {
+        "default": "mdi:thermometer"
+      },
+      "z1_room_temp": {
+        "default": "mdi:thermometer"
+      },
+      "z1_actual_room_temp_desired": {
+        "default": "mdi:thermostat"
+      },
+      "hc1_flow_temp": {
+        "default": "mdi:thermometer-water"
+      },
+      "hc1_actual_flow_temp_desired": {
+        "default": "mdi:thermometer-chevron-up"
+      },
+      "hwc_storage_temp": {
+        "default": "mdi:thermometer-water"
+      },
+      "hwc_flow_temp": {
+        "default": "mdi:thermometer-water"
+      },
+      "bass3_energy_hc_this_month": {
+        "default": "mdi:fire"
+      },
+      "bass3_energy_hc_last_month": {
+        "default": "mdi:fire"
+      },
+      "bass3_energy_hc_total": {
+        "default": "mdi:fire"
+      },
+      "bass3_energy_hwc_this_month": {
+        "default": "mdi:water-boiler"
+      },
+      "bass3_energy_hwc_last_month": {
+        "default": "mdi:water-boiler"
+      },
+      "bass3_energy_hwc_total": {
+        "default": "mdi:water-boiler"
+      },
+      "vwzio_electric_power": {
+        "default": "mdi:lightning-bolt"
+      },
+      "vwzio_energy_electric_hc": {
+        "default": "mdi:lightning-bolt"
+      },
+      "vwzio_energy_electric_hwc": {
+        "default": "mdi:lightning-bolt"
+      },
+      "vwzio_energy_thermal_hc": {
+        "default": "mdi:fire"
+      },
+      "vwzio_energy_thermal_hwc": {
+        "default": "mdi:water-boiler"
+      },
+      "wireless_room_temp_dial": {
+        "default": "mdi:thermometer"
+      },
+      "wireless_room_target_temp": {
+        "default": "mdi:thermostat"
+      },
+      "broadcast_outside_temp": {
+        "default": "mdi:thermometer"
+      },
+      "broadcast_datetime": {
+        "default": "mdi:clock-outline"
       }
     },
     "number": {

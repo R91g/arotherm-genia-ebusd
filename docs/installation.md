@@ -66,7 +66,7 @@ Copy the CSV files into your `ebusd` configuration directory preserving this exa
     └── f6.netx3.csv           <-- Wireless room thermostat passive RF frames
 ```
 
-### Option A: Home Assistant eBUSd Add-on
+### Option A: Home Assistant eBUSd Add-on ([LukasGrebe/ha-addons](https://github.com/LukasGrebe/ha-addons))
 
 1. Copy `ebusd-configuration/broadcast.csv` to:
    `/addon_configs/b4d7ad18_ebusd/ebusd-configuration/en/broadcast.csv`
