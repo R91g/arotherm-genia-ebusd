@@ -546,6 +546,14 @@ class SaunierGeniaCoordinator:
         """Return configured eBUSd TCP port."""
         return int(self.entry.options.get(CONF_EBUSD_TCP_PORT, DEFAULT_EBUSD_TCP_PORT))
 
+    def _get_device_registry_entry(self, dev_reg: Any, device_key: str) -> Any:
+        """Look up a DeviceEntry for device_key scoped to this config entry."""
+        entry_id = self.entry.entry_id
+        identifier = (DOMAIN, f"{entry_id}_{device_key}")
+        if hasattr(dev_reg, "async_get_device_by_identifier"):
+            return dev_reg.async_get_device_by_identifier(identifier, entry_id)
+        return dev_reg.async_get_device(identifiers={identifier})
+
     @property
     def outdoor_device_id(self) -> str | None:
         """Return the internal Home Assistant Device Registry ID for the outdoor unit."""
@@ -556,12 +564,7 @@ class SaunierGeniaCoordinator:
         from homeassistant.helpers import device_registry as dr
 
         dev_reg = dr.async_get(self.hass)
-        entry_id = self.entry.entry_id
-        outdoor_id = f"{entry_id}_{DEVICE_OUTDOOR_UNIT}"
-        if hasattr(dev_reg, "async_get_device_by_identifier"):
-            device = dev_reg.async_get_device_by_identifier((DOMAIN, outdoor_id))
-        else:
-            device = dev_reg.async_get_device(identifiers={(DOMAIN, outdoor_id)})
+        device = self._get_device_registry_entry(dev_reg, DEVICE_OUTDOOR_UNIT)
         if device:
             self._outdoor_device_id = device.id
             return device.id
@@ -3609,12 +3612,7 @@ class SaunierGeniaCoordinator:
             from homeassistant.helpers import device_registry as dr
 
             dev_reg = dr.async_get(self.hass)
-            entry_id = self.entry.entry_id
-            device_id_key = f"{entry_id}_{device_key}"
-            if hasattr(dev_reg, "async_get_device_by_identifier"):
-                device = dev_reg.async_get_device_by_identifier((DOMAIN, device_id_key))
-            else:
-                device = dev_reg.async_get_device(identifiers={(DOMAIN, device_id_key)})
+            device = self._get_device_registry_entry(dev_reg, device_key)
             if not device:
                 return
 
@@ -3630,7 +3628,10 @@ class SaunierGeniaCoordinator:
             if kwargs:
                 dev_reg.async_update_device(device.id, **kwargs)
                 _LOGGER.debug(
-                    "Updated Device Registry for %s with %s", device_id_key, kwargs
+                    "Updated Device Registry for %s_%s with %s",
+                    self.entry.entry_id,
+                    device_key,
+                    kwargs,
                 )
         except Exception:
             _LOGGER.exception("Failed to update Device Registry for %s", device_key)

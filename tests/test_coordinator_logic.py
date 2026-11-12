@@ -919,7 +919,15 @@ class TestCoordinatorLogic(unittest.TestCase):
         mock_device = MagicMock()
         mock_device.id = "mock_device_outdoor_id"
         dev_reg.async_get_device.return_value = mock_device
-        dev_reg.async_get_device_by_identifier.return_value = mock_device
+
+        def strict_get_by_identifier(
+            identifier: tuple[str, str], config_entry_id: str
+        ) -> MagicMock:
+            return mock_device
+
+        dev_reg.async_get_device_by_identifier = MagicMock(
+            side_effect=strict_get_by_identifier
+        )
 
         coord = SaunierGeniaCoordinator(hass, entry)
 
@@ -1066,6 +1074,53 @@ class TestCoordinatorLogic(unittest.TestCase):
             dev_info_thermostat_linked.get("via_device_id"), "reg_outdoor_12345"
         )
         self.assertNotIn("via_device", dev_info_thermostat_linked)
+
+    def test_device_registry_lookup_scoped_and_legacy_fallback(self) -> None:
+        """Verify HA 2026.8+ 2-arg async_get_device_by_identifier and legacy async_get_device fallback."""
+        import sys
+
+        hass = MagicMock()
+        entry = MagicMock()
+        entry.entry_id = "entry_xyz"
+        entry.data = {}
+
+        dr_mod = sys.modules["homeassistant.helpers.device_registry"]
+        dev_reg = MagicMock()
+        dr_mod.async_get.return_value = dev_reg
+        mock_device = MagicMock()
+        mock_device.id = "dev_id_xyz"
+
+        def strict_get_by_identifier(
+            identifier: tuple[str, str], config_entry_id: str
+        ) -> MagicMock:
+            return mock_device
+
+        dev_reg.async_get_device_by_identifier = MagicMock(
+            side_effect=strict_get_by_identifier
+        )
+
+        coord = SaunierGeniaCoordinator(hass, entry)
+        self.assertEqual(coord.outdoor_device_id, "dev_id_xyz")
+        dev_reg.async_get_device_by_identifier.assert_called_once_with(
+            (DOMAIN, f"entry_xyz_{DEVICE_OUTDOOR_UNIT}"), "entry_xyz"
+        )
+
+        # Simulate pre-2026.8 Home Assistant without async_get_device_by_identifier
+        legacy_reg = MagicMock(spec=["async_get_device", "async_update_device"])
+        legacy_dev = MagicMock()
+        legacy_dev.id = "legacy_dev_id"
+        legacy_reg.async_get_device.return_value = legacy_dev
+        dr_mod.async_get.return_value = legacy_reg
+
+        coord._outdoor_device_id = None
+        coord._async_update_device_registry(DEVICE_CLIMATE_CONTROLLER)
+        legacy_reg.async_get_device.assert_called_with(
+            identifiers={(DOMAIN, f"entry_xyz_{DEVICE_CLIMATE_CONTROLLER}")}
+        )
+        legacy_reg.async_update_device.assert_called_with(
+            "legacy_dev_id", sw_version="0708", hw_version="4304"
+        )
+        self.assertEqual(coord.outdoor_device_id, "legacy_dev_id")
 
     def test_controller_circuit_aliasing_bass3_and_basv3(self) -> None:
         """Test bidirectional aliasing, scan detection, and routing between bass3 and basv3."""

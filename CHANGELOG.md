@@ -84,7 +84,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **English Localization for Countdown Duration States:**
   - Standardized coordinator string returns for `sensor.holiday_duration_remaining` and `sensor.cooling_duration_remaining` from Spanish (`Inactivo` / `Final abierto`) to standard English (`Inactive` / `Open-ended`), defined centrally in `const.py` (`STATE_INACTIVE` / `STATE_OPEN_ENDED`).
 - **Compatibility & Code Quality:**
-  - Raised minimum supported Home Assistant version to `2024.12.0` and achieved 100% clean Pyright static typing and Ruff formatting across 187 unit tests.
+  - Fixed Home Assistant Core 2026.8+ Device Registry compatibility by passing `config_entry_id` to `async_get_device_by_identifier` via a unified registry lookup helper (retaining `async_get_device` fallback for earlier releases).
+  - Raised minimum supported Home Assistant version to `2024.12.0` and achieved 100% clean Pyright static typing and Ruff formatting across 188 unit tests.
 
 ### Changed
 - **Fast Live Electric Power Polling (`r1;u`) & Thermodynamic Polling (`r2;u`):**
