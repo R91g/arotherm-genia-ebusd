@@ -1017,7 +1017,7 @@
     },
     "read_parameter": {
       "name": "Read Parameter via MQTT",
-      "description": "Reads a symbolic eBUSd register via MQTT (publishing to '<prefix>/<circuit>/<name>/get' and awaiting reply on '<prefix>/<circuit>/<name>'). Supports returning cached value or forcing an active bus read.",
+      "description": "Reads a symbolic eBUSd register via MQTT (publishing to '[prefix]/[circuit]/[name]/get' and awaiting reply on '[prefix]/[circuit]/[name]'). Supports returning cached value or forcing an active bus read.",
       "fields": {
         "circuit": {
           "name": "Circuit",
@@ -1039,7 +1039,7 @@
     },
     "write_parameter": {
       "name": "Write Parameter via MQTT",
-      "description": "Writes a value to a symbolic eBUSd register via MQTT (publishing to '<prefix>/<circuit>/<name>/set'). Applies optimistic state update in Home Assistant and leverages intelligent circuit alias routing.",
+      "description": "Writes a value to a symbolic eBUSd register via MQTT (publishing to '[prefix]/[circuit]/[name]/set'). Applies optimistic state update in Home Assistant and leverages intelligent circuit alias routing.",
       "fields": {
         "circuit": {
           "name": "Circuit",

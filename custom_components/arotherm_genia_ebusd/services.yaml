@@ -385,8 +385,8 @@ send_hex_command:
 read_parameter:
   name: Read Parameter via MQTT
   description: >
-    Reads a symbolic eBUSd register via MQTT (publishing to '<prefix>/<circuit>/<name>/get'
-    and awaiting reply on '<prefix>/<circuit>/<name>'). Supports returning cached value or
+    Reads a symbolic eBUSd register via MQTT (publishing to '[prefix]/[circuit]/[name]/get'
+    and awaiting reply on '[prefix]/[circuit]/[name]'). Supports returning cached value or
     forcing an active physical bus read.
   fields:
     circuit:
@@ -428,7 +428,7 @@ read_parameter:
 write_parameter:
   name: Write Parameter via MQTT
   description: >
-    Writes a value to a symbolic eBUSd register via MQTT (publishing to '<prefix>/<circuit>/<name>/set').
+    Writes a value to a symbolic eBUSd register via MQTT (publishing to '[prefix]/[circuit]/[name]/set').
     Applies optimistic state update in Home Assistant and leverages intelligent circuit alias routing.
   fields:
     circuit:

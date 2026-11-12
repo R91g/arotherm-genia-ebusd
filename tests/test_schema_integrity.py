@@ -160,25 +160,29 @@ class TestSchemaIntegrity(unittest.TestCase):
             }
         self.assertEqual(yaml_services, strings_services)
 
-        # Check for empty strings in all translation files
-        def check_no_empty_strings(obj: dict | list | str, path: str = "") -> None:
+        # Check for empty strings or HTML-like tags in all translation files (Hassfest requirement)
+        def check_translation_strings(obj: dict | list | str, path: str = "") -> None:
             if isinstance(obj, dict):
                 for k, v in obj.items():
-                    check_no_empty_strings(v, f"{path}.{k}")
+                    check_translation_strings(v, f"{path}.{k}")
             elif isinstance(obj, list):
                 for i, v in enumerate(obj):
-                    check_no_empty_strings(v, f"{path}[{i}]")
+                    check_translation_strings(v, f"{path}[{i}]")
             elif isinstance(obj, str):
                 self.assertGreater(
                     len(obj.strip()),
                     0,
                     f"Empty translation string found at: {path}",
                 )
+                self.assertIsNone(
+                    re.search(r"<[^>]+>", obj),
+                    f"HTML-like tag disallowed by Hassfest at {path}: {obj}",
+                )
 
-        check_no_empty_strings(strings, "strings.json")
-        check_no_empty_strings(en, "en.json")
-        check_no_empty_strings(es, "es.json")
-        check_no_empty_strings(de, "de.json")
+        check_translation_strings(strings, "strings.json")
+        check_translation_strings(en, "en.json")
+        check_translation_strings(es, "es.json")
+        check_translation_strings(de, "de.json")
 
     def test_services_yaml(self) -> None:
         """Verify services.yaml exposes services registered in __init__.py."""

@@ -1017,7 +1017,7 @@
     },
     "read_parameter": {
       "name": "Parameter über MQTT lesen",
-      "description": "Liest ein symbolisches eBUSd-Register über MQTT (Veröffentlichung unter '<Präfix>/<Kreis>/<Name>/get' und Warten auf '<Präfix>/<Kreis>/<Name>'). Unterstützt Cache-Rückgabe oder erzwungenes Lesen vom physischen Bus.",
+      "description": "Liest ein symbolisches eBUSd-Register über MQTT (Veröffentlichung unter '[Präfix]/[Kreis]/[Name]/get' und Warten auf '[Präfix]/[Kreis]/[Name]'). Unterstützt Cache-Rückgabe oder erzwungenes Lesen vom physischen Bus.",
       "fields": {
         "circuit": {
           "name": "Schaltkreis",
@@ -1039,7 +1039,7 @@
     },
     "write_parameter": {
       "name": "Parameter über MQTT schreiben",
-      "description": "Schreibt einen Wert in ein symbolisches eBUSd-Register über MQTT (Veröffentlichung unter '<Präfix>/<Kreis>/<Name>/set'). Wendet optimistische Zustandsaktualisierung in Home Assistant an und nutzt intelligentes Routing.",
+      "description": "Schreibt einen Wert in ein symbolisches eBUSd-Register über MQTT (Veröffentlichung unter '[Präfix]/[Kreis]/[Name]/set'). Wendet optimistische Zustandsaktualisierung in Home Assistant an und nutzt intelligentes Routing.",
       "fields": {
         "circuit": {
           "name": "Schaltkreis",

@@ -1017,7 +1017,7 @@
     },
     "read_parameter": {
       "name": "Leer parámetro por MQTT",
-      "description": "Lee un registro simbólico de eBUSd a través de MQTT (publicando en '<prefijo>/<circuito>/<nombre>/get' y esperando la respuesta en '<prefijo>/<circuito>/<nombre>'). Permite devolver el valor almacenado en caché o forzar una lectura activa del bus físico.",
+      "description": "Lee un registro simbólico de eBUSd a través de MQTT (publicando en '[prefijo]/[circuito]/[nombre]/get' y esperando la respuesta en '[prefijo]/[circuito]/[nombre]'). Permite devolver el valor almacenado en caché o forzar una lectura activa del bus físico.",
       "fields": {
         "circuit": {
           "name": "Circuito",
@@ -1039,7 +1039,7 @@
     },
     "write_parameter": {
       "name": "Escribir parámetro por MQTT",
-      "description": "Escribe un valor en un registro simbólico de eBUSd a través de MQTT (publicando en '<prefijo>/<circuito>/<nombre>/set'). Aplica una actualización optimista en el estado de Home Assistant y aprovecha el enrutamiento inteligente de circuitos.",
+      "description": "Escribe un valor en un registro simbólico de eBUSd a través de MQTT (publicando en '[prefijo]/[circuito]/[nombre]/set'). Aplica una actualización optimista en el estado de Home Assistant y aprovecha el enrutamiento inteligente de circuitos.",
       "fields": {
         "circuit": {
           "name": "Circuito",
