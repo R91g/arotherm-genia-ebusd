@@ -3817,6 +3817,137 @@ class TestCoordinatorLogic(unittest.TestCase):
 
         asyncio.run(_run())
 
+    def test_coordinator_restore_write_failures_preserve_state_and_store(self) -> None:
+        """Verify write failures during restore preserve memory state and store for retry."""
+
+        async def _run() -> None:
+            hass = MagicMock()
+            entry = MagicMock(entry_id="write_fail_entry")
+            entry.data = {"mqtt_prefix": "ebusd"}
+            entry.options = {}
+
+            # --- 1. DHW Boost write failure ---
+            coord = SaunierGeniaCoordinator(hass, entry)
+            coord._state[(CIRCUIT_BASS3.lower(), "Status01")] = {"temp1": 35.0}
+            coord._saved_dhw_target_temp = 50.0
+            coord._dhw_boost_active = True
+            await coord._dhw_boost_store.async_save(
+                {
+                    "saved_target_temp": 50.0,
+                    "end_timestamp": datetime.now().timestamp() + 3600.0,
+                    "end_time": (datetime.now() + timedelta(hours=1)).isoformat(),
+                }
+            )
+
+            with (
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                    side_effect=HomeAssistantError("Broker unavailable"),
+                ),
+                self.assertRaises(HomeAssistantError),
+            ):
+                await coord._async_restore_dhw_target_temp("testing write failure")
+
+            self.assertEqual(coord.saved_dhw_target_temp, 50.0)
+            self.assertTrue(coord.pending_dhw_boost_restore)
+            dhw_store = await coord._dhw_boost_store.async_load()
+            self.assertIsNotNone(dhw_store)
+            self.assertEqual(dhw_store.get("saved_target_temp"), 50.0)
+            self.assertEqual(dhw_store.get("end_timestamp"), 0.0)
+
+            # Retry succeeds
+            with patch(
+                "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                new_callable=AsyncMock,
+            ):
+                await coord._async_restore_dhw_target_temp("retry success")
+            self.assertIsNone(coord.saved_dhw_target_temp)
+            self.assertFalse(coord.pending_dhw_boost_restore)
+            self.assertIsNone(await coord._dhw_boost_store.async_load())
+
+            # --- 2. Heating Veto write failure ---
+            coord._state[(CIRCUIT_BASS3.lower(), "Status01")] = {"temp1": 35.0}
+            coord._pre_veto_opmode = "off"
+            await coord._heating_veto_store.async_save(
+                {
+                    "pre_opmode": "off",
+                    "end_timestamp": datetime.now().timestamp() + 3600.0,
+                    "end_time": (datetime.now() + timedelta(hours=1)).isoformat(),
+                }
+            )
+
+            with (
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                    side_effect=HomeAssistantError("Broker unavailable"),
+                ),
+                self.assertRaises(HomeAssistantError),
+            ):
+                await coord._async_finish_heating_veto_off_restore(
+                    "testing write failure"
+                )
+
+            self.assertEqual(coord.pre_veto_opmode, "off")
+            self.assertTrue(coord._pending_heating_veto_restore)
+            heating_store = await coord._heating_veto_store.async_load()
+            self.assertIsNotNone(heating_store)
+            self.assertEqual(heating_store.get("pre_opmode"), "off")
+            self.assertEqual(heating_store.get("end_timestamp"), 0.0)
+
+            # Retry succeeds
+            with patch(
+                "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                new_callable=AsyncMock,
+            ):
+                await coord._async_finish_heating_veto_off_restore("retry success")
+            self.assertIsNone(coord.pre_veto_opmode)
+            self.assertFalse(coord._pending_heating_veto_restore)
+            self.assertIsNone(await coord._heating_veto_store.async_load())
+
+            # --- 3. Cooling Veto write failure ---
+            coord._pre_cooling_veto_opmode = "night"
+            coord._pre_cooling_veto_temp = 24.0
+            await coord._cooling_veto_store.async_save(
+                {
+                    "pre_opmode": "night",
+                    "pre_temp": 24.0,
+                    "end_timestamp": datetime.now().timestamp() + 3600.0,
+                    "end_time": (datetime.now() + timedelta(hours=1)).isoformat(),
+                }
+            )
+
+            with (
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                    side_effect=HomeAssistantError("Broker unavailable"),
+                ),
+                self.assertRaises(HomeAssistantError),
+            ):
+                await coord.async_cancel_cooling_quick_veto(restore=True)
+
+            self.assertEqual(coord._pre_cooling_veto_opmode, "night")
+            self.assertEqual(coord._pre_cooling_veto_temp, 24.0)
+            self.assertTrue(coord._pending_cooling_veto_restore)
+            cooling_store = await coord._cooling_veto_store.async_load()
+            self.assertIsNotNone(cooling_store)
+            self.assertEqual(cooling_store.get("pre_opmode"), "night")
+            self.assertEqual(cooling_store.get("end_timestamp"), 0.0)
+
+            # Retry succeeds
+            with patch(
+                "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                new_callable=AsyncMock,
+            ):
+                await coord.async_cancel_cooling_quick_veto(restore=True)
+            self.assertIsNone(coord._pre_cooling_veto_opmode)
+            self.assertIsNone(coord._pre_cooling_veto_temp)
+            self.assertFalse(coord._pending_cooling_veto_restore)
+            self.assertIsNone(await coord._cooling_veto_store.async_load())
+
+            await coord.async_unload()
+
+        asyncio.run(_run())
+
 
 if __name__ == "__main__":
     unittest.main()

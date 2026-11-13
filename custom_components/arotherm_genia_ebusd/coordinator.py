@@ -2808,12 +2808,10 @@ class SaunierGeniaCoordinator:
         """Restore HwcTempDesired to its pre-boost setpoint and clear boost state."""
         saved_temp = self._saved_dhw_target_temp
         self._dhw_boost_active = False
-        self._saved_dhw_target_temp = None
         self._dhw_boost_goal_temp = None
         self._dhw_boost_started_ts = None
         self._dhw_boost_end_time = None
         self._dhw_boost_seen_load = False
-        self._pending_dhw_boost_restore = False
 
         if self._dhw_boost_timeout_unsub is not None:
             self._dhw_boost_timeout_unsub()
@@ -2822,17 +2820,56 @@ class SaunierGeniaCoordinator:
             self._dhw_boost_restore_unsub()
             self._dhw_boost_restore_unsub = None
 
-        await self._async_clear_store(self._dhw_boost_store, "DHW boost")
-
         if saved_temp is not None:
+            if not self.is_ebus_operational:
+                self._saved_dhw_target_temp = saved_temp
+                self._pending_dhw_boost_restore = True
+                await self._async_save_store(
+                    self._dhw_boost_store,
+                    {
+                        "saved_target_temp": saved_temp,
+                        "end_timestamp": 0.0,
+                        "end_time": datetime.fromtimestamp(0.0).isoformat(),
+                    },
+                    "DHW boost",
+                )
+                _LOGGER.info(
+                    "DHW boost restore requested while eBUS offline; deferring restoration of HwcTempDesired=%.1f°C",
+                    saved_temp,
+                )
+                return
+
             _LOGGER.info(
                 "Restoring HwcTempDesired to original setpoint %.1f°C (%s)",
                 saved_temp,
                 reason,
             )
-            await self.async_write_parameter(
-                CIRCUIT_BASS3, "HwcTempDesired", saved_temp
-            )
+            try:
+                await self.async_write_parameter(
+                    CIRCUIT_BASS3, "HwcTempDesired", saved_temp
+                )
+            except Exception as err:
+                self._saved_dhw_target_temp = saved_temp
+                self._pending_dhw_boost_restore = True
+                await self._async_save_store(
+                    self._dhw_boost_store,
+                    {
+                        "saved_target_temp": saved_temp,
+                        "end_timestamp": 0.0,
+                        "end_time": datetime.fromtimestamp(0.0).isoformat(),
+                    },
+                    "DHW boost",
+                )
+                _LOGGER.warning(
+                    "Failed to write HwcTempDesired restoration to bus (%s); will retry on next telemetry: %s",
+                    reason,
+                    err,
+                )
+                raise
+
+        self._saved_dhw_target_temp = None
+        self._pending_dhw_boost_restore = False
+        await self._async_clear_store(self._dhw_boost_store, "DHW boost")
 
     async def async_activate_holiday_mode(
         self,
@@ -3099,6 +3136,8 @@ class SaunierGeniaCoordinator:
         """Check whether hardware countdown timer ended quick veto and restore prior state."""
         if self._pre_veto_opmode != "off":
             return
+        if self._pending_heating_veto_restore:
+            return
         sf_mode = (self.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or "").lower()
         if not sf_mode or sf_mode == "veto":
             return
@@ -3109,7 +3148,7 @@ class SaunierGeniaCoordinator:
             self._heating_veto_end_time = None
             self._pending_heating_veto_restore = True
             return
-        self._pre_veto_opmode = None
+        self._pending_heating_veto_restore = True
         self.hass.async_create_task(
             self._async_finish_heating_veto_off_restore(f"Z1SFMode={sf_mode}")
         )
@@ -3122,15 +3161,52 @@ class SaunierGeniaCoordinator:
         if self._heating_veto_restore_unsub is not None:
             self._heating_veto_restore_unsub()
             self._heating_veto_restore_unsub = None
-        self._pending_heating_veto_restore = False
         self._heating_veto_end_time = None
-        self._pre_veto_opmode = None
 
-        await self._async_clear_store(self._heating_veto_store, "heating quick veto")
+        if not self.is_ebus_operational:
+            self._pre_veto_opmode = "off"
+            self._pending_heating_veto_restore = True
+            await self._async_save_store(
+                self._heating_veto_store,
+                {
+                    "pre_opmode": "off",
+                    "end_timestamp": 0.0,
+                    "end_time": datetime.fromtimestamp(0.0).isoformat(),
+                },
+                "heating quick veto",
+            )
+            _LOGGER.info(
+                "Heating quick veto restore requested while eBUS offline; deferring Z1OpMode='off' restoration"
+            )
+            return
+
         _LOGGER.info(
             "Restoring Z1OpMode to 'off' after heating quick veto (%s)", reason
         )
-        await self.async_write_parameter(CIRCUIT_BASS3, "Z1OpMode", "off")
+        try:
+            await self.async_write_parameter(CIRCUIT_BASS3, "Z1OpMode", "off")
+        except Exception as err:
+            self._pre_veto_opmode = "off"
+            self._pending_heating_veto_restore = True
+            await self._async_save_store(
+                self._heating_veto_store,
+                {
+                    "pre_opmode": "off",
+                    "end_timestamp": 0.0,
+                    "end_time": datetime.fromtimestamp(0.0).isoformat(),
+                },
+                "heating quick veto",
+            )
+            _LOGGER.warning(
+                "Failed to write Z1OpMode='off' restoration to bus (%s); will retry on next telemetry: %s",
+                reason,
+                err,
+            )
+            raise
+
+        self._pending_heating_veto_restore = False
+        self._pre_veto_opmode = None
+        await self._async_clear_store(self._heating_veto_store, "heating quick veto")
 
     def _arm_heating_veto_timer(self, delay_seconds: float) -> None:
         """Arm backup timer to restore Zone 1 heating to 'off' if veto expires unseen."""
@@ -3468,20 +3544,35 @@ class SaunierGeniaCoordinator:
             self._cooling_veto_restore_unsub()
             self._cooling_veto_restore_unsub = None
 
-        self._pending_cooling_veto_restore = False
         self._cooling_veto_end_time = None
         self._cooling_veto_active_temp = None
 
         pre_opmode = self._pre_cooling_veto_opmode
         pre_temp = self._pre_cooling_veto_temp
-        self._pre_cooling_veto_opmode = None
-        self._pre_cooling_veto_temp = None
-
-        await self._async_clear_cooling_veto_store()
 
         should_restore_temp = restore if restore_temp is None else restore_temp
 
-        if (restore or should_restore_temp) and self.is_ebus_operational:
+        if restore or should_restore_temp:
+            if not self.is_ebus_operational:
+                if restore:
+                    self._pre_cooling_veto_opmode = pre_opmode
+                    self._pre_cooling_veto_temp = pre_temp
+                    self._pending_cooling_veto_restore = True
+                    await self._async_save_store(
+                        self._cooling_veto_store,
+                        {
+                            "end_timestamp": 0.0,
+                            "end_time": datetime.fromtimestamp(0.0).isoformat(),
+                            "pre_opmode": pre_opmode,
+                            "pre_temp": pre_temp,
+                        },
+                        "cooling quick veto",
+                    )
+                    _LOGGER.info(
+                        "Cooling quick veto cancelled while offline; deferring bus restoration until eBUS is operational"
+                    )
+                return
+
             _LOGGER.info(
                 "Cancelling Cooling Quick Veto: restore=%s, restore_temp=%s (pre_opmode=%s, pre_temp=%s)",
                 restore,
@@ -3489,25 +3580,46 @@ class SaunierGeniaCoordinator:
                 pre_opmode,
                 pre_temp,
             )
-            if restore and pre_opmode is not None and pre_opmode != "day":
-                await self.async_write_parameter(
-                    CIRCUIT_BASS3, "Z1OpModeCooling", pre_opmode
-                )
-                await asyncio.sleep(0.3)
-
-            if (
-                should_restore_temp
-                and pre_temp is not None
-                and pre_temp < SENTINEL_COOLING_THRESHOLD
-            ):
-                await self.async_write_parameter(
-                    CIRCUIT_BASS3, "Z1CoolingManualTemp", pre_temp
-                )
-                if restore and pre_opmode == "day":
-                    await asyncio.sleep(0.3)
+            try:
+                if restore and pre_opmode is not None and pre_opmode != "day":
                     await self.async_write_parameter(
-                        CIRCUIT_BASS3, "Z1CoolingTempDesired", pre_temp
+                        CIRCUIT_BASS3, "Z1OpModeCooling", pre_opmode
                     )
+                    await asyncio.sleep(0.3)
+
+                if (
+                    should_restore_temp
+                    and pre_temp is not None
+                    and pre_temp < SENTINEL_COOLING_THRESHOLD
+                ):
+                    await self.async_write_parameter(
+                        CIRCUIT_BASS3, "Z1CoolingManualTemp", pre_temp
+                    )
+                    if restore and pre_opmode == "day":
+                        await asyncio.sleep(0.3)
+                        await self.async_write_parameter(
+                            CIRCUIT_BASS3, "Z1CoolingTempDesired", pre_temp
+                        )
+            except Exception as err:
+                if restore:
+                    self._pre_cooling_veto_opmode = pre_opmode
+                    self._pre_cooling_veto_temp = pre_temp
+                    self._pending_cooling_veto_restore = True
+                    await self._async_save_store(
+                        self._cooling_veto_store,
+                        {
+                            "end_timestamp": 0.0,
+                            "end_time": datetime.fromtimestamp(0.0).isoformat(),
+                            "pre_opmode": pre_opmode,
+                            "pre_temp": pre_temp,
+                        },
+                        "cooling quick veto",
+                    )
+                _LOGGER.warning(
+                    "Failed to write cooling quick veto restoration to bus; will retry on next telemetry: %s",
+                    err,
+                )
+                raise
 
             # Returning to auto/night: schedule a confirmation read of Z1CoolingTempDesired
             # so HA picks up the controller's real schedule/setback setpoint (or 99 °C sentinel).
@@ -3525,6 +3637,11 @@ class SaunierGeniaCoordinator:
                     SET_CONFIRMATION_DELAY_SECONDS,
                     _async_refresh_cooling_desired,
                 )
+
+        self._pending_cooling_veto_restore = False
+        self._pre_cooling_veto_opmode = None
+        self._pre_cooling_veto_temp = None
+        await self._async_clear_cooling_veto_store()
 
         self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1CoolingTempDesired")
         self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1OpModeCooling")
