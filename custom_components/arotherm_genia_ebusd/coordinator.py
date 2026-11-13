@@ -1104,9 +1104,16 @@ class SaunierGeniaCoordinator:
                     self.get_str(CIRCUIT_BASS3, "Z1Status", "value") or ""
                 ).lower()
                 if z1_status_val == "holidayaway" and self.cooling_quick_veto_active:
-                    self.hass.async_create_task(
-                        self.async_cancel_cooling_quick_veto(restore=True)
-                    )
+
+                    async def _cancel_cooling_veto_task() -> None:
+                        try:
+                            await self.async_cancel_cooling_quick_veto(restore=True)
+                        except HomeAssistantError as err:
+                            _LOGGER.debug(
+                                "Holiday away cooling veto cancel failed: %s", err
+                            )
+
+                    self.hass.async_create_task(_cancel_cooling_veto_task())
 
         # If any persisted transient override expired while HA/eBUS was offline, restore once operational
         if self.is_ebus_operational and (
@@ -2741,9 +2748,19 @@ class SaunierGeniaCoordinator:
         if self._dhw_boost_active and self._saved_dhw_target_temp is not None:
             if self.is_ebus_operational:
                 self._dhw_boost_active = False
-                self.hass.async_create_task(
-                    self._async_restore_dhw_target_temp("60-minute safety timeout")
-                )
+
+                async def _timeout_restore_task() -> None:
+                    try:
+                        await self._async_restore_dhw_target_temp(
+                            "60-minute safety timeout"
+                        )
+                    except HomeAssistantError as err:
+                        _LOGGER.debug(
+                            "DHW boost safety timeout restore failed; will retry on next telemetry: %s",
+                            err,
+                        )
+
+                self.hass.async_create_task(_timeout_restore_task())
             else:
                 self._dhw_boost_active = False
                 self._dhw_boost_goal_temp = None
@@ -2794,9 +2811,17 @@ class SaunierGeniaCoordinator:
             self._dhw_boost_timeout_unsub = None
 
         if self.is_ebus_operational:
-            self.hass.async_create_task(
-                self._async_restore_dhw_target_temp(restore_reason)
-            )
+
+            async def _tracking_restore_task() -> None:
+                try:
+                    await self._async_restore_dhw_target_temp(restore_reason)
+                except HomeAssistantError as err:
+                    _LOGGER.debug(
+                        "DHW boost tracking restore failed; will retry on next telemetry: %s",
+                        err,
+                    )
+
+            self.hass.async_create_task(_tracking_restore_task())
         else:
             self._dhw_boost_goal_temp = None
             self._dhw_boost_started_ts = None
@@ -3122,11 +3147,19 @@ class SaunierGeniaCoordinator:
             return
         if self.is_ebus_operational:
             self._pre_veto_opmode = None
-            self.hass.async_create_task(
-                self._async_finish_heating_veto_off_restore(
-                    "heating veto duration timeout"
-                )
-            )
+
+            async def _timeout_task() -> None:
+                try:
+                    await self._async_finish_heating_veto_off_restore(
+                        "heating veto duration timeout"
+                    )
+                except HomeAssistantError as err:
+                    _LOGGER.debug(
+                        "Heating veto timeout restore failed; will retry on next telemetry: %s",
+                        err,
+                    )
+
+            self.hass.async_create_task(_timeout_task())
         else:
             self._heating_veto_end_time = None
             self._pending_heating_veto_restore = True
@@ -3149,9 +3182,16 @@ class SaunierGeniaCoordinator:
             self._pending_heating_veto_restore = True
             return
         self._pending_heating_veto_restore = True
-        self.hass.async_create_task(
-            self._async_finish_heating_veto_off_restore(f"Z1SFMode={sf_mode}")
-        )
+
+        async def _sf_restore_task() -> None:
+            try:
+                await self._async_finish_heating_veto_off_restore(f"Z1SFMode={sf_mode}")
+            except HomeAssistantError as err:
+                _LOGGER.debug(
+                    "Heating veto restore on Z1SFMode transition failed: %s", err
+                )
+
+        self.hass.async_create_task(_sf_restore_task())
 
     async def _async_finish_heating_veto_off_restore(self, reason: str) -> None:
         """Clear heating veto store and write Z1OpMode='off'."""
@@ -3489,21 +3529,36 @@ class SaunierGeniaCoordinator:
         self._cooling_veto_end_time = datetime.now() + timedelta(hours=dur_val)
 
         seconds = dur_val * 3600.0
-
-        @callback
-        def _async_on_cooling_veto_timeout(_now: datetime) -> None:
-            self._cooling_veto_unsub = None
-            self.hass.async_create_task(
-                self.async_cancel_cooling_quick_veto(restore=True)
-            )
-
-        self._cooling_veto_unsub = async_call_later(
-            self.hass, seconds, _async_on_cooling_veto_timeout
-        )
+        self._arm_cooling_veto_timer(seconds)
         await self._async_save_cooling_veto_state()
         self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1CoolingTempDesired")
         self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1OpModeCooling")
         self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1CoolingManualTemp")
+
+    def _arm_cooling_veto_timer(self, delay_seconds: float) -> None:
+        """Arm backup timer to cancel cooling quick veto on expiration."""
+        if self._cooling_veto_unsub is not None:
+            self._cooling_veto_unsub()
+            self._cooling_veto_unsub = None
+
+        @callback
+        def _async_on_cooling_veto_timeout(_now: datetime) -> None:
+            self._cooling_veto_unsub = None
+
+            async def _timeout_task() -> None:
+                try:
+                    await self.async_cancel_cooling_quick_veto(restore=True)
+                except HomeAssistantError as err:
+                    _LOGGER.debug(
+                        "Cooling veto timeout restore will retry on next telemetry: %s",
+                        err,
+                    )
+
+            self.hass.async_create_task(_timeout_task())
+
+        self._cooling_veto_unsub = async_call_later(
+            self.hass, max(0.0, float(delay_seconds)), _async_on_cooling_veto_timeout
+        )
 
     async def async_update_cooling_quick_veto_temperature(
         self, temperature: float
@@ -3544,9 +3599,8 @@ class SaunierGeniaCoordinator:
             self._cooling_veto_restore_unsub()
             self._cooling_veto_restore_unsub = None
 
-        self._cooling_veto_end_time = None
-        self._cooling_veto_active_temp = None
-
+        end_time = self._cooling_veto_end_time
+        active_temp = self._cooling_veto_active_temp
         pre_opmode = self._pre_cooling_veto_opmode
         pre_temp = self._pre_cooling_veto_temp
 
@@ -3555,6 +3609,8 @@ class SaunierGeniaCoordinator:
         if restore or should_restore_temp:
             if not self.is_ebus_operational:
                 if restore:
+                    self._cooling_veto_end_time = None
+                    self._cooling_veto_active_temp = None
                     self._pre_cooling_veto_opmode = pre_opmode
                     self._pre_cooling_veto_temp = pre_temp
                     self._pending_cooling_veto_restore = True
@@ -3571,7 +3627,19 @@ class SaunierGeniaCoordinator:
                     _LOGGER.info(
                         "Cooling quick veto cancelled while offline; deferring bus restoration until eBUS is operational"
                     )
-                return
+                    return
+
+                # Preset change path (restore=False): preserve veto state in memory, re-arm timer with max(0.0, remaining), raise error
+                self._cooling_veto_end_time = end_time
+                self._cooling_veto_active_temp = active_temp
+                self._pre_cooling_veto_opmode = pre_opmode
+                self._pre_cooling_veto_temp = pre_temp
+                if end_time is not None:
+                    remaining = end_time.timestamp() - datetime.now().timestamp()
+                    self._arm_cooling_veto_timer(max(0.0, remaining))
+                raise HomeAssistantError(
+                    "Cannot cancel cooling quick veto: eBUS communication is not operational."
+                )
 
             _LOGGER.info(
                 "Cancelling Cooling Quick Veto: restore=%s, restore_temp=%s (pre_opmode=%s, pre_temp=%s)",
@@ -3602,6 +3670,8 @@ class SaunierGeniaCoordinator:
                         )
             except Exception as err:
                 if restore:
+                    self._cooling_veto_end_time = None
+                    self._cooling_veto_active_temp = None
                     self._pre_cooling_veto_opmode = pre_opmode
                     self._pre_cooling_veto_temp = pre_temp
                     self._pending_cooling_veto_restore = True
@@ -3615,10 +3685,22 @@ class SaunierGeniaCoordinator:
                         },
                         "cooling quick veto",
                     )
-                _LOGGER.warning(
-                    "Failed to write cooling quick veto restoration to bus; will retry on next telemetry: %s",
-                    err,
-                )
+                    _LOGGER.warning(
+                        "Failed to write cooling quick veto restoration to bus; will retry on next telemetry: %s",
+                        err,
+                    )
+                else:
+                    self._cooling_veto_end_time = end_time
+                    self._cooling_veto_active_temp = active_temp
+                    self._pre_cooling_veto_opmode = pre_opmode
+                    self._pre_cooling_veto_temp = pre_temp
+                    if end_time is not None:
+                        remaining = end_time.timestamp() - datetime.now().timestamp()
+                        self._arm_cooling_veto_timer(max(0.0, remaining))
+                    _LOGGER.warning(
+                        "Failed to restore cooling quick veto setpoint during cancellation: %s",
+                        err,
+                    )
                 raise
 
             # Returning to auto/night: schedule a confirmation read of Z1CoolingTempDesired
@@ -3638,6 +3720,8 @@ class SaunierGeniaCoordinator:
                     _async_refresh_cooling_desired,
                 )
 
+        self._cooling_veto_end_time = None
+        self._cooling_veto_active_temp = None
         self._pending_cooling_veto_restore = False
         self._pre_cooling_veto_opmode = None
         self._pre_cooling_veto_temp = None
@@ -3790,19 +3874,7 @@ class SaunierGeniaCoordinator:
         remaining = end_ts - datetime.now().timestamp()
         if remaining > 0:
             self._cooling_veto_end_time = datetime.fromtimestamp(end_ts)
-            if self._cooling_veto_unsub is not None:
-                self._cooling_veto_unsub()
-
-            @callback
-            def _async_on_cooling_veto_timeout(_now: datetime) -> None:
-                self._cooling_veto_unsub = None
-                self.hass.async_create_task(
-                    self.async_cancel_cooling_quick_veto(restore=True)
-                )
-
-            self._cooling_veto_unsub = async_call_later(
-                self.hass, remaining, _async_on_cooling_veto_timeout
-            )
+            self._arm_cooling_veto_timer(remaining)
             _LOGGER.info(
                 "Restored active cooling quick veto after restart (%.0fs remaining, active_temp=%s, pre_opmode=%s, pre_temp=%s)",
                 remaining,
@@ -3834,7 +3906,13 @@ class SaunierGeniaCoordinator:
             self._pre_cooling_veto_opmode,
             self._pre_cooling_veto_temp,
         )
-        await self.async_cancel_cooling_quick_veto(restore=True)
+        try:
+            await self.async_cancel_cooling_quick_veto(restore=True)
+        except HomeAssistantError as err:
+            _LOGGER.debug(
+                "Deferred cooling quick veto restore failed; will retry on next telemetry: %s",
+                err,
+            )
 
     async def _async_save_heating_veto_state(self) -> None:
         """Persist heating quick veto from 'off' across Home Assistant restarts."""
@@ -3909,9 +3987,15 @@ class SaunierGeniaCoordinator:
                 "Deferred heating quick veto restore paused: controller reports Z1SFMode=veto still active"
             )
             return
-        await self._async_finish_heating_veto_off_restore(
-            "persisted heating quick veto expired while offline"
-        )
+        try:
+            await self._async_finish_heating_veto_off_restore(
+                "persisted heating quick veto expired while offline"
+            )
+        except HomeAssistantError as err:
+            _LOGGER.debug(
+                "Deferred heating quick veto restore failed; will retry on next telemetry: %s",
+                err,
+            )
 
     async def _async_save_dhw_boost_state(self) -> None:
         """Persist active forced DHW boost state across Home Assistant restarts."""
@@ -4002,9 +4086,15 @@ class SaunierGeniaCoordinator:
         """Execute deferred restoration of pre-boost HwcTempDesired after restart/offline expiry."""
         if not self._pending_dhw_boost_restore or not self.is_ebus_operational:
             return
-        await self._async_restore_dhw_target_temp(
-            "deferred DHW boost setpoint restoration"
-        )
+        try:
+            await self._async_restore_dhw_target_temp(
+                "deferred DHW boost setpoint restoration"
+            )
+        except HomeAssistantError as err:
+            _LOGGER.debug(
+                "Deferred DHW boost restore failed; will retry on next telemetry: %s",
+                err,
+            )
 
     # -------------------------------------------------------------------------
     # Passive Scan & Hardware/Software Version Detection

@@ -3948,6 +3948,160 @@ class TestCoordinatorLogic(unittest.TestCase):
 
         asyncio.run(_run())
 
+    def test_cooling_veto_cancel_restore_false_offline_and_failure_flow(self) -> None:
+        """Verify cooling veto cancel with restore=False handles offline, failure, and expiry."""
+
+        async def _run() -> None:
+            hass = MagicMock()
+            entry = MagicMock(entry_id="cooling_preset_fail_entry")
+            entry.data = {"mqtt_prefix": "ebusd"}
+            entry.options = {}
+
+            coord = SaunierGeniaCoordinator(hass, entry)
+
+            # -------------------------------------------------------------
+            # Condition 1: Bus not operational with restore=False, restore_temp=True
+            # Must raise HomeAssistantError, keep veto in memory and store,
+            # re-arm timer with max(0, remaining), and NOT set pending.
+            # -------------------------------------------------------------
+            future_end = datetime.now() + timedelta(hours=2)
+            coord._cooling_veto_end_time = future_end
+            coord._cooling_veto_active_temp = 19.0
+            coord._pre_cooling_veto_opmode = "auto"
+            coord._pre_cooling_veto_temp = 25.0
+            await coord._cooling_veto_store.async_save(
+                {
+                    "end_timestamp": future_end.timestamp(),
+                    "end_time": future_end.isoformat(),
+                    "active_temp": 19.0,
+                    "pre_opmode": "auto",
+                    "pre_temp": 25.0,
+                }
+            )
+
+            # Bus is offline (no operational status telemetry)
+            self.assertFalse(coord.is_ebus_operational)
+
+            with (
+                patch.object(coord, "_arm_cooling_veto_timer") as mock_arm,
+                self.assertRaises(HomeAssistantError),
+            ):
+                await coord.async_cancel_cooling_quick_veto(
+                    restore=False, restore_temp=True
+                )
+
+            # Veto preserved in memory
+            self.assertTrue(coord.cooling_quick_veto_active)
+            self.assertEqual(coord._cooling_veto_end_time, future_end)
+            self.assertEqual(coord._cooling_veto_active_temp, 19.0)
+            self.assertEqual(coord._pre_cooling_veto_opmode, "auto")
+            self.assertEqual(coord._pre_cooling_veto_temp, 25.0)
+            self.assertFalse(coord._pending_cooling_veto_restore)
+
+            # Timer re-armed with remaining > 0
+            mock_arm.assert_called_once()
+            armed_delay = mock_arm.call_args[0][0]
+            self.assertGreater(armed_delay, 7000.0)
+
+            # Store intact on disk
+            persisted = await coord._cooling_veto_store.async_load()
+            self.assertIsNotNone(persisted)
+            self.assertEqual(persisted.get("active_temp"), 19.0)
+
+            # -------------------------------------------------------------
+            # Condition 2: Deadline passed during failed attempt (remaining < 0)
+            # Must re-arm with max(0.0, remaining) = 0.0 to trigger natural expiry.
+            # -------------------------------------------------------------
+            past_end = datetime.now() - timedelta(seconds=10)
+            coord._cooling_veto_end_time = past_end
+            with (
+                patch.object(coord, "_arm_cooling_veto_timer") as mock_arm_expired,
+                self.assertRaises(HomeAssistantError),
+            ):
+                await coord.async_cancel_cooling_quick_veto(
+                    restore=False, restore_temp=True
+                )
+
+            mock_arm_expired.assert_called_once_with(0.0)
+
+            # -------------------------------------------------------------
+            # Broker write failure with restore=False -> retry -> restart flow
+            # -------------------------------------------------------------
+            # Bring bus operational
+            coord._state[(CIRCUIT_BASS3.lower(), "Status01")] = {"temp1": 35.0}
+            coord._last_telemetry_time = time.monotonic()
+            self.assertTrue(coord.is_ebus_operational)
+
+            coord._cooling_veto_end_time = future_end
+            coord._cooling_veto_active_temp = 19.0
+            coord._pre_cooling_veto_opmode = "auto"
+            coord._pre_cooling_veto_temp = 25.0
+
+            # Failed cancel
+            with (
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                    side_effect=HomeAssistantError("Broker write failed"),
+                ),
+                self.assertRaises(HomeAssistantError),
+            ):
+                await coord.async_cancel_cooling_quick_veto(
+                    restore=False, restore_temp=True
+                )
+
+            # HA still shows veto active, store still intact
+            self.assertTrue(coord.cooling_quick_veto_active)
+            self.assertFalse(coord._pending_cooling_veto_restore)
+            self.assertIsNotNone(await coord._cooling_veto_store.async_load())
+
+            # User retry: climate checks was_cooling_veto = coordinator.cooling_quick_veto_active (True)
+            # and retries async_cancel_cooling_quick_veto(restore=False, restore_temp=True)
+            published = []
+
+            async def _fake_publish(_h, topic, payload, **_k):
+                published.append((topic, payload))
+
+            with patch(
+                "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                side_effect=_fake_publish,
+            ):
+                await coord.async_cancel_cooling_quick_veto(
+                    restore=False, restore_temp=True
+                )
+                # Emulate user setting manual mode + 26.0 °C
+                await coord.async_write_parameter(
+                    CIRCUIT_BASS3, "Z1OpModeCooling", "day"
+                )
+                await coord.async_write_parameter(
+                    CIRCUIT_BASS3, "Z1CoolingManualTemp", 26.0
+                )
+
+            # Veto inactive in memory and store cleared
+            self.assertFalse(coord.cooling_quick_veto_active)
+            self.assertIsNone(coord._cooling_veto_end_time)
+            self.assertIsNone(coord._pre_cooling_veto_opmode)
+            self.assertIsNone(coord._pre_cooling_veto_temp)
+            self.assertIsNone(await coord._cooling_veto_store.async_load())
+            self.assertIn(("ebusd/bass3/Z1CoolingManualTemp/set", "25.0"), published)
+            self.assertIn(("ebusd/bass3/Z1OpModeCooling/set", "day"), published)
+            self.assertIn(("ebusd/bass3/Z1CoolingManualTemp/set", "26.0"), published)
+
+            # Restart HA before the original veto end
+            coord2 = SaunierGeniaCoordinator(hass, entry)
+            coord2._state[(CIRCUIT_BASS3.lower(), "Status01")] = {"temp1": 35.0}
+            coord2._last_telemetry_time = time.monotonic()
+            await coord2._async_restore_persisted_cooling_veto()
+
+            # No veto was restored because store was cleanly deleted
+            self.assertFalse(coord2.cooling_quick_veto_active)
+            self.assertIsNone(coord2._cooling_veto_end_time)
+            self.assertIsNone(coord2._pre_cooling_veto_opmode)
+
+            await coord.async_unload()
+            await coord2.async_unload()
+
+        asyncio.run(_run())
+
 
 if __name__ == "__main__":
     unittest.main()
