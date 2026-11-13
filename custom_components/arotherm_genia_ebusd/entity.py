@@ -9,6 +9,10 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 
 from .const import (
+    CIRCUIT_BASV3,
+    CIRCUIT_CTLV2,
+    CIRCUIT_CTLV3,
+    CIRCUIT_GLOBAL,
     DEVICE_CLIMATE_CONTROLLER,
     DEVICE_HYDRAULIC_INTERFACE,
     DEVICE_OUTDOOR_UNIT,
@@ -63,7 +67,7 @@ def build_device_info(
         outdoor_model = coordinator.outdoor_model
         return DeviceInfo(
             identifiers={(DOMAIN, outdoor_id)},
-            name=f"{outdoor_model} (Unidad Exterior)",
+            name=f"{outdoor_model} (Outdoor Unit)",
             manufacturer=manufacturer,
             model=OUTDOOR_MODEL_SPECS.get(outdoor_model, outdoor_model),
             sw_version=sw_version,
@@ -73,15 +77,17 @@ def build_device_info(
 
     if device_key == DEVICE_CLIMATE_CONTROLLER:
         controller_name = (
-            "sensoCOMFORT (Controlador de Clima)"
+            "sensoCOMFORT (Climate Controller)"
             if is_vaillant
-            else "MiPro Sense (Controlador de Clima)"
+            else "MiPro Sense (Climate Controller)"
         )
-        controller_model = (
-            "sensoCOMFORT VRC 720/3 (BASS3)"
-            if is_vaillant
-            else "MiPro Sense SRC 720/3 (BASS3)"
-        )
+        active_circuit = getattr(coordinator, "active_controller_circuit", None)
+        if active_circuit in (CIRCUIT_CTLV2, CIRCUIT_CTLV3):
+            controller_model = f"sensoCOMFORT VRC 720 ({active_circuit.upper()})"
+        elif is_vaillant or active_circuit == CIRCUIT_BASV3:
+            controller_model = "sensoCOMFORT VRC 720/3 (BASV3)"
+        else:
+            controller_model = "MiPro Sense SRC 720/3 (BASS3)"
         info_kwargs: dict[str, Any] = {
             "identifiers": {(DOMAIN, f"{entry_id}_{DEVICE_CLIMATE_CONTROLLER}")},
             "name": controller_name,
@@ -97,7 +103,7 @@ def build_device_info(
 
     if device_key == DEVICE_HYDRAULIC_INTERFACE:
         indoor_model = coordinator.indoor_model
-        display_name = f"Interfaz Hidráulica {indoor_model}"
+        display_name = f"{indoor_model} (Hydraulic Interface)"
         info_kwargs = {
             "identifiers": {(DOMAIN, f"{entry_id}_{DEVICE_HYDRAULIC_INTERFACE}")},
             "name": display_name,
@@ -113,15 +119,20 @@ def build_device_info(
 
     # DEVICE_WIRELESS_THERMOSTAT
     thermostat_name = (
-        "Termostato Inalámbrico sensoCOMFORT RF"
+        "sensoCOMFORT Wireless Thermostat RF"
         if is_vaillant
-        else "Termostato Inalámbrico MiPro Sense"
+        else "MiPro Sense Wireless Thermostat"
+    )
+    thermostat_model = (
+        "Communication Gateway NETX3 (VR 940f / VR 921)"
+        if is_vaillant
+        else "Wireless Receiver NETX3 (0020260979)"
     )
     info_kwargs = {
         "identifiers": {(DOMAIN, f"{entry_id}_{DEVICE_WIRELESS_THERMOSTAT}")},
         "name": thermostat_name,
         "manufacturer": manufacturer,
-        "model": "Receptor Radio NETX3 (0020260979)",
+        "model": thermostat_model,
         "sw_version": sw_version,
         "hw_version": hw_version,
         "serial_number": serial_number,
@@ -146,6 +157,7 @@ class SaunierGeniaEntity(Entity):
 
     _attr_has_entity_name = True
     _attr_should_poll = False
+    _gate_availability_on_ebus: bool = False
 
     def __init__(
         self,
@@ -164,10 +176,24 @@ class SaunierGeniaEntity(Entity):
         self._attr_device_info = build_device_info(coordinator, device_key)
         self._subscriptions = subscriptions
 
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        if self._gate_availability_on_ebus and not self.coordinator.is_ebus_operational:
+            return False
+        return super().available
+
     async def async_added_to_hass(self) -> None:
         """Subscribe to relevant (circuit, message) updates when added to Home Assistant."""
         await super().async_added_to_hass()
-        for circuit, message in self._subscriptions:
+        all_subs = list(self._subscriptions)
+        if self._gate_availability_on_ebus:
+            if (CIRCUIT_GLOBAL, "running") not in all_subs:
+                all_subs.append((CIRCUIT_GLOBAL, "running"))
+            if (CIRCUIT_GLOBAL, "signal") not in all_subs:
+                all_subs.append((CIRCUIT_GLOBAL, "signal"))
+
+        for circuit, message in all_subs:
             self.async_on_remove(
                 self.coordinator.async_add_listener(
                     circuit, message, self._handle_coordinator_update

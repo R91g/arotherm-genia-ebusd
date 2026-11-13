@@ -1,0 +1,478 @@
+type,circuit,level,name,comment,qq,zz,pbsb,id,*name,part,type,divisor/values,unit,comment
+*r,
+*w,
+*u,
+*uw,
+
+# ==============================================================================
+# 1. GENERAL PARAMETERS, HYDRAULICS, AND ENERGY TELEMETRY (BASS3)
+# ==============================================================================
+r;u,,,WaterPressure,water pressure,,,b524,020000003900,ign,,IGN:4,,,,press,,EXP,,bar,water pressure
+r;u,,,SystemFlowTemp,system flow temp,,,b524,020000004b00,ign,,IGN:4,,,,value,,EXP,,°C,system flow temperature
+r;u,,,ContinuosHeating,continuos heating,,,b524,020000000200,ign,,IGN:4,,,,value,,EXP,,°C,"-26=off, when the outside temperature falls below this threshold temperature the continuous heating function is started (off <=> function is disabled)"
+w,,,ContinuosHeating,continuos heating,,,b524,020100000200,value,,EXP,,°C,"-26=off, when the outside temperature falls below this threshold temperature the continuous heating function is started (off <=> function is disabled)"
+r;u,,,FrostOverRideTime,frost delay time,,,b524,020000000300,ign,,IGN:4,,,,value,,UIN,,h,delay before frost protection is activated
+w,,,FrostOverRideTime,frost delay time,,,b524,020100000300,value,,UIN,,h,delay before frost protection is activated
+r;u,,,GlobalSystemOff,Global System OFF,,,b524,020000000700,ign,,IGN:4,,,,value,,UCH,0=no;1=yes,,For switching system off
+w,,install,GlobalSystemOff,Global System OFF,,,b524,020100000700,value,,UCH,0=no;1=yes,,For switching system off
+r9;u,,,MaxRoomHumidity,max room humidity,,,b524,020000000e00,ign,,IGN:4,,,,value,,UIN,,,maximum room humidity
+w,,,MaxRoomHumidity,max room humidity,,,b524,020100000e00,value,,UIN,,,maximum room humidity
+r;u,,,AdaptHeatCurve,adaptive heat curve,,,b524,020000001400,ign,,IGN:4,,,,value,,UCH,0=no;1=yes,,automatic correction of configured heat curve
+w,,,AdaptHeatCurve,adaptive heat curve,,,b524,020100001400,value,,UCH,0=no;1=yes,,automatic correction of configured heat curve
+r;u,,,Date,date,,,b524,020000003400,ign,,IGN:4,,,,value,,HDA:3,,,current date
+w,,,Date,date,,,b524,020100003400,value,,HDA:3,,,current date
+r;u,,,Time,time,,,b524,020000003500,ign,,IGN:4,,,,value,,HTI,,,current time
+w,,,Time,time,,,b524,020100003500,value,,HTI,,,current time
+r;u,,,HydraulicScheme,system diagram,,,b524,020000003600,ign,,IGN:4,,,,value,,UIN,,,system diagram
+w,,,HydraulicScheme,system diagram,,,b524,020100003600,value,,UIN,,,system diagram
+r;u,,,MultiRelaySetting,multifunction relay setting,,,b524,020000004d00,ign,,IGN:4,,,,value,,UIN,0=circulation;1=dryer;2=zone;3=legiopump,,
+w,,,MultiRelaySetting,multifunction relay setting,,,b524,020100004d00,value,,UIN,0=circulation;1=dryer;2=zone;3=legiopump,,
+r;u,,,DisplayedOutsideTemp,outside temperature,,,b524,020000007300,ign,,IGN:4,,,,value,,EXP,,°C,outside temperature
+r;u,,,OutsideTempAvg,average outside temperature,,,b524,020000009500,ign,,IGN:4,,,,value,,EXP,,°C,rounded average outside temperature (updated every 3h)
+w,,,OutsideTempAvg,average outside temperature,,,b524,020100009500,value,,EXP,,°C,rounded average outside temperature (updated every 3h)
+# Disabled active polling of non-existent solar registers to prevent bus saturation and read timeouts
+r;u,,,YieldTotal,total environmental yield,,,b524,020000003e00,ign,,IGN:4,,,,value,,ULG,,kWh,total environmental yield
+w,,,YieldTotal,total environmental yield,,,b524,020100003e00,value,,ULG,,kWh,total environmental yield
+r;u,,,SolarYieldTotal,total solar yield,,,b524,020000003d00,ign,,IGN:4,,,,value,,ULG,,kWh,total solar yield
+w,,,SolarYieldTotal,total solar yield,,,b524,020100003d00,value,,ULG,,kWh,total solar yield
+r9;u,,,PrEnergySumHc,total energy consumption heating,,,b524,020000005700,ign,,IGN:4,,,,value,,ULG,,kWh,total heating electricity consumption
+w,,,PrEnergySumHc,total energy consumption heating,,,b524,020100005700,value,,ULG,,kWh,total heating electricity consumption
+r9;u,,,PrEnergySumHcThisMonth,this months energy consumption heating,,,b524,020000004f00,ign,,IGN:4,,,,value,,ULG,,kWh,current month heating electricity consumption
+w,,,PrEnergySumHcThisMonth,this months energy consumption heating,,,b524,020100004f00,value,,ULG,,kWh,current month heating electricity consumption
+r9;u,,,PrEnergySumHcLastMonth,last months energy consumption heating,,,b524,020000005300,ign,,IGN:4,,,,value,,ULG,,kWh,last month heating electricity consumption
+w,,,PrEnergySumHcLastMonth,last months energy consumption heating,,,b524,020100005300,value,,ULG,,kWh,last month heating electricity consumption
+r9;u,,,PrEnergySumHwc,total energy consumption hot water,,,b524,020000005800,ign,,IGN:4,,,,value,,ULG,,kWh,total hot water electricity consumption
+w,,,PrEnergySumHwc,total energy consumption hot water,,,b524,020100005800,value,,ULG,,kWh,total hot water electricity consumption
+r9;u,,,PrEnergySumHwcThisMonth,this months energy consumption hot water,,,b524,020000005000,ign,,IGN:4,,,,value,,ULG,,kWh,current month hot water electricity consumption
+w,,,PrEnergySumHwcThisMonth,this months energy consumption hot water,,,b524,020100005000,value,,ULG,,kWh,current month hot water electricity consumption
+r9;u,,,PrEnergySumHwcLastMonth,last months energy consumption hot water,,,b524,020000005400,ign,,IGN:4,,,,value,,ULG,,kWh,last month hot water electricity consumption
+w,,,PrEnergySumHwcLastMonth,last months energy consumption hot water,,,b524,020100005400,value,,ULG,,kWh,last month hot water electricity consumption
+r;u,,,KeyCodeforConfigMenu,code for installer menu,,,b524,020000007600,ign,,IGN:4,,,,value,,UIN,,,000-999; code for the installer's menues
+w,,,KeyCodeforConfigMenu,code for installer menu,,,b524,020100007600,value,,UIN,,,000-999; code for the installer's menues
+r;u,,,MaintenanceDate,next maintenance,,,b524,020000002c00,ign,,IGN:4,,,,value,,HDA:3,,,next maintenance date
+w,,,MaintenanceDate,next maintenance,,,b524,020100002c00,value,,HDA:3,,,next maintenance date
+r;u,,,MaintenanceDue,maintenance due,,,b524,020000009600,ign,,IGN:4,,,,value,,UCH,0=no;1=yes,,indicates whether maintenance is due
+r;u,,,SystemOperatingState,system operating state,,,b524,020000004800,ign,,IGN:4,,,,value,,UIN,0=standby;1=heating;2=cooling;3=dhw,,current active system operating state
+r;u,,,BivalencePointHc,bivalence point heating,,,b524,020000002300,ign,,IGN:4,,,,value,,EXP,,°C,bivalence point for heat pump heating
+w,,,BivalencePointHc,bivalence point heating,,,b524,020100002300,value,,EXP,,°C,bivalence point for heat pump heating
+r;u,,,BivalencePointHwc,bivalence point hot water,,,b524,020000000100,ign,,IGN:4,,,,value,,EXP,,°C,bivalence point for hot water
+w,,,BivalencePointHwc,bivalence point hot water,,,b524,020100000100,value,,EXP,,°C,bivalence point for hot water
+r;u,,,AlternativePoint,alternative point heating,,,b524,020000002200,ign,,IGN:4,,,,value,,EXP,,°C,alternative point threshold temperature
+w,,,AlternativePoint,alternative point heating,,,b524,020100002200,value,,EXP,,°C,alternative point threshold temperature
+r;u,,,Unknown04,unknown register 04 (uninstalled),,,b524,020000000400,data,,HEX:4,,,
+r;u,,,SolarStorageTempBottom,solar storage temperature bottom,,,b524,020000006700,ign,,IGN:4,,,,value,,EXP,,°C,"solar temperature sensor, bottom"
+r;u,,,SolarStorageTempTop,solar storage temperature top,,,b524,020000006800,ign,,IGN:4,,,,value,,EXP,,°C,"solar temperature sensor, top"
+r;u,,,UnknownSettingB6,unknown setting b6 (uninstalled),,,b524,02000000b600,data,,HEX:4,,,
+r;u,,,PrEnergySolarTotal,total solar energy sum,,,b516,1000ffff01000000,ign,,IGN:7,,,,energy,,EXP,,Wh,
+r;u,,,MultiInputSetting,multifunction input setting,,,b524,020000006a00,ign,,IGN:4,,,,value,,UCH,0=off;1=circulation;2=photovoltaic;3=cooling,,multifunction input setting
+w,,,MultiInputSetting,multifunction input setting,,,b524,020100006a00,value,,UCH,0=off;1=circulation;2=photovoltaic;3=cooling,,multifunction input setting
+r;u,,,OffsetOutsideTemp,outside temperature calibration offset,,,b524,020000002d00,ign,,IGN:4,,,,value,,EXP,,K,outside temperature calibration offset
+w,,,OffsetOutsideTemp,outside temperature calibration offset,,,b524,020100002d00,value,,EXP,,K,outside temperature calibration offset
+
+# ==============================================================================
+# 2. DOMESTIC HOT WATER (DHW)
+# ==============================================================================
+r;u,,,HwcStorageTemp,hwc storage temperature,,,b524,020001000500,ign,,IGN:4,,,,value,,EXP,,°C,actual storage temperature
+r;u,,,HwcTempDesired,hwc temperature desired,,,b524,020001000400,ign,,IGN:4,,,,value,,EXP,,°C,setpoint of domestic hot water circuit
+w,,,HwcTempDesired,hwc temperature desired,,,b524,020101000400,value,,EXP,,°C,setpoint of domestic hot water circuit
+r;u,,,HwcOpMode,hwc operation mode,,,b524,020001000300,ign,,IGN:4,,,,value,,UIN,0=off;1=auto;2=day;3=night,,operation mode of Hwc
+w,,,HwcOpMode,hwc operation mode,,,b524,020101000300,value,,UIN,0=off;1=auto;2=day;3=night,,operation mode of Hwc
+r9;u,,,HwcSFMode,hwc SF mode,,,b524,020001000d00,ign,,IGN:4,,,,value,,UCH,0=auto;1=ventilation;2=party;3=veto;4=onedayaway;5=onedayathome;6=load,,
+w,,,HwcSFMode,hwc SF mode,,,b524,020101000d00,value,,UCH,0=auto;1=ventilation;2=party;3=veto;4=onedayaway;5=onedayathome;6=load,,
+r9;u,,,HwcFlowTemp,hwc flow temperature,,,b524,020001000800,ign,,IGN:4,,,,value,,EXP,,°C,desired flow temp for Hwc
+r;u,,,HwcMaxFlowTempDesired,hwc max flow temp desired,,,b524,020000004600,ign,,IGN:4,,,,value,,EXP,,°C,maximum flow temperature setpoint of Hwc
+w,,,HwcMaxFlowTempDesired,hwc max flow temp desired,,,b524,020100004600,value,,EXP,,°C,maximum flow temperature setpoint of Hwc
+r;u,,,HwcParallelLoading,hwc parallel loading,,,b524,020000000a00,ign,,IGN:4,,,,value,,UCH,0=off;1=on,,heating and hot water parallel
+w,,,HwcParallelLoading,hwc parallel loading,,,b524,020100000a00,value,,UCH,0=off;1=on,,heating and hot water parallel
+r;u,,,HwcLockTime,hwc lock time,,,b524,020000001800,ign,,IGN:4,,,,value,,UIN,,min,DHW lock time
+w,,,HwcLockTime,hwc lock time,,,b524,020100001800,value,,UIN,,min,DHW lock time
+r;u,,,MaxCylinderChargeTime,maximale Speicherladezeit,,,b524,020000001700,ign,,IGN:4,,,,value,,UIN,,min,maximum cylinder charging time
+w,,,MaxCylinderChargeTime,maximale Speicherladezeit,,,b524,020100001700,value,,UIN,,min,maximum cylinder charging time
+r;u,,,PumpAdditionalTime,pump additional time,,,b524,020000001b00,ign,,IGN:4,,,,value,,UIN,,min,charging pump overrun time
+w,,,PumpAdditionalTime,pump additional time,,,b524,020100001b00,value,,UIN,,min,charging pump overrun time
+r;u,,,CylinderChargeHyst,hysteresis cylinder charge,,,b524,020000002700,ign,,IGN:4,,,,value,,EXP,,K,cylinder charging hysteresis
+w,,,CylinderChargeHyst,hysteresis cylinder charge,,,b524,020100002700,value,,EXP,,K,cylinder charging hysteresis
+r;u,,,CylinderChargeOffset,offset cylinder charge,,,b524,020000002900,ign,,IGN:4,,,,value,,EXP,,K,cylinder charging offset
+w,,,CylinderChargeOffset,offset cylinder charge,,,b524,020100002900,value,,EXP,,K,cylinder charging offset
+r;u,,,HwcStorageTempTop,hwc storage temperature top,,,b524,020000009d00,ign,,IGN:4,,,,value,,EXP,,°C,"DHW temperature sensor, top"
+r;u,,,HwcStorageTempBottom,storage temperature bottom,,,b524,020000009e00,ign,,IGN:4,,,,value,,EXP,,°C,"DHW temperature sensor, bottom"
+r;u,,,HwcLegionellaDay,legionella protection day,,,b524,020000002b00,ign,,IGN:4,,,,day,,UIN,0=off;1=Monday;2=Tuesday;3=Wednesday;4=Thursday;5=Friday;6=Saturday;7=Sunday,,legionella protection day
+w,,,HwcLegionellaDay,legionella protection day,,,b524,020100002b00,day,,UIN,0=off;1=Monday;2=Tuesday;3=Wednesday;4=Thursday;5=Friday;6=Saturday;7=Sunday,,legionella protection day
+r;u,,,HwcLegionellaTime,legionella protection time,,,b524,020000002a00,ign,,IGN:4,,,,time,,HTM,,,legionella protection time
+w,,,HwcLegionellaTime,legionella protection time,,,b524,020100002a00,time,,HTM,,,legionella protection time
+
+r;u,,,HwcStatus,hwc status,,,b524,020001000f00,ign,,IGN:4,,,,value,,UIN,0=auto;7=holidayaway;9=load;10=off,,
+r;u,,,BufferChargeOffset,offset buffer charge,,,b524,02000000a200,ign,,IGN:4,,,,value,,EXP,,K,
+w,,,BufferChargeOffset,offset buffer charge,,,b524,02010000a200,value,,EXP,,K,
+
+# ==============================================================================
+# 3. CLIMATE CONTROL / HEATING (CIRCUIT 1 - SINGLE ZONE)
+# ==============================================================================
+r;u,,,Z1RoomTemp,room temperature zone 1,,,b524,020003000f00,ign,,IGN:4,,,,value,,EXP,,°C,current room temperature in zone 1
+r;u,,,Z1ActualRoomTempDesired,room temperature desired zone 1,,,b524,020003001400,ign,,IGN:4,,,,value,,EXP,,°C,current room setpoint considering all basic conditions passed to the control algorithms
+w,,,Z1ActualRoomTempDesired,room temperature desired zone 1,,,b524,020103001400,value,,EXP,,°C,current room setpoint considering all basic conditions passed to the control algorithms
+r;u,,,Z1OpMode,operation mode zone 1,,,b524,020003000600,ign,,IGN:4,,,,value,,UIN,0=off;1=auto;2=day;3=night,,operation mode of zone 1
+w,,,Z1OpMode,operation mode zone 1,,,b524,020103000600,value,,UIN,0=off;1=auto;2=day;3=night,,operation mode of zone 1
+r;u,,,Z1SFMode,SF mode zone 1,,,b524,020003000e00,ign,,IGN:4,,,,value,,UCH,0=auto;1=ventilation;2=party;3=veto;4=onedayaway;5=onedayathome;6=load,,
+w,,,Z1SFMode,SF mode zone 1,,,b524,020103000e00,value,,UCH,0=auto;1=ventilation;2=party;3=veto;4=onedayaway;5=onedayathome;6=load,,
+r9;u,,,Z1QuickVetoTemp,quick veto temperature zone 1,,,b524,020003000800,ign,,IGN:4,,,,value,,EXP,,°C,manual override setpoint for zone 1
+w,,,Z1QuickVetoTemp,quick veto temperature zone 1,,,b524,020103000800,value,,EXP,,°C,manual override setpoint for zone 1
+r9;u,,,Z1QuickVetoDuration,quick veto duration zone 1,,,b524,020003002600,ign,,IGN:4,,,,value,,EXP,,h,quick veto duration for zone 1
+w,,,Z1QuickVetoDuration,quick veto duration zone 1,,,b524,020103002600,value,,EXP,,h,quick veto duration for zone 1
+r;u,,,Z1NightTemp,night temperature zone 1,,,b524,020003000900,ign,,IGN:4,,,,value,,EXP,,°C,night setpoint for zone 1
+w,,,Z1NightTemp,night temperature zone 1,,,b524,020103000900,value,,EXP,,°C,night setpoint for zone 1
+r;u,,,Hc1FlowTemp,FlowTemp heating circuit 1,,,b524,020002000800,ign,,IGN:4,,,,value,,EXP,,°C,current flow temperature of Hc1
+r;u,,,Hc1ActualFlowTempDesired,ActualFlowTempDesired heating circuit 1,,,b524,020002000700,ign,,IGN:4,,,,value,,EXP,,°C,current flow temperature setpoint of Hc1
+r;u,,,Hc1HeatCurve,HeatCurve heating circuit 1,,,b524,020002000f00,ign,,IGN:4,,,,value,,EXP,,,heating curve of Hc1
+w,,,Hc1HeatCurve,HeatCurve heating circuit 1,,,b524,020102000f00,value,,EXP,,,heating curve of Hc1
+r;u,,,Hc1SummerTempLimit,summer outside switchoff temperature heating circuit 1,,,b524,020002001400,ign,,IGN:4,,,,value,,EXP,,°C,if outside temperature > summer limit => heating is OFF;applies to comfort and night setback setpoint
+w,,,Hc1SummerTempLimit,summer outside switchoff temperature heating circuit 1,,,b524,020102001400,value,,EXP,,°C,if outside temperature > summer limit => heating is OFF;applies to comfort and night setback setpoint
+r;u,,,Hc1MaxFlowTempDesired,MaxFlowTempDesired heating circuit 1,,,b524,020002001000,ign,,IGN:4,,,,value,,EXP,,°C,maximum flow temperature setpoint (end emphasis) of Hc1
+w,,,Hc1MaxFlowTempDesired,MaxFlowTempDesired heating circuit 1,,,b524,020102001000,value,,EXP,,°C,maximum flow temperature setpoint (end emphasis) of Hc1
+r;u,,,Hc1MinFlowTempDesired,MinFlowTempDesired heating circuit 1,,,b524,020002001200,ign,,IGN:4,,,,value,,EXP,,°C,minimum flow temperature setpoint (end emphasis) of Hc1
+w,,,Hc1MinFlowTempDesired,MinFlowTempDesired heating circuit 1,,,b524,020102001200,value,,EXP,,°C,minimum flow temperature setpoint (end emphasis) of Hc1
+r;u,,,Hc1RoomTempSwitchOn,RoomTempSwitchOn heating circuit 1,,,b524,020002001500,ign,,IGN:4,,,,value,,UIN,0=off;1=modulating;2=thermostat,,room temperature modulation of Hc1
+w,,,Hc1RoomTempSwitchOn,RoomTempSwitchOn heating circuit 1,,,b524,020102001500,value,,UIN,0=off;1=modulating;2=thermostat,,room temperature modulation of Hc1
+r;u,,,Hc1Status,Status heating circuit 1,,,b524,020002001b00,ign,,IGN:4,,,,value,,UCH,,,status of zone 1
+w,,,Hc1Status,Status heating circuit 1,,,b524,020102001b00,value,,UCH,,,status of zone 1
+r;u,,,Hc1PumpStatus,PumpStatus heating circuit 1,,,b524,020002001e00,ign,,IGN:4,,,,value,,UIN,,,pump status of zone 1
+w,,,Hc1PumpStatus,PumpStatus heating circuit 1,,,b524,020102001e00,value,,UIN,,,pump status of zone 1
+r;u,,,Hc1AutoOffMode,AutoOffMode heating circuit 1,,,b524,020002000e00,ign,,IGN:4,,,,value,,UIN,0=eco;1=night,,operation of Hc1 during the lowering time; no influence if room temperature modulation is set to thermostat
+w,,,Hc1AutoOffMode,AutoOffMode heating circuit 1,,,b524,020102000e00,value,,UIN,0=eco;1=night,,operation of Hc1 during the lowering time; no influence if room temperature modulation is set to thermostat
+r;u,,,Hc1CircuitType,CircuitType heating circuit 1,,,b524,020002000200,ign,,IGN:4,,,,mctype,,UCH,0=inactive;1=mixer;2=fixed;3=hwc;4=returnincr;5=pool,,mixer type,ign_2,,IGN:1,,,
+# Disabled active polling of non-existent mixer circuit and adaptive curve (prevents collisions and timeouts)
+r;u,,,Hc1ExcessTemp,ExcessTemp heating circuit 1,,,b524,020002000b00,ign,,IGN:4,,,,value,,EXP,,K,excess temperature of Hc1
+w,,,Hc1ExcessTemp,ExcessTemp heating circuit 1,,,b524,020102000b00,value,,EXP,,K,excess temperature of Hc1
+r;u,,,Hc1MixerMovement,MixerMovement heating circuit 1,,,b524,020002001a00,ign,,IGN:4,,,,value,,EXP,,,"status of mixer (<0 closing, >0 opening)"
+r;u,,,Hc1HeatCurveAdaption,HeatCurveAdaption heating circuit 1,,,b524,020002001c00,ign,,IGN:4,,,,value,,EXP,,,adaption applied to heating curve of Hc1
+r;u,,,HcStorageTempTop,hc storage temperature top,,,b524,020000009f00,ign,,IGN:4,,,,value,,EXP,,°C,"heating storage temperature sensor, top"
+r;u,,,HcStorageTempBottom,hc storage temperature bottom,,,b524,02000000a000,ign,,IGN:4,,,,value,,EXP,,°C,"heating storage temperature sensor, bottom"
+r;u,,,Z1ValveStatus,valve status zone 1,,,b524,020003001200,ign,,IGN:4,,,,value,,UCH,,,valve status of zone 1
+w,,,Z1ValveStatus,valve status zone 1,,,b524,020103001200,value,,UCH,,,valve status of zone 1
+r;u,,,Z1RoomZoneMapping,room zone mapping zone 1,,,b524,020003001300,ign,,IGN:4,,,,value,,UIN,0=none;1=VRC700;2=VR91_1;3=VR91_2;4=VR91_3,,configures which room temperature is assigned to zone 1
+w,,,Z1RoomZoneMapping,room zone mapping zone 1,,,b524,020103001300,value,,UIN,0=none;1=VRC700;2=VR91_1;3=VR91_2;4=VR91_3,,configures which room temperature is assigned to zone 1
+r;u,,,Z1Shortname,short name zone 1,,,b524,020003001600,ign,,IGN:4,,,,value,,STR:6,,,short name of zone 1
+w,,,Z1Shortname,short name zone 1,,,b524,020103001600,value,,STR:6,,,short name of zone 1
+r;u,,,Z1Name1,zone 1 label (first part),,,b524,020003001700,ign,,IGN:4,,,,value,,STR:5,,,name of zone 1
+w,,,Z1Name1,zone 1 label (first part),,,b524,020103001700,value,,STR:5,,,name of zone 1
+r;u,,,Z1Status,zone 1 status,,,b524,020003001b00,ign,,IGN:4,,,,value,,UIN,0=auto;1=ventilation;4=veto;7=holidayaway;9=load;10=off,,
+r;u,,,Z1HeatingState,zone 1 heating demand state,,,b524,020003002c00,ign,,IGN:4,,,,value,,UCH,0=off;1=on,,heating demand status
+r;u,,,Z1ManualTemp,manual heating setpoint zone 1,,,b524,020003002200,ign,,IGN:4,,,,value,,EXP,,°C,temperature
+w,,,Z1ManualTemp,manual heating setpoint zone 1,,,b524,020103002200,value,,EXP,,°C,temperature
+r;u,,,Z1CoolingManualTemp,manual cooling setpoint zone 1,,,b524,020003002300,ign,,IGN:4,,,,value,,EXP,,°C,desired cooling manual setpoint for zone 1
+w,,,Z1CoolingManualTemp,manual cooling setpoint zone 1,,,b524,020103002300,value,,EXP,,°C,desired cooling manual setpoint for zone 1
+r;u,,,Z1RoomHumidity,room relative humidity zone 1,,,b524,020003002800,ign,,IGN:4,,,,value,,EXP,,%,current relative room humidity in zone 1
+
+# ==============================================================================
+# 4. COOLING LOGIC (SEASON WINDOW AND SETPOINTS)
+# ==============================================================================
+r;u,,,Z1OpModeCooling,cooling operation mode zone 1,,,b524,020003000100,ign,,IGN:4,,,,value,,UIN,0=off;1=auto;2=day;3=night,,operation mode for cooling of zone 1
+w,,,Z1OpModeCooling,cooling operation mode zone 1,,,b524,020103000100,value,,UIN,0=off;1=auto;2=day;3=night,,operation mode for cooling of zone 1
+r;u,,,Z1CoolingTemp,cooling setpoint zone 1,,,b524,020003000200,ign,,IGN:4,,,,value,,EXP,,°C,desired cooling setpoint for zone 1
+w,,,Z1CoolingTemp,cooling setpoint zone 1,,,b524,020103000200,value,,EXP,,°C,desired cooling setpoint for zone 1
+r;u,,,CoolingStartDate,cooling start date,,,b524,02000000da00,ign,,IGN:4,,,,day,,UCH,,,,month,,UCH,,,,year,,UCH,,,"Start date for active cooling (day, month, year)"
+w,,,CoolingStartDate,cooling start date,,,b524,02010000da00,day,,UCH,,,,month,,UCH,,,,year,,UCH,,,"Start date for active cooling (day, month, year)"
+r;u,,,CoolingEndDate,cooling end date,,,b524,02000000db00,ign,,IGN:4,,,,day,,UCH,,,,month,,UCH,,,,year,,UCH,,,"End date for active cooling (day, month, year)"
+w,,,CoolingEndDate,cooling end date,,,b524,02010000db00,day,,UCH,,,,month,,UCH,,,,year,,UCH,,,"End date for active cooling (day, month, year)"
+r;u,,,Z1CoolingTempDesired,cooling room temperature desired zone 1,,,b524,020003001500,ign,,IGN:4,,,,value,,EXP,,°C,temperature
+w,,,Z1CoolingTempDesired,cooling room temperature desired zone 1,,,b524,020103001500,value,,EXP,,°C,temperature
+r;u,,,CoolingReleaseStatus,cooling release status,,,b524,020000000900,ign,,IGN:4,,,,value,,UCH,0=off;1=on,,cooling release status
+r;u,,,CoolingFlowTempDesiredMin,cooling min flow temp desired,,,b524,020002001100,ign,,IGN:4,,,,value,,EXP,,°C,min flow temperature setpoint for cooling (Circuit 1: 10.0 °C on MiPro Sense)
+w,,,CoolingFlowTempDesiredMin,cooling min flow temp desired,,,b524,020102001100,value,,EXP,,°C,min flow temperature setpoint for cooling (Circuit 1: 10.0 °C on MiPro Sense)
+r;u,,,CoolingFlowTempDesiredMax,cooling max flow temp desired,,,b524,020000002600,ign,,IGN:4,,,,value,,EXP,,°C,max flow temperature setpoint for cooling
+w,,,CoolingFlowTempDesiredMax,cooling max flow temp desired,,,b524,020100002600,value,,EXP,,°C,max flow temperature setpoint for cooling
+r;u,,,CoolingOutsideTempThreshold,cooling outside temperature threshold,,,b524,020000003800,ign,,IGN:4,,,,value,,EXP,,°C,cooling outside temperature threshold
+w,,,CoolingOutsideTempThreshold,cooling outside temperature threshold,,,b524,020100003800,value,,EXP,,°C,cooling outside temperature threshold
+r;u,,,DewPointOffset,dew point offset,,,b524,020000003a00,ign,,IGN:4,,,,value,,EXP,,K,dew point offset
+w,,,DewPointOffset,dew point offset,,,b524,020100003a00,value,,EXP,,K,dew point offset
+r;u,,,DewPointMonitoring,dew point monitoring,,,b524,020002000400,ign,,IGN:4,,,,value,,UCH,0=off;1=on,,dew point monitoring
+w,,,DewPointMonitoring,dew point monitoring,,,b524,020102000400,value,,UCH,0=off;1=on,,dew point monitoring
+
+
+# ==============================================================================
+# 4b. HOLIDAY / AWAY MODE LOGIC (READ ZONE 1 03 00 / WRITE GLOBAL 00 00)
+# ==============================================================================
+r;u,,,HolidayTemp,holiday room temperature setpoint,,,b524,020003000500,ign,,IGN:4,,,,value,,EXP,,°C,holiday setpoint
+w,,,HolidayTemp,holiday room temperature setpoint,,,b524,02010000f600,value,,EXP,,°C,holiday setpoint
+r;u,,,HolidayStartDate,holiday start date,,,b524,020003000300,ign,,IGN:4,,,,day,,UCH,,,,month,,UCH,,,,year,,UCH,,,"Start date for holiday mode (day, month, year)"
+w,,,HolidayStartDate,holiday start date,,,b524,02010000f200,day,,UCH,,,,month,,UCH,,,,year,,UCH,,,"Start date for holiday mode (day, month, year)"
+r;u,,,HolidayStartTime,holiday start time,,,b524,020003002100,ign,,IGN:4,,,,hours,,UCH,,,,minutes,,UCH,,,,seconds,,UCH,,,"Start time for holiday mode (hours, minutes, seconds)"
+w,,,HolidayStartTime,holiday start time,,,b524,02010000f400,hours,,UCH,,,,minutes,,UCH,,,,seconds,,UCH,,,"Start time for holiday mode (hours, minutes, seconds)"
+r;u,,,HolidayEndDate,holiday end date,,,b524,020003000400,ign,,IGN:4,,,,day,,UCH,,,,month,,UCH,,,,year,,UCH,,,"End date for holiday mode (day, month, year)"
+w,,,HolidayEndDate,holiday end date,,,b524,02010000f300,day,,UCH,,,,month,,UCH,,,,year,,UCH,,,"End date for holiday mode (day, month, year)"
+r;u,,,HolidayEndTime,holiday end time,,,b524,020003002000,ign,,IGN:4,,,,hours,,UCH,,,,minutes,,UCH,,,,seconds,,UCH,,,"End time for holiday mode (hours, minutes, seconds)"
+w,,,HolidayEndTime,holiday end time,,,b524,02010000f500,hours,,UCH,,,,minutes,,UCH,,,,seconds,,UCH,,,"End time for holiday mode (hours, minutes, seconds)"
+r;u,,,HolidayCancel,holiday cancel trigger,,,b524,02000000f700,ign,,IGN:4,,,,value,,UCH,,,holiday cancel trigger
+w,,,HolidayCancel,holiday cancel trigger,,,b524,02010000f700,value,,UCH,,,holiday cancel trigger
+
+
+# ==============================================================================
+# 5. DIAGNOSTICS AND ERROR LOGGING
+# ==============================================================================
+r;u,,,Currenterror,Current errors,,,b503,0001,error,,UIN,,,error number,error_1,,UIN,,,error number,error_2,,UIN,,,error number,error_3,,UIN,,,error number,error_4,,UIN,,,error number
+r;u,,,Errorhistory,Error_History,,,b503,0101,index,m,UCH,,,,status,,UCH,,,Status,time,,VTM,,,time,date,,HDA:3,,,date,error,,UIN,,,error number
+r;u,,,ErrorMemorySlot,error memory slot,,,b503,00,slot,m,UCH,,,,error,,UIN,,,error number,data,,HEX:8,,,
+w,,install,Clearerrorhistory,Clear error history,,,b503,0201,cleared,s,UCH,0=no;1=yes,,
+r;u,,,AppSessionStatus,app session status,,,b531,0301,status,,UCH,1=connected;0=disconnected,,app session status
+
+# ==============================================================================
+# 6. WEEKLY TIME SCHEDULE (b5 55: READ r;u / WRITE w)
+# ==============================================================================
+# Read command structure (a5):  a5 00 [circuit] [day 00-06] [slot 00-02]
+# Write command structure (a6): a6 00 [circuit] [day 00-06] [slot 00-02] [total_slots 01-03] [from_h] [from_m] [to_h] [to_m] [temp 2B UIN:10]
+# Circuits: 00=Heating Zone 1, 01=Cooling, 02=DHW, 03=Circulation
+# Days: 00=Monday, 01=Tuesday, 02=Wednesday, 03=Thursday, 04=Friday, 05=Saturday, 06=Sunday
+# Slots: 00=Slot 1, 01=Slot 2, 02=Slot 3
+# Note: total_slots must be identical across all active slots for a given day (e.g. 02 if 2 slots are active).
+# 6.1 Heating Zone 1 (Circuit 00)
+r;u,,,Z1Timer_Monday,Timer Heating Monday,,,b555,a500000000,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Monday (HH;MM;HH;MM)"
+w,,,Z1Timer_Monday,Timer Heating Monday,,,b555,a600000000,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Monday (HH;MM;HH;MM)"
+r;u,,,Z1Timer_Monday_Slot2,Timer Heating Monday Slot 2,,,b555,a500000001,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Monday Slot 2 (HH;MM;HH;MM)"
+w,,,Z1Timer_Monday_Slot2,Timer Heating Monday Slot 2,,,b555,a600000001,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Monday Slot 2 (HH;MM;HH;MM)"
+r;u,,,Z1Timer_Monday_Slot3,Timer Heating Monday Slot 3,,,b555,a500000002,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Monday Slot 3 (HH;MM;HH;MM)"
+w,,,Z1Timer_Monday_Slot3,Timer Heating Monday Slot 3,,,b555,a600000002,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Monday Slot 3 (HH;MM;HH;MM)"
+r;u,,,Z1Timer_Tuesday,Timer Heating Tuesday,,,b555,a500000100,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Tuesday (HH;MM;HH;MM)"
+w,,,Z1Timer_Tuesday,Timer Heating Tuesday,,,b555,a600000100,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Tuesday (HH;MM;HH;MM)"
+r;u,,,Z1Timer_Tuesday_Slot2,Timer Heating Tuesday Slot 2,,,b555,a500000101,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Tuesday Slot 2 (HH;MM;HH;MM)"
+w,,,Z1Timer_Tuesday_Slot2,Timer Heating Tuesday Slot 2,,,b555,a600000101,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Tuesday Slot 2 (HH;MM;HH;MM)"
+r;u,,,Z1Timer_Tuesday_Slot3,Timer Heating Tuesday Slot 3,,,b555,a500000102,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Tuesday Slot 3 (HH;MM;HH;MM)"
+w,,,Z1Timer_Tuesday_Slot3,Timer Heating Tuesday Slot 3,,,b555,a600000102,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Tuesday Slot 3 (HH;MM;HH;MM)"
+r;u,,,Z1Timer_Wednesday,Timer Heating Wednesday,,,b555,a500000200,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Wednesday (HH;MM;HH;MM)"
+w,,,Z1Timer_Wednesday,Timer Heating Wednesday,,,b555,a600000200,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Wednesday (HH;MM;HH;MM)"
+r;u,,,Z1Timer_Wednesday_Slot2,Timer Heating Wednesday Slot 2,,,b555,a500000201,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Wednesday Slot 2 (HH;MM;HH;MM)"
+w,,,Z1Timer_Wednesday_Slot2,Timer Heating Wednesday Slot 2,,,b555,a600000201,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Wednesday Slot 2 (HH;MM;HH;MM)"
+r;u,,,Z1Timer_Wednesday_Slot3,Timer Heating Wednesday Slot 3,,,b555,a500000202,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Wednesday Slot 3 (HH;MM;HH;MM)"
+w,,,Z1Timer_Wednesday_Slot3,Timer Heating Wednesday Slot 3,,,b555,a600000202,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Wednesday Slot 3 (HH;MM;HH;MM)"
+r;u,,,Z1Timer_Thursday,Timer Heating Thursday,,,b555,a500000300,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Thursday (HH;MM;HH;MM)"
+w,,,Z1Timer_Thursday,Timer Heating Thursday,,,b555,a600000300,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Thursday (HH;MM;HH;MM)"
+r;u,,,Z1Timer_Thursday_Slot2,Timer Heating Thursday Slot 2,,,b555,a500000301,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Thursday Slot 2 (HH;MM;HH;MM)"
+w,,,Z1Timer_Thursday_Slot2,Timer Heating Thursday Slot 2,,,b555,a600000301,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Thursday Slot 2 (HH;MM;HH;MM)"
+r;u,,,Z1Timer_Thursday_Slot3,Timer Heating Thursday Slot 3,,,b555,a500000302,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Thursday Slot 3 (HH;MM;HH;MM)"
+w,,,Z1Timer_Thursday_Slot3,Timer Heating Thursday Slot 3,,,b555,a600000302,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Thursday Slot 3 (HH;MM;HH;MM)"
+r;u,,,Z1Timer_Friday,Timer Heating Friday,,,b555,a500000400,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Friday (HH;MM;HH;MM)"
+w,,,Z1Timer_Friday,Timer Heating Friday,,,b555,a600000400,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Friday (HH;MM;HH;MM)"
+r;u,,,Z1Timer_Friday_Slot2,Timer Heating Friday Slot 2,,,b555,a500000401,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Friday Slot 2 (HH;MM;HH;MM)"
+w,,,Z1Timer_Friday_Slot2,Timer Heating Friday Slot 2,,,b555,a600000401,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Friday Slot 2 (HH;MM;HH;MM)"
+r;u,,,Z1Timer_Friday_Slot3,Timer Heating Friday Slot 3,,,b555,a500000402,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Friday Slot 3 (HH;MM;HH;MM)"
+w,,,Z1Timer_Friday_Slot3,Timer Heating Friday Slot 3,,,b555,a600000402,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Friday Slot 3 (HH;MM;HH;MM)"
+r;u,,,Z1Timer_Saturday,Timer Heating Saturday,,,b555,a500000500,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Saturday (HH;MM;HH;MM)"
+w,,,Z1Timer_Saturday,Timer Heating Saturday,,,b555,a600000500,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Saturday (HH;MM;HH;MM)"
+r;u,,,Z1Timer_Saturday_Slot2,Timer Heating Saturday Slot 2,,,b555,a500000501,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Saturday Slot 2 (HH;MM;HH;MM)"
+w,,,Z1Timer_Saturday_Slot2,Timer Heating Saturday Slot 2,,,b555,a600000501,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Saturday Slot 2 (HH;MM;HH;MM)"
+r;u,,,Z1Timer_Saturday_Slot3,Timer Heating Saturday Slot 3,,,b555,a500000502,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Saturday Slot 3 (HH;MM;HH;MM)"
+w,,,Z1Timer_Saturday_Slot3,Timer Heating Saturday Slot 3,,,b555,a600000502,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Saturday Slot 3 (HH;MM;HH;MM)"
+r;u,,,Z1Timer_Sunday,Timer Heating Sunday,,,b555,a500000600,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Sunday (HH;MM;HH;MM)"
+w,,,Z1Timer_Sunday,Timer Heating Sunday,,,b555,a600000600,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Sunday (HH;MM;HH;MM)"
+r;u,,,Z1Timer_Sunday_Slot2,Timer Heating Sunday Slot 2,,,b555,a500000601,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Sunday Slot 2 (HH;MM;HH;MM)"
+w,,,Z1Timer_Sunday_Slot2,Timer Heating Sunday Slot 2,,,b555,a600000601,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Sunday Slot 2 (HH;MM;HH;MM)"
+r;u,,,Z1Timer_Sunday_Slot3,Timer Heating Sunday Slot 3,,,b555,a500000602,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Sunday Slot 3 (HH;MM;HH;MM)"
+w,,,Z1Timer_Sunday_Slot3,Timer Heating Sunday Slot 3,,,b555,a600000602,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"Heating schedule Sunday Slot 3 (HH;MM;HH;MM)"
+
+# 6.1b Passive MiGo Link / Gateway Schedule Writes (a6 00 00)
+# Structure: a6 00 00 [day 00-06] [slot 00-02] [total_slots] [from_h] [from_m] [to_h] [to_m] [temp 2B UIN:10]
+u,,,Z1Timer_Monday_Passive,Timer Heating Monday Passive,,,b555,a600000000,total_slots,m,UCH,,,,from_hour,m,UCH,,,,from_min,m,UCH,,,,to_hour,m,UCH,,,,to_min,m,UCH,,,,temp,m,UIN,10,°C,
+u,,,Z1Timer_Monday_Slot2_Passive,Timer Heating Monday Slot 2 Passive,,,b555,a600000001,total_slots,m,UCH,,,,from_hour,m,UCH,,,,from_min,m,UCH,,,,to_hour,m,UCH,,,,to_min,m,UCH,,,,temp,m,UIN,10,°C,
+u,,,Z1Timer_Monday_Slot3_Passive,Timer Heating Monday Slot 3 Passive,,,b555,a600000002,total_slots,m,UCH,,,,from_hour,m,UCH,,,,from_min,m,UCH,,,,to_hour,m,UCH,,,,to_min,m,UCH,,,,temp,m,UIN,10,°C,
+u,,,Z1Timer_Tuesday_Passive,Timer Heating Tuesday Passive,,,b555,a600000100,total_slots,m,UCH,,,,from_hour,m,UCH,,,,from_min,m,UCH,,,,to_hour,m,UCH,,,,to_min,m,UCH,,,,temp,m,UIN,10,°C,
+u,,,Z1Timer_Tuesday_Slot2_Passive,Timer Heating Tuesday Slot 2 Passive,,,b555,a600000101,total_slots,m,UCH,,,,from_hour,m,UCH,,,,from_min,m,UCH,,,,to_hour,m,UCH,,,,to_min,m,UCH,,,,temp,m,UIN,10,°C,
+u,,,Z1Timer_Tuesday_Slot3_Passive,Timer Heating Tuesday Slot 3 Passive,,,b555,a600000102,total_slots,m,UCH,,,,from_hour,m,UCH,,,,from_min,m,UCH,,,,to_hour,m,UCH,,,,to_min,m,UCH,,,,temp,m,UIN,10,°C,
+u,,,Z1Timer_Wednesday_Passive,Timer Heating Wednesday Passive,,,b555,a600000200,total_slots,m,UCH,,,,from_hour,m,UCH,,,,from_min,m,UCH,,,,to_hour,m,UCH,,,,to_min,m,UCH,,,,temp,m,UIN,10,°C,
+u,,,Z1Timer_Wednesday_Slot2_Passive,Timer Heating Wednesday Slot 2 Passive,,,b555,a600000201,total_slots,m,UCH,,,,from_hour,m,UCH,,,,from_min,m,UCH,,,,to_hour,m,UCH,,,,to_min,m,UCH,,,,temp,m,UIN,10,°C,
+u,,,Z1Timer_Wednesday_Slot3_Passive,Timer Heating Wednesday Slot 3 Passive,,,b555,a600000202,total_slots,m,UCH,,,,from_hour,m,UCH,,,,from_min,m,UCH,,,,to_hour,m,UCH,,,,to_min,m,UCH,,,,temp,m,UIN,10,°C,
+u,,,Z1Timer_Thursday_Passive,Timer Heating Thursday Passive,,,b555,a600000300,total_slots,m,UCH,,,,from_hour,m,UCH,,,,from_min,m,UCH,,,,to_hour,m,UCH,,,,to_min,m,UCH,,,,temp,m,UIN,10,°C,
+u,,,Z1Timer_Thursday_Slot2_Passive,Timer Heating Thursday Slot 2 Passive,,,b555,a600000301,total_slots,m,UCH,,,,from_hour,m,UCH,,,,from_min,m,UCH,,,,to_hour,m,UCH,,,,to_min,m,UCH,,,,temp,m,UIN,10,°C,
+u,,,Z1Timer_Thursday_Slot3_Passive,Timer Heating Thursday Slot 3 Passive,,,b555,a600000302,total_slots,m,UCH,,,,from_hour,m,UCH,,,,from_min,m,UCH,,,,to_hour,m,UCH,,,,to_min,m,UCH,,,,temp,m,UIN,10,°C,
+u,,,Z1Timer_Friday_Passive,Timer Heating Friday Passive,,,b555,a600000400,total_slots,m,UCH,,,,from_hour,m,UCH,,,,from_min,m,UCH,,,,to_hour,m,UCH,,,,to_min,m,UCH,,,,temp,m,UIN,10,°C,
+u,,,Z1Timer_Friday_Slot2_Passive,Timer Heating Friday Slot 2 Passive,,,b555,a600000401,total_slots,m,UCH,,,,from_hour,m,UCH,,,,from_min,m,UCH,,,,to_hour,m,UCH,,,,to_min,m,UCH,,,,temp,m,UIN,10,°C,
+u,,,Z1Timer_Friday_Slot3_Passive,Timer Heating Friday Slot 3 Passive,,,b555,a600000402,total_slots,m,UCH,,,,from_hour,m,UCH,,,,from_min,m,UCH,,,,to_hour,m,UCH,,,,to_min,m,UCH,,,,temp,m,UIN,10,°C,
+u,,,Z1Timer_Saturday_Passive,Timer Heating Saturday Passive,,,b555,a600000500,total_slots,m,UCH,,,,from_hour,m,UCH,,,,from_min,m,UCH,,,,to_hour,m,UCH,,,,to_min,m,UCH,,,,temp,m,UIN,10,°C,
+u,,,Z1Timer_Saturday_Slot2_Passive,Timer Heating Saturday Slot 2 Passive,,,b555,a600000501,total_slots,m,UCH,,,,from_hour,m,UCH,,,,from_min,m,UCH,,,,to_hour,m,UCH,,,,to_min,m,UCH,,,,temp,m,UIN,10,°C,
+u,,,Z1Timer_Saturday_Slot3_Passive,Timer Heating Saturday Slot 3 Passive,,,b555,a600000502,total_slots,m,UCH,,,,from_hour,m,UCH,,,,from_min,m,UCH,,,,to_hour,m,UCH,,,,to_min,m,UCH,,,,temp,m,UIN,10,°C,
+u,,,Z1Timer_Sunday_Passive,Timer Heating Sunday Passive,,,b555,a600000600,total_slots,m,UCH,,,,from_hour,m,UCH,,,,from_min,m,UCH,,,,to_hour,m,UCH,,,,to_min,m,UCH,,,,temp,m,UIN,10,°C,
+u,,,Z1Timer_Sunday_Slot2_Passive,Timer Heating Sunday Slot 2 Passive,,,b555,a600000601,total_slots,m,UCH,,,,from_hour,m,UCH,,,,from_min,m,UCH,,,,to_hour,m,UCH,,,,to_min,m,UCH,,,,temp,m,UIN,10,°C,
+u,,,Z1Timer_Sunday_Slot3_Passive,Timer Heating Sunday Slot 3 Passive,,,b555,a600000602,total_slots,m,UCH,,,,from_hour,m,UCH,,,,from_min,m,UCH,,,,to_hour,m,UCH,,,,to_min,m,UCH,,,,temp,m,UIN,10,°C,
+
+# 6.2 Domestic Hot Water - DHW (Circuit 02)
+r;u,,,HwcTimer_Monday,Timer DHW Monday,,,b555,a500020000,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Monday (HH;MM;HH;MM)"
+w,,,HwcTimer_Monday,Timer DHW Monday,,,b555,a600020000,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Monday (HH;MM;HH;MM)"
+r;u,,,HwcTimer_Monday_Slot2,Timer DHW Monday Slot 2,,,b555,a500020001,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Monday Slot 2 (HH;MM;HH;MM)"
+w,,,HwcTimer_Monday_Slot2,Timer DHW Monday Slot 2,,,b555,a600020001,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Monday Slot 2 (HH;MM;HH;MM)"
+r;u,,,HwcTimer_Monday_Slot3,Timer DHW Monday Slot 3,,,b555,a500020002,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Monday Slot 3 (HH;MM;HH;MM)"
+w,,,HwcTimer_Monday_Slot3,Timer DHW Monday Slot 3,,,b555,a600020002,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Monday Slot 3 (HH;MM;HH;MM)"
+r;u,,,HwcTimer_Tuesday,Timer DHW Tuesday,,,b555,a500020100,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Tuesday (HH;MM;HH;MM)"
+w,,,HwcTimer_Tuesday,Timer DHW Tuesday,,,b555,a600020100,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Tuesday (HH;MM;HH;MM)"
+r;u,,,HwcTimer_Tuesday_Slot2,Timer DHW Tuesday Slot 2,,,b555,a500020101,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Tuesday Slot 2 (HH;MM;HH;MM)"
+w,,,HwcTimer_Tuesday_Slot2,Timer DHW Tuesday Slot 2,,,b555,a600020101,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Tuesday Slot 2 (HH;MM;HH;MM)"
+r;u,,,HwcTimer_Tuesday_Slot3,Timer DHW Tuesday Slot 3,,,b555,a500020102,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Tuesday Slot 3 (HH;MM;HH;MM)"
+w,,,HwcTimer_Tuesday_Slot3,Timer DHW Tuesday Slot 3,,,b555,a600020102,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Tuesday Slot 3 (HH;MM;HH;MM)"
+r;u,,,HwcTimer_Wednesday,Timer DHW Wednesday,,,b555,a500020200,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Wednesday (HH;MM;HH;MM)"
+w,,,HwcTimer_Wednesday,Timer DHW Wednesday,,,b555,a600020200,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Wednesday (HH;MM;HH;MM)"
+r;u,,,HwcTimer_Wednesday_Slot2,Timer DHW Wednesday Slot 2,,,b555,a500020201,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Wednesday Slot 2 (HH;MM;HH;MM)"
+w,,,HwcTimer_Wednesday_Slot2,Timer DHW Wednesday Slot 2,,,b555,a600020201,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Wednesday Slot 2 (HH;MM;HH;MM)"
+r;u,,,HwcTimer_Wednesday_Slot3,Timer DHW Wednesday Slot 3,,,b555,a500020202,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Wednesday Slot 3 (HH;MM;HH;MM)"
+w,,,HwcTimer_Wednesday_Slot3,Timer DHW Wednesday Slot 3,,,b555,a600020202,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Wednesday Slot 3 (HH;MM;HH;MM)"
+r;u,,,HwcTimer_Thursday,Timer DHW Thursday,,,b555,a500020300,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Thursday (HH;MM;HH;MM)"
+w,,,HwcTimer_Thursday,Timer DHW Thursday,,,b555,a600020300,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Thursday (HH;MM;HH;MM)"
+r;u,,,HwcTimer_Thursday_Slot2,Timer DHW Thursday Slot 2,,,b555,a500020301,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Thursday Slot 2 (HH;MM;HH;MM)"
+w,,,HwcTimer_Thursday_Slot2,Timer DHW Thursday Slot 2,,,b555,a600020301,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Thursday Slot 2 (HH;MM;HH;MM)"
+r;u,,,HwcTimer_Thursday_Slot3,Timer DHW Thursday Slot 3,,,b555,a500020302,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Thursday Slot 3 (HH;MM;HH;MM)"
+w,,,HwcTimer_Thursday_Slot3,Timer DHW Thursday Slot 3,,,b555,a600020302,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Thursday Slot 3 (HH;MM;HH;MM)"
+r;u,,,HwcTimer_Friday,Timer DHW Friday,,,b555,a500020400,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Friday (HH;MM;HH;MM)"
+w,,,HwcTimer_Friday,Timer DHW Friday,,,b555,a600020400,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Friday (HH;MM;HH;MM)"
+r;u,,,HwcTimer_Friday_Slot2,Timer DHW Friday Slot 2,,,b555,a500020401,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Friday Slot 2 (HH;MM;HH;MM)"
+w,,,HwcTimer_Friday_Slot2,Timer DHW Friday Slot 2,,,b555,a600020401,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Friday Slot 2 (HH;MM;HH;MM)"
+r;u,,,HwcTimer_Friday_Slot3,Timer DHW Friday Slot 3,,,b555,a500020402,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Friday Slot 3 (HH;MM;HH;MM)"
+w,,,HwcTimer_Friday_Slot3,Timer DHW Friday Slot 3,,,b555,a600020402,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Friday Slot 3 (HH;MM;HH;MM)"
+r;u,,,HwcTimer_Saturday,Timer DHW Saturday,,,b555,a500020500,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Saturday (HH;MM;HH;MM)"
+w,,,HwcTimer_Saturday,Timer DHW Saturday,,,b555,a600020500,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Saturday (HH;MM;HH;MM)"
+r;u,,,HwcTimer_Saturday_Slot2,Timer DHW Saturday Slot 2,,,b555,a500020501,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Saturday Slot 2 (HH;MM;HH;MM)"
+w,,,HwcTimer_Saturday_Slot2,Timer DHW Saturday Slot 2,,,b555,a600020501,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Saturday Slot 2 (HH;MM;HH;MM)"
+r;u,,,HwcTimer_Saturday_Slot3,Timer DHW Saturday Slot 3,,,b555,a500020502,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Saturday Slot 3 (HH;MM;HH;MM)"
+w,,,HwcTimer_Saturday_Slot3,Timer DHW Saturday Slot 3,,,b555,a600020502,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Saturday Slot 3 (HH;MM;HH;MM)"
+r;u,,,HwcTimer_Sunday,Timer DHW Sunday,,,b555,a500020600,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Sunday (HH;MM;HH;MM)"
+w,,,HwcTimer_Sunday,Timer DHW Sunday,,,b555,a600020600,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Sunday (HH;MM;HH;MM)"
+r;u,,,HwcTimer_Sunday_Slot2,Timer DHW Sunday Slot 2,,,b555,a500020601,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Sunday Slot 2 (HH;MM;HH;MM)"
+w,,,HwcTimer_Sunday_Slot2,Timer DHW Sunday Slot 2,,,b555,a600020601,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Sunday Slot 2 (HH;MM;HH;MM)"
+r;u,,,HwcTimer_Sunday_Slot3,Timer DHW Sunday Slot 3,,,b555,a500020602,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Sunday Slot 3 (HH;MM;HH;MM)"
+w,,,HwcTimer_Sunday_Slot3,Timer DHW Sunday Slot 3,,,b555,a600020602,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,temp,,UIN,10,°C,"DHW schedule Sunday Slot 3 (HH;MM;HH;MM)"
+
+# 6.3 Cooling (Circuit 01)
+r;u,,,CoolingTimer_Monday,Timer Cooling Monday,,,b555,a500010000,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Monday (HH;MM;HH;MM)"
+w,,,CoolingTimer_Monday,Timer Cooling Monday,,,b555,a600010000,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Monday (HH;MM;HH;MM)"
+r;u,,,CoolingTimer_Monday_Slot2,Timer Cooling Monday Slot 2,,,b555,a500010001,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Monday Slot 2 (HH;MM;HH;MM)"
+w,,,CoolingTimer_Monday_Slot2,Timer Cooling Monday Slot 2,,,b555,a600010001,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Monday Slot 2 (HH;MM;HH;MM)"
+r;u,,,CoolingTimer_Monday_Slot3,Timer Cooling Monday Slot 3,,,b555,a500010002,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Monday Slot 3 (HH;MM;HH;MM)"
+w,,,CoolingTimer_Monday_Slot3,Timer Cooling Monday Slot 3,,,b555,a600010002,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Monday Slot 3 (HH;MM;HH;MM)"
+r;u,,,CoolingTimer_Tuesday,Timer Cooling Tuesday,,,b555,a500010100,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Tuesday (HH;MM;HH;MM)"
+w,,,CoolingTimer_Tuesday,Timer Cooling Tuesday,,,b555,a600010100,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Tuesday (HH;MM;HH;MM)"
+r;u,,,CoolingTimer_Tuesday_Slot2,Timer Cooling Tuesday Slot 2,,,b555,a500010101,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Tuesday Slot 2 (HH;MM;HH;MM)"
+w,,,CoolingTimer_Tuesday_Slot2,Timer Cooling Tuesday Slot 2,,,b555,a600010101,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Tuesday Slot 2 (HH;MM;HH;MM)"
+r;u,,,CoolingTimer_Tuesday_Slot3,Timer Cooling Tuesday Slot 3,,,b555,a500010102,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Tuesday Slot 3 (HH;MM;HH;MM)"
+w,,,CoolingTimer_Tuesday_Slot3,Timer Cooling Tuesday Slot 3,,,b555,a600010102,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Tuesday Slot 3 (HH;MM;HH;MM)"
+r;u,,,CoolingTimer_Wednesday,Timer Cooling Wednesday,,,b555,a500010200,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Wednesday (HH;MM;HH;MM)"
+w,,,CoolingTimer_Wednesday,Timer Cooling Wednesday,,,b555,a600010200,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Wednesday (HH;MM;HH;MM)"
+r;u,,,CoolingTimer_Wednesday_Slot2,Timer Cooling Wednesday Slot 2,,,b555,a500010201,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Wednesday Slot 2 (HH;MM;HH;MM)"
+w,,,CoolingTimer_Wednesday_Slot2,Timer Cooling Wednesday Slot 2,,,b555,a600010201,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Wednesday Slot 2 (HH;MM;HH;MM)"
+r;u,,,CoolingTimer_Wednesday_Slot3,Timer Cooling Wednesday Slot 3,,,b555,a500010202,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Wednesday Slot 3 (HH;MM;HH;MM)"
+w,,,CoolingTimer_Wednesday_Slot3,Timer Cooling Wednesday Slot 3,,,b555,a600010202,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Wednesday Slot 3 (HH;MM;HH;MM)"
+r;u,,,CoolingTimer_Thursday,Timer Cooling Thursday,,,b555,a500010300,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Thursday (HH;MM;HH;MM)"
+w,,,CoolingTimer_Thursday,Timer Cooling Thursday,,,b555,a600010300,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Thursday (HH;MM;HH;MM)"
+r;u,,,CoolingTimer_Thursday_Slot2,Timer Cooling Thursday Slot 2,,,b555,a500010301,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Thursday Slot 2 (HH;MM;HH;MM)"
+w,,,CoolingTimer_Thursday_Slot2,Timer Cooling Thursday Slot 2,,,b555,a600010301,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Thursday Slot 2 (HH;MM;HH;MM)"
+r;u,,,CoolingTimer_Thursday_Slot3,Timer Cooling Thursday Slot 3,,,b555,a500010302,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Thursday Slot 3 (HH;MM;HH;MM)"
+w,,,CoolingTimer_Thursday_Slot3,Timer Cooling Thursday Slot 3,,,b555,a600010302,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Thursday Slot 3 (HH;MM;HH;MM)"
+r;u,,,CoolingTimer_Friday,Timer Cooling Friday,,,b555,a500010400,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Friday (HH;MM;HH;MM)"
+w,,,CoolingTimer_Friday,Timer Cooling Friday,,,b555,a600010400,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Friday (HH;MM;HH;MM)"
+r;u,,,CoolingTimer_Friday_Slot2,Timer Cooling Friday Slot 2,,,b555,a500010401,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Friday Slot 2 (HH;MM;HH;MM)"
+w,,,CoolingTimer_Friday_Slot2,Timer Cooling Friday Slot 2,,,b555,a600010401,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Friday Slot 2 (HH;MM;HH;MM)"
+r;u,,,CoolingTimer_Friday_Slot3,Timer Cooling Friday Slot 3,,,b555,a500010402,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Friday Slot 3 (HH;MM;HH;MM)"
+w,,,CoolingTimer_Friday_Slot3,Timer Cooling Friday Slot 3,,,b555,a600010402,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Friday Slot 3 (HH;MM;HH;MM)"
+r;u,,,CoolingTimer_Saturday,Timer Cooling Saturday,,,b555,a500010500,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Saturday (HH;MM;HH;MM)"
+w,,,CoolingTimer_Saturday,Timer Cooling Saturday,,,b555,a600010500,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Saturday (HH;MM;HH;MM)"
+r;u,,,CoolingTimer_Saturday_Slot2,Timer Cooling Saturday Slot 2,,,b555,a500010501,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Saturday Slot 2 (HH;MM;HH;MM)"
+w,,,CoolingTimer_Saturday_Slot2,Timer Cooling Saturday Slot 2,,,b555,a600010501,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Saturday Slot 2 (HH;MM;HH;MM)"
+r;u,,,CoolingTimer_Saturday_Slot3,Timer Cooling Saturday Slot 3,,,b555,a500010502,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Saturday Slot 3 (HH;MM;HH;MM)"
+w,,,CoolingTimer_Saturday_Slot3,Timer Cooling Saturday Slot 3,,,b555,a600010502,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Saturday Slot 3 (HH;MM;HH;MM)"
+r;u,,,CoolingTimer_Sunday,Timer Cooling Sunday,,,b555,a500010600,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Sunday (HH;MM;HH;MM)"
+w,,,CoolingTimer_Sunday,Timer Cooling Sunday,,,b555,a600010600,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Sunday (HH;MM;HH;MM)"
+r;u,,,CoolingTimer_Sunday_Slot2,Timer Cooling Sunday Slot 2,,,b555,a500010601,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Sunday Slot 2 (HH;MM;HH;MM)"
+w,,,CoolingTimer_Sunday_Slot2,Timer Cooling Sunday Slot 2,,,b555,a600010601,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Sunday Slot 2 (HH;MM;HH;MM)"
+r;u,,,CoolingTimer_Sunday_Slot3,Timer Cooling Sunday Slot 3,,,b555,a500010602,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Sunday Slot 3 (HH;MM;HH;MM)"
+w,,,CoolingTimer_Sunday_Slot3,Timer Cooling Sunday Slot 3,,,b555,a600010602,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,cooling_temp,,UIN,10,°C,"Cooling schedule Sunday Slot 3 (HH;MM;HH;MM)"
+
+# 6.4 Circulation Pump (Circuit 03)
+r;u,,,CirculationTimer_Monday,Timer Circulation Monday,,,b555,a500030000,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Monday (HH;MM;HH;MM)"
+w,,,CirculationTimer_Monday,Timer Circulation Monday,,,b555,a600030000,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Monday (HH;MM;HH;MM)"
+r;u,,,CirculationTimer_Monday_Slot2,Timer Circulation Monday Slot 2,,,b555,a500030001,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Monday Slot 2 (HH;MM;HH;MM)"
+w,,,CirculationTimer_Monday_Slot2,Timer Circulation Monday Slot 2,,,b555,a600030001,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Monday Slot 2 (HH;MM;HH;MM)"
+r;u,,,CirculationTimer_Monday_Slot3,Timer Circulation Monday Slot 3,,,b555,a500030002,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Monday Slot 3 (HH;MM;HH;MM)"
+w,,,CirculationTimer_Monday_Slot3,Timer Circulation Monday Slot 3,,,b555,a600030002,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Monday Slot 3 (HH;MM;HH;MM)"
+r;u,,,CirculationTimer_Tuesday,Timer Circulation Tuesday,,,b555,a500030100,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Tuesday (HH;MM;HH;MM)"
+w,,,CirculationTimer_Tuesday,Timer Circulation Tuesday,,,b555,a600030100,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Tuesday (HH;MM;HH;MM)"
+r;u,,,CirculationTimer_Tuesday_Slot2,Timer Circulation Tuesday Slot 2,,,b555,a500030101,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Tuesday Slot 2 (HH;MM;HH;MM)"
+w,,,CirculationTimer_Tuesday_Slot2,Timer Circulation Tuesday Slot 2,,,b555,a600030101,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Tuesday Slot 2 (HH;MM;HH;MM)"
+r;u,,,CirculationTimer_Tuesday_Slot3,Timer Circulation Tuesday Slot 3,,,b555,a500030102,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Tuesday Slot 3 (HH;MM;HH;MM)"
+w,,,CirculationTimer_Tuesday_Slot3,Timer Circulation Tuesday Slot 3,,,b555,a600030102,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Tuesday Slot 3 (HH;MM;HH;MM)"
+r;u,,,CirculationTimer_Wednesday,Timer Circulation Wednesday,,,b555,a500030200,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Wednesday (HH;MM;HH;MM)"
+w,,,CirculationTimer_Wednesday,Timer Circulation Wednesday,,,b555,a600030200,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Wednesday (HH;MM;HH;MM)"
+r;u,,,CirculationTimer_Wednesday_Slot2,Timer Circulation Wednesday Slot 2,,,b555,a500030201,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Wednesday Slot 2 (HH;MM;HH;MM)"
+w,,,CirculationTimer_Wednesday_Slot2,Timer Circulation Wednesday Slot 2,,,b555,a600030201,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Wednesday Slot 2 (HH;MM;HH;MM)"
+r;u,,,CirculationTimer_Wednesday_Slot3,Timer Circulation Wednesday Slot 3,,,b555,a500030202,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Wednesday Slot 3 (HH;MM;HH;MM)"
+w,,,CirculationTimer_Wednesday_Slot3,Timer Circulation Wednesday Slot 3,,,b555,a600030202,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Wednesday Slot 3 (HH;MM;HH;MM)"
+r;u,,,CirculationTimer_Thursday,Timer Circulation Thursday,,,b555,a500030300,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Thursday (HH;MM;HH;MM)"
+w,,,CirculationTimer_Thursday,Timer Circulation Thursday,,,b555,a600030300,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Thursday (HH;MM;HH;MM)"
+r;u,,,CirculationTimer_Thursday_Slot2,Timer Circulation Thursday Slot 2,,,b555,a500030301,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Thursday Slot 2 (HH;MM;HH;MM)"
+w,,,CirculationTimer_Thursday_Slot2,Timer Circulation Thursday Slot 2,,,b555,a600030301,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Thursday Slot 2 (HH;MM;HH;MM)"
+r;u,,,CirculationTimer_Thursday_Slot3,Timer Circulation Thursday Slot 3,,,b555,a500030302,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Thursday Slot 3 (HH;MM;HH;MM)"
+w,,,CirculationTimer_Thursday_Slot3,Timer Circulation Thursday Slot 3,,,b555,a600030302,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Thursday Slot 3 (HH;MM;HH;MM)"
+r;u,,,CirculationTimer_Friday,Timer Circulation Friday,,,b555,a500030400,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Friday (HH;MM;HH;MM)"
+w,,,CirculationTimer_Friday,Timer Circulation Friday,,,b555,a600030400,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Friday (HH;MM;HH;MM)"
+r;u,,,CirculationTimer_Friday_Slot2,Timer Circulation Friday Slot 2,,,b555,a500030401,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Friday Slot 2 (HH;MM;HH;MM)"
+w,,,CirculationTimer_Friday_Slot2,Timer Circulation Friday Slot 2,,,b555,a600030401,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Friday Slot 2 (HH;MM;HH;MM)"
+r;u,,,CirculationTimer_Friday_Slot3,Timer Circulation Friday Slot 3,,,b555,a500030402,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Friday Slot 3 (HH;MM;HH;MM)"
+w,,,CirculationTimer_Friday_Slot3,Timer Circulation Friday Slot 3,,,b555,a600030402,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Friday Slot 3 (HH;MM;HH;MM)"
+r;u,,,CirculationTimer_Saturday,Timer Circulation Saturday,,,b555,a500030500,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Saturday (HH;MM;HH;MM)"
+w,,,CirculationTimer_Saturday,Timer Circulation Saturday,,,b555,a600030500,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Saturday (HH;MM;HH;MM)"
+r;u,,,CirculationTimer_Saturday_Slot2,Timer Circulation Saturday Slot 2,,,b555,a500030501,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Saturday Slot 2 (HH;MM;HH;MM)"
+w,,,CirculationTimer_Saturday_Slot2,Timer Circulation Saturday Slot 2,,,b555,a600030501,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Saturday Slot 2 (HH;MM;HH;MM)"
+r;u,,,CirculationTimer_Saturday_Slot3,Timer Circulation Saturday Slot 3,,,b555,a500030502,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Saturday Slot 3 (HH;MM;HH;MM)"
+w,,,CirculationTimer_Saturday_Slot3,Timer Circulation Saturday Slot 3,,,b555,a600030502,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Saturday Slot 3 (HH;MM;HH;MM)"
+r;u,,,CirculationTimer_Sunday,Timer Circulation Sunday,,,b555,a500030600,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Sunday (HH;MM;HH;MM)"
+w,,,CirculationTimer_Sunday,Timer Circulation Sunday,,,b555,a600030600,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Sunday (HH;MM;HH;MM)"
+r;u,,,CirculationTimer_Sunday_Slot2,Timer Circulation Sunday Slot 2,,,b555,a500030601,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Sunday Slot 2 (HH;MM;HH;MM)"
+w,,,CirculationTimer_Sunday_Slot2,Timer Circulation Sunday Slot 2,,,b555,a600030601,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Sunday Slot 2 (HH;MM;HH;MM)"
+r;u,,,CirculationTimer_Sunday_Slot3,Timer Circulation Sunday Slot 3,,,b555,a500030602,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Sunday Slot 3 (HH;MM;HH;MM)"
+w,,,CirculationTimer_Sunday_Slot3,Timer Circulation Sunday Slot 3,,,b555,a600030602,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Circulation schedule Sunday Slot 3 (HH;MM;HH;MM)"
+
+# ============================================================================== # 6.5 WEEKLY SCHEDULE TIMER: SILENT MODE (b5 55 a5/a6 00 04)
+# ============================================================================== 
+r;u,,,SilentTimer_Monday,Timer Silent Mode Monday,,,b555,a500040000,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Monday (HH;MM;HH;MM)"
+w,,,SilentTimer_Monday,Timer Silent Mode Monday,,,b555,a600040000,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Monday (HH;MM;HH;MM)"
+r;u,,,SilentTimer_Monday_Slot2,Timer Silent Mode Monday Slot 2,,,b555,a500040001,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Monday Slot 2 (HH;MM;HH;MM)"
+w,,,SilentTimer_Monday_Slot2,Timer Silent Mode Monday Slot 2,,,b555,a600040001,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Monday Slot 2 (HH;MM;HH;MM)"
+r;u,,,SilentTimer_Monday_Slot3,Timer Silent Mode Monday Slot 3,,,b555,a500040002,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Monday Slot 3 (HH;MM;HH;MM)"
+w,,,SilentTimer_Monday_Slot3,Timer Silent Mode Monday Slot 3,,,b555,a600040002,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Monday Slot 3 (HH;MM;HH;MM)"
+r;u,,,SilentTimer_Tuesday,Timer Silent Mode Tuesday,,,b555,a500040100,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Tuesday (HH;MM;HH;MM)"
+w,,,SilentTimer_Tuesday,Timer Silent Mode Tuesday,,,b555,a600040100,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Tuesday (HH;MM;HH;MM)"
+r;u,,,SilentTimer_Tuesday_Slot2,Timer Silent Mode Tuesday Slot 2,,,b555,a500040101,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Tuesday Slot 2 (HH;MM;HH;MM)"
+w,,,SilentTimer_Tuesday_Slot2,Timer Silent Mode Tuesday Slot 2,,,b555,a600040101,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Tuesday Slot 2 (HH;MM;HH;MM)"
+r;u,,,SilentTimer_Tuesday_Slot3,Timer Silent Mode Tuesday Slot 3,,,b555,a500040102,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Tuesday Slot 3 (HH;MM;HH;MM)"
+w,,,SilentTimer_Tuesday_Slot3,Timer Silent Mode Tuesday Slot 3,,,b555,a600040102,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Tuesday Slot 3 (HH;MM;HH;MM)"
+r;u,,,SilentTimer_Wednesday,Timer Silent Mode Wednesday,,,b555,a500040200,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Wednesday (HH;MM;HH;MM)"
+w,,,SilentTimer_Wednesday,Timer Silent Mode Wednesday,,,b555,a600040200,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Wednesday (HH;MM;HH;MM)"
+r;u,,,SilentTimer_Wednesday_Slot2,Timer Silent Mode Wednesday Slot 2,,,b555,a500040201,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Wednesday Slot 2 (HH;MM;HH;MM)"
+w,,,SilentTimer_Wednesday_Slot2,Timer Silent Mode Wednesday Slot 2,,,b555,a600040201,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Wednesday Slot 2 (HH;MM;HH;MM)"
+r;u,,,SilentTimer_Wednesday_Slot3,Timer Silent Mode Wednesday Slot 3,,,b555,a500040202,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Wednesday Slot 3 (HH;MM;HH;MM)"
+w,,,SilentTimer_Wednesday_Slot3,Timer Silent Mode Wednesday Slot 3,,,b555,a600040202,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Wednesday Slot 3 (HH;MM;HH;MM)"
+r;u,,,SilentTimer_Thursday,Timer Silent Mode Thursday,,,b555,a500040300,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Thursday (HH;MM;HH;MM)"
+w,,,SilentTimer_Thursday,Timer Silent Mode Thursday,,,b555,a600040300,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Thursday (HH;MM;HH;MM)"
+r;u,,,SilentTimer_Thursday_Slot2,Timer Silent Mode Thursday Slot 2,,,b555,a500040301,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Thursday Slot 2 (HH;MM;HH;MM)"
+w,,,SilentTimer_Thursday_Slot2,Timer Silent Mode Thursday Slot 2,,,b555,a600040301,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Thursday Slot 2 (HH;MM;HH;MM)"
+r;u,,,SilentTimer_Thursday_Slot3,Timer Silent Mode Thursday Slot 3,,,b555,a500040302,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Thursday Slot 3 (HH;MM;HH;MM)"
+w,,,SilentTimer_Thursday_Slot3,Timer Silent Mode Thursday Slot 3,,,b555,a600040302,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Thursday Slot 3 (HH;MM;HH;MM)"
+r;u,,,SilentTimer_Friday,Timer Silent Mode Friday,,,b555,a500040400,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Friday (HH;MM;HH;MM)"
+w,,,SilentTimer_Friday,Timer Silent Mode Friday,,,b555,a600040400,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Friday (HH;MM;HH;MM)"
+r;u,,,SilentTimer_Friday_Slot2,Timer Silent Mode Friday Slot 2,,,b555,a500040401,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Friday Slot 2 (HH;MM;HH;MM)"
+w,,,SilentTimer_Friday_Slot2,Timer Silent Mode Friday Slot 2,,,b555,a600040401,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Friday Slot 2 (HH;MM;HH;MM)"
+r;u,,,SilentTimer_Friday_Slot3,Timer Silent Mode Friday Slot 3,,,b555,a500040402,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Friday Slot 3 (HH;MM;HH;MM)"
+w,,,SilentTimer_Friday_Slot3,Timer Silent Mode Friday Slot 3,,,b555,a600040402,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Friday Slot 3 (HH;MM;HH;MM)"
+r;u,,,SilentTimer_Saturday,Timer Silent Mode Saturday,,,b555,a500040500,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Saturday (HH;MM;HH;MM)"
+w,,,SilentTimer_Saturday,Timer Silent Mode Saturday,,,b555,a600040500,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Saturday (HH;MM;HH;MM)"
+r;u,,,SilentTimer_Saturday_Slot2,Timer Silent Mode Saturday Slot 2,,,b555,a500040501,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Saturday Slot 2 (HH;MM;HH;MM)"
+w,,,SilentTimer_Saturday_Slot2,Timer Silent Mode Saturday Slot 2,,,b555,a600040501,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Saturday Slot 2 (HH;MM;HH;MM)"
+r;u,,,SilentTimer_Saturday_Slot3,Timer Silent Mode Saturday Slot 3,,,b555,a500040502,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Saturday Slot 3 (HH;MM;HH;MM)"
+w,,,SilentTimer_Saturday_Slot3,Timer Silent Mode Saturday Slot 3,,,b555,a600040502,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Saturday Slot 3 (HH;MM;HH;MM)"
+r;u,,,SilentTimer_Sunday,Timer Silent Mode Sunday,,,b555,a500040600,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Sunday (HH;MM;HH;MM)"
+w,,,SilentTimer_Sunday,Timer Silent Mode Sunday,,,b555,a600040600,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Sunday (HH;MM;HH;MM)"
+r;u,,,SilentTimer_Sunday_Slot2,Timer Silent Mode Sunday Slot 2,,,b555,a500040601,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Sunday Slot 2 (HH;MM;HH;MM)"
+w,,,SilentTimer_Sunday_Slot2,Timer Silent Mode Sunday Slot 2,,,b555,a600040601,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Sunday Slot 2 (HH;MM;HH;MM)"
+r;u,,,SilentTimer_Sunday_Slot3,Timer Silent Mode Sunday Slot 3,,,b555,a500040602,ign,,IGN:1,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Sunday Slot 3 (HH;MM;HH;MM)"
+w,,,SilentTimer_Sunday_Slot3,Timer Silent Mode Sunday Slot 3,,,b555,a600040602,total_slots,,UCH,,,,from_hour,,UCH,,,,from_min,,UCH,,,,to_hour,,UCH,,,,to_min,,UCH,,,,ign_end,,IGN:2,,,"Silent mode schedule Sunday Slot 3 (HH;MM;HH;MM)"
+
+# ============================================================================== # 6.6 NUMBER OF ACTIVE TIME SLOTS PER DAY (MONDAY TO SUNDAY)
+# ============================================================================== 
+r;u,,,CirculationTimer_Slots,Active slots Circulation,,,b555,a40003,ign,,IGN:1,,,,mon,,UCH,,,,tue,,UCH,,,,wed,,UCH,,,,thu,,UCH,,,,fri,,UCH,,,,sat,,UCH,,,,sun,,UCH,,,,ign_2,,IGN:1,,,
+r;u,,,CoolingTimer_Slots,Active slots Cooling,,,b555,a40001,ign,,IGN:1,,,,mon,,UCH,,,,tue,,UCH,,,,wed,,UCH,,,,thu,,UCH,,,,fri,,UCH,,,,sat,,UCH,,,,sun,,UCH,,,,ign_2,,IGN:1,,,
+r;u,,,HwcTimer_Slots,Active slots DHW,,,b555,a40002,ign,,IGN:1,,,,mon,,UCH,,,,tue,,UCH,,,,wed,,UCH,,,,thu,,UCH,,,,fri,,UCH,,,,sat,,UCH,,,,sun,,UCH,,,,ign_2,,IGN:1,,,
+r;u,,,SilentTimer_Slots,Active slots Silent Mode,,,b555,a40004,ign,,IGN:1,,,,mon,,UCH,,,,tue,,UCH,,,,wed,,UCH,,,,thu,,UCH,,,,fri,,UCH,,,,sat,,UCH,,,,sun,,UCH,,,,ign_2,,IGN:1,,,
+r;u,,,Z1Timer_Slots,Active slots Zone 1,,,b555,a40000,ign,,IGN:1,,,,mon,,UCH,,,,tue,,UCH,,,,wed,,UCH,,,,thu,,UCH,,,,fri,,UCH,,,,sat,,UCH,,,,sun,,UCH,,,,ign_2,,IGN:1,,,

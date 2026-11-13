@@ -15,6 +15,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     CIRCUIT_BASS3,
+    CIRCUIT_GLOBAL,
     DEFAULT_CYLINDER_HYST,
     DEVICE_CLIMATE_CONTROLLER,
     DOMAIN,
@@ -62,7 +63,7 @@ async def async_setup_entry(
 class SaunierGeniaWaterHeater(SaunierGeniaEntity, WaterHeaterEntity):
     """Representation of the DHW Water Heater with Smart Forced Boost."""
 
-    _attr_temperature_unit = UnitOfTemperature.CELSIUS
+    _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_min_temp = 35.0
     _attr_max_temp = 68.0
     _attr_target_temperature_step = 0.5
@@ -84,6 +85,8 @@ class SaunierGeniaWaterHeater(SaunierGeniaEntity, WaterHeaterEntity):
             (CIRCUIT_BASS3, "HwcFlowTemp"),
             (CIRCUIT_BASS3, "CylinderChargeHyst"),
             (CIRCUIT_BASS3, "SystemOperatingState"),
+            (CIRCUIT_GLOBAL, "signal"),
+            (CIRCUIT_GLOBAL, "running"),
         ]
         super().__init__(
             coordinator=coordinator,
@@ -94,13 +97,18 @@ class SaunierGeniaWaterHeater(SaunierGeniaEntity, WaterHeaterEntity):
         )
 
     @property
-    def current_temperature(self) -> float | None:
+    def available(self) -> bool:
+        """Return True if DHW entity is operational on eBUS."""
+        return self.coordinator.is_ebus_operational
+
+    @property
+    def native_current_temperature(self) -> float | None:
         """Return current DHW tank temperature (Probe SP1)."""
         temp = self.coordinator.get_float(CIRCUIT_BASS3, "HwcStorageTemp", "value")
         return round(temp, 2) if temp is not None else None
 
     @property
-    def target_temperature(self) -> float | None:
+    def native_target_temperature(self) -> float | None:
         """Return target DHW tank setpoint."""
         return self.coordinator.get_float(CIRCUIT_BASS3, "HwcTempDesired", "value")
 
@@ -117,7 +125,10 @@ class SaunierGeniaWaterHeater(SaunierGeniaEntity, WaterHeaterEntity):
             return OP_BOOST
 
         op_mode = (
-            self.coordinator.get_str(CIRCUIT_BASS3, "HwcOpMode", "value") or ""
+            self.coordinator.get_str(CIRCUIT_BASS3, "HwcOpMode", "value")
+            or hwc_status
+            or sf_mode
+            or ""
         ).lower()
         if not op_mode:
             return None
@@ -166,9 +177,12 @@ class SaunierGeniaWaterHeater(SaunierGeniaEntity, WaterHeaterEntity):
         if temperature is None:
             return
         temp_val = round(float(temperature) * 2.0) / 2.0
-        # If boost was active, user manual setpoint overrides it
-        if self.coordinator.dhw_boost_forced_active:
-            self.coordinator.cancel_dhw_boost_tracking(temp_val)
+        # If boost was active or pending restore, user manual setpoint overrides it
+        if (
+            self.coordinator.dhw_boost_forced_active
+            or self.coordinator.pending_dhw_boost_restore
+        ):
+            await self.coordinator.async_cancel_dhw_boost_tracking(temp_val)
         await self.coordinator.async_write_parameter(
             CIRCUIT_BASS3, "HwcTempDesired", temp_val
         )
@@ -180,3 +194,14 @@ class SaunierGeniaWaterHeater(SaunierGeniaEntity, WaterHeaterEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the water heater."""
         await self.async_set_operation_mode(OP_OFF)
+
+
+# Backward compatibility for HA versions older than 2026.11
+if not hasattr(WaterHeaterEntity, "native_current_temperature"):
+    SaunierGeniaWaterHeater.current_temperature = property(  # type: ignore[attr-defined]
+        lambda self: self.native_current_temperature
+    )
+    SaunierGeniaWaterHeater.target_temperature = property(  # type: ignore[attr-defined]
+        lambda self: self.native_target_temperature
+    )
+    SaunierGeniaWaterHeater._attr_temperature_unit = UnitOfTemperature.CELSIUS  # type: ignore[attr-defined]

@@ -42,6 +42,8 @@ async def async_get_config_entry_diagnostics(
             "has_migo_link": coordinator.has_migo_link,
             "force_dhw_boost": coordinator.force_dhw_boost,
             "dhw_boost_forced_active": coordinator.dhw_boost_forced_active,
+            "active_controller_circuit": coordinator.active_controller_circuit,
+            "active_outdoor_circuit": coordinator.active_outdoor_circuit,
             "saved_dhw_target_temp": coordinator.saved_dhw_target_temp,
             "last_active_cop": coordinator.last_active_cop,
             "active_listeners_count": sum(

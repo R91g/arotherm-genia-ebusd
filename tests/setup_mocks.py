@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass
-from typing import Any
-from unittest.mock import MagicMock
+from enum import Enum
+from typing import Any, Generic, TypeVar
+from unittest.mock import AsyncMock, MagicMock
 
 MOCKED_MODULES = [
     "voluptuous",
     "homeassistant",
     "homeassistant.components",
     "homeassistant.components.binary_sensor",
+    "homeassistant.components.button",
     "homeassistant.components.climate",
     "homeassistant.components.datetime",
     "homeassistant.components.diagnostics",
@@ -20,10 +22,12 @@ MOCKED_MODULES = [
     "homeassistant.components.select",
     "homeassistant.components.sensor",
     "homeassistant.components.switch",
+    "homeassistant.components.time",
     "homeassistant.components.water_heater",
     "homeassistant.config_entries",
     "homeassistant.const",
     "homeassistant.core",
+    "homeassistant.data_entry_flow",
     "homeassistant.exceptions",
     "homeassistant.helpers",
     "homeassistant.helpers.config_validation",
@@ -35,6 +39,7 @@ MOCKED_MODULES = [
     "homeassistant.helpers.issue_registry",
     "homeassistant.helpers.restore_state",
     "homeassistant.helpers.selector",
+    "homeassistant.helpers.storage",
     "homeassistant.util",
     "homeassistant.util.dt",
 ]
@@ -46,6 +51,62 @@ for mod_name in MOCKED_MODULES:
         sys.modules[mod_name] = mock
 
 
+class HomeAssistantError(Exception):
+    """Base error for Home Assistant."""
+
+
+class SupportsResponse(str, Enum):
+    """Mock SupportsResponse enum."""
+
+    NONE = "none"
+    OPTIONAL = "optional"
+    ONLY = "only"
+
+
+class RegistryEntryDisabler(str, Enum):
+    """Mock RegistryEntryDisabler enum."""
+
+    INTEGRATION = "integration"
+    USER = "user"
+
+
+sys.modules["homeassistant.exceptions"].HomeAssistantError = HomeAssistantError
+sys.modules["homeassistant.core"].SupportsResponse = SupportsResponse
+sys.modules[
+    "homeassistant.helpers.entity_registry"
+].RegistryEntryDisabler = RegistryEntryDisabler
+sys.modules["homeassistant.core"].ServiceResponse = dict[str, Any] | None
+sys.modules["homeassistant.components.diagnostics"].async_redact_data = (
+    lambda data, to_redact: data
+)
+sys.modules["homeassistant.components.mqtt"].async_subscribe = AsyncMock(
+    return_value=MagicMock()
+)
+sys.modules["homeassistant.components.mqtt"].async_publish = AsyncMock()
+
+
+class MockSchema:
+    """Mock voluptuous.Schema."""
+
+    def __init__(self, schema: Any = None) -> None:
+        self.schema = schema or {}
+
+    def __call__(self, val: Any) -> Any:
+        return val
+
+
+class MockMarker:
+    """Mock voluptuous.Required and voluptuous.Optional."""
+
+    def __init__(self, schema: Any, **kwargs: Any) -> None:
+        self.schema = schema
+
+
+sys.modules["voluptuous"].Schema = MockSchema
+sys.modules["voluptuous"].Required = MockMarker
+sys.modules["voluptuous"].Optional = MockMarker
+
+
 class MockEntity:
     """Mock base class for Home Assistant entities."""
 
@@ -54,6 +115,95 @@ class MockEntity:
     _attr_unique_id: str | None = None
     _attr_translation_key: str | None = None
     _attr_device_info: Any = None
+    _attr_available: bool = True
+    _attr_mode: Any = "box"
+
+    @property
+    def unique_id(self) -> str | None:
+        """Mock unique_id property."""
+        return self._attr_unique_id
+
+    @property
+    def device_info(self) -> Any:
+        """Mock device_info property."""
+        return self._attr_device_info
+
+    @property
+    def available(self) -> bool:
+        """Mock available property."""
+        return self._attr_available
+
+    @property
+    def current_temperature(self) -> float | None:
+        """Mock delegation to native_current_temperature if defined."""
+        if hasattr(self, "native_current_temperature"):
+            return self.native_current_temperature
+        return getattr(self, "_attr_current_temperature", None)
+
+    @property
+    def target_temperature(self) -> float | None:
+        """Mock delegation to native_target_temperature if defined."""
+        if hasattr(self, "native_target_temperature"):
+            return self.native_target_temperature
+        return getattr(self, "_attr_target_temperature", None)
+
+    @property
+    def native_current_temperature(self) -> float | None:
+        """Mock native_current_temperature."""
+        return getattr(self, "_attr_native_current_temperature", None)
+
+    @property
+    def native_target_temperature(self) -> float | None:
+        """Mock native_target_temperature."""
+        return getattr(self, "_attr_native_target_temperature", None)
+
+    @property
+    def temperature_unit(self) -> str:
+        """Mock delegation to native_temperature_unit."""
+        if hasattr(self, "_attr_native_temperature_unit"):
+            return self._attr_native_temperature_unit
+        return getattr(self, "_attr_temperature_unit", "°C")
+
+    @property
+    def native_temperature_unit(self) -> str:
+        """Mock native_temperature_unit."""
+        return getattr(self, "_attr_native_temperature_unit", "°C")
+
+    @property
+    def mode(self) -> Any:
+        """Mock mode property for number entities."""
+        return self._attr_mode
+
+    @property
+    def native_min_value(self) -> float:
+        """Mock native_min_value delegating to entity_description."""
+        if hasattr(self, "_attr_native_min_value"):
+            return self._attr_native_min_value
+        if hasattr(self, "entity_description") and (
+            self.entity_description.native_min_value is not None
+        ):
+            return self.entity_description.native_min_value
+        return 0.0
+
+    @property
+    def native_max_value(self) -> float:
+        """Mock native_max_value delegating to entity_description."""
+        if hasattr(self, "_attr_native_max_value"):
+            return self._attr_native_max_value
+        if hasattr(self, "entity_description") and (
+            self.entity_description.native_max_value is not None
+        ):
+            return self.entity_description.native_max_value
+        return 100.0
+
+    @property
+    def native_step(self) -> float | None:
+        """Mock native_step delegating to entity_description."""
+        if hasattr(self, "_attr_native_step"):
+            return self._attr_native_step
+        if hasattr(self, "entity_description"):
+            return self.entity_description.native_step
+        return None
 
     async def async_added_to_hass(self) -> None:
         """Mock async_added_to_hass."""
@@ -69,10 +219,63 @@ class MockRestoreEntity:
     """Mock base class for restore state."""
 
     async def async_get_last_state(self) -> Any:
-        return None
+        return getattr(self, "_mock_last_state", None)
+
+
+class MockSelectEntity(MockEntity):
+    """Mock SelectEntity with options property."""
+
+    _attr_options: list[str] | None = None
+
+    @property
+    def options(self) -> list[str]:
+        if self._attr_options is not None:
+            return self._attr_options
+        if (
+            hasattr(self, "entity_description")
+            and getattr(self.entity_description, "options", None) is not None
+        ):
+            return self.entity_description.options
+        return []
+
+
+_StoreT = TypeVar("_StoreT")
+
+
+class MockStore(Generic[_StoreT]):
+    """In-memory mock for homeassistant.helpers.storage.Store."""
+
+    def __init__(self, hass: Any, version: int, key: str) -> None:
+        self.hass = hass
+        self.version = version
+        self.key = key
+        self._fallback_bucket: dict[str, Any] = {}
+
+    def _bucket(self) -> dict[str, Any]:
+        if self.hass is not None and hasattr(self.hass, "__dict__"):
+            bucket = self.hass.__dict__.get("_mock_storage_data")
+            if not isinstance(bucket, dict):
+                bucket = {}
+                self.hass.__dict__["_mock_storage_data"] = bucket
+            return bucket
+        return self._fallback_bucket
+
+    async def async_load(self) -> Any:
+        data = self._bucket().get(self.key)
+        return dict(data) if isinstance(data, dict) else None
+
+    async def async_save(self, data: Any) -> None:
+        if isinstance(data, dict):
+            self._bucket()[self.key] = dict(data)
+        else:
+            self._bucket()[self.key] = data
+
+    async def async_remove(self) -> None:
+        self._bucket().pop(self.key, None)
 
 
 sys.modules["homeassistant.helpers.entity"].Entity = MockEntity
+sys.modules["homeassistant.helpers.storage"].Store = MockStore
 sys.modules["homeassistant.helpers"].entity_registry = sys.modules[
     "homeassistant.helpers.entity_registry"
 ]
@@ -86,11 +289,12 @@ sys.modules["homeassistant.helpers.device_registry"].DeviceInfo = dict
 sys.modules["homeassistant.components.sensor"].SensorEntity = MockEntity
 sys.modules["homeassistant.components.binary_sensor"].BinarySensorEntity = MockEntity
 sys.modules["homeassistant.components.number"].NumberEntity = MockEntity
-sys.modules["homeassistant.components.select"].SelectEntity = MockEntity
+sys.modules["homeassistant.components.select"].SelectEntity = MockSelectEntity
 sys.modules["homeassistant.components.switch"].SwitchEntity = MockEntity
 sys.modules["homeassistant.components.climate"].ClimateEntity = MockEntity
 sys.modules["homeassistant.components.water_heater"].WaterHeaterEntity = MockEntity
 sys.modules["homeassistant.components.datetime"].DateTimeEntity = MockEntity
+sys.modules["homeassistant.components.time"].TimeEntity = MockEntity
 sys.modules["homeassistant.helpers.restore_state"].RestoreEntity = MockRestoreEntity
 
 
@@ -134,16 +338,58 @@ sys.modules[
 sys.modules[
     "homeassistant.components.datetime"
 ].DateTimeEntityDescription = MockEntityDescription
+sys.modules[
+    "homeassistant.components.time"
+].TimeEntityDescription = MockEntityDescription
+sys.modules[
+    "homeassistant.components.button"
+].ButtonEntityDescription = MockEntityDescription
+
+
+class MockButtonEntity(MockEntity):
+    """Mock Button Entity."""
+
+    def press(self) -> None:
+        """Press the button."""
+
+    async def async_press(self) -> None:
+        """Press the button asynchronously."""
+
+
+sys.modules["homeassistant.components.button"].ButtonEntity = MockButtonEntity
+
+
+class MockRegistryEntryDisabler:
+    """Mock RegistryEntryDisabler enum."""
+
+    INTEGRATION = "integration"
+    USER = "user"
+
+
+sys.modules[
+    "homeassistant.helpers.entity_registry"
+].RegistryEntryDisabler = MockRegistryEntryDisabler
+
+
+def mock_section(schema: Any, options: dict[str, Any] | None = None) -> Any:
+    """Mock data_entry_flow.section helper."""
+    return schema
+
+
+sys.modules["homeassistant.data_entry_flow"].section = mock_section
 
 # Mock common string enums and constants
-from datetime import UTC
+from datetime import UTC, datetime
 
 sys.modules["homeassistant.util"].dt.get_default_time_zone.return_value = UTC
 sys.modules["homeassistant.util.dt"].get_default_time_zone.return_value = UTC
 sys.modules["homeassistant.util"].dt.as_local.side_effect = lambda dt: dt
 sys.modules["homeassistant.util.dt"].as_local.side_effect = lambda dt: dt
+sys.modules["homeassistant.util"].dt.utcnow.side_effect = lambda: datetime.now(UTC)
+sys.modules["homeassistant.util.dt"].utcnow.side_effect = lambda: datetime.now(UTC)
 
 sys.modules["homeassistant.const"].PERCENTAGE = "%"
+sys.modules["homeassistant.const"].ATTR_TEMPERATURE = "temperature"
 sys.modules["homeassistant.const"].UnitOfTemperature = MagicMock(CELSIUS="°C")
 sys.modules["homeassistant.const"].UnitOfPressure = MagicMock(BAR="bar")
 sys.modules["homeassistant.const"].UnitOfPower = MagicMock(WATT="W", KILO_WATT="kW")
@@ -156,3 +402,46 @@ sys.modules["homeassistant.const"].UnitOfVolumeFlowRate = MagicMock(
 sys.modules["homeassistant.const"].UnitOfTime = MagicMock(
     HOURS="h", MINUTES="min", SECONDS="s", DAYS="d"
 )
+sys.modules["homeassistant.const"].Platform = MagicMock(
+    CLIMATE="climate",
+    WATER_HEATER="water_heater",
+    SENSOR="sensor",
+    BINARY_SENSOR="binary_sensor",
+    NUMBER="number",
+    SELECT="select",
+    SWITCH="switch",
+    DATETIME="datetime",
+    BUTTON="button",
+)
+
+
+class MockOptionsFlow:
+    """Mock OptionsFlow base class."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        pass
+
+    def async_show_form(
+        self,
+        step_id: str | None = None,
+        data_schema: Any = None,
+        errors: dict[str, str] | None = None,
+        description_placeholders: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        return {
+            "type": "form",
+            "step_id": step_id,
+            "data_schema": data_schema,
+            "errors": errors or {},
+            "description_placeholders": description_placeholders,
+        }
+
+    def async_create_entry(self, title: str = "", data: Any = None) -> dict[str, Any]:
+        return {
+            "type": "create_entry",
+            "title": title,
+            "data": data or {},
+        }
+
+
+sys.modules["homeassistant.config_entries"].OptionsFlow = MockOptionsFlow

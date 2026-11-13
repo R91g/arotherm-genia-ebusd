@@ -49,10 +49,15 @@ from .const import (
     CALC_THERMAL_POWER,
     CIRCUIT_BASS3,
     CIRCUIT_BROADCAST,
+    CIRCUIT_CTLV2,
+    CIRCUIT_GLOBAL,
+    CIRCUIT_HMU,
+    CIRCUIT_HMU00,
     CIRCUIT_HMUX0,
     CIRCUIT_NETX3,
     CIRCUIT_NETX3_ALT,
     CIRCUIT_VWZIO,
+    CONTROLLER_CIRCUITS,
     DEFAULT_COMFORT_TEMP,
     DEVICE_CLIMATE_CONTROLLER,
     DEVICE_HYDRAULIC_INTERFACE,
@@ -60,6 +65,7 @@ from .const import (
     DEVICE_WIRELESS_THERMOSTAT,
     HMU_STATUS_CODES,
     HWC_STATUS_OPTIONS,
+    OUTDOOR_CIRCUITS,
     SENTINEL_HEATING_THRESHOLD,
     SETMODE_HC_MODES,
     SYSTEM_OPERATING_STATES,
@@ -87,11 +93,13 @@ class SaunierGeniaSensorEntityDescription(SensorEntityDescription):
     value_fn: Callable[[SaunierGeniaCoordinator], Any] | None = None
     attr_fn: Callable[[SaunierGeniaCoordinator], dict[str, Any]] | None = None
     requires_wireless_unit: bool = False
+    hmux0_only: bool = False
+    # Optional override to keep a stable unique_id when the data source changes
+    unique_id_suffix: str | None = None
 
 
-def _get_vwzio_error(coord: SaunierGeniaCoordinator) -> str | None:
-    """Format vwzio Currenterror (error..error_4), returning 'OK' when all slots are '-' or 0."""
-    msg = coord.get_message(CIRCUIT_VWZIO, "Currenterror")
+def _format_currenterror_msg(msg: dict[str, Any] | None) -> str | None:
+    """Format Currenterror payload (error..error_4), returning 'OK' when all slots are '-' or 0."""
     if not msg:
         return None
     errors: list[str] = []
@@ -101,6 +109,29 @@ def _get_vwzio_error(coord: SaunierGeniaCoordinator) -> str | None:
             if val_str and val_str not in ("-", "0", "65535", "none", "None"):
                 errors.append(val_str)
     return ", ".join(errors) if errors else "OK"
+
+
+def _get_vwzio_error(coord: SaunierGeniaCoordinator) -> str | None:
+    """Format vwzio Currenterror (error..error_4), returning 'OK' when all slots are '-' or 0."""
+    return _format_currenterror_msg(coord.get_message(CIRCUIT_VWZIO, "Currenterror"))
+
+
+def _get_outdoor_error(coord: SaunierGeniaCoordinator) -> str | None:
+    """Format outdoor unit Currenterror (error..error_4), returning 'OK' when all slots are '-' or 0."""
+    for circuit in OUTDOOR_CIRCUITS:
+        msg = coord.get_message(circuit, "Currenterror")
+        if msg:
+            return _format_currenterror_msg(msg)
+    return None
+
+
+def _get_controller_error(coord: SaunierGeniaCoordinator) -> str | None:
+    """Format climate controller Currenterror (error..error_4), returning 'OK' when all slots are '-' or 0."""
+    for circuit in CONTROLLER_CIRCUITS:
+        msg = coord.get_message(circuit, "Currenterror")
+        if msg:
+            return _format_currenterror_msg(msg)
+    return None
 
 
 def _get_vwzio_secondary_status(coord: SaunierGeniaCoordinator) -> str | None:
@@ -234,9 +265,17 @@ def _get_z1_actual_desired_filtered(
     if val <= SENTINEL_HEATING_THRESHOLD:
         op_mode = (coord.get_str(CIRCUIT_BASS3, "Z1OpMode", "value") or "").lower()
         if op_mode == "off":
-            day_temp = coord.get_float(CIRCUIT_BASS3, "Z1DayTemp", "value")
-            return day_temp if day_temp is not None else DEFAULT_COMFORT_TEMP
+            manual_temp = coord.get_float(CIRCUIT_BASS3, "Z1ManualTemp", "value")
+            return manual_temp if manual_temp is not None else DEFAULT_COMFORT_TEMP
     return round(val, 2)
+
+
+def _get_z1_room_humidity(coord: SaunierGeniaCoordinator) -> float | None:
+    """Return Zone 1 relative room humidity (%) if within valid physical bounds (0 < RH <= 100)."""
+    val = coord.get_float(CIRCUIT_BASS3, "Z1RoomHumidity", "value")
+    if val is None or val <= 0.0 or val > 100.0:
+        return None
+    return round(val, 1)
 
 
 def _get_live_cop_attrs(coord: SaunierGeniaCoordinator) -> dict[str, Any]:
@@ -263,6 +302,139 @@ def _get_compressor_modulation(coord: SaunierGeniaCoordinator) -> float | None:
     return coord.get_float(CIRCUIT_HMUX0, "StateCompressor", "modulation")
 
 
+def _get_subcooling(coord: SaunierGeniaCoordinator) -> float | None:
+    """Return condenser subcooling (K) = CondensationTemp - CondensateTemp."""
+    t_cond = coord.get_float(CIRCUIT_HMUX0, "RunDataCondensationTemp", "value")
+    if t_cond is None:
+        t_cond = coord.get_float(CIRCUIT_HMU, "RunDataCondensationTemp", "value")
+    t_liquid = coord.get_float(CIRCUIT_HMUX0, "RunDataCondensateTemp", "value")
+    if t_liquid is None:
+        t_liquid = coord.get_float(CIRCUIT_HMU, "RunDataCondensateTemp", "value")
+    if t_cond is not None and t_liquid is not None:
+        return round(t_cond - t_liquid, 2)
+    return None
+
+
+def _get_compressor_hc_hours(coord: SaunierGeniaCoordinator) -> float | None:
+    """Return compressor heating operating hours from minutes."""
+    mins = coord.get_float(CIRCUIT_HMUX0, "RunStatsCompressorHc", "runtime")
+    if mins is None:
+        mins = coord.get_float(CIRCUIT_HMU, "CompressorHc", "runtime")
+    return round(mins / 60.0, 1) if mins is not None else None
+
+
+def _get_compressor_hwc_hours(coord: SaunierGeniaCoordinator) -> float | None:
+    """Return compressor DHW operating hours from minutes."""
+    mins = coord.get_float(CIRCUIT_HMUX0, "RunStatsCompressorHwc", "runtime")
+    if mins is None:
+        mins = coord.get_float(CIRCUIT_HMU, "CompressorHwc", "runtime")
+    return round(mins / 60.0, 1) if mins is not None else None
+
+
+def _get_compressor_cool_hours(coord: SaunierGeniaCoordinator) -> float | None:
+    """Return compressor cooling operating hours from minutes."""
+    mins = coord.get_float(CIRCUIT_HMUX0, "RunStatsCompressorCool", "runtime")
+    if mins is None:
+        mins = coord.get_float(CIRCUIT_HMU, "CompressorCool", "runtime")
+    return round(mins / 60.0, 1) if mins is not None else None
+
+
+def _get_hydraulic_heater_hc_hours(coord: SaunierGeniaCoordinator) -> float | None:
+    """Return immersion heater heating operating hours from minutes."""
+    mins = coord.get_float(CIRCUIT_VWZIO, "RunStatsHeaterHc", "runtime")
+    return round(mins / 60.0, 1) if mins is not None else None
+
+
+def _get_hydraulic_heater_hwc_hours(coord: SaunierGeniaCoordinator) -> float | None:
+    """Return immersion heater DHW operating hours from minutes."""
+    mins = coord.get_float(CIRCUIT_VWZIO, "RunStatsHeaterHwc", "runtime")
+    return round(mins / 60.0, 1) if mins is not None else None
+
+
+def _get_electric_power(coord: SaunierGeniaCoordinator) -> float | None:
+    """Return instantaneous electrical power consumption (W).
+
+    Prioritizes RunDataElectricPowerConsumption (active high-frequency r1 poll),
+    falling back dynamically to PowerStatus when stale (> 180s) or missing.
+    """
+    return coord.get_instantaneous_electric_power()
+
+
+def _get_thermal_hc_wh(coord: SaunierGeniaCoordinator) -> float | None:
+    """Return cumulative heating thermal energy delivered in Wh.
+
+    Reads PrEnergyThermalHc (Wh) on HMUX0, or (YieldHc + PrEnergySumHc) * 1000 on HMU/HMU00.
+    """
+    if coord.active_outdoor_circuit in (CIRCUIT_HMU, CIRCUIT_HMU00):
+        yield_hc = coord.get_float(CIRCUIT_HMU, "YieldHc", "value")
+        elec_hc = coord.get_float(CIRCUIT_BASS3, "PrEnergySumHc", "value")
+        if yield_hc is not None and elec_hc is not None:
+            return round((yield_hc + elec_hc) * 1000.0, 1)
+        return None
+    wh = coord.get_float(CIRCUIT_HMUX0, "PrEnergyThermalHc", "energy")
+    return round(wh, 1) if wh is not None else None
+
+
+def _get_thermal_hwc_wh(coord: SaunierGeniaCoordinator) -> float | None:
+    """Return cumulative DHW thermal energy delivered in Wh.
+
+    Reads PrEnergyThermalHwc (Wh) on HMUX0, or (YieldHwc + PrEnergySumHwc) * 1000 on HMU/HMU00.
+    """
+    if coord.active_outdoor_circuit in (CIRCUIT_HMU, CIRCUIT_HMU00):
+        yield_hwc = coord.get_float(CIRCUIT_HMU, "YieldHwc", "value")
+        elec_hwc = coord.get_float(CIRCUIT_BASS3, "PrEnergySumHwc", "value")
+        if yield_hwc is not None and elec_hwc is not None:
+            return round((yield_hwc + elec_hwc) * 1000.0, 1)
+        return None
+    wh = coord.get_float(CIRCUIT_HMUX0, "PrEnergyThermalHwc", "energy")
+    return round(wh, 1) if wh is not None else None
+
+
+def _get_thermal_cool_wh(coord: SaunierGeniaCoordinator) -> float | None:
+    """Return cumulative cooling energy extracted in Wh.
+
+    Reads PrEnergyThermalCool (Wh) on HMUX0, or converts YieldCooling (kWh -> Wh) on HMU/HMU00.
+    """
+    if coord.active_outdoor_circuit in (CIRCUIT_HMU, CIRCUIT_HMU00):
+        kwh = coord.get_float(CIRCUIT_HMU, "YieldCooling", "value")
+        return round(kwh * 1000.0, 1) if kwh is not None else None
+    wh = coord.get_float(CIRCUIT_HMUX0, "PrEnergyThermalCool", "energy")
+    if wh is not None:
+        return round(wh, 1)
+    kwh = coord.get_float(CIRCUIT_HMU, "YieldCooling", "value")
+    return round(kwh * 1000.0, 1) if kwh is not None else None
+
+
+def _get_env_yield_hc_wh(coord: SaunierGeniaCoordinator) -> float | None:
+    """Return cumulative heating environmental energy yield in Wh.
+
+    Reads PrEnergyEnvYieldHc (Wh) on HMUX0, or converts YieldHc (kWh -> Wh) on HMU/HMU00.
+    """
+    if coord.active_outdoor_circuit in (CIRCUIT_HMU, CIRCUIT_HMU00):
+        kwh = coord.get_float(CIRCUIT_HMU, "YieldHc", "value")
+        return round(kwh * 1000.0, 1) if kwh is not None else None
+    wh = coord.get_float(CIRCUIT_HMUX0, "PrEnergyEnvYieldHc", "energy")
+    if wh is not None:
+        return round(wh, 1)
+    kwh = coord.get_float(CIRCUIT_HMU, "YieldHc", "value")
+    return round(kwh * 1000.0, 1) if kwh is not None else None
+
+
+def _get_env_yield_hwc_wh(coord: SaunierGeniaCoordinator) -> float | None:
+    """Return cumulative DHW environmental energy yield in Wh.
+
+    Reads PrEnergyEnvYieldHwc (Wh) on HMUX0, or converts YieldHwc (kWh -> Wh) on HMU/HMU00.
+    """
+    if coord.active_outdoor_circuit in (CIRCUIT_HMU, CIRCUIT_HMU00):
+        kwh = coord.get_float(CIRCUIT_HMU, "YieldHwc", "value")
+        return round(kwh * 1000.0, 1) if kwh is not None else None
+    wh = coord.get_float(CIRCUIT_HMUX0, "PrEnergyEnvYieldHwc", "energy")
+    if wh is not None:
+        return round(wh, 1)
+    kwh = coord.get_float(CIRCUIT_HMU, "YieldHwc", "value")
+    return round(kwh * 1000.0, 1) if kwh is not None else None
+
+
 SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
     # =========================================================================
     # B) Outdoor Unit Sensors (08.hmux0 -> DEVICE_OUTDOOR_UNIT)
@@ -278,6 +450,18 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         options=HMU_STATUS_CODES,
     ),
     SaunierGeniaSensorEntityDescription(
+        key="hmu_current_error",
+        translation_key="hmu_current_error",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_HMUX0,
+        message="Currenterror",
+        field="error",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="Currenterror",
+        fallback_field="error",
+        value_fn=_get_outdoor_error,
+    ),
+    SaunierGeniaSensorEntityDescription(
         key="electric_power_consumption",
         translation_key="electric_power_consumption",
         device_key=DEVICE_OUTDOOR_UNIT,
@@ -287,6 +471,8 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         fallback_circuit=CIRCUIT_HMUX0,
         fallback_message="PowerStatus",
         fallback_field="power",
+        unique_id_suffix="hmux0_rundataelectricpowerconsumption_power",
+        value_fn=_get_electric_power,
         native_unit_of_measurement=UnitOfPower.WATT,
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
@@ -409,7 +595,9 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         device_key=DEVICE_OUTDOOR_UNIT,
         circuit=CIRCUIT_HMUX0,
         message="RunDataFlowRate",
-        field="value",
+        field="flow_rate",
+        fallback_field="value",
+        unique_id_suffix="hmux0_rundataflowrate_value",
         native_unit_of_measurement=UnitOfVolumeFlowRate.LITERS_PER_HOUR,
         device_class=SensorDeviceClass.VOLUME_FLOW_RATE,
         state_class=SensorStateClass.MEASUREMENT,
@@ -436,7 +624,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         field="value",
         fallback_circuit=CIRCUIT_HMUX0,
         fallback_message="Status01",
-        fallback_field="temp1",
+        fallback_field="flow_temp",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
@@ -516,6 +704,124 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="evaporation_temp",
+        translation_key="evaporation_temp",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_HMUX0,
+        message="RunDataEvaporationTemp",
+        field="value",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="RunDataEvaporationTemp",
+        fallback_field="value",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="condensation_temp",
+        translation_key="condensation_temp",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_HMUX0,
+        message="RunDataCondensationTemp",
+        field="value",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="RunDataCondensationTemp",
+        fallback_field="value",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="condensate_temp",
+        translation_key="condensate_temp",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_HMUX0,
+        message="RunDataCondensateTemp",
+        field="value",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="RunDataCondensateTemp",
+        fallback_field="value",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="superheat",
+        translation_key="superheat",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_HMUX0,
+        message="RunDataSuperheat",
+        field="value",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="RunDataSuperheat",
+        fallback_field="value",
+        native_unit_of_measurement="K",
+        device_class=TEMP_DELTA_DEVICE_CLASS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="subcooling",
+        translation_key="subcooling",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CALC_CIRCUIT,
+        message="Subcooling",
+        field="value",
+        value_fn=_get_subcooling,
+        native_unit_of_measurement="K",
+        device_class=TEMP_DELTA_DEVICE_CLASS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="energy_integral",
+        translation_key="energy_integral",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_HMUX0,
+        message="RunDataEnergyIntegral",
+        field="value",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="EnergyIntegral",
+        fallback_field="value",
+        native_unit_of_measurement="°min",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        is_integer=True,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="compressor_flow_temp_desired",
+        translation_key="compressor_flow_temp_desired",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_HMUX0,
+        message="RunDataFlowTempDesired",
+        field="value",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="RunDataFlowTempDesired",
+        fallback_field="value",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="heat_output_internal",
+        translation_key="heat_output_internal",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_HMUX0,
+        message="RunDataHeatOutput",
+        field="value",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="RunDataHeatOutput",
+        fallback_field="value",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
     ),
     SaunierGeniaSensorEntityDescription(
         key="building_cpump_power",
@@ -614,6 +920,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         circuit=CIRCUIT_HMUX0,
         message="PrEnergyElectricCool",
         field="energy",
+        hmux0_only=True,
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -626,6 +933,10 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         circuit=CIRCUIT_HMUX0,
         message="PrEnergyThermalHc",
         field="energy",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="YieldHc",
+        fallback_field="value",
+        value_fn=_get_thermal_hc_wh,
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -638,6 +949,10 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         circuit=CIRCUIT_HMUX0,
         message="PrEnergyThermalHwc",
         field="energy",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="YieldHwc",
+        fallback_field="value",
+        value_fn=_get_thermal_hwc_wh,
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -650,6 +965,10 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         circuit=CIRCUIT_HMUX0,
         message="PrEnergyThermalCool",
         field="energy",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="YieldCooling",
+        fallback_field="value",
+        value_fn=_get_thermal_cool_wh,
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -662,6 +981,10 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         circuit=CIRCUIT_HMUX0,
         message="PrEnergyEnvYieldHc",
         field="energy",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="YieldHc",
+        fallback_field="value",
+        value_fn=_get_env_yield_hc_wh,
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -674,6 +997,10 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         circuit=CIRCUIT_HMUX0,
         message="PrEnergyEnvYieldHwc",
         field="energy",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="YieldHwc",
+        fallback_field="value",
+        value_fn=_get_env_yield_hwc_wh,
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -686,6 +1013,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         circuit=CIRCUIT_HMUX0,
         message="PrEnergyElectricHc",
         field="energy",
+        hmux0_only=True,
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -699,6 +1027,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         circuit=CIRCUIT_HMUX0,
         message="PrEnergyElectricHwc",
         field="energy",
+        hmux0_only=True,
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -724,6 +1053,9 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         circuit=CIRCUIT_HMUX0,
         message="RunStatsCompressorHours",
         field="value",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="CompressorHours",
+        fallback_field="value",
         native_unit_of_measurement=UnitOfTime.HOURS,
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -736,6 +1068,9 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         circuit=CIRCUIT_HMUX0,
         message="RunStatsCompressorStarts",
         field="value",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="CompressorStarts",
+        fallback_field="value",
         state_class=SensorStateClass.TOTAL_INCREASING,
         is_integer=True,
     ),
@@ -793,9 +1128,6 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         circuit=CIRCUIT_HMUX0,
         message="RunStatsBuildingPumpHours",
         field="value",
-        fallback_circuit=CIRCUIT_HMUX0,
-        fallback_message="RunStatsBuildingCPumpHours",
-        fallback_field="hours",
         native_unit_of_measurement=UnitOfTime.HOURS,
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -840,8 +1172,24 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         circuit=CIRCUIT_HMUX0,
         message="RunStatsFan1Hours",
         field="value",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="RunStatsFan1Hours",
+        fallback_field="value",
         native_unit_of_measurement=UnitOfTime.HOURS,
         device_class=SensorDeviceClass.DURATION,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        is_integer=True,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="stats_fan1_starts",
+        translation_key="stats_fan1_starts",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_HMUX0,
+        message="RunStatsFan1Starts",
+        field="value",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="RunStatsFan1Starts",
+        fallback_field="value",
         state_class=SensorStateClass.TOTAL_INCREASING,
         is_integer=True,
     ),
@@ -852,8 +1200,25 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         circuit=CIRCUIT_HMUX0,
         message="RunStatsFan2Hours",
         field="value",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="RunStatsFan2Hours",
+        fallback_field="value",
         native_unit_of_measurement=UnitOfTime.HOURS,
         device_class=SensorDeviceClass.DURATION,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        is_integer=True,
+        entity_registry_enabled_default=False,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="stats_fan2_starts",
+        translation_key="stats_fan2_starts",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_HMUX0,
+        message="RunStatsFan2Starts",
+        field="value",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="RunStatsFan2Starts",
+        fallback_field="value",
         state_class=SensorStateClass.TOTAL_INCREASING,
         is_integer=True,
         entity_registry_enabled_default=False,
@@ -865,8 +1230,24 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         circuit=CIRCUIT_HMUX0,
         message="RunStatsDeiceHours",
         field="value",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="RunStatsDeiceHours",
+        fallback_field="value",
         native_unit_of_measurement=UnitOfTime.HOURS,
         device_class=SensorDeviceClass.DURATION,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        is_integer=True,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="stats_deice_starts",
+        translation_key="stats_deice_starts",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_HMUX0,
+        message="RunStatsDeiceStarts",
+        field="value",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="RunStatsDeiceStarts",
+        fallback_field="value",
         state_class=SensorStateClass.TOTAL_INCREASING,
         is_integer=True,
     ),
@@ -877,6 +1258,9 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         circuit=CIRCUIT_HMUX0,
         message="RunStatsImmersionHeaterHours",
         field="value",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="RunStatsImmersionHeaterHours",
+        fallback_field="value",
         native_unit_of_measurement=UnitOfTime.HOURS,
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -890,9 +1274,99 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         circuit=CIRCUIT_HMUX0,
         message="RunStatsImmersionHeaterStarts",
         field="value",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="RunStatsImmersionHeaterStarts",
+        fallback_field="value",
         state_class=SensorStateClass.TOTAL_INCREASING,
         is_integer=True,
         entity_registry_enabled_default=False,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="stats_compressor_hc_hours",
+        translation_key="stats_compressor_hc_hours",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_HMUX0,
+        message="RunStatsCompressorHc",
+        field="runtime",
+        value_fn=_get_compressor_hc_hours,
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="CompressorHc",
+        fallback_field="runtime",
+        native_unit_of_measurement=UnitOfTime.HOURS,
+        device_class=SensorDeviceClass.DURATION,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=1,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="stats_compressor_hc_starts",
+        translation_key="stats_compressor_hc_starts",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_HMUX0,
+        message="RunStatsCompressorHc",
+        field="cycles",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="CompressorHc",
+        fallback_field="cycles",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        is_integer=True,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="stats_compressor_hwc_hours",
+        translation_key="stats_compressor_hwc_hours",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_HMUX0,
+        message="RunStatsCompressorHwc",
+        field="runtime",
+        value_fn=_get_compressor_hwc_hours,
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="CompressorHwc",
+        fallback_field="runtime",
+        native_unit_of_measurement=UnitOfTime.HOURS,
+        device_class=SensorDeviceClass.DURATION,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=1,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="stats_compressor_hwc_starts",
+        translation_key="stats_compressor_hwc_starts",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_HMUX0,
+        message="RunStatsCompressorHwc",
+        field="cycles",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="CompressorHwc",
+        fallback_field="cycles",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        is_integer=True,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="stats_compressor_cool_hours",
+        translation_key="stats_compressor_cool_hours",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_HMUX0,
+        message="RunStatsCompressorCool",
+        field="runtime",
+        value_fn=_get_compressor_cool_hours,
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="CompressorCool",
+        fallback_field="runtime",
+        native_unit_of_measurement=UnitOfTime.HOURS,
+        device_class=SensorDeviceClass.DURATION,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=1,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="stats_compressor_cool_starts",
+        translation_key="stats_compressor_cool_starts",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_HMUX0,
+        message="RunStatsCompressorCool",
+        field="cycles",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="CompressorCool",
+        fallback_field="cycles",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        is_integer=True,
     ),
     # =========================================================================
     # C) Climate Controller Sensors (15.bass3 -> DEVICE_CLIMATE_CONTROLLER)
@@ -908,12 +1382,27 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         options=SYSTEM_OPERATING_STATES,
     ),
     SaunierGeniaSensorEntityDescription(
+        key="controller_current_error",
+        translation_key="controller_current_error",
+        device_key=DEVICE_CLIMATE_CONTROLLER,
+        circuit=CIRCUIT_BASS3,
+        message="Currenterror",
+        field="error",
+        fallback_circuit=CIRCUIT_CTLV2,
+        fallback_message="Currenterror",
+        fallback_field="error",
+        value_fn=_get_controller_error,
+    ),
+    SaunierGeniaSensorEntityDescription(
         key="water_pressure",
         translation_key="water_pressure",
         device_key=DEVICE_CLIMATE_CONTROLLER,
         circuit=CIRCUIT_BASS3,
         message="WaterPressure",
         field="press",
+        fallback_circuit=CIRCUIT_HMUX0,
+        fallback_message="FlowPressure",
+        fallback_field="value",
         native_unit_of_measurement=UnitOfPressure.BAR,
         device_class=SensorDeviceClass.PRESSURE,
         state_class=SensorStateClass.MEASUREMENT,
@@ -954,6 +1443,19 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="z1_room_humidity",
+        translation_key="z1_room_humidity",
+        device_key=DEVICE_CLIMATE_CONTROLLER,
+        circuit=CIRCUIT_BASS3,
+        message="Z1RoomHumidity",
+        field="value",
+        native_unit_of_measurement=PERCENTAGE,
+        device_class=SensorDeviceClass.HUMIDITY,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value_fn=_get_z1_room_humidity,
     ),
     SaunierGeniaSensorEntityDescription(
         key="z1_actual_room_temp_desired",
@@ -1270,6 +1772,76 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         entity_registry_enabled_default=False,
     ),
     SaunierGeniaSensorEntityDescription(
+        key="vwzio_heater_energy",
+        translation_key="vwzio_heater_energy",
+        device_key=DEVICE_HYDRAULIC_INTERFACE,
+        circuit=CIRCUIT_VWZIO,
+        message="RunStatsHeaterEnergy",
+        field="value",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=1,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="vwzio_heater_flow_temp",
+        translation_key="vwzio_heater_flow_temp",
+        device_key=DEVICE_HYDRAULIC_INTERFACE,
+        circuit=CIRCUIT_VWZIO,
+        message="RunDataHeaterFlowTemp",
+        field="value",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="stats_vwzio_heater_hc_hours",
+        translation_key="stats_vwzio_heater_hc_hours",
+        device_key=DEVICE_HYDRAULIC_INTERFACE,
+        circuit=CIRCUIT_VWZIO,
+        message="RunStatsHeaterHc",
+        field="runtime",
+        value_fn=_get_hydraulic_heater_hc_hours,
+        native_unit_of_measurement=UnitOfTime.HOURS,
+        device_class=SensorDeviceClass.DURATION,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=1,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="stats_vwzio_heater_hc_starts",
+        translation_key="stats_vwzio_heater_hc_starts",
+        device_key=DEVICE_HYDRAULIC_INTERFACE,
+        circuit=CIRCUIT_VWZIO,
+        message="RunStatsHeaterHc",
+        field="cycles",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        is_integer=True,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="stats_vwzio_heater_hwc_hours",
+        translation_key="stats_vwzio_heater_hwc_hours",
+        device_key=DEVICE_HYDRAULIC_INTERFACE,
+        circuit=CIRCUIT_VWZIO,
+        message="RunStatsHeaterHwc",
+        field="runtime",
+        value_fn=_get_hydraulic_heater_hwc_hours,
+        native_unit_of_measurement=UnitOfTime.HOURS,
+        device_class=SensorDeviceClass.DURATION,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=1,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="stats_vwzio_heater_hwc_starts",
+        translation_key="stats_vwzio_heater_hwc_starts",
+        device_key=DEVICE_HYDRAULIC_INTERFACE,
+        circuit=CIRCUIT_VWZIO,
+        message="RunStatsHeaterHwc",
+        field="cycles",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        is_integer=True,
+    ),
+    SaunierGeniaSensorEntityDescription(
         key="wireless_room_temp_dial",
         translation_key="wireless_room_temp_dial",
         device_key=DEVICE_WIRELESS_THERMOSTAT,
@@ -1289,12 +1861,14 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         key="wireless_room_target_temp",
         translation_key="wireless_room_target_temp",
         device_key=DEVICE_WIRELESS_THERMOSTAT,
-        circuit=CIRCUIT_NETX3,
-        message="RoomTargetTemp",
-        field="temp",
-        fallback_circuit=CIRCUIT_BASS3,
-        fallback_message="Z1DayTemp",
-        fallback_field="value",
+        # The NETX3 thermostat does not publish its own target on the bus
+        # (04.netx3.csv / f6.netx3.csv only define RoomTempDial). This sensor
+        # mirrors the climate controller's Zone 1 manual heating setpoint (Z1ManualTemp).
+        circuit=CIRCUIT_BASS3,
+        message="Z1ManualTemp",
+        field="value",
+        # Preserve the historical unique_id (was circuit 04 / RoomTargetTemp / temp)
+        unique_id_suffix="04_roomtargettemp_temp",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
@@ -1325,6 +1899,101 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         fallback_field="date",
         value_fn=_get_broadcast_datetime,
     ),
+    # -------------------------------------------------------------------------
+    # Physical eBUS Bus Health & ebusd Daemon Diagnostics (ebusd/global/)
+    # -------------------------------------------------------------------------
+    SaunierGeniaSensorEntityDescription(
+        key="ebusd_uptime",
+        translation_key="ebusd_uptime",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_GLOBAL,
+        message="uptime",
+        field="value",
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        device_class=SensorDeviceClass.DURATION,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        is_integer=True,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="ebusd_version",
+        translation_key="ebusd_version",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_GLOBAL,
+        message="version",
+        field="value",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="ebusd_scan_status",
+        translation_key="ebusd_scan_status",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_GLOBAL,
+        message="scan",
+        field="value",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="ebusd_symbol_rate",
+        translation_key="ebusd_symbol_rate",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_GLOBAL,
+        message="symbol_rate",
+        field="value",
+        native_unit_of_measurement="symbols/s",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        is_integer=True,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="ebusd_reconnects",
+        translation_key="ebusd_reconnects",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_GLOBAL,
+        message="reconnects",
+        field="value",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        is_integer=True,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="ebusd_masters",
+        translation_key="ebusd_masters",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_GLOBAL,
+        message="masters",
+        field="value",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        is_integer=True,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="ebusd_arbitration_latency",
+        translation_key="ebusd_arbitration_latency",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_GLOBAL,
+        message="arbitration_latency",
+        field="value",
+        native_unit_of_measurement=UnitOfTime.MILLISECONDS,
+        device_class=SensorDeviceClass.DURATION,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        is_integer=True,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="ebusd_missing_csv_devices",
+        translation_key="ebusd_missing_csv_devices",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_GLOBAL,
+        message="missing_csv_devices",
+        field="value",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+    ),
 )
 
 WEEKLY_SCHEDULE_SENSORS: tuple[tuple[str, str], ...] = (
@@ -1332,4 +2001,5 @@ WEEKLY_SCHEDULE_SENSORS: tuple[tuple[str, str], ...] = (
     ("hwc_weekly_schedule_summary", "HwcTimer"),
     ("cooling_weekly_schedule_summary", "CoolingTimer"),
     ("circulation_weekly_schedule_summary", "CirculationTimer"),
+    ("silent_mode_weekly_schedule_summary", "SilentTimer"),
 )

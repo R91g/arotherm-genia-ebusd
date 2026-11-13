@@ -20,6 +20,8 @@ PLATFORMS: list[Platform] = [
     Platform.SELECT,
     Platform.SWITCH,
     Platform.DATETIME,
+    Platform.TIME,
+    Platform.BUTTON,
 ]
 
 # Configuration keys and defaults (ConfigFlow)
@@ -39,25 +41,43 @@ OUTDOOR_MODELS_SAUNIER: list[str] = [
     "GeniaAir Max ES 12",
     "GeniaAir Max ES 15",
     "GeniaAir Iso ES",
-    "GeniaAir Max 4 (Legacy)",
-    "GeniaAir Max 6 (Legacy)",
-    "GeniaAir Max 8 (Legacy)",
-    "GeniaAir Max 11 (Legacy)",
-    "GeniaAir Max 15 (Legacy)",
+    "GeniaAir Max 4",
+    "GeniaAir Max 6",
+    "GeniaAir Max 8",
+    "GeniaAir Max 11",
+    "GeniaAir Max 15",
 ]
 
 OUTDOOR_MODELS_VAILLANT: list[str] = [
+    # aroTHERM plus ES (Spain / International /7.1 A)
     "aroTHERM plus ES VWL 55/7.1 A 230V",
     "aroTHERM plus ES VWL 85/7.1 A 230V",
     "aroTHERM plus ES VWL 125/7.1 A 230V",
     "aroTHERM plus ES VWL 125/7.1 A 400V",
     "aroTHERM plus ES VWL 155/7.1 A 230V",
     "aroTHERM plus ES VWL 155/7.1 A 400V",
-    "aroTHERM plus VWL 35/6 A 230V (Legacy)",
-    "aroTHERM plus VWL 55/6 A 230V (Legacy)",
-    "aroTHERM plus VWL 75/6 A 230V (Legacy)",
-    "aroTHERM plus VWL 105/6 A 230V (Legacy)",
-    "aroTHERM plus VWL 125/6 A (Legacy)",
+    # aroTHERM pro (UK /7.1 A)
+    "aroTHERM pro VWL 55/7.1 A 230V",
+    "aroTHERM pro VWL 85/7.1 A 230V",
+    "aroTHERM pro VWL 125/7.1 A 230V",
+    "aroTHERM pro VWL 125/7.1 A 400V",
+    "aroTHERM pro VWL 155/7.1 A 230V",
+    "aroTHERM pro VWL 155/7.1 A 400V",
+    # aroTHERM plus /8.1 A (v2)
+    "aroTHERM plus VWL 35/8.1 A 230V",
+    "aroTHERM plus VWL 55/8.1 A 230V",
+    "aroTHERM plus VWL 75/8.1 A 230V",
+    "aroTHERM plus VWL 105/8.1 A 230V",
+    "aroTHERM plus VWL 105/8.1 A 400V",
+    "aroTHERM plus VWL 125/8.1 A 230V",
+    "aroTHERM plus VWL 125/8.1 A 400V",
+    # aroTHERM plus /6 A (2020)
+    "aroTHERM plus VWL 35/6 A 230V",
+    "aroTHERM plus VWL 55/6 A 230V",
+    "aroTHERM plus VWL 75/6 A 230V",
+    "aroTHERM plus VWL 105/6 A 230V",
+    "aroTHERM plus VWL 125/6 A 230V",
+    "aroTHERM plus VWL 125/6 A",
 ]
 
 OUTDOOR_MODELS: list[str] = OUTDOOR_MODELS_SAUNIER + OUTDOOR_MODELS_VAILLANT
@@ -73,17 +93,46 @@ OUTDOOR_MODEL_SPECS: dict[str, str] = {
     "GeniaAir Max ES 12": "GeniaAir Max ES 12 (HA 12-7.1 O 230V B3)",
     "GeniaAir Max ES 15": "GeniaAir Max ES 15 (HA 15-7.1 O 230V B3)",
     "GeniaAir Iso ES": "GeniaAir Iso ES (HA 7.1 O 230V)",
+    "GeniaAir Max 4": "GeniaAir Max 4 (HA 4-5/2 230V R290)",
+    "GeniaAir Max 6": "GeniaAir Max 6 (HA 6-5/2 230V R290)",
+    "GeniaAir Max 8": "GeniaAir Max 8 (HA 8-5/2 230V R290)",
+    "GeniaAir Max 11": "GeniaAir Max 11 (HA 11-5/2 230V R290)",
+    "GeniaAir Max 15": "GeniaAir Max 15 (HA 15-5/2 230V R290)",
     "GeniaAir Max 4 (Legacy)": "GeniaAir Max 4 (HA 4-5/2 230V R290)",
     "GeniaAir Max 6 (Legacy)": "GeniaAir Max 6 (HA 6-5/2 230V R290)",
     "GeniaAir Max 8 (Legacy)": "GeniaAir Max 8 (HA 8-5/2 230V R290)",
     "GeniaAir Max 11 (Legacy)": "GeniaAir Max 11 (HA 11-5/2 230V R290)",
     "GeniaAir Max 15 (Legacy)": "GeniaAir Max 15 (HA 15-5/2 230V R290)",
+    # aroTHERM plus ES /7.1 A
     "aroTHERM plus ES VWL 55/7.1 A 230V": "aroTHERM plus ES VWL 55/7.1 A 230V S3 (R290)",
     "aroTHERM plus ES VWL 85/7.1 A 230V": "aroTHERM plus ES VWL 85/7.1 A 230V S3 (R290)",
     "aroTHERM plus ES VWL 125/7.1 A 230V": "aroTHERM plus ES VWL 125/7.1 A 230V S3 (R290)",
     "aroTHERM plus ES VWL 125/7.1 A 400V": "aroTHERM plus ES VWL 125/7.1 A 400V S3 (R290)",
     "aroTHERM plus ES VWL 155/7.1 A 230V": "aroTHERM plus ES VWL 155/7.1 A 230V S3 (R290)",
     "aroTHERM plus ES VWL 155/7.1 A 400V": "aroTHERM plus ES VWL 155/7.1 A 400V S3 (R290)",
+    # aroTHERM pro /7.1 A
+    "aroTHERM pro VWL 55/7.1 A 230V": "aroTHERM pro VWL 55/7.1 A 230V S3 (R290)",
+    "aroTHERM pro VWL 85/7.1 A 230V": "aroTHERM pro VWL 85/7.1 A 230V S3 (R290)",
+    "aroTHERM pro VWL 125/7.1 A 230V": "aroTHERM pro VWL 125/7.1 A 230V S3 (R290)",
+    "aroTHERM pro VWL 125/7.1 A 400V": "aroTHERM pro VWL 125/7.1 A 400V S3 (R290)",
+    "aroTHERM pro VWL 155/7.1 A 230V": "aroTHERM pro VWL 155/7.1 A 230V S3 (R290)",
+    "aroTHERM pro VWL 155/7.1 A 400V": "aroTHERM pro VWL 155/7.1 A 400V S3 (R290)",
+    # aroTHERM plus /8.1 A (v2)
+    "aroTHERM plus VWL 35/8.1 A 230V": "aroTHERM plus VWL 35/8.1 A 230V S3 (R290)",
+    "aroTHERM plus VWL 55/8.1 A 230V": "aroTHERM plus VWL 55/8.1 A 230V S3 (R290)",
+    "aroTHERM plus VWL 75/8.1 A 230V": "aroTHERM plus VWL 75/8.1 A 230V S3 (R290)",
+    "aroTHERM plus VWL 105/8.1 A 230V": "aroTHERM plus VWL 105/8.1 A 230V S3 (R290)",
+    "aroTHERM plus VWL 105/8.1 A 400V": "aroTHERM plus VWL 105/8.1 A 400V S3 (R290)",
+    "aroTHERM plus VWL 125/8.1 A 230V": "aroTHERM plus VWL 125/8.1 A 230V S3 (R290)",
+    "aroTHERM plus VWL 125/8.1 A 400V": "aroTHERM plus VWL 125/8.1 A 400V S3 (R290)",
+    # aroTHERM plus /6 A
+    "aroTHERM plus VWL 35/6 A 230V": "aroTHERM plus VWL 35/6 A 230V S3 (R290)",
+    "aroTHERM plus VWL 55/6 A 230V": "aroTHERM plus VWL 55/6 A 230V S3 (R290)",
+    "aroTHERM plus VWL 75/6 A 230V": "aroTHERM plus VWL 75/6 A 230V S3 (R290)",
+    "aroTHERM plus VWL 105/6 A 230V": "aroTHERM plus VWL 105/6 A 230V S3 (R290)",
+    "aroTHERM plus VWL 125/6 A 230V": "aroTHERM plus VWL 125/6 A 230V S3 (R290)",
+    "aroTHERM plus VWL 125/6 A": "aroTHERM plus VWL 125/6 A S3 (R290)",
+    # Legacy strings
     "aroTHERM plus VWL 35/6 A 230V (Legacy)": "aroTHERM plus VWL 35/6 A 230V S3 (R290)",
     "aroTHERM plus VWL 55/6 A 230V (Legacy)": "aroTHERM plus VWL 55/6 A 230V S3 (R290)",
     "aroTHERM plus VWL 75/6 A 230V (Legacy)": "aroTHERM plus VWL 75/6 A 230V S3 (R290)",
@@ -99,7 +148,7 @@ DEFAULT_INDOOR_MODEL = DEFAULT_INDOOR_MODEL_SAUNIER
 INDOOR_MODELS_SAUNIER: list[str] = [
     "HPIM 7 230V",
     "GeniaSet FEW/FIW 200-7",
-    "Módulo Hidráulico HE 9-7 W",
+    "Hydraulic Module HE 9-7 W",
 ]
 
 INDOOR_MODELS_VAILLANT: list[str] = [
@@ -119,11 +168,12 @@ INDOOR_MODELS_BY_MANUFACTURER: dict[str, list[str]] = {
 INDOOR_MODEL_SPECS: dict[str, str] = {
     "HPIM 7 230V": "HPIM 7 230V (VWZIO 8000033994)",
     "GeniaSet FEW/FIW 200-7": "GeniaSet FEW/FIW 200-7 (VWZIO)",
-    "Módulo Hidráulico HE 9-7 W": "Módulo Hidráulico HE 9-7 W (VWZIO)",
-    "VWZ MEH 97/7": "Módulo Hidráulico Mural VWZ MEH 97/7 (VWZIO)",
-    "uniTOWER VIH QW 190/7": "Torre Hidráulica uniTOWER VIH QW 190/7 (VWZIO)",
-    "VWZ MH 97/7": "Módulo Hidráulico VWZ MH 97/7 (VWZIO)",
-    "VWZ AI 7/230V": "Interfaz de Bomba VWZ AI /7 230V (VWZIO)",
+    "Hydraulic Module HE 9-7 W": "Hydraulic Module HE 9-7 W (VWZIO)",
+    "Módulo Hidráulico HE 9-7 W": "Hydraulic Module HE 9-7 W (VWZIO)",
+    "VWZ MEH 97/7": "Wall-Hung Hydraulic Module VWZ MEH 97/7 (VWZIO)",
+    "uniTOWER VIH QW 190/7": "Hydraulic Tower uniTOWER VIH QW 190/7 (VWZIO)",
+    "VWZ MH 97/7": "Hydraulic Module VWZ MH 97/7 (VWZIO)",
+    "VWZ AI 7/230V": "Heat Pump Interface VWZ AI /7 230V (VWZIO)",
 }
 
 CONF_HAS_WIRELESS_ROOM_UNIT = "has_wireless_room_unit"
@@ -144,6 +194,20 @@ DEFAULT_AUTO_COOLING_LOCK_BYPASS = True
 CONF_FALLBACK_POLL_INTERVAL = "fallback_poll_interval"
 DEFAULT_FALLBACK_POLL_INTERVAL = 300
 
+SECTION_ADVANCED_OPTIONS = "advanced_options"
+
+CONF_ENABLE_EBUSD_TCP = "enable_ebusd_tcp"
+DEFAULT_ENABLE_EBUSD_TCP = False
+
+CONF_EBUSD_TCP_HOST = "ebusd_tcp_host"
+DEFAULT_EBUSD_TCP_HOST = "127.0.0.1"
+
+CONF_EBUSD_TCP_PORT = "ebusd_tcp_port"
+DEFAULT_EBUSD_TCP_PORT = 8888
+
+CONF_ENABLE_SEND_HEX = "enable_send_hex"
+DEFAULT_ENABLE_SEND_HEX = False
+
 # Logical Device Identifiers
 DEVICE_OUTDOOR_UNIT = "outdoor_unit"
 DEVICE_CLIMATE_CONTROLLER = "climate_controller"
@@ -152,14 +216,50 @@ DEVICE_WIRELESS_THERMOSTAT = "wireless_thermostat"
 
 # eBUS Circuits
 CIRCUIT_HMUX0 = "hmux0"
+CIRCUIT_HMU = "hmu"
+CIRCUIT_HMU00 = "hmu00"
+OUTDOOR_CIRCUITS: tuple[str, ...] = (CIRCUIT_HMUX0, CIRCUIT_HMU, CIRCUIT_HMU00)
 CIRCUIT_BASS3 = "bass3"
 CIRCUIT_BASV3 = "basv3"
-CONTROLLER_CIRCUITS: tuple[str, ...] = (CIRCUIT_BASS3, CIRCUIT_BASV3)
+CIRCUIT_CTLV2 = "ctlv2"
+CIRCUIT_CTLV3 = "ctlv3"
+CONTROLLER_CIRCUITS: tuple[str, ...] = (
+    CIRCUIT_BASS3,
+    CIRCUIT_BASV3,
+    CIRCUIT_CTLV2,
+    CIRCUIT_CTLV3,
+)
 CIRCUIT_VWZIO = "vwzio"
 CIRCUIT_NETX3 = "04"
 CIRCUIT_NETX3_ALT = "f6"
 CIRCUIT_BROADCAST = "broadcast"
 CIRCUIT_GLOBAL = "global"
+
+# Cross-circuit and traditional eBUSd message name normalization aliases
+MESSAGE_ALIASES: dict[str, str] = {
+    "flowtemp": "RunDataFlowTemp",
+    "buildingcircuitflow": "RunDataFlowRate",
+    "waterthroughput": "RunDataFlowRate",
+    "rundatastatuscode": "HMUStatusCode",
+    "powerconsumptionhmu": "RunDataElectricPowerConsumption",
+    "z1maxflowtempdesired": "Z1RoomHumidity",
+    "rundataenergyintegral": "EnergyIntegral",
+    "energyintegral": "EnergyIntegral",
+}
+
+# Weekly timer passive update aliases for eavesdropping MiGo Link / gateway writes
+for _day in (
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+):
+    MESSAGE_ALIASES[f"z1timer_{_day.lower()}_passive"] = f"Z1Timer_{_day}"
+    MESSAGE_ALIASES[f"z1timer_{_day.lower()}_slot2_passive"] = f"Z1Timer_{_day}_Slot2"
+    MESSAGE_ALIASES[f"z1timer_{_day.lower()}_slot3_passive"] = f"Z1Timer_{_day}_Slot3"
 
 # eBUS Scan address mapping for passive hardware & software version detection
 SCAN_ADDRESS_TO_DEVICE_KEY: dict[str, str] = {
@@ -204,8 +304,20 @@ CALC_HEATING_TOTAL_ENERGY = "calculated_heating_total_energy"
 CALC_DHW_TOTAL_ENERGY = "calculated_dhw_total_energy"
 CALC_SYSTEM_TOTAL_ENERGY = "calculated_system_total_energy"
 
+# Duration sensor states
+STATE_INACTIVE = "Inactive"
+STATE_OPEN_ENDED = "Open-ended"
+
 # Deprecated unique_id suffixes automatically removed from entity_registry on setup
 DEPRECATED_UNIQUE_ID_SUFFIXES: tuple[str, ...] = (
+    "number_bass3_z1daytemp_value",
+    "number_bass3_z1coolingtempdesired_value",
+    "number_basv3_z1daytemp_value",
+    "number_basv3_z1coolingtempdesired_value",
+    "number_ctlv2_z1daytemp_value",
+    "number_ctlv2_z1coolingtempdesired_value",
+    "number_ctlv3_z1daytemp_value",
+    "number_ctlv3_z1coolingtempdesired_value",
     "calculated_calculated_daily_cop_value",
     "calculated_calculated_monthly_cop_value",
     "calculated_calculated_total_cop_value",
@@ -239,6 +351,12 @@ INITIAL_HYDRATION_WAIT_SECONDS = 5.0
 HYDRATION_STEP_DELAY_SECONDS = 0.8
 SET_CONFIRMATION_DELAY_SECONDS = 1.5
 DHW_BOOST_MAX_TIMEOUT_SECONDS = 3600  # 60 minutes safety timeout
+ELECTRIC_POWER_STALE_TIMEOUT_SECONDS: float = (
+    180.0  # 3 minutes staleness fallback threshold
+)
+ELECTRIC_POWER_UNAVAILABLE_TIMEOUT_SECONDS: float = (
+    600.0  # 10 minutes max age before marking unavailable
+)
 
 # Firmware Sentinel Thresholds
 SENTINEL_COOLING_OFF_TEMP = 99.0
@@ -252,8 +370,20 @@ DEFAULT_CYLINDER_HYST = 5.0
 # Services
 SERVICE_SET_WEEKLY_TIMER = "set_weekly_timer"
 SERVICE_FORCE_DHW_BOOST = "force_dhw_boost"
+SERVICE_SET_LEGIONELLA_PROTECTION = "set_legionella_protection"
 SERVICE_SET_HOLIDAY_MODE = "set_holiday_mode"
 SERVICE_CANCEL_HOLIDAY_MODE = "cancel_holiday_mode"
+SERVICE_QUICK_VETO = "quick_veto"
+SERVICE_CANCEL_QUICK_VETO = "cancel_quick_veto"
+SERVICE_DUMP_MQTT_VALUES = "dump_mqtt_values"
+SERVICE_RECORD_TOPIC_CHANGES = "record_topic_changes"
+SERVICE_SEND_HEX_COMMAND = "send_hex_command"
+SERVICE_READ_PARAMETER = "read_parameter"
+SERVICE_WRITE_PARAMETER = "write_parameter"
+
+DEFAULT_QUICK_VETO_DURATION = 3.0
+DEFAULT_QUICK_VETO_BOOST_DELTA = 3.0
+DEFAULT_COOLING_QUICK_VETO_BOOST_DELTA = 2.0
 
 # Presets
 PRESET_COMFORT = "comfort"
@@ -295,16 +425,20 @@ TIMER_CIRCUIT_PREFIXES: dict[str, str] = {
     "dhw": "HwcTimer",
     "cooling": "CoolingTimer",
     "circulation": "CirculationTimer",
+    "silent": "SilentTimer",
 }
 
 # Essential eBUSd messages for Initial Staggered Hydration (/get queue)
-# ONLY messages with active read priority (r / r1..r9) on the physical bus.
-# Purely passive ('u') messages (temperatures, modes, runstats) are populated
+# Prioritizes active read setpoints, energy counters, and initial startup telemetry.
+# General passive messages (temperatures, live modes, runstats) are populated
 # automatically via retained MQTT topics and periodic master broadcasts (f1 / 10).
 ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     # Climate Controller (15.bass3) - Actively readable setpoints, offsets & energy counters (r / r9)
+    (CIRCUIT_BASS3, "Z1ManualTemp"),
+    (CIRCUIT_BASS3, "Z1CoolingManualTemp"),
     (CIRCUIT_BASS3, "Z1NightTemp"),
     (CIRCUIT_BASS3, "Z1QuickVetoTemp"),
+    (CIRCUIT_BASS3, "Z1QuickVetoDuration"),
     (CIRCUIT_BASS3, "HolidayTemp"),
     (CIRCUIT_BASS3, "HolidayStartDate"),
     (CIRCUIT_BASS3, "HolidayStartTime"),
@@ -316,6 +450,14 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
         CIRCUIT_BASS3,
         "Z1HolidayTemp",
     ),  # Probes for legacy pre-v1.2.4 CSV compatibility check
+    (
+        CIRCUIT_BASS3,
+        "Z1DayTemp",
+    ),  # Probes for legacy pre-v1.3.0 CSV compatibility check (replaced by Z1CoolingManualTemp)
+    (
+        CIRCUIT_BASS3,
+        "SilentTimer_Slots",
+    ),  # Probes for modern v1.3.0+ weekly schedule timer support
     (CIRCUIT_BASS3, "CoolingReleaseStatus"),
     (CIRCUIT_BASS3, "HwcSFMode"),
     (CIRCUIT_BASS3, "HwcFlowTemp"),
@@ -336,6 +478,7 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_BASS3, "HwcParallelLoading"),
     (CIRCUIT_BASS3, "AdaptHeatCurve"),
     (CIRCUIT_BASS3, "BufferChargeOffset"),
+    (CIRCUIT_BASS3, "Z1RoomHumidity"),
     (CIRCUIT_BASS3, "MaxRoomHumidity"),
     (CIRCUIT_BASS3, "BivalencePointHc"),
     (CIRCUIT_BASS3, "BivalencePointHwc"),
@@ -349,11 +492,11 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     # Outdoor Unit (08.hmux0) - Active live telemetry & energy counters (r / r1..r9)
     (CIRCUIT_HMUX0, "HMUStatusCode"),
     (CIRCUIT_HMUX0, "PowerStatus"),
+    (CIRCUIT_HMUX0, "CompressorSilentOperationLevel"),
     (CIRCUIT_HMUX0, "RunDataCompressorSpeed"),
     (CIRCUIT_HMUX0, "RunDataFan1Speed"),
     (CIRCUIT_HMUX0, "RunDataFlowRate"),
     (CIRCUIT_HMUX0, "RunDataBuildingCPumpPower"),
-    (CIRCUIT_HMUX0, "RunDataElectricPowerConsumption"),
     (CIRCUIT_HMUX0, "RunDataHighPressure"),
     (CIRCUIT_HMUX0, "RunDataFlowTemp"),
     (CIRCUIT_HMUX0, "RunDataReturnTemp"),
@@ -376,6 +519,49 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_VWZIO, "PrEnergyElectricHwc"),
     (CIRCUIT_VWZIO, "PrEnergyThermalHc"),
     (CIRCUIT_VWZIO, "PrEnergyThermalHwc"),
+]
+
+# Communication silence timeout before marking eBUS as non-operational (seconds)
+EBUSD_TRAFFIC_TIMEOUT_SECONDS: int = 600
+
+# Messages exclusive to Monobloc units (08.hmux0.csv b516 EEPROM table) that do not exist on Split (08.hmu.HW5103.csv)
+HMUX0_EXCLUSIVE_MESSAGES: frozenset[str] = frozenset(
+    {
+        "RunStatsHcStarts",
+        "PrEnergyElectricHc",
+        "PrEnergyElectricHwc",
+        "PrEnergyElectricCool",
+        "PrEnergyThermalHc",
+        "PrEnergyThermalHwc",
+        "PrEnergyThermalCool",
+        "PrEnergyEnvYieldHc",
+        "PrEnergyEnvYieldHwc",
+    }
+)
+
+# Unique ID suffixes of outdoor per-mode electrical sensors exclusive to HMUX0 b516 EEPROM
+HMUX0_ONLY_SENSOR_UNIQUE_ID_SUFFIXES: frozenset[str] = frozenset(
+    {
+        "hmux0_prenergyelectriccool_energy",
+        "hmux0_prenergyelectrichc_energy",
+        "hmux0_prenergyelectrichwc_energy",
+    }
+)
+
+# Additional eBUSd messages for Vaillant HMU00 (HW=5103) outdoor units
+HMU_HW5103_HYDRATION_MESSAGES: list[tuple[str, str]] = [
+    (CIRCUIT_HMU, "FlowPressure"),
+    (CIRCUIT_HMU, "YieldHc"),
+    (CIRCUIT_HMU, "YieldHwc"),
+    (CIRCUIT_HMU, "YieldCooling"),
+    (CIRCUIT_HMU, "CopHc"),
+    (CIRCUIT_HMU, "CopHwc"),
+    (CIRCUIT_HMU, "CopCooling"),
+    (CIRCUIT_HMU, "TotalEnergyUsage"),
+    (CIRCUIT_HMU, "EnergyIntegral"),
+    (CIRCUIT_HMU, "CompressorSilentOperationLevel"),
+    (CIRCUIT_HMU, "CompressorHours"),
+    (CIRCUIT_HMU, "CompressorStarts"),
 ]
 
 # All 52 HMUStatusCode values (plus normalized aliases)
@@ -483,10 +669,16 @@ VWZIO_SECONDARY_HWC_OPTIONS: list[str] = [
 
 # Home Assistant Repairs (issue_registry) Identifiers
 ISSUE_OUTDATED_HMUX0_CSV = "outdated_hmux0_csv"
+ISSUE_OUTDATED_HMU_CSV = "outdated_hmu_csv"
 ISSUE_OUTDATED_CONTROLLER_CSV = "outdated_controller_csv"
 ISSUE_MISSING_CUSTOM_CSV = "missing_custom_csv"
 ISSUE_NO_EBUSD_MQTT_TRAFFIC = "no_ebusd_mqtt_traffic"
 ISSUE_MQTTJSON_NOT_ENABLED = "mqttjson_not_enabled"
+ISSUE_EBUSD_SLOW_POLLING_SEED = "ebusd_slow_polling_seed"
+
+SLOW_POLLING_WARNING_THRESHOLD_SECONDS: float = (
+    300.0  # 5 minutes without r1 power updates
+)
 
 # Signature messages proving our custom 08.hmux0.csv is loaded in ebusd
 HMUX0_CUSTOM_SIGNATURE_MESSAGES: tuple[str, ...] = (

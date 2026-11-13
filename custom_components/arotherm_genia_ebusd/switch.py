@@ -12,7 +12,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import CIRCUIT_BASS3, DEVICE_CLIMATE_CONTROLLER, DOMAIN
+from .const import CIRCUIT_BASS3, DEVICE_CLIMATE_CONTROLLER, DOMAIN, STATE_INACTIVE
 from .coordinator import SaunierGeniaCoordinator
 from .entity import SaunierGeniaEntity
 
@@ -86,6 +86,8 @@ async def async_setup_entry(
 class SaunierGeniaDhwBoostSwitch(SaunierGeniaEntity, SwitchEntity):
     """Switch for One-Time DHW Boost (ACS Puntual) with Smart Forced Hysteresis Bypass."""
 
+    _gate_availability_on_ebus = True
+
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the DHW Boost switch."""
         super().__init__(
@@ -128,6 +130,8 @@ class SaunierGeniaDhwBoostSwitch(SaunierGeniaEntity, SwitchEntity):
 
 class SaunierGeniaCoolingSeasonSwitch(SaunierGeniaEntity, SwitchEntity):
     """Switch for Cooling Season Authorization (Lock 1: CoolingStartDate / CoolingEndDate)."""
+
+    _gate_availability_on_ebus = True
 
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the Cooling Season Authorization (Lock 1) switch."""
@@ -213,7 +217,9 @@ class SaunierGeniaCoolingSeasonSwitch(SaunierGeniaEntity, SwitchEntity):
 
 
 class SaunierGeniaHolidayModeSwitch(SaunierGeniaEntity, SwitchEntity):
-    """Switch for Away / Holiday Mode (Modo Ausencia)."""
+    """Switch for Away / Holiday Mode."""
+
+    _gate_availability_on_ebus = True
 
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the Holiday Mode switch."""
@@ -243,7 +249,7 @@ class SaunierGeniaHolidayModeSwitch(SaunierGeniaEntity, SwitchEntity):
         if start_year == 15 or end_year == 15:
             return False
         if end_year is not None and end_year != 15:
-            return self.coordinator.get_holiday_remaining_days() != "Inactivo"
+            return self.coordinator.get_holiday_remaining_days() != STATE_INACTIVE
         return (z1_status is not None and z1_status.lower() == "holidayaway") or (
             hwc_status is not None and hwc_status.lower() == "holidayaway"
         )
@@ -292,6 +298,7 @@ class SaunierGeniaStandardSwitch(SaunierGeniaEntity, SwitchEntity):
     """Standard single-register switch entity for MiPro Sense parameters."""
 
     entity_description: SaunierGeniaSwitchEntityDescription
+    _gate_availability_on_ebus = True
 
     def __init__(
         self,

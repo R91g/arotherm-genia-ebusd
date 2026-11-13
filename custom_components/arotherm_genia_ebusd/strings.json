@@ -50,10 +50,41 @@
       "init": {
         "title": "Runtime Options (aroTHERM & GeniaAir)",
         "description": "Tune the Smart Forced DHW Boost algorithm, Double-Lock cooling automation, and fallback polling interval.",
+        "sections": {
+          "advanced_options": {
+            "name": "Advanced Settings (eBUSd TCP Connection & HEX Commands)",
+            "description": "Configure direct TCP socket connectivity with the eBUSd daemon to unlock real-time physical metrics and advanced commands.",
+            "data": {
+              "enable_ebusd_tcp": "Enable eBUSd physical diagnostics and commands via TCP",
+              "ebusd_tcp_host": "eBUSd TCP Host (IP or hostname)",
+              "ebusd_tcp_port": "eBUSd TCP Port",
+              "enable_send_hex": "Enable raw hexadecimal command service (send_hex_command)"
+            },
+            "data_description": {
+              "enable_ebusd_tcp": "Periodically queries the eBUSd TCP socket to monitor physical symbol rate, arbitration latency, adapter reconnects, and verify unloaded CSV files. Automatically activates diagnostic entities and action buttons.",
+              "ebusd_tcp_host": "eBUSd daemon address. In Home Assistant OS with the community add-on (LukasGrebe) it is auto-detected or use 'b4d7ad18-ebusd'. For native host setups with exposed port, use '127.0.0.1'.",
+              "ebusd_tcp_port": "eBUSd TCP daemon port (default: 8888).",
+              "enable_send_hex": "Enables sending raw hexadecimal eBUS telegrams via the arotherm_genia_ebusd.send_hex_command service. Requires the --enablehex flag enabled in eBUSd configuration."
+            }
+          }
+        },
         "data": {
-          "force_dhw_boost": "Enable Smart Forced DHW Boost (applies T_current + hysteresis + 1.5 °C when ΔT < hysteresis)",
+          "force_dhw_boost": "Enable Smart Forced DHW Boost",
           "auto_cooling_lock_bypass": "Automatically open Cooling Lock 1 (01;01;99) when selecting Cool mode",
-          "fallback_poll_interval": "Fallback /get polling interval when cloud gateway is absent (seconds)"
+          "fallback_poll_interval": "Fallback /get polling interval when cloud gateway is absent (seconds)",
+          "enable_ebusd_tcp": "Enable eBUSd physical diagnostics and commands via TCP",
+          "ebusd_tcp_host": "eBUSd TCP Host (IP or hostname)",
+          "ebusd_tcp_port": "eBUSd TCP Port",
+          "enable_send_hex": "Enable raw hexadecimal command service (send_hex_command)"
+        },
+        "data_description": {
+          "force_dhw_boost": "Automatically applies T_current + hysteresis + 1.5 °C when the gap between setpoint and tank temperature is below the hysteresis margin.",
+          "auto_cooling_lock_bypass": "Unlocks the cooling season authorization lock on the controller when switching to cooling mode.",
+          "fallback_poll_interval": "Polling frequency when the installation lacks an official cloud gateway.",
+          "enable_ebusd_tcp": "Periodically queries the eBUSd TCP socket to monitor physical symbol rate, arbitration latency, adapter reconnects, and verify unloaded CSV files. Automatically activates diagnostic entities and action buttons.",
+          "ebusd_tcp_host": "eBUSd daemon address. In Home Assistant OS with the community add-on (LukasGrebe) it is auto-detected or use 'b4d7ad18-ebusd'. For native host setups with exposed port, use '127.0.0.1'.",
+          "ebusd_tcp_port": "eBUSd TCP daemon port (default: 8888).",
+          "enable_send_hex": "Enables sending raw hexadecimal eBUS telegrams via the arotherm_genia_ebusd.send_hex_command service. Requires the --enablehex flag enabled in eBUSd configuration."
         }
       }
     }
@@ -61,15 +92,19 @@
   "issues": {
     "outdated_hmux0_csv": {
       "title": "Outdated 08.hmux0.csv file in eBUSd",
-      "description": "Your `ebusd` instance is using an older version of `vaillant/08.hmux0.csv` (reporting a static 900 l/h flow rate or legacy `StateCompressor` fields). Please copy the updated `ebusd-configuration/vaillant/08.hmux0.csv` (v1.2.4+) into your `ebusd` configuration folder and restart `ebusd` to enable the real-time vortex water flow sensor (`540200090b`), the `D2C` fix in `StateCompressor`, and optimized polling priorities. This repair notice will clear automatically once `ebusd` reloads the updated CSV."
+      "description": "Your `ebusd` instance is using an older version of `vaillant/08.hmux0.csv` (reporting a static 900 l/h flow rate, legacy `StateCompressor` fields, or missing `CompressorSilentOperationLevel`). Please copy the updated `ebusd-configuration/vaillant/08.hmux0.csv` (v1.3.0+) into your `ebusd` configuration folder and restart `ebusd` to enable the real-time vortex water flow sensor (`540200090b`), compressor silent mode levels, and high-frequency electric power telemetry (`RunDataElectricPowerConsumption`). This repair notice will clear automatically once `ebusd` reloads the updated CSV."
+    },
+    "outdated_hmu_csv": {
+      "title": "Outdated or default 08.hmu.csv / 08.hmu.HW5103.csv file in eBUSd",
+      "description": "Your `ebusd` instance is using the upstream default or an older version of `vaillant/08.hmu.csv` or `08.hmu.HW5103.csv` (reporting raw unmapped `temp_1..temp_4` fields in `Status01`, missing `CompressorSilentOperationLevel`, or missing real-time power telemetry). Please copy `ebusd-configuration/vaillant/08.hmu.csv` or `08.hmu.HW5103.csv` into your `ebusd` configuration folder and restart `ebusd`. This repair notice will clear automatically once `ebusd` reloads the updated CSV."
     },
     "outdated_controller_csv": {
-      "title": "Outdated 15.bass3.csv / 15.basv3.csv file in eBUSd",
-      "description": "Your `ebusd` instance is using an older version of `vaillant/15.bass3.csv` or `vaillant/15.basv3.csv` (reporting legacy `Z1HolidayTemp` instead of Zone 1 mapped Holiday Mode registers). Please copy the updated `ebusd-configuration/vaillant/15.bass3.csv` and `ebusd-configuration/vaillant/15.basv3.csv` (v1.2.4+) into your `ebusd` configuration folder and restart `ebusd` to enable real-time Holiday Mode synchronization and active cooling season parameters. This repair notice will clear automatically once `ebusd` reloads the updated CSV."
+      "title": "Outdated controller CSV file in eBUSd",
+      "description": "Your `ebusd` instance is using an older version of `vaillant/15.bass3.csv`, `15.basv3.csv`, `15.ctlv2.csv`, or `15.ctlv3.csv` (reporting legacy `Z1HolidayTemp` or `Z1DayTemp`, or missing `SilentTimer` weekly schedule programming support). Please copy the updated `ebusd-configuration/vaillant/*.csv` into your `ebusd` configuration folder and restart `ebusd` to enable real-time Holiday Mode synchronization, active cooling manual setpoint (`Z1CoolingManualTemp`), and silent mode weekly schedules. This repair notice will clear automatically once `ebusd` reloads the updated CSV."
     },
     "missing_custom_csv": {
       "title": "Custom eBUSd CSV files not loaded or incomplete scan",
-      "description": "Your `ebusd` instance has active eBUS signal, but one or more required CSV circuits (`08.hmux0.csv`, `15.bass3.csv`/`15.basv3.csv`, or `76.vwzio.csv`) did not load or timed out during initial scan (`scan config ERR: read timeout`). Please verify that `broadcast.csv` and `vaillant/*.csv` from `ebusd-configuration/` are copied into your `ebusd` `--configpath` directory and restart `ebusd`. This repair notice will clear automatically once all three circuits report telemetry."
+      "description": "Your `ebusd` instance has active eBUS signal, but one or more required CSV circuits (`08.hmux0.csv`/`08.hmu.HW5103.csv`, `15.bass3.csv`/`15.basv3.csv`/`15.ctlv2.csv`/`15.ctlv3.csv`, or `76.vwzio.csv`) did not load or timed out during initial scan (`scan config ERR: read timeout`). Please verify that `broadcast.csv` and `vaillant/*.csv` from `ebusd-configuration/` are copied into your `ebusd` `--configpath` directory and restart `ebusd`. This repair notice will clear automatically once all three circuits report telemetry."
     },
     "no_ebusd_mqtt_traffic": {
       "title": "No MQTT traffic received on prefix {mqtt_prefix}",
@@ -78,6 +113,10 @@
     "mqttjson_not_enabled": {
       "title": "The --mqttjson flag is not enabled in eBUSd",
       "description": "Your `ebusd` instance is publishing plain-text semicolon-separated values instead of JSON objects. Please add `--mqttjson` to your `ebusd` startup arguments and restart `ebusd` so multi-field telemetry (compressor state, weekly timers, dates, and live power) can be decoded properly. This repair notice will clear automatically once JSON messages arrive."
+    },
+    "ebusd_slow_polling_seed": {
+      "title": "Slow eBUSd telemetry update rate (possible seed_mqtt_cfg issue)",
+      "description": "High-priority electrical power telemetry (`RunDataElectricPowerConsumption`) is updating very slowly ({interval} minutes between updates instead of ~10–20 seconds) while the eBUS is active. If you are using the Home Assistant eBUSd Add-on (LukasGrebe/ha-addons), this typically happens when the option **\"Seed HA MQTT integration config (only needed once)\"** is enabled (`seed_mqtt_cfg: true`), which injects a legacy configuration that polls 160+ registers every 16 minutes and causes heavy bus traffic. (If you run ebusd standalone or in Docker without this add-on, this setting does not apply; check your polling timers instead). Please: (1) Go to **Settings → Add-ons → eBUSd → Configuration** and turn OFF **Seed HA MQTT integration config**, (2) Verify that `--mqttjson` is present in `commandline_options`, and (3) Restart the add-on. This repair notice will clear automatically once high-frequency telemetry updates resume."
     }
   },
   "entity": {
@@ -139,9 +178,6 @@
       "cooling_flow_temp_desired_max": {
         "name": "Maximum Cooling Flow Setpoint"
       },
-      "z1_day_temp": {
-        "name": "Zone 1 Comfort Heating Setpoint (Day)"
-      },
       "z1_night_temp": {
         "name": "Zone 1 Night Setback Temperature (Night)"
       },
@@ -150,6 +186,15 @@
       },
       "z1_quick_veto_temp": {
         "name": "Zone 1 Quick Veto Setpoint"
+      },
+      "z1_quick_veto_duration": {
+        "name": "Zone 1 Quick Veto Duration"
+      },
+      "z1_quick_veto_boost_delta": {
+        "name": "Zone 1 Quick Veto Boost Temperature Delta"
+      },
+      "z1_cooling_quick_veto_boost_delta": {
+        "name": "Zone 1 Cooling Quick Veto Boost Temperature Delta"
       },
       "z1_cooling_temp_time_controlled": {
         "name": "Zone 1 Time-Controlled Cooling Setpoint (Setback)"
@@ -192,6 +237,9 @@
       },
       "max_room_humidity": {
         "name": "Maximum Permitted Room Humidity"
+      },
+      "compressor_silent_operation_level": {
+        "name": "Compressor Silent Operation Level"
       }
     },
     "select": {
@@ -209,7 +257,8 @@
         "state": {
           "off": "Off",
           "auto": "Time-Controlled (Auto)",
-          "day": "Continuous Manual (Day)"
+          "day": "Continuous Manual (Day)",
+          "night": "Setback (Night / Eco)"
         }
       },
       "hwc_op_mode": {
@@ -225,8 +274,7 @@
         "name": "Circuit 1 Night Lowering Mode",
         "state": {
           "eco": "Eco (Switch-off)",
-          "night": "Normal (Night setback)",
-          "off": "Off"
+          "night": "Normal (Night setback)"
         }
       },
       "hc1_room_temp_switch_on": {
@@ -235,6 +283,19 @@
           "off": "Inactive (Weather curve only)",
           "modulating": "Active (Modulating)",
           "thermostat": "Expanded (Thermostat cut-off)"
+        }
+      },
+      "hwc_legionella_day": {
+        "name": "Anti-Legionella Protection Day",
+        "state": {
+          "off": "Disabled",
+          "monday": "Monday",
+          "tuesday": "Tuesday",
+          "wednesday": "Wednesday",
+          "thursday": "Thursday",
+          "friday": "Friday",
+          "saturday": "Saturday",
+          "sunday": "Sunday"
         }
       }
     },
@@ -272,6 +333,11 @@
         "name": "Manual Cooling End Date"
       }
     },
+    "time": {
+      "hwc_legionella_time": {
+        "name": "Anti-Legionella Protection Time"
+      }
+    },
     "binary_sensor": {
       "compressor_active": {
         "name": "Compressor Running"
@@ -296,6 +362,9 @@
       },
       "ebusd_signal": {
         "name": "eBUS Signal"
+      },
+      "ebusd_running": {
+        "name": "ebusd Daemon Status"
       }
     },
     "sensor": {
@@ -359,6 +428,9 @@
           "connection_fault_frequency_converter": "Frequency converter communication fault (S.581)",
           "four_port_valve_position_fault": "4-port reversing valve position fault (S.590)"
         }
+      },
+      "hmu_current_error": {
+        "name": "Active Error Diagnostics"
       },
       "electric_power_consumption": {
         "name": "Instantaneous Electric Power Consumption"
@@ -510,11 +582,20 @@
       "stats_fan1_hours": {
         "name": "Fan 1 Operating Hours"
       },
+      "stats_fan1_starts": {
+        "name": "Fan 1 Total Starts"
+      },
       "stats_fan2_hours": {
         "name": "Fan 2 Operating Hours"
       },
+      "stats_fan2_starts": {
+        "name": "Fan 2 Total Starts"
+      },
       "stats_deice_hours": {
         "name": "Defrost Total Operating Hours"
+      },
+      "stats_deice_starts": {
+        "name": "Defrost Total Cycles"
       },
       "stats_immersion_heater_hours": {
         "name": "Backup Immersion Heater Operating Hours"
@@ -531,6 +612,9 @@
           "dhw": "Domestic Hot Water (DHW)"
         }
       },
+      "controller_current_error": {
+        "name": "Active Error Diagnostics"
+      },
       "water_pressure": {
         "name": "System Water Pressure"
       },
@@ -542,6 +626,9 @@
       },
       "z1_room_temp": {
         "name": "Zone 1 Room Temperature"
+      },
+      "z1_room_humidity": {
+        "name": "Zone 1 Room Humidity"
       },
       "z1_actual_room_temp_desired": {
         "name": "Zone 1 Effective Room Setpoint"
@@ -669,6 +756,307 @@
       },
       "circulation_weekly_schedule_summary": {
         "name": "Circulation Pump Weekly Schedule"
+      },
+      "silent_mode_weekly_schedule_summary": {
+        "name": "Silent Mode Weekly Schedule"
+      },
+      "ebusd_uptime": {
+        "name": "ebusd Uptime"
+      },
+      "ebusd_version": {
+        "name": "ebusd Daemon Version"
+      },
+      "ebusd_scan_status": {
+        "name": "ebusd Scan Status"
+      },
+      "ebusd_symbol_rate": {
+        "name": "eBUS Physical Symbol Rate"
+      },
+      "ebusd_reconnects": {
+        "name": "eBUS Adapter Reconnect Count"
+      },
+      "ebusd_masters": {
+        "name": "eBUS Master Devices Detected"
+      },
+      "ebusd_arbitration_latency": {
+        "name": "eBUS Arbitration Latency"
+      },
+      "evaporation_temp": {
+        "name": "Refrigerant Evaporation Temperature"
+      },
+      "condensation_temp": {
+        "name": "Refrigerant Condensation Temperature"
+      },
+      "condensate_temp": {
+        "name": "Condenser Liquid Outlet Temperature"
+      },
+      "superheat": {
+        "name": "Suction Line Superheat"
+      },
+      "subcooling": {
+        "name": "Condenser Subcooling"
+      },
+      "energy_integral": {
+        "name": "Compressor Energy Integral"
+      },
+      "compressor_flow_temp_desired": {
+        "name": "Compressor Target Flow Temperature"
+      },
+      "heat_output_internal": {
+        "name": "Internal Water Heat Output"
+      },
+      "stats_compressor_hc_hours": {
+        "name": "Compressor Heating Operating Hours"
+      },
+      "stats_compressor_hc_starts": {
+        "name": "Compressor Heating Starts"
+      },
+      "stats_compressor_hwc_hours": {
+        "name": "Compressor Hot Water Operating Hours"
+      },
+      "stats_compressor_hwc_starts": {
+        "name": "Compressor Hot Water Starts"
+      },
+      "stats_compressor_cool_hours": {
+        "name": "Compressor Cooling Operating Hours"
+      },
+      "stats_compressor_cool_starts": {
+        "name": "Compressor Cooling Starts"
+      },
+      "vwzio_heater_energy": {
+        "name": "Hydraulic Auxiliary Heater Electric Energy"
+      },
+      "vwzio_heater_flow_temp": {
+        "name": "Hydraulic Auxiliary Heater Flow Temperature"
+      },
+      "stats_vwzio_heater_hc_hours": {
+        "name": "Hydraulic Auxiliary Heater Heating Operating Hours"
+      },
+      "stats_vwzio_heater_hc_starts": {
+        "name": "Hydraulic Auxiliary Heater Heating Starts"
+      },
+      "stats_vwzio_heater_hwc_hours": {
+        "name": "Hydraulic Auxiliary Heater Hot Water Operating Hours"
+      },
+      "stats_vwzio_heater_hwc_starts": {
+        "name": "Hydraulic Auxiliary Heater Hot Water Starts"
+      },
+      "ebusd_missing_csv_devices": {
+        "name": "eBUS Missing CSV Devices"
+      }
+    },
+    "button": {
+      "ebusd_reload_csv": {
+        "name": "Reload eBUSd CSV Files"
+      },
+      "ebusd_restart_scan": {
+        "name": "Restart eBUSd Device Scan"
+      }
+    }
+  },
+  "services": {
+    "set_weekly_timer": {
+      "name": "Set Weekly Schedule Timer (b5 55)",
+      "description": "Configures a weekly schedule time slot on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3) for Zone 1 Heating, Domestic Hot Water (DHW), Cooling, Circulation, or Silent Mode. Supports configuring slots (1, 2, 3), deleting individual slots, or clearing the entire day.",
+      "fields": {
+        "circuit_type": {
+          "name": "Circuit Type",
+          "description": "Schedule circuit to modify: 'heating' (Zone 1 Heating), 'dhw' (Domestic Hot Water), 'cooling' (Cooling), 'circulation' (Circulation), or 'silent' (Silent Mode)."
+        },
+        "day": {
+          "name": "Day of the Week",
+          "description": "Specific day of the week, Weekdays, Weekend, or All Days. Accepts English and Spanish names."
+        },
+        "action": {
+          "name": "Action",
+          "description": "Action to perform: 'set' to add/update a time slot, 'delete' to remove a specific slot, or 'clear' to erase all slots for the day."
+        },
+        "slot": {
+          "name": "Time Slot Number",
+          "description": "Daily time slot index (1, 2, or 3). Defaults to 1."
+        },
+        "start_time": {
+          "name": "Start Time",
+          "description": "Slot start time in HH:MM 24-hour format (e.g. 13:10). Required for action 'set'."
+        },
+        "end_time": {
+          "name": "End Time",
+          "description": "Slot end time in HH:MM 24-hour format (e.g. 14:50, or 24:00 for all day). Required for action 'set'."
+        },
+        "temp": {
+          "name": "Target Temperature Setpoint (Optional)",
+          "description": "Optional target temperature setpoint in °C for this slot. Applies only to 'heating', 'dhw', and 'cooling' (ignored for 'circulation' and 'silent'). If omitted, uses current circuit setpoint."
+        },
+        "reset_remaining": {
+          "name": "Reset Remaining Slots (Overwrite Day)",
+          "description": "When enabled with slot 1, overwrites the day with only this slot (total_slots=1), resetting slots 2 and 3 if they existed."
+        }
+      }
+    },
+    "force_dhw_boost": {
+      "name": "Activate Smart Forced DHW Boost",
+      "description": "Initiates a one-time domestic hot water tank charge (HwcSFMode = load) automatically overcoming thermostat hysteresis via dynamic temporary setpoint elevation (T_current + hysteresis + 1.5 °C) and restores original setpoint upon completion.",
+      "fields": {
+        "boost_temp": {
+          "name": "Temporary Boost Temperature (Optional - Solar Surpluses)",
+          "description": "Optional temporary setpoint in °C for this specific boost cycle (e.g. 60 °C for PV solar surpluses). If omitted, automatically applies T_current + hysteresis + 1.5 °C."
+        }
+      }
+    },
+    "set_legionella_protection": {
+      "name": "Set Anti-Legionella Protection Schedule",
+      "description": "Configures the weekly anti-legionella thermal disinfection schedule on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3). Sets the day of the week and target execution time.",
+      "fields": {
+        "day": {
+          "name": "Day of the Week",
+          "description": "Day of the week to run anti-legionella disinfection ('off' or Monday through Sunday)."
+        },
+        "time": {
+          "name": "Execution Time (Optional)",
+          "description": "Scheduled time in HH:MM format (e.g. 03:00 or 04:00). Defaults to 04:00 if day is active."
+        }
+      }
+    },
+    "set_holiday_mode": {
+      "name": "Set Holiday / Away Mode",
+      "description": "Activates Holiday/Away Mode on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3), suspending hot water production and reducing heating setpoint to setback temperature during a timed or open-ended window.",
+      "fields": {
+        "temperature": {
+          "name": "Setback Temperature",
+          "description": "Target temperature in °C during absence (default 15.0 °C)."
+        },
+        "start_date": {
+          "name": "Start Date (Optional)",
+          "description": "Start date in YYYY-MM-DD or DD/MM/YYYY format. Defaults to today."
+        },
+        "start_time": {
+          "name": "Start Time (Optional)",
+          "description": "Start time in HH:MM format. Defaults to current time."
+        },
+        "end_date": {
+          "name": "End Date (Optional)",
+          "description": "End date of absence. If omitted, sets an open-ended/indefinite absence until manually cancelled."
+        },
+        "end_time": {
+          "name": "End Time (Optional)",
+          "description": "End time in HH:MM format (defaults to 23:59)."
+        }
+      }
+    },
+    "cancel_holiday_mode": {
+      "name": "Cancel Holiday / Away Mode",
+      "description": "Immediately cancels Holiday/Away Mode on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3) and restores automatic schedule operation for heating and domestic hot water."
+    },
+    "quick_veto": {
+      "name": "Quick Veto (Zone 1 Boost)",
+      "description": "Activates Quick Veto (Boost) on Zone 1 (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3) to temporarily override the schedule or manual setpoint for a specific duration. Supports hardware Quick Veto in heating and persistent synthetic Quick Veto in cooling.",
+      "fields": {
+        "temperature": {
+          "name": "Target Temperature Setpoint (Optional)",
+          "description": "Target temperature in °C during the veto period (10.0 to 30.0 °C in heating, 15.0 to 30.0 °C in cooling). If omitted, uses configured boost delta."
+        },
+        "duration": {
+          "name": "Duration in Hours (Optional)",
+          "description": "Duration of the veto period in hours (0.5 to 12.0 hours). If omitted, uses the currently configured Quick Veto Duration (default 3.0 hours)."
+        }
+      }
+    },
+    "cancel_quick_veto": {
+      "name": "Cancel Quick Veto",
+      "description": "Immediately cancels active heating or cooling Quick Veto on Zone 1 (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3) and restores the previous operating mode and manual setpoint."
+    },
+    "dump_mqtt_values": {
+      "name": "Dump MQTT Values (Diagnostics)",
+      "description": "Dumps full installation state and eBUSd MQTT telemetry into a structured JSON format suitable for troubleshooting or attaching to GitHub issues.",
+      "fields": {
+        "circuit": {
+          "name": "Circuit Filter (Optional)",
+          "description": "Filters telemetry by a specific eBUS circuit (e.g. '08', '15', 'hmu', 'bass3'). If omitted, dumps all active circuits."
+        },
+        "anonymize": {
+          "name": "Anonymize Serial Numbers (Recommended)",
+          "description": "Automatically masks 28-character hardware serial numbers so diagnostic dumps can be safely shared in public GitHub issue threads."
+        }
+      }
+    },
+    "record_topic_changes": {
+      "name": "Record MQTT Topic Changes (Live Diagnostics)",
+      "description": "Records real-time eBUSd MQTT traffic for a configurable duration, capturing topics, raw payloads, and timestamps.",
+      "fields": {
+        "duration": {
+          "name": "Duration (seconds)",
+          "description": "Recording duration in seconds (between 5 and 120 seconds, defaults to 30)."
+        },
+        "circuit": {
+          "name": "Circuit / Topic Substring Filter (Optional)",
+          "description": "Filters captured messages by substring (e.g. '08', '15', 'hmu'). If omitted, records all MQTT traffic under prefix."
+        },
+        "anonymize": {
+          "name": "Anonymize Serial Numbers (Recommended)",
+          "description": "Automatically masks manufacturing serial numbers and hardware identifiers found in payloads."
+        }
+      }
+    },
+    "send_hex_command": {
+      "name": "Send Direct Raw HEX Command (TCP Diagnostics)",
+      "description": "Sends a raw hexadecimal command telegram to the eBUSd daemon over TCP (port 8888) and returns decoded response bytes. Requires eBUSd running with '--enablehex' and the 'enable_send_hex' option enabled in integration options. Does not require modifying CSV files.",
+      "fields": {
+        "command": {
+          "name": "Hexadecimal Command String",
+          "description": "Hex byte string to send (spaces are automatically stripped, e.g. '08b51a0405ff3428')."
+        },
+        "host": {
+          "name": "Host / IP Address (Optional)",
+          "description": "IP address or hostname where eBUSd daemon is running (defaults to 127.0.0.1 or b4d7ad18-ebusd)."
+        },
+        "port": {
+          "name": "TCP Port (Optional)",
+          "description": "eBUSd TCP daemon port (defaults to 8888)."
+        },
+        "timeout": {
+          "name": "Timeout (seconds)",
+          "description": "Maximum time in seconds to connect and await daemon response (defaults to 5.0 seconds)."
+        }
+      }
+    },
+    "read_parameter": {
+      "name": "Read Parameter via MQTT",
+      "description": "Reads a symbolic eBUSd register via MQTT (publishing to '[prefix]/[circuit]/[name]/get' and awaiting reply on '[prefix]/[circuit]/[name]'). Supports returning cached value or forcing an active bus read.",
+      "fields": {
+        "circuit": {
+          "name": "Circuit",
+          "description": "eBUS circuit name or address (e.g. 'hmu', '08', 'bass3', 'ctlv2')."
+        },
+        "name": {
+          "name": "Parameter / Message Name",
+          "description": "Symbolic register name as defined in CSV files (e.g. 'CompressorSilentOperationLevel', 'Status01', 'Z1OpMode')."
+        },
+        "force": {
+          "name": "Force Physical Bus Read (Optional)",
+          "description": "If true, forces an active read from the physical bus instead of returning cached value if present."
+        },
+        "timeout": {
+          "name": "Timeout (seconds)",
+          "description": "Maximum time in seconds to wait for eBUSd reply via MQTT (defaults to 5.0 seconds)."
+        }
+      }
+    },
+    "write_parameter": {
+      "name": "Write Parameter via MQTT",
+      "description": "Writes a value to a symbolic eBUSd register via MQTT (publishing to '[prefix]/[circuit]/[name]/set'). Applies optimistic state update in Home Assistant and leverages intelligent circuit alias routing.",
+      "fields": {
+        "circuit": {
+          "name": "Circuit",
+          "description": "eBUS circuit name or address (e.g. 'hmu', '08', 'bass3', 'ctlv2')."
+        },
+        "name": {
+          "name": "Parameter / Message Name",
+          "description": "Symbolic register name as defined in CSV files (e.g. 'CompressorSilentOperationLevel', 'Z1OpMode')."
+        },
+        "value": {
+          "name": "Value to Write",
+          "description": "Value or string payload to send to eBUSd."
+        }
       }
     }
   }

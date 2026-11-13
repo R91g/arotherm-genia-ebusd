@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.0] - Unreleased
+
+> [!IMPORTANT]
+> **Action required when updating:**
+> 1. Update **all** CSV files in your `ebusd` folder (`ebusd-configuration/vaillant/`): controller (`15.*`) and outdoor unit (`08.*`) definitions changed, then restart `ebusd`. Outdated files are flagged by the built-in Repair checks.
+> 2. **If using the Home Assistant eBUSd Add-on ([LukasGrebe/ha-addons](https://github.com/LukasGrebe/ha-addons)):** Ensure **"Seed HA MQTT integration config"** is turned **OFF** (`seed_mqtt_cfg: false`) in the add-on configuration and `--mqttjson` is present in `commandline_options`. (This setting is exclusive to this add-on; standalone eBUSd or Docker setups are unaffected). A legacy seeded configuration queries 160+ registers every 16 minutes, saturating the eBUS and starving high-frequency telemetry. The integration now includes an automatic Repair issue (`ebusd_slow_polling_seed`) that warns you if power telemetry updates abnormally slowly.
+> 3. **Home Assistant 2024.12.0 or newer is now required** (up from 2024.4.0).
+> 4. The old `Z1DayTemp` setpoint entity is removed automatically; the cooling manual setpoint now lives in a new entity (`Z1CoolingManualTemp`). If your automations, scripts or dashboards referenced the old one, point them to the new entity.
+> 5. `Z1MaxFlowTempDesired` was actually Zone 1 room humidity; it now appears as the "Zone 1 Room Humidity" sensor and as `current_humidity` on the climate entity.
+> 6. Default device names migrate from Spanish to English automatically; any names you customized are preserved.
+
+### Added
+- **New hardware: CTLV2 / CTLV3 controllers (`sensoHOME` / `sensoCOMFORT` / `MiSet`) and Vaillant HMU00 (HW5103) / aroTHERM Split outdoor units.** New ebusd CSV templates (`15.ctlv2.csv`, `15.ctlv3.csv`, `08.hmu.HW5103.csv`) with automatic scan detection and circuit aliasing; Split water pressure, silent mode levels, compressor hours/starts fallbacks and native COP registers. Also added UK `aroTHERM pro 7.1` and `aroTHERM plus 8.1` models. Developed with the help of community testers and not yet validated on every model; please report any mismatch in GitHub issues.
+- **Persistent overrides across restarts (Store):**
+  - **Cooling Quick Veto:** Timed synthetic cooling veto for scheduled and manual cooling, stored in Home Assistant so active vetos resume after a restart and restore the previous operating mode and setpoint.
+  - **Heating Quick Veto from Off:** Preserves and restores `Z1OpMode = "off"` upon veto expiration even if Home Assistant restarts mid-veto or if the eBUS daemon is offline.
+  - **Smart Forced DHW Boost:** Preserves original `HwcTempDesired` across restarts, automatically restoring the setpoint upon charge completion or 60-minute timeout.
+- **Quick veto controls.** Adjustable veto duration (0.5–12 h), heating and cooling boost deltas, and `quick_veto` / `cancel_quick_veto` actions.
+- **Anti-legionella control.** Day selector, time entity and `set_legionella_protection` action across all controller CSVs.
+- **Weekly schedules: 3 slots per day + silent mode.** Heating, cooling, DHW and circulation expand from 1 to 3 daily slots; new silent mode weekly schedule (with its own summary sensor); passive decoding of schedule writes made from the official app, without polling.
+- **New telemetry sensors.** Refrigeration cycle (evaporation, condensation, superheat, subcooling and more), per-mode compressor hours and starts, hydraulic auxiliary heater statistics, active error sensors for the outdoor unit and the controller, and Zone 1 relative humidity.
+- **100% explicit MDI icon coverage.** Added missing entity icons across all platforms in `icons.json` for full UI consistency without relying on fallback icons.
+- **ebusd daemon health.** A daemon status binary sensor plus an optional advanced TCP connection (Options Flow) that reports daemon info, verifies loaded CSV files, detects devices missing CSV definitions, and adds reload-CSV and restart-scan buttons. Metrics that ebusd does not publish over MQTT stay disabled by default.
+- **Slow eBUS telemetry repair issue (`ebusd_slow_polling_seed`):** Automatically detects if high-priority power telemetry (`RunDataElectricPowerConsumption`) updates abnormally slowly (≥ 5 minutes while eBUS is active), alerting users running the Home Assistant eBUSd Add-on ([LukasGrebe/ha-addons](https://github.com/LukasGrebe/ha-addons)) to disable the legacy `seed_mqtt_cfg` option that overloads the bus.
+- **Diagnostic actions.** Symbolic `read_parameter` / `write_parameter`; `dump_mqtt_values` and `record_topic_changes` mask serial numbers and barcodes by default (still review the output before sharing it); `send_hex_command` is now behind an explicit opt-in switch.
+- **German translation** and full EN/ES/DE parity across all 12 actions.
+- **Restructured documentation:** shorter README plus modular English and Spanish guides under `docs/` (installation, configuration, hardware, services, troubleshooting).
+
+### Changed
+- **Faster live electric power:** moved to ebusd's highest polling priority (`r1`), with `PowerStatus` as fallback when the primary source goes stale and a 10-minute expiration to `unavailable` when updates stop.
+- **Faster thermal telemetry:** flow temperature, return temperature and flow rate moved from the slowest to the second polling priority (`r2`), so thermal power and live COP refresh sooner.
+- **Install from the HACS default catalog:** no custom repository URL needed anymore.
+- **Limited background polling:** low-priority (`r9`) reads are restricted to registers the official gateway never queries, and unverified registers carry conservative names.
+- **ebusd add-on setup docs updated:** Added explicit instructions for the Home Assistant eBUSd Add-on ([LukasGrebe/ha-addons](https://github.com/LukasGrebe/ha-addons)) regarding `seed_mqtt_cfg` and `--mqttjson` after a known configuration caused heavy polling and duplicate MQTT entities.
+- Minimum supported Home Assistant version raised from 2024.4.0 to **2024.12.0**.
+
+### Fixed
+- **State persistence across Home Assistant restarts:** fixed elevated `HwcTempDesired` becoming permanent when restarting during a forced DHW boost, and fixed Zone 1 staying in `auto` instead of reverting to `off` when restarting during a heating quick veto started from off. Also fixed a startup race condition where `Z1Status` could cancel an active heating veto before `Z1SFMode` arrived. Restoration writes across DHW boost, heating quick veto, and cooling quick veto now preserve their persisted state and memory flags until the eBUS write confirms successfully, retrying automatically on transport failures.
+- **Cooling quick veto cancellation consistency during preset changes:** fixed an issue where cancelling an active cooling quick veto during preset selection (`restore=False`) prematurely marked the veto as ended in memory while retaining the on-disk state on transport failures. In-memory state, expiration timers, and persistent storage are now preserved on offline bus conditions and write failures, re-arming expiration timers safely (`max(0.0, remaining)`) to guarantee natural expiration and preventing revived vetos from overriding subsequent user setpoints after a restart. Background restoration tasks also handle transport exceptions cleanly without unhandled task logs.
+- **Dead references and CSV field cleanup:** removed obsolete `EnergyYieldPrecision` fallbacks, purged redundant `"value"` fallback in `HwcLegionellaTime`, and aligned `Status01` flow temperature with canonical CSV field `flow_temp`.
+- **Heating and cooling setpoints decoupled:** register `2300` was mislabeled as `Z1DayTemp`; it is the cooling manual setpoint (`Z1CoolingManualTemp`), while heating uses `2200`. This fixes cases where changing the heating temperature wrote cooling setpoints and where Boost from cooling armed the heating quick veto.
+- **Energy counters on HMU / Split units:** fixed the 65,535 kWh 16-bit overflow (now 32-bit) and restored cumulative energy, environmental yield and per-mode COP/EER on units without Monobloc EEPROM registers.
+- **Weekly schedule writing hardened:** validates every day before writing anything, rejects overlaps and slots crossing midnight, serializes writes with a lock, and safely invalidates the cached schedule state if a write fails midway.
+- **Climate behavior:** holiday/away mode now takes priority over cooling, `AUTO` picks the season dynamically, and the cooling ECO preset behaves symmetrically to heating.
+- **Instantaneous power staleness:** prefers the primary power register while it is fresh (up to 3 minutes old), falls back to `PowerStatus` when stale, and expires power and live COP to `unavailable` after 10 minutes without updates instead of showing obsolete values.
+- **Connection watchdog:** control entities go unavailable after 10 minutes without bus telemetry, while historical sensors stay available.
+- **CSV compliance:** headers on line 1 for the ebusd 26.1 parser, byte-for-byte parity across controller CSVs, and incompatible queries filtered on HMU units.
+- **Home Assistant 2026.8+ compatibility** in the device registry, and automatic migration of legacy Spanish device names.
+
+---
+
 ## [1.2.4] - 2026-11-04
 
 > [!IMPORTANT]

@@ -1,56 +1,78 @@
 set_weekly_timer:
-  name: Configurar programación horaria semanal (b5 55)
+  name: Set Weekly Schedule Timer (b5 55)
   description: >
-    Modifica una franja horaria semanal en el regulador MiPro Sense (15.bass3)
-    para Calefacción Zona 1, Agua Caliente Sanitaria (ACS), Refrigeración o Recirculación.
+    Configures a weekly schedule time slot on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3)
+    for Zone 1 Heating, Domestic Hot Water (DHW), Cooling, Circulation, or Silent Mode. Supports configuring slots (1, 2, 3),
+    deleting individual slots, or clearing the entire day.
   fields:
     circuit_type:
-      name: Circuito
-      description: Circuito de programación horaria a modificar.
+      name: Circuit Type
+      description: "Schedule circuit to modify: 'heating' (Zone 1 Heating), 'dhw' (Domestic Hot Water), 'cooling' (Cooling), 'circulation' (Circulation), or 'silent' (Silent Mode)."
       required: true
       example: "dhw"
       selector:
         select:
           options:
-            - label: "Calefacción Zona 1 (Z1Timer)"
-              value: "heating"
-            - label: "Agua Caliente Sanitaria - ACS (HwcTimer)"
+            - label: "Domestic Hot Water - DHW / Agua Caliente Sanitaria - ACS (HwcTimer)"
               value: "dhw"
-            - label: "Refrigeración (CoolingTimer)"
+            - label: "Zone 1 Heating / Calefacción Zona 1 (Z1Timer)"
+              value: "heating"
+            - label: "Cooling / Refrigeración (CoolingTimer)"
               value: "cooling"
-            - label: "Recirculación (CirculationTimer)"
+            - label: "Circulation / Recirculación (CirculationTimer)"
               value: "circulation"
+            - label: "Silent Mode / Modo Silencioso (SilentTimer)"
+              value: "silent"
     day:
-      name: Día de la semana
-      description: Día específico, Lunes a Viernes (Weekdays) o toda la semana (All).
+      name: Day of the Week
+      description: Specific day of the week (e.g. Monday / Lunes), Weekdays (Laborables), Weekend (Fin de semana), or All Days (Toda la semana). Accepts English and Spanish names.
       required: true
-      example: "All"
+      example: "Monday"
+      selector:
+        select:
+          custom_value: true
+          options:
+            - label: "Monday / Lunes"
+              value: "Monday"
+            - label: "Tuesday / Martes"
+              value: "Tuesday"
+            - label: "Wednesday / Miércoles"
+              value: "Wednesday"
+            - label: "Thursday / Jueves"
+              value: "Thursday"
+            - label: "Friday / Viernes"
+              value: "Friday"
+            - label: "Saturday / Sábado"
+              value: "Saturday"
+            - label: "Sunday / Domingo"
+              value: "Sunday"
+            - label: "Weekdays / Laborables (Lunes - Viernes)"
+              value: "Weekdays"
+            - label: "Weekend / Fin de semana (Sábado - Domingo)"
+              value: "Weekend"
+            - label: "All Days / Toda la semana (Lunes - Domingo)"
+              value: "All"
+    action:
+      name: Action
+      description: "Action to perform: 'set' to add/update a time slot, 'delete' to remove a specific slot and shift remaining slots down, or 'clear' to erase all slots for the day (0 active slots)."
+      required: false
+      default: "set"
+      example: "set"
       selector:
         select:
           options:
-            - label: "Lunes (Monday)"
-              value: "Monday"
-            - label: "Martes (Tuesday)"
-              value: "Tuesday"
-            - label: "Miércoles (Wednesday)"
-              value: "Wednesday"
-            - label: "Jueves (Thursday)"
-              value: "Thursday"
-            - label: "Viernes (Friday)"
-              value: "Friday"
-            - label: "Sábado (Saturday)"
-              value: "Saturday"
-            - label: "Domingo (Sunday)"
-              value: "Sunday"
-            - label: "Lunes a Viernes (Weekdays)"
-              value: "Weekdays"
-            - label: "Todos los días L-D (All)"
-              value: "All"
+            - label: "Set / Configurar franja (set)"
+              value: "set"
+            - label: "Delete / Borrar ranura (delete)"
+              value: "delete"
+            - label: "Clear Day / Limpiar día completo (clear)"
+              value: "clear"
     slot:
-      name: Ranura horaria (Slot)
-      description: Número de ranura diaria (1, 2 o 3). Por defecto 1.
+      name: Time Slot Number
+      description: Daily time slot index (1, 2, or 3). Defaults to 1. Ignored when action is 'clear'.
       required: false
       default: 1
+      example: 1
       selector:
         number:
           min: 1
@@ -58,32 +80,51 @@ set_weekly_timer:
           step: 1
           mode: box
     start_time:
-      name: Hora de inicio
-      description: Hora de inicio de la franja en formato HH:MM (ej. 13:10).
-      required: true
+      name: Start Time
+      description: Slot start time in HH:MM 24-hour format (e.g. 13:10). Required when action is 'set'.
+      required: false
       example: "13:10"
       selector:
         text:
     end_time:
-      name: Hora de fin
-      description: Hora de finalización de la franja en formato HH:MM (ej. 14:50).
-      required: true
+      name: End Time
+      description: Slot end time in HH:MM 24-hour format (e.g. 14:50, or 24:00 for all day). Required when action is 'set'.
+      required: false
       example: "14:50"
       selector:
         text:
+    temp:
+      name: Target Temperature Setpoint (Optional)
+      description: "Optional target temperature setpoint in °C for this slot. Applies only to 'heating', 'dhw', and 'cooling' (ignored for 'circulation' and 'silent'). If omitted, uses current circuit setpoint."
+      required: false
+      example: 50.0
+      selector:
+        number:
+          min: 5.0
+          max: 80.0
+          step: 0.5
+          unit_of_measurement: "°C"
+          mode: box
+    reset_remaining:
+      name: Reset Remaining Slots (Overwrite Day)
+      description: When enabled with slot 1, overwrites the day with only this slot (total_slots=1), resetting slots 2 and 3 if they existed. Useful when prior slot telemetry is not yet known.
+      required: false
+      default: false
+      selector:
+        boolean:
 
 force_dhw_boost:
-  name: Activar ACS Puntual Forzado Inteligente (Boost)
+  name: Activate Smart Forced DHW Boost
   description: >
-    Inicia una carga puntual del depósito de ACS (HwcSFMode = load) superando
-    automáticamente la histéresis mediante elevación dinámica temporal de consigna
-    (T_actual + histéresis + 1.5 °C) y restauración automática al finalizar.
+    Initiates a one-time domestic hot water tank charge (HwcSFMode = load)
+    automatically overcoming thermostat hysteresis via dynamic temporary setpoint elevation
+    (T_current + hysteresis + 1.5 °C) and restores original setpoint upon completion.
   fields:
     boost_temp:
-      name: Temperatura temporal de Boost (Opcional - Excedentes)
+      name: Temporary Boost Temperature (Optional - Solar Surpluses)
       description: >
-        Consigna temporal opcional en °C para este ciclo concreto (ej. 60 °C para excedentes solares).
-        Si se omite, calcula automáticamente T_actual + histéresis + 1.5 °C.
+        Optional temporary setpoint in °C for this specific boost cycle (e.g. 60 °C for PV solar surpluses).
+        If omitted, automatically applies T_current + hysteresis + 1.5 °C.
       required: false
       example: 60.0
       selector:
@@ -94,16 +135,54 @@ force_dhw_boost:
           unit_of_measurement: "°C"
           mode: box
 
-set_holiday_mode:
-  name: Activar Modo Ausencia / Vacaciones
+set_legionella_protection:
+  name: Set Anti-Legionella Protection Schedule
   description: >
-    Activa el Modo Ausencia en el regulador MiPro Sense (15.bass3),
-    suspendiendo la producción de ACS y reduciendo la consigna de calefacción
-    a la temperatura de mantenimiento seleccionada durante una ventana temporal o indefinida.
+    Configures the weekly anti-legionella thermal disinfection schedule on the climate controller
+    (15.bass3 / 15.ctlv2 / 15.ctlv3). Sets the day of the week and target execution time.
+  fields:
+    day:
+      name: Day of the Week
+      description: Day of the week to run anti-legionella disinfection ('off' or Monday through Sunday).
+      required: true
+      example: "Sunday"
+      selector:
+        select:
+          options:
+            - label: "Disabled / Desactivado (off)"
+              value: "off"
+            - label: "Monday / Lunes"
+              value: "Monday"
+            - label: "Tuesday / Martes"
+              value: "Tuesday"
+            - label: "Wednesday / Miércoles"
+              value: "Wednesday"
+            - label: "Thursday / Jueves"
+              value: "Thursday"
+            - label: "Friday / Viernes"
+              value: "Friday"
+            - label: "Saturday / Sábado"
+              value: "Saturday"
+            - label: "Sunday / Domingo"
+              value: "Sunday"
+    time:
+      name: Execution Time (Optional)
+      description: Scheduled time in HH:MM format (e.g. 03:00 or 04:00). Defaults to 04:00 if day is active.
+      required: false
+      example: "04:00"
+      selector:
+        text:
+
+set_holiday_mode:
+  name: Set Holiday / Away Mode
+  description: >
+    Activates Holiday/Away Mode on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3),
+    suspending hot water production and reducing heating setpoint to setback temperature
+    during a timed or open-ended window.
   fields:
     temperature:
-      name: Temperatura de ausencia
-      description: Consigna de temperatura en °C durante la ausencia (por defecto 15.0 °C).
+      name: Setback Temperature
+      description: Target temperature in °C during absence (defaults to 15.0 °C).
       required: false
       default: 15.0
       example: 15.0
@@ -115,36 +194,262 @@ set_holiday_mode:
           unit_of_measurement: "°C"
           mode: box
     start_date:
-      name: Fecha de inicio (Opcional)
-      description: Fecha de inicio de la ausencia en formato AAAA-MM-DD o DD/MM/AAAA. Por defecto, hoy.
+      name: Start Date (Optional)
+      description: Start date in YYYY-MM-DD or DD/MM/YYYY format. Defaults to today.
       required: false
       example: "2026-10-30"
       selector:
         text:
     start_time:
-      name: Hora de inicio (Opcional)
-      description: Hora de inicio de la ausencia en formato HH:MM. Por defecto, hora actual.
+      name: Start Time (Optional)
+      description: Start time in HH:MM format. Defaults to current time.
       required: false
       example: "10:30"
       selector:
         text:
     end_date:
-      name: Fecha de fin (Opcional)
-      description: Fecha de finalización de la ausencia. Si se omite, se establece de forma abierta/indefinida (hasta cancelación manual).
+      name: End Date (Optional)
+      description: End date of absence. If omitted, sets an open-ended/indefinite absence until manually cancelled.
       required: false
       example: "2026-11-05"
       selector:
         text:
     end_time:
-      name: Hora de fin (Opcional)
-      description: Hora de finalización en formato HH:MM (por defecto 23:59).
+      name: End Time (Optional)
+      description: End time in HH:MM format (defaults to 23:59).
       required: false
       example: "23:59"
       selector:
         text:
 
 cancel_holiday_mode:
-  name: Cancelar Modo Ausencia / Vacaciones
+  name: Cancel Holiday / Away Mode
   description: >
-    Cancela de forma inmediata el Modo Ausencia en el regulador MiPro Sense (15.bass3)
-    y restablece el funcionamiento automático en calefacción y agua caliente sanitaria (ACS).
+    Immediately cancels Holiday/Away Mode on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3)
+    and restores automatic schedule operation for heating and domestic hot water.
+
+quick_veto:
+  name: Quick Veto (Zone 1 Boost)
+  description: >
+    Activates Quick Veto (Boost) on Zone 1 (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3)
+    to temporarily override the schedule or manual setpoint for a specific duration.
+    Automatically applies hardware Quick Veto in heating (or when off, restoring off afterward)
+    and persistent synthetic Quick Veto in cooling.
+  fields:
+    temperature:
+      name: Target Temperature Setpoint (Optional)
+      description: >
+        Target temperature in °C during the veto period (10.0 °C to 30.0 °C in heating, 15.0 °C to 30.0 °C in cooling).
+        If omitted, intelligently applies the configured boost delta (e.g. +3.0 °C in heating, -2.0 °C in cooling).
+      required: false
+      example: 22.5
+      selector:
+        number:
+          min: 10.0
+          max: 30.0
+          step: 0.5
+          unit_of_measurement: "°C"
+          mode: box
+    duration:
+      name: Duration in Hours (Optional)
+      description: >
+        Duration of the veto period in hours (0.5 to 12.0 hours).
+        If omitted, uses the currently configured Quick Veto Duration (default 3.0 hours).
+      required: false
+      example: 2.5
+      selector:
+        number:
+          min: 0.5
+          max: 12.0
+          step: 0.5
+          unit_of_measurement: "h"
+          mode: box
+
+cancel_quick_veto:
+  name: Cancel Quick Veto
+  description: >
+    Immediately cancels active heating or cooling Quick Veto on Zone 1 (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3)
+    and restores the previous operating mode and manual setpoint.
+
+dump_mqtt_values:
+  name: Dump MQTT Values (Diagnostics)
+  description: >
+    Dumps full installation state and eBUSd MQTT telemetry into a structured JSON
+    format suitable for troubleshooting or attaching to GitHub issues.
+  fields:
+    circuit:
+      name: Circuit Filter (Optional)
+      description: >
+        Filters telemetry by a specific eBUS circuit (e.g. "08", "15", "hmu", "bass3").
+        If omitted, dumps all active circuits.
+      required: false
+      example: "08"
+      selector:
+        text:
+    anonymize:
+      name: Anonymize Serial Numbers (Recommended)
+      description: >
+        Automatically masks 28-character hardware serial numbers so diagnostic dumps
+        can be safely shared in public GitHub issue threads.
+      required: false
+      default: true
+      selector:
+        boolean:
+
+record_topic_changes:
+  name: Record MQTT Topic Changes (Live Diagnostics)
+  description: >
+    Records real-time eBUSd MQTT traffic for a configurable duration, capturing
+    topics, raw payloads, and timestamps.
+  fields:
+    duration:
+      name: Duration (seconds)
+      description: Recording duration in seconds (between 5 and 120 seconds, defaults to 30).
+      required: false
+      default: 30
+      example: 30
+      selector:
+        number:
+          min: 5
+          max: 120
+          step: 1
+          unit_of_measurement: "s"
+          mode: box
+    circuit:
+      name: Circuit / Topic Substring Filter (Optional)
+      description: >
+        Filters captured messages by substring (e.g. "08", "15", "hmu").
+        If omitted, records all MQTT traffic under prefix.
+      required: false
+      example: "08"
+      selector:
+        text:
+    anonymize:
+      name: Anonymize Serial Numbers (Recommended)
+      description: >
+        Automatically masks manufacturing serial numbers and hardware identifiers
+        found in MQTT payloads.
+      required: false
+      default: true
+      selector:
+        boolean:
+
+send_hex_command:
+  name: Send Direct Raw HEX Command (TCP Diagnostics)
+  description: >
+    Sends a raw hexadecimal command telegram to the eBUSd daemon over TCP (port 8888)
+    and returns decoded response bytes. Requires eBUSd running with '--enablehex'
+    and the 'enable_send_hex' option enabled in integration options. Does not require modifying CSV files.
+  fields:
+    command:
+      name: Hexadecimal Command String
+      description: Hex byte string to send (spaces are automatically stripped, e.g. "08b51a0405ff3428").
+      required: true
+      example: "08b51a0405ff3428"
+      selector:
+        text:
+    host:
+      name: Host / IP Address (Optional)
+      description: IP address or hostname where eBUSd daemon is running (defaults to 127.0.0.1 or b4d7ad18-ebusd).
+      required: false
+      default: "127.0.0.1"
+      example: "127.0.0.1"
+      selector:
+        text:
+    port:
+      name: TCP Port (Optional)
+      description: eBUSd TCP daemon port (defaults to 8888).
+      required: false
+      default: 8888
+      example: 8888
+      selector:
+        number:
+          min: 1
+          max: 65535
+          step: 1
+          mode: box
+    timeout:
+      name: Timeout (seconds)
+      description: Maximum time in seconds to connect and await daemon response (defaults to 5.0 seconds).
+      required: false
+      default: 5.0
+      example: 5.0
+      selector:
+        number:
+          min: 1.0
+          max: 30.0
+          step: 0.5
+          unit_of_measurement: "s"
+          mode: box
+
+read_parameter:
+  name: Read Parameter via MQTT
+  description: >
+    Reads a symbolic eBUSd register via MQTT (publishing to '[prefix]/[circuit]/[name]/get'
+    and awaiting reply on '[prefix]/[circuit]/[name]'). Supports returning cached value or
+    forcing an active physical bus read.
+  fields:
+    circuit:
+      name: Circuit
+      description: eBUS circuit name or address (e.g. "hmu", "08", "bass3", "ctlv2").
+      required: true
+      example: "08"
+      selector:
+        text:
+    name:
+      name: Parameter / Message Name
+      description: >
+        Symbolic register name as defined in CSV files (e.g. "CompressorSilentOperationLevel", "Status01", "Z1OpMode").
+      required: true
+      example: "CompressorSilentOperationLevel"
+      selector:
+        text:
+    force:
+      name: Force Physical Bus Read (Optional)
+      description: If true, forces an active read from the physical bus instead of returning cached value if present.
+      required: false
+      default: false
+      selector:
+        boolean:
+    timeout:
+      name: Timeout (seconds)
+      description: Maximum time in seconds to wait for eBUSd reply via MQTT (defaults to 5.0 seconds).
+      required: false
+      default: 5.0
+      example: 5.0
+      selector:
+        number:
+          min: 1.0
+          max: 30.0
+          step: 0.5
+          unit_of_measurement: "s"
+          mode: box
+
+write_parameter:
+  name: Write Parameter via MQTT
+  description: >
+    Writes a value to a symbolic eBUSd register via MQTT (publishing to '[prefix]/[circuit]/[name]/set').
+    Applies optimistic state update in Home Assistant and leverages intelligent circuit alias routing.
+  fields:
+    circuit:
+      name: Circuit
+      description: eBUS circuit name or address (e.g. "hmu", "08", "bass3", "ctlv2").
+      required: true
+      example: "08"
+      selector:
+        text:
+    name:
+      name: Parameter / Message Name
+      description: >
+        Symbolic register name as defined in CSV files (e.g. "CompressorSilentOperationLevel", "Z1OpMode").
+      required: true
+      example: "CompressorSilentOperationLevel"
+      selector:
+        text:
+    value:
+      name: Value to Write
+      description: Value or string payload to send to eBUSd.
+      required: true
+      example: "50"
+      selector:
+        text:

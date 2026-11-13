@@ -58,7 +58,7 @@ class SaunierGeniaHolidayStartDateTime(SaunierGeniaEntity, DateTimeEntity):
         """Return the current holiday start datetime or preselected buffer.
 
         Returns None when the bus holds the inactive sentinel (year == 15) and
-        no preselected buffer exists, so Home Assistant shows 'Desconocido'.
+        no preselected buffer exists, so Home Assistant shows 'Unknown'.
         Year == 99 (open-ended) is shown normally.
         """
         date_msg = self.coordinator.get_message(CIRCUIT_BASS3, "HolidayStartDate")
@@ -130,7 +130,7 @@ class SaunierGeniaHolidayEndDateTime(SaunierGeniaEntity, DateTimeEntity):
         """Return the current holiday end datetime or preselected buffer.
 
         Returns None when the bus holds the inactive sentinel (year == 15) and
-        no preselected buffer exists, so Home Assistant shows 'Desconocido'.
+        no preselected buffer exists, so Home Assistant shows 'Unknown'.
         Year == 99 (open-ended) is shown normally.
         """
         date_msg = self.coordinator.get_message(CIRCUIT_BASS3, "HolidayEndDate")
@@ -200,7 +200,7 @@ class SaunierGeniaCoolingStartDateTime(SaunierGeniaEntity, DateTimeEntity):
         """Return the cooling start date.
 
         Returns None when the bus holds the inactive sentinel (year == 19),
-        so Home Assistant shows 'Desconocido'. Year == 99 is shown normally.
+        so Home Assistant shows 'Unknown'. Year == 99 is shown normally.
         """
         date_msg = self.coordinator.get_message(CIRCUIT_BASS3, "CoolingStartDate")
         if date_msg:
@@ -254,7 +254,7 @@ class SaunierGeniaCoolingEndDateTime(SaunierGeniaEntity, DateTimeEntity):
         """Return the cooling end date.
 
         Returns None when the bus holds the inactive sentinel (year == 19),
-        so Home Assistant shows 'Desconocido'. Year == 99 (indefinite) is
+        so Home Assistant shows 'Unknown'. Year == 99 (indefinite) is
         shown normally.
         """
         date_msg = self.coordinator.get_message(CIRCUIT_BASS3, "CoolingEndDate")

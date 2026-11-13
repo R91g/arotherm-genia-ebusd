@@ -1,0 +1,81 @@
+{
+  "domain": "arotherm_genia_ebusd",
+  "entry_id": "fixture_vaillant_arotherm_split_hmu",
+  "anonymized": true,
+  "mqtt_prefix": "ebusd",
+  "manufacturer": "Vaillant",
+  "outdoor_model": "aroTHERM Split VWL 75/5 IS",
+  "indoor_model": "sensoCOMFORT VRC 720",
+  "active_outdoor_circuit": "hmu",
+  "active_controller_circuit": "ctlv2",
+  "is_ebus_operational": true,
+  "values": {
+    "hmu": {
+      "Status01": {
+        "temp1": 35.0,
+        "return_temp": 30.5,
+        "pumpstate": "on"
+      },
+      "HMUStatusCode": {
+        "status": "heating"
+      },
+      "RunDataCompressorSpeed": {
+        "speed": 52.0
+      },
+      "RunDataElectricPowerConsumption": {
+        "power": 620.0
+      },
+      "RunDataFlowRate": {
+        "flow_rate": 980.0
+      },
+      "RunDataFlowTemp": {
+        "value": 35.0
+      },
+      "RunDataReturnTemp": {
+        "value": 30.5
+      },
+      "YieldHc": {
+        "0": {
+          "value": 1950.0
+        }
+      },
+      "YieldHwc": {
+        "0": {
+          "value": 420.0
+        }
+      },
+      "PowerStatus": {
+        "power": 620.0
+      },
+      "Scan.08": {
+        "id": "211905001003************77N2"
+      }
+    },
+    "ctlv2": {
+      "z1RoomTemp": {
+        "value": 21.0
+      },
+      "z1ActualRoomTempDesired": {
+        "value": 21.0
+      },
+      "Z1OpMode": {
+        "value": "auto"
+      },
+      "Z1DayTemp": {
+        "value": 21.0
+      },
+      "HwcOpMode": {
+        "value": "auto"
+      },
+      "HwcTempDesired": {
+        "value": 48.0
+      },
+      "HwcStorageTemp": {
+        "value": 46.5
+      },
+      "Scan.15": {
+        "id": "212108001001************55N0"
+      }
+    }
+  }
+}

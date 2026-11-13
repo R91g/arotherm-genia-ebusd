@@ -4,22 +4,38 @@ import asyncio
 import os
 import sys
 import unittest
-from datetime import datetime
+from datetime import datetime, time
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 import setup_mocks  # noqa: F401
+from homeassistant.exceptions import HomeAssistantError
 
+from custom_components.arotherm_genia_ebusd import _async_register_services
+from custom_components.arotherm_genia_ebusd.const import (
+    DOMAIN,
+    SERVICE_SET_LEGIONELLA_PROTECTION,
+)
 from custom_components.arotherm_genia_ebusd.datetime import (
     SaunierGeniaCoolingEndDateTime,
     SaunierGeniaCoolingStartDateTime,
     SaunierGeniaHolidayEndDateTime,
     SaunierGeniaHolidayStartDateTime,
 )
+from custom_components.arotherm_genia_ebusd.select import (
+    SELECT_DESCRIPTIONS,
+    SaunierGeniaSelect,
+)
 from custom_components.arotherm_genia_ebusd.switch import (
     SaunierGeniaCoolingSeasonSwitch,
     SaunierGeniaHolidayModeSwitch,
+)
+from custom_components.arotherm_genia_ebusd.time import (
+    SaunierGeniaHwcLegionellaTime,
+)
+from custom_components.arotherm_genia_ebusd.time import (
+    async_setup_entry as async_setup_time_entry,
 )
 
 
@@ -39,13 +55,20 @@ class MockCoordinatorForDatetime:
         self.outdoor_model = "GeniaAir Max ES 15"
         self.indoor_model = "HPIM 7 230V"
         self.has_wireless_room_unit = True
+        self.is_ebus_operational = True
+
+    def resolve_circuit(self, circuit: str) -> str:
+        return circuit
 
     def get_message(self, circuit: str, message: str) -> dict | None:
         return self._state.get((circuit.lower(), message.lower()))
 
     def get_str(self, circuit: str, message: str, field: str = "value") -> str | None:
         msg = self.get_message(circuit, message)
-        return str(msg.get(field)) if msg and field in msg else None
+        if not msg:
+            return None
+        val = msg.get(field, msg.get("value"))
+        return str(val) if val is not None else None
 
     def get_int(self, circuit: str, message: str, field: str = "value") -> int | None:
         msg = self.get_message(circuit, message)
@@ -323,7 +346,7 @@ class TestDateTimeAndSwitches(unittest.TestCase):
         self.assertIn(("bass3", "CoolingEndDate", "15;08;26"), self.coord.writes)
 
     def test_sensor_dynamic_unit_of_measurement(self) -> None:
-        """Test that sensor suppresses unit of measurement for string states (Inactivo, Final abierto)."""
+        """Test that sensor suppresses unit of measurement for string states (Inactive, Open-ended)."""
         from custom_components.arotherm_genia_ebusd.sensor import SaunierGeniaSensor
         from custom_components.arotherm_genia_ebusd.sensor_descriptions import (
             SENSOR_DESCRIPTIONS,
@@ -339,15 +362,162 @@ class TestDateTimeAndSwitches(unittest.TestCase):
         self.assertEqual(sensor.native_value, 5)
         self.assertEqual(sensor.native_unit_of_measurement, "d")
 
-        # 2. When coordinator returns 'Inactivo'
-        self.coord.get_holiday_remaining_days = lambda: "Inactivo"
-        self.assertEqual(sensor.native_value, "Inactivo")
+        # 2. When coordinator returns 'Inactive'
+        self.coord.get_holiday_remaining_days = lambda: "Inactive"
+        self.assertEqual(sensor.native_value, "Inactive")
         self.assertIsNone(sensor.native_unit_of_measurement)
 
-        # 3. When coordinator returns 'Final abierto'
-        self.coord.get_holiday_remaining_days = lambda: "Final abierto"
-        self.assertEqual(sensor.native_value, "Final abierto")
+        # 3. When coordinator returns 'Open-ended'
+        self.coord.get_holiday_remaining_days = lambda: "Open-ended"
+        self.assertEqual(sensor.native_value, "Open-ended")
         self.assertIsNone(sensor.native_unit_of_measurement)
+
+    def test_legionella_select_entity(self) -> None:
+        """Test anti-legionella day select entity reading and writing."""
+        desc = next(d for d in SELECT_DESCRIPTIONS if d.key == "hwc_legionella_day")
+        select_ent = SaunierGeniaSelect(self.coord, desc)
+
+        # 1. Initially empty
+        self.assertIsNone(select_ent.current_option)
+
+        # 2. Reading string day from eBUSd
+        self.coord._state[("bass3", "hwclegionelladay")] = {"day": "Sunday"}
+        self.assertEqual(select_ent.current_option, "sunday")
+
+        # 3. Reading numeric day from eBUSd (e.g. 7 = sunday, 0 = off)
+        self.coord._state[("bass3", "hwclegionelladay")] = {"day": "7"}
+        self.assertEqual(select_ent.current_option, "sunday")
+
+        self.coord._state[("bass3", "hwclegionelladay")] = {"day": 0}
+        self.assertEqual(select_ent.current_option, "off")
+
+        self.coord._state[("bass3", "hwclegionelladay")] = {"day": "off"}
+        self.assertEqual(select_ent.current_option, "off")
+
+        self.coord._state[("bass3", "hwclegionelladay")] = {"day": "3"}
+        self.assertEqual(select_ent.current_option, "wednesday")
+
+        # 4. Unknown/unmapped value
+        self.coord._state[("bass3", "hwclegionelladay")] = {"day": "invalid"}
+        self.assertIsNone(select_ent.current_option)
+
+        # 5. Writing option uses options_map
+        self.coord.writes.clear()
+        asyncio.run(select_ent.async_select_option("sunday"))
+        self.assertIn(("bass3", "HwcLegionellaDay", "7"), self.coord.writes)
+
+        self.coord.writes.clear()
+        asyncio.run(select_ent.async_select_option("off"))
+        self.assertIn(("bass3", "HwcLegionellaDay", "0"), self.coord.writes)
+
+        self.coord.writes.clear()
+        asyncio.run(select_ent.async_select_option("monday"))
+        self.assertIn(("bass3", "HwcLegionellaDay", "1"), self.coord.writes)
+
+    def test_legionella_time_entity(self) -> None:
+        """Test anti-legionella time entity reading and writing."""
+        time_ent = SaunierGeniaHwcLegionellaTime(self.coord)
+
+        # 1. Initially empty
+        self.assertIsNone(time_ent.native_value)
+
+        # 2. Reading "04:00" string
+        self.coord._state[("bass3", "hwclegionellatime")] = {"time": "04:00"}
+        self.assertEqual(time_ent.native_value, time(4, 0))
+
+        # 3. Reading "03:30" under "value"
+        self.coord._state[("bass3", "hwclegionellatime")] = {"value": "03:30"}
+        self.assertEqual(time_ent.native_value, time(3, 30))
+
+        # 4. Reading discrete hours / minutes payload
+        self.coord._state[("bass3", "hwclegionellatime")] = {"hours": 5, "minutes": 15}
+        self.assertEqual(time_ent.native_value, time(5, 15))
+
+        # 5. Writing time formats to HH:MM
+        self.coord.writes.clear()
+        asyncio.run(time_ent.async_set_value(time(3, 45)))
+        self.assertIn(("bass3", "HwcLegionellaTime", "03:45"), self.coord.writes)
+
+        # 6. Setup entry verification
+        added_entities: list[Any] = []
+        mock_hass = MagicMock()
+        mock_hass.data = {DOMAIN: {"test_entry_id": self.coord}}
+        asyncio.run(
+            async_setup_time_entry(
+                mock_hass,
+                MagicMock(entry_id="test_entry_id"),
+                lambda ents: added_entities.extend(ents),
+            )
+        )
+        self.assertTrue(
+            any(isinstance(e, SaunierGeniaHwcLegionellaTime) for e in added_entities)
+        )
+
+    def test_set_legionella_protection_service(self) -> None:
+        """Test arotherm_genia_ebusd.set_legionella_protection service."""
+        services: dict[str, Any] = {}
+        hass = MagicMock()
+        hass.services.has_service.return_value = False
+        hass.services.async_register.side_effect = (
+            lambda d, s, h, schema=None, *args, **kwargs: services.update({s: h})
+        )
+        hass.data = {DOMAIN: {"test_entry_id": self.coord}}
+
+        _async_register_services(hass)
+        self.assertIn(SERVICE_SET_LEGIONELLA_PROTECTION, services)
+        handler = services[SERVICE_SET_LEGIONELLA_PROTECTION]
+
+        # 1. Calling service with day and time
+        self.coord.writes.clear()
+        call = MagicMock()
+        call.data = {"day": "Sunday", "time": "04:30"}
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            asyncio.run(handler(call))
+        self.assertIn(("bass3", "HwcLegionellaDay", "7"), self.coord.writes)
+        self.assertIn(("bass3", "HwcLegionellaTime", "04:30"), self.coord.writes)
+
+        # 2. Calling service with Spanish day without time -> defaults to 04:00
+        self.coord.writes.clear()
+        call.data = {"day": "Miércoles"}
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            asyncio.run(handler(call))
+        self.assertIn(("bass3", "HwcLegionellaDay", "3"), self.coord.writes)
+        self.assertIn(("bass3", "HwcLegionellaTime", "04:00"), self.coord.writes)
+
+        # 3. Disabling protection ("off") -> does not write time
+        self.coord.writes.clear()
+        call.data = {"day": "off"}
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            asyncio.run(handler(call))
+        self.assertIn(("bass3", "HwcLegionellaDay", "0"), self.coord.writes)
+        self.assertFalse(any(m == "HwcLegionellaTime" for _, m, _ in self.coord.writes))
+
+        # 4. Disabling protection ("desactivado")
+        self.coord.writes.clear()
+        call.data = {"day": "desactivado"}
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            asyncio.run(handler(call))
+        self.assertIn(("bass3", "HwcLegionellaDay", "0"), self.coord.writes)
+
+        # 5. Invalid day -> HomeAssistantError
+        call.data = {"day": "InvalidDay"}
+        with self.assertRaises(HomeAssistantError) as ctx:
+            asyncio.run(handler(call))
+        self.assertIn("Invalid day", str(ctx.exception))
+
+        # 6. eBUS not operational -> HomeAssistantError
+        self.coord.is_ebus_operational = False
+        call.data = {"day": "Sunday"}
+        with self.assertRaises(HomeAssistantError) as ctx:
+            asyncio.run(handler(call))
+        self.assertIn("eBUS communication is not operational", str(ctx.exception))
+        self.coord.is_ebus_operational = True
+
+        # 7. No coordinators configured -> HomeAssistantError
+        hass.data = {DOMAIN: {}}
+        with self.assertRaises(HomeAssistantError) as ctx:
+            asyncio.run(handler(call))
+        self.assertIn("No configured instances", str(ctx.exception))
 
 
 if __name__ == "__main__":

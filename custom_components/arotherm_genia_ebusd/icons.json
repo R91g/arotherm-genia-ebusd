@@ -2,8 +2,16 @@
   "services": {
     "set_weekly_timer": "mdi:calendar-clock",
     "force_dhw_boost": "mdi:water-boiler-alert",
+    "set_legionella_protection": "mdi:bacteria-outline",
     "set_holiday_mode": "mdi:bag-suitcase",
-    "cancel_holiday_mode": "mdi:bag-suitcase-off"
+    "cancel_holiday_mode": "mdi:bag-suitcase-off",
+    "quick_veto": "mdi:timer-plus-outline",
+    "cancel_quick_veto": "mdi:timer-off-outline",
+    "dump_mqtt_values": "mdi:code-json",
+    "record_topic_changes": "mdi:record-rec",
+    "send_hex_command": "mdi:hexadecimal",
+    "read_parameter": "mdi:database-search",
+    "write_parameter": "mdi:database-edit"
   },
   "entity": {
     "climate": {
@@ -43,7 +51,8 @@
         "state": {
           "off": "mdi:snowflake-off",
           "auto": "mdi:calendar-clock",
-          "day": "mdi:snowflake"
+          "day": "mdi:snowflake",
+          "night": "mdi:weather-night"
         }
       },
       "hwc_op_mode": {
@@ -59,8 +68,7 @@
         "default": "mdi:power-sleep",
         "state": {
           "eco": "mdi:leaf",
-          "night": "mdi:weather-night",
-          "off": "mdi:power-off"
+          "night": "mdi:weather-night"
         }
       },
       "hc1_room_temp_switch_on": {
@@ -70,6 +78,9 @@
           "modulating": "mdi:tune",
           "thermostat": "mdi:thermometer-check"
         }
+      },
+      "hwc_legionella_day": {
+        "default": "mdi:bacteria-outline"
       }
     },
     "switch": {
@@ -130,6 +141,11 @@
         "default": "mdi:calendar-arrow-left"
       }
     },
+    "time": {
+      "hwc_legionella_time": {
+        "default": "mdi:clock-alert-outline"
+      }
+    },
     "binary_sensor": {
       "compressor_active": {
         "default": "mdi:heat-pump",
@@ -185,6 +201,13 @@
         "state": {
           "on": "mdi:network-outline",
           "off": "mdi:network-off-outline"
+        }
+      },
+      "ebusd_running": {
+        "default": "mdi:server-network",
+        "state": {
+          "on": "mdi:server-network",
+          "off": "mdi:server-network-off"
         }
       }
     },
@@ -304,6 +327,9 @@
       "water_pressure": {
         "default": "mdi:gauge"
       },
+      "z1_room_humidity": {
+        "default": "mdi:water-percent"
+      },
       "primary_flow_rate": {
         "default": "mdi:waves-arrow-right"
       },
@@ -370,6 +396,9 @@
       "circulation_weekly_schedule_summary": {
         "default": "mdi:calendar-clock"
       },
+      "silent_mode_weekly_schedule_summary": {
+        "default": "mdi:volume-mute"
+      },
       "solar_yield_total": {
         "default": "mdi:solar-power"
       },
@@ -396,6 +425,240 @@
       },
       "energy_env_yield_hwc": {
         "default": "mdi:leaf"
+      },
+      "ebusd_uptime": {
+        "default": "mdi:timer-outline"
+      },
+      "ebusd_version": {
+        "default": "mdi:tag-outline"
+      },
+      "ebusd_scan_status": {
+        "default": "mdi:radar"
+      },
+      "ebusd_symbol_rate": {
+        "default": "mdi:speedometer"
+      },
+      "ebusd_reconnects": {
+        "default": "mdi:sync-alert"
+      },
+      "ebusd_masters": {
+        "default": "mdi:devices"
+      },
+      "ebusd_arbitration_latency": {
+        "default": "mdi:clock-fast"
+      },
+      "ebusd_missing_csv_devices": {
+        "default": "mdi:file-alert"
+      },
+      "holiday_duration_remaining": {
+        "default": "mdi:calendar-clock"
+      },
+      "cooling_duration_remaining": {
+        "default": "mdi:snowflake-check"
+      },
+      "hmu_current_error": {
+        "default": "mdi:alert-circle-outline"
+      },
+      "controller_current_error": {
+        "default": "mdi:alert-circle-outline"
+      },
+      "vwzio_current_error": {
+        "default": "mdi:alert-circle-outline"
+      },
+      "energy_integral": {
+        "default": "mdi:chart-areaspline"
+      },
+      "evaporation_temp": {
+        "default": "mdi:thermometer-minus"
+      },
+      "condensation_temp": {
+        "default": "mdi:thermometer-plus"
+      },
+      "condensate_temp": {
+        "default": "mdi:thermometer-water"
+      },
+      "superheat": {
+        "default": "mdi:thermometer-high"
+      },
+      "subcooling": {
+        "default": "mdi:thermometer-low"
+      },
+      "heat_output_internal": {
+        "default": "mdi:fire"
+      },
+      "compressor_flow_temp_desired": {
+        "default": "mdi:thermometer-chevron-up"
+      },
+      "eev_position_abs": {
+        "default": "mdi:valve"
+      },
+      "setmode_flow_temp_desired": {
+        "default": "mdi:thermometer"
+      },
+      "stats_hmu_hours": {
+        "default": "mdi:timer-sand"
+      },
+      "stats_hc_hours": {
+        "default": "mdi:timer-sand"
+      },
+      "stats_hc_starts": {
+        "default": "mdi:counter"
+      },
+      "stats_hwc_hours": {
+        "default": "mdi:timer-sand"
+      },
+      "stats_hwc_starts": {
+        "default": "mdi:counter"
+      },
+      "stats_fan1_starts": {
+        "default": "mdi:counter"
+      },
+      "stats_fan2_starts": {
+        "default": "mdi:counter"
+      },
+      "stats_deice_starts": {
+        "default": "mdi:counter"
+      },
+      "stats_compressor_hc_hours": {
+        "default": "mdi:timer-sand"
+      },
+      "stats_compressor_hc_starts": {
+        "default": "mdi:counter"
+      },
+      "stats_compressor_hwc_hours": {
+        "default": "mdi:timer-sand"
+      },
+      "stats_compressor_hwc_starts": {
+        "default": "mdi:counter"
+      },
+      "stats_compressor_cool_hours": {
+        "default": "mdi:timer-sand"
+      },
+      "stats_compressor_cool_starts": {
+        "default": "mdi:counter"
+      },
+      "vwzio_heater_energy": {
+        "default": "mdi:heating-coil"
+      },
+      "vwzio_heater_flow_temp": {
+        "default": "mdi:thermometer"
+      },
+      "stats_vwzio_heater_hc_hours": {
+        "default": "mdi:timer-sand"
+      },
+      "stats_vwzio_heater_hc_starts": {
+        "default": "mdi:counter"
+      },
+      "stats_vwzio_heater_hwc_hours": {
+        "default": "mdi:timer-sand"
+      },
+      "stats_vwzio_heater_hwc_starts": {
+        "default": "mdi:counter"
+      },
+      "calculated_system_total_energy": {
+        "default": "mdi:lightning-bolt"
+      },
+      "calculated_heating_total_energy": {
+        "default": "mdi:lightning-bolt"
+      },
+      "calculated_dhw_total_energy": {
+        "default": "mdi:lightning-bolt"
+      },
+      "hydraulic_scheme": {
+        "default": "mdi:pipe"
+      },
+      "hc1_pump_status": {
+        "default": "mdi:pump"
+      },
+      "flow_temp_precision": {
+        "default": "mdi:thermometer-water"
+      },
+      "return_temp_precision": {
+        "default": "mdi:thermometer-water"
+      },
+      "air_inlet_temp": {
+        "default": "mdi:thermometer"
+      },
+      "compressor_inlet_temp": {
+        "default": "mdi:thermometer-low"
+      },
+      "compressor_outlet_temp": {
+        "default": "mdi:thermometer-high"
+      },
+      "eev_outlet_temp": {
+        "default": "mdi:thermometer-minus"
+      },
+      "condenser_out_temp": {
+        "default": "mdi:thermometer-chevron-down"
+      },
+      "displayed_outside_temp": {
+        "default": "mdi:thermometer"
+      },
+      "outside_temp_avg": {
+        "default": "mdi:thermometer"
+      },
+      "z1_room_temp": {
+        "default": "mdi:thermometer"
+      },
+      "z1_actual_room_temp_desired": {
+        "default": "mdi:thermostat"
+      },
+      "hc1_flow_temp": {
+        "default": "mdi:thermometer-water"
+      },
+      "hc1_actual_flow_temp_desired": {
+        "default": "mdi:thermometer-chevron-up"
+      },
+      "hwc_storage_temp": {
+        "default": "mdi:thermometer-water"
+      },
+      "hwc_flow_temp": {
+        "default": "mdi:thermometer-water"
+      },
+      "bass3_energy_hc_this_month": {
+        "default": "mdi:fire"
+      },
+      "bass3_energy_hc_last_month": {
+        "default": "mdi:fire"
+      },
+      "bass3_energy_hc_total": {
+        "default": "mdi:fire"
+      },
+      "bass3_energy_hwc_this_month": {
+        "default": "mdi:water-boiler"
+      },
+      "bass3_energy_hwc_last_month": {
+        "default": "mdi:water-boiler"
+      },
+      "bass3_energy_hwc_total": {
+        "default": "mdi:water-boiler"
+      },
+      "vwzio_electric_power": {
+        "default": "mdi:lightning-bolt"
+      },
+      "vwzio_energy_electric_hc": {
+        "default": "mdi:lightning-bolt"
+      },
+      "vwzio_energy_electric_hwc": {
+        "default": "mdi:lightning-bolt"
+      },
+      "vwzio_energy_thermal_hc": {
+        "default": "mdi:fire"
+      },
+      "vwzio_energy_thermal_hwc": {
+        "default": "mdi:water-boiler"
+      },
+      "wireless_room_temp_dial": {
+        "default": "mdi:thermometer"
+      },
+      "wireless_room_target_temp": {
+        "default": "mdi:thermostat"
+      },
+      "broadcast_outside_temp": {
+        "default": "mdi:thermometer"
+      },
+      "broadcast_datetime": {
+        "default": "mdi:clock-outline"
       }
     },
     "number": {
@@ -408,9 +671,6 @@
       "hwc_temp_desired": {
         "default": "mdi:thermometer-water"
       },
-      "z1_day_temp": {
-        "default": "mdi:white-balance-sunny"
-      },
       "z1_night_temp": {
         "default": "mdi:weather-night"
       },
@@ -419,6 +679,15 @@
       },
       "z1_quick_veto_temp": {
         "default": "mdi:lightning-bolt"
+      },
+      "z1_quick_veto_duration": {
+        "default": "mdi:timer-outline"
+      },
+      "z1_quick_veto_boost_delta": {
+        "default": "mdi:thermometer-chevron-up"
+      },
+      "z1_cooling_quick_veto_boost_delta": {
+        "default": "mdi:thermometer-chevron-down"
       },
       "z1_cooling_temp_manual": {
         "default": "mdi:snowflake"
@@ -473,8 +742,27 @@
       },
       "hwc_max_flow_temp_desired": {
         "default": "mdi:thermometer-chevron-up"
+      },
+      "compressor_silent_operation_level": {
+        "default": "mdi:volume-mute"
+      }
+    },
+    "button": {
+      "ebusd_reload_csv": {
+        "default": "mdi:refresh"
+      },
+      "ebusd_restart_scan": {
+        "default": "mdi:radar"
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "sections": {
+          "advanced_options": "mdi:cog-transfer-outline"
+        }
       }
     }
   }
 }
-
