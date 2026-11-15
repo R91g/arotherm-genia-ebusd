@@ -20,6 +20,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import (
+    CALC_CIRCUIT,
     CIRCUIT_BASS3,
     CIRCUIT_BROADCAST,
     CIRCUIT_GLOBAL,
@@ -36,6 +37,7 @@ from .const import (
     PRESET_COMFORT,
     PRESET_ECO,
     PRESET_MANUAL,
+    PRESET_VENTILATION,
     SENTINEL_COOLING_THRESHOLD,
     SENTINEL_HEATING_THRESHOLD,
 )
@@ -92,6 +94,7 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             PRESET_ECO,
             PRESET_BOOST,
             PRESET_AWAY,
+            PRESET_VENTILATION,
         ]
         subscriptions = [
             (CIRCUIT_BASS3, "Z1RoomTemp"),
@@ -126,6 +129,9 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             (CIRCUIT_BROADCAST, "Outsidetemp"),
             (CIRCUIT_GLOBAL, "signal"),
             (CIRCUIT_GLOBAL, "running"),
+            (CALC_CIRCUIT, "QuickVetoRemaining"),
+            (CALC_CIRCUIT, "VentilationBoostRemaining"),
+            (CALC_CIRCUIT, "HolidayRemaining"),
         ]
 
         super().__init__(
@@ -352,12 +358,15 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
         if z1_status == "holidayaway":
             return PRESET_AWAY
 
-        if self.coordinator.cooling_quick_veto_active:
-            return PRESET_BOOST
-
         sf_mode = (
             self.coordinator.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or ""
         ).lower()
+        if z1_status == "ventilation" or sf_mode == "ventilation":
+            return PRESET_VENTILATION
+
+        if self.coordinator.cooling_quick_veto_active:
+            return PRESET_BOOST
+
         if sf_mode == "veto" or z1_status == "veto":
             return PRESET_BOOST
 
@@ -387,6 +396,9 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             if holiday_temp is not None and holiday_temp > 5.0:
                 return round(holiday_temp, 1)
             return DEFAULT_HOLIDAY_TEMP
+
+        if current_preset == PRESET_VENTILATION:
+            return None
 
         if (
             self.coordinator.cooling_quick_veto_active
@@ -521,9 +533,33 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             if self.coordinator._cooling_veto_end_time is not None
             else None
         )
+        veto_attrs = self.coordinator.get_quick_veto_remaining_attributes()
+        vent_attrs = self.coordinator.get_ventilation_remaining_attributes()
+        holiday_attrs = self.coordinator.get_holiday_remaining_attributes()
+        veto_rem_min = (
+            veto_attrs.get("remaining_minutes") if veto_attrs.get("is_active") else None
+        )
+        vent_rem_min = (
+            vent_attrs.get("remaining_minutes") if vent_attrs.get("is_active") else None
+        )
+        holiday_rem_days = (
+            holiday_attrs.get("days_remaining")
+            if holiday_attrs.get("is_active")
+            else None
+        )
+
+        active_preset = self.preset_mode
+        active_preset_remaining: str | None = None
+        if active_preset == PRESET_BOOST:
+            active_preset_remaining = veto_attrs.get("remaining_formatted")
+        elif active_preset == PRESET_VENTILATION:
+            active_preset_remaining = vent_attrs.get("remaining_formatted")
+        elif active_preset == PRESET_AWAY and holiday_attrs.get("is_active"):
+            active_preset_remaining = holiday_attrs.get("remaining_formatted")
 
         return {
             "active_season": self._active_season,
+            "active_preset_remaining": active_preset_remaining,
             "saved_heating_target": self._saved_heating_target,
             "saved_cooling_target": self._saved_cooling_target,
             "defrost_active": hmu_status in ("deicing", "deicing_active"),
@@ -532,6 +568,20 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             "cooling_quick_veto_active": self.coordinator.cooling_quick_veto_active,
             "cooling_quick_veto_remaining_minutes": self.coordinator.cooling_quick_veto_remaining_minutes,
             "cooling_quick_veto_end_time": cooling_veto_end,
+            "quick_veto_remaining_minutes": veto_rem_min,
+            "quick_veto_remaining_formatted": veto_attrs.get("remaining_formatted"),
+            "quick_veto_end_time": veto_attrs.get("end_time"),
+            "ventilation_remaining_minutes": vent_rem_min,
+            "ventilation_remaining_formatted": vent_attrs.get("remaining_formatted"),
+            "ventilation_end_time": vent_attrs.get("end_time"),
+            "holiday_remaining_days": holiday_rem_days,
+            "holiday_remaining_hours": holiday_attrs.get("remaining_hours"),
+            "holiday_remaining_minutes": holiday_attrs.get("remaining_minutes"),
+            "holiday_remaining_formatted": holiday_attrs.get("remaining_formatted"),
+            "holiday_start_date": holiday_attrs.get("start_date"),
+            "holiday_start_time": holiday_attrs.get("start_time"),
+            "holiday_end_date": holiday_attrs.get("end_date"),
+            "holiday_end_time": holiday_attrs.get("end_time"),
             "raw_z1_actual_room_temp_desired": raw_heating_desired,
             "raw_z1_cooling_temp_desired": raw_cooling_desired,
             "raw_z1_cooling_manual_temp": raw_cooling_manual,
@@ -584,6 +634,61 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
         )
         await asyncio.sleep(0.5)
 
+    def _is_ventilation_active(self) -> bool:
+        """Return True if intensive ventilation boost is currently active."""
+        z1_status = (
+            self.coordinator.get_str(CIRCUIT_BASS3, "Z1Status", "value") or ""
+        ).lower()
+        sf_mode = (
+            self.coordinator.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or ""
+        ).lower()
+        return z1_status == "ventilation" or sf_mode == "ventilation"
+
+    async def _async_clear_ventilation_if_active(self) -> None:
+        """Cancel active intensive ventilation boost before changing mode or preset."""
+        if self._is_ventilation_active():
+            await self.coordinator.async_cancel_ventilation_boost()
+            await asyncio.sleep(0.5)
+
+    def _is_heating_veto_active(self) -> bool:
+        """Return True if a heating quick veto is active on bus state or coordinator."""
+        sf_mode = (
+            self.coordinator.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or ""
+        ).lower()
+        z1_status = (
+            self.coordinator.get_str(CIRCUIT_BASS3, "Z1Status", "value") or ""
+        ).lower()
+        return (
+            sf_mode == "veto"
+            or z1_status == "veto"
+            or getattr(self.coordinator, "_heating_veto_end_time", None) is not None
+        )
+
+    async def _async_clear_active_vetos(
+        self,
+        *,
+        restore_heating_opmode: bool,
+        restore_cooling_opmode: bool,
+        restore_cooling_temp: bool,
+    ) -> bool:
+        """Cancel any active cooling or heating quick veto and reset boost memory."""
+        was_cooling_veto = self.coordinator.cooling_quick_veto_active
+        if was_cooling_veto:
+            await self.coordinator.async_cancel_cooling_quick_veto(
+                restore=restore_cooling_opmode,
+                restore_temp=restore_cooling_temp,
+            )
+
+        if self._is_heating_veto_active():
+            await self.coordinator.async_cancel_quick_veto(
+                restore_opmode=restore_heating_opmode
+            )
+            await asyncio.sleep(0.3)
+
+        self._pre_boost_hvac_mode = None
+        self._pre_boost_preset_mode = None
+        return was_cooling_veto
+
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set new target HVAC mode with transparent Double-Lock and seasonal setpoint memory."""
         await self._async_run_transition(self._async_apply_hvac_mode(hvac_mode))
@@ -595,6 +700,7 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
         sufficient time to arbitrate collisions and let the MiPro Sense controller process state transitions.
         """
         if hvac_mode == HVACMode.OFF:
+            await self._async_clear_ventilation_if_active()
             await self.coordinator.async_write_parameter(
                 CIRCUIT_BASS3, "Z1OpMode", "off"
             )
@@ -606,22 +712,29 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             # Automatic Lock 1 closure when turning off
             await self._async_ensure_cooling_lock_closed()
 
-            # Clear quick veto if it was active
-            if self.coordinator.cooling_quick_veto_active:
-                await self.coordinator.async_cancel_cooling_quick_veto(restore=False)
-
-            sf_mode = (
-                self.coordinator.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or ""
-            ).lower()
-            if sf_mode == "veto":
-                await self.coordinator.async_cancel_quick_veto()
-            self._pre_boost_hvac_mode = None
-            self._pre_boost_preset_mode = None
+            # Clear any active quick veto (Z1OpMode is already forced to 'off')
+            await self._async_clear_active_vetos(
+                restore_heating_opmode=False,
+                restore_cooling_opmode=False,
+                restore_cooling_temp=False,
+            )
             return
 
         if hvac_mode == HVACMode.HEAT:
-            if self.coordinator.cooling_quick_veto_active:
-                await self.coordinator.async_cancel_cooling_quick_veto(restore=False)
+            # Never carry active/stale vetos, ventilation, or holidayaway accidentally into HEAT
+            await self._async_clear_ventilation_if_active()
+            await self._async_clear_active_vetos(
+                restore_heating_opmode=False,
+                restore_cooling_opmode=False,
+                restore_cooling_temp=True,
+            )
+            z1_status = (
+                self.coordinator.get_str(CIRCUIT_BASS3, "Z1Status", "value") or ""
+            ).lower()
+            if z1_status == "holidayaway":
+                await self.coordinator.async_cancel_holiday_mode()
+                await asyncio.sleep(0.5)
+
             self._active_season = SEASON_HEATING
             await self.coordinator.async_write_parameter(
                 CIRCUIT_BASS3, "Z1OpModeCooling", "off"
@@ -654,6 +767,14 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
                 raise HomeAssistantError(
                     "Cannot activate cooling while Holiday / Away mode is active."
                 )
+
+            # Clear any active ventilation or quick veto before switching into COOL
+            await self._async_clear_ventilation_if_active()
+            await self._async_clear_active_vetos(
+                restore_heating_opmode=False,
+                restore_cooling_opmode=False,
+                restore_cooling_temp=True,
+            )
 
             self._active_season = SEASON_COOLING
             # 1. Turn off heating
@@ -694,6 +815,11 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
 
     async def _async_apply_temperature(self, temp_val: float) -> None:
         """Write the eBUS sequence for a new target temperature (runs with learning paused)."""
+        if self.preset_mode == PRESET_VENTILATION:
+            raise HomeAssistantError(
+                "Cannot change target temperature while intensive ventilation boost is active."
+            )
+
         if self.preset_mode == PRESET_AWAY:
             await self.coordinator.async_write_parameter(
                 CIRCUIT_BASS3, "HolidayTemp", temp_val
@@ -770,7 +896,7 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
         )
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
-        """Set preset mode (comfort, manual, eco, boost, away)."""
+        """Set preset mode (comfort, manual, eco, boost, away, ventilation)."""
         await self._async_run_transition(self._async_apply_preset_mode(preset_mode))
 
     async def _async_apply_preset_mode(self, preset_mode: str) -> None:
@@ -784,7 +910,24 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             await self.coordinator.async_cancel_holiday_mode()
             await asyncio.sleep(0.5)
 
+        if preset_mode == PRESET_VENTILATION:
+            await self._async_clear_active_vetos(
+                restore_heating_opmode=True,
+                restore_cooling_opmode=False,
+                restore_cooling_temp=True,
+            )
+            await self.coordinator.async_activate_ventilation_boost()
+            return
+
+        # Cancel active intensive ventilation before applying any other preset
+        await self._async_clear_ventilation_if_active()
+
         if preset_mode == PRESET_AWAY:
+            await self._async_clear_active_vetos(
+                restore_heating_opmode=True,
+                restore_cooling_opmode=False,
+                restore_cooling_temp=True,
+            )
             await self.coordinator.async_activate_holiday_mode()
             return
 
@@ -802,24 +945,14 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
                 await self.coordinator.async_set_quick_veto()
             return
 
-        # Clear cooling quick veto if active (restoring manual setpoint without fighting preset opmode)
-        was_cooling_veto = self.coordinator.cooling_quick_veto_active
+        # Clear any active quick veto before applying the new preset
+        # (never bounce Z1OpMode through 'off' since the target opmode is written below)
         pre_cool_temp = getattr(self.coordinator, "pre_cooling_veto_temp", None)
-        if was_cooling_veto:
-            await self.coordinator.async_cancel_cooling_quick_veto(
-                restore=False, restore_temp=True
-            )
-            self._pre_boost_hvac_mode = None
-            self._pre_boost_preset_mode = None
-
-        # Clear quick veto if active
-        sf_mode = (
-            self.coordinator.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or ""
-        ).lower()
-        if sf_mode == "veto":
-            await self.coordinator.async_cancel_quick_veto()
-            self._pre_boost_hvac_mode = None
-            self._pre_boost_preset_mode = None
+        was_cooling_veto = await self._async_clear_active_vetos(
+            restore_heating_opmode=False,
+            restore_cooling_opmode=False,
+            restore_cooling_temp=True,
+        )
 
         in_cooling = self._is_cooling_active()
 

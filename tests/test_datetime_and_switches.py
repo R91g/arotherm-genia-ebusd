@@ -30,6 +30,7 @@ from custom_components.arotherm_genia_ebusd.select import (
 from custom_components.arotherm_genia_ebusd.switch import (
     SaunierGeniaCoolingSeasonSwitch,
     SaunierGeniaHolidayModeSwitch,
+    SaunierGeniaVentilationBoostSwitch,
 )
 from custom_components.arotherm_genia_ebusd.time import (
     SaunierGeniaHwcLegionellaTime,
@@ -130,8 +131,50 @@ class MockCoordinatorForDatetime:
     def get_device_serial_number(self, device_key: str) -> str | None:
         return None
 
-    def get_holiday_remaining_days(self) -> int:
+    def get_holiday_remaining_days(self) -> int | None:
         return 5
+
+    def get_holiday_remaining_attributes(self) -> dict[str, Any]:
+        start_msg = self.get_message("bass3", "HolidayStartDate")
+        end_msg = self.get_message("bass3", "HolidayEndDate")
+        start_t = self.get_message("bass3", "HolidayStartTime")
+        end_t = self.get_message("bass3", "HolidayEndTime")
+        s_date = (
+            f"{start_msg.get('day'):02d}/{start_msg.get('month'):02d}/20{start_msg.get('year'):02d}"
+            if start_msg
+            and all(isinstance(start_msg.get(k), int) for k in ("day", "month", "year"))
+            and start_msg.get("year") != 15
+            else None
+        )
+        e_date = (
+            f"{end_msg.get('day'):02d}/{end_msg.get('month'):02d}/20{end_msg.get('year'):02d}"
+            if end_msg
+            and all(isinstance(end_msg.get(k), int) for k in ("day", "month", "year"))
+            and end_msg.get("year") != 15
+            else None
+        )
+        s_time = (
+            f"{start_t.get('hours'):02d}:{start_t.get('minutes'):02d}:{start_t.get('seconds', 0):02d}"
+            if s_date and start_t and isinstance(start_t.get("hours"), int)
+            else None
+        )
+        e_time = (
+            f"{end_t.get('hours'):02d}:{end_t.get('minutes'):02d}:{end_t.get('seconds', 0):02d}"
+            if e_date and end_t and isinstance(end_t.get("hours"), int)
+            else None
+        )
+        return {
+            "days_remaining": 5 if e_date else 0,
+            "remaining_hours": 4 if e_date else None,
+            "remaining_minutes": 30 if e_date else None,
+            "remaining_formatted": "5d 4h 30min" if e_date else None,
+            "is_active": bool(e_date),
+            "is_open_ended": False,
+            "start_date": s_date,
+            "start_time": s_time,
+            "end_date": e_date,
+            "end_time": e_time,
+        }
 
     def get_cooling_remaining_days(self) -> int | None:
         return 10
@@ -141,6 +184,14 @@ class MockCoordinatorForDatetime:
 
     async def async_cancel_holiday_mode(self) -> None:
         self.writes.append(("bass3", "HolidayModeCancelled", True))
+
+    async def async_activate_ventilation_boost(self) -> None:
+        self.writes.append(("bass3", "VentilationBoost", "on"))
+        self._state[("bass3", "z1status")] = {"value": "ventilation"}
+
+    async def async_cancel_ventilation_boost(self) -> None:
+        self.writes.append(("bass3", "VentilationBoost", "off"))
+        self._state[("bass3", "z1status")] = {"value": "auto"}
 
 
 class TestDateTimeAndSwitches(unittest.TestCase):
@@ -311,12 +362,27 @@ class TestDateTimeAndSwitches(unittest.TestCase):
             "month": 11,
             "year": 26,
         }
+        self.coord._state[("bass3", "holidaystarttime")] = {
+            "hours": 9,
+            "minutes": 15,
+            "seconds": 0,
+        }
+        self.coord._state[("bass3", "holidayendtime")] = {
+            "hours": 18,
+            "minutes": 30,
+            "seconds": 0,
+        }
         self.assertTrue(sw.is_on)
         attrs = sw.extra_state_attributes
         self.assertTrue(attrs["holiday_ongoing"])
         self.assertEqual(attrs["holiday_remaining_days"], 5)
+        self.assertEqual(attrs["holiday_remaining_hours"], 4)
+        self.assertEqual(attrs["holiday_remaining_minutes"], 30)
+        self.assertEqual(attrs["holiday_remaining_formatted"], "5d 4h 30min")
         self.assertEqual(attrs["holiday_start_date"], "05/11/2026")
+        self.assertEqual(attrs["holiday_start_time"], "09:15:00")
         self.assertEqual(attrs["holiday_end_date"], "10/11/2026")
+        self.assertEqual(attrs["holiday_end_time"], "18:30:00")
 
         # Switching turn_on activates holiday mode
         asyncio.run(sw.async_turn_on())
@@ -345,32 +411,46 @@ class TestDateTimeAndSwitches(unittest.TestCase):
         self.assertIn(("bass3", "CoolingStartDate", "01;07;26"), self.coord.writes)
         self.assertIn(("bass3", "CoolingEndDate", "15;08;26"), self.coord.writes)
 
-    def test_sensor_dynamic_unit_of_measurement(self) -> None:
-        """Test that sensor suppresses unit of measurement for string states (Inactive, Open-ended)."""
+    def test_remaining_duration_sensors_unified(self) -> None:
+        """Test all 4 remaining-duration sensors share non-diagnostic Sensors category and numeric DURATION units."""
+        from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
+
         from custom_components.arotherm_genia_ebusd.sensor import SaunierGeniaSensor
         from custom_components.arotherm_genia_ebusd.sensor_descriptions import (
             SENSOR_DESCRIPTIONS,
         )
+
+        for key in (
+            "holiday_duration_remaining",
+            "cooling_duration_remaining",
+            "quick_veto_remaining_time",
+            "ventilation_remaining_time",
+        ):
+            desc = next(d for d in SENSOR_DESCRIPTIONS if d.key == key)
+            self.assertIsNone(desc.entity_category)
+            self.assertEqual(desc.device_class, SensorDeviceClass.DURATION)
+            self.assertEqual(desc.state_class, SensorStateClass.MEASUREMENT)
+            self.assertTrue(desc.is_integer)
 
         desc = next(
             d for d in SENSOR_DESCRIPTIONS if d.key == "holiday_duration_remaining"
         )
         sensor = SaunierGeniaSensor(self.coord, desc)
 
-        # 1. When coordinator returns int (e.g. 5 days remaining)
+        # 1. Active timed holiday: returns int and keeps unit 'd'
         self.coord.get_holiday_remaining_days = lambda: 5
         self.assertEqual(sensor.native_value, 5)
         self.assertEqual(sensor.native_unit_of_measurement, "d")
 
-        # 2. When coordinator returns 'Inactive'
-        self.coord.get_holiday_remaining_days = lambda: "Inactive"
-        self.assertEqual(sensor.native_value, "Inactive")
-        self.assertIsNone(sensor.native_unit_of_measurement)
+        # 2. Inactive holiday: returns 0 (localized as '0 d' / '0 días' by HA)
+        self.coord.get_holiday_remaining_days = lambda: 0
+        self.assertEqual(sensor.native_value, 0)
+        self.assertEqual(sensor.native_unit_of_measurement, "d")
 
-        # 3. When coordinator returns 'Open-ended'
-        self.coord.get_holiday_remaining_days = lambda: "Open-ended"
-        self.assertEqual(sensor.native_value, "Open-ended")
-        self.assertIsNone(sensor.native_unit_of_measurement)
+        # 3. Open-ended holiday: returns None (HA renders localized Unknown) while keeping duration unit
+        self.coord.get_holiday_remaining_days = lambda: None
+        self.assertIsNone(sensor.native_value)
+        self.assertEqual(sensor.native_unit_of_measurement, "d")
 
     def test_legionella_select_entity(self) -> None:
         """Test anti-legionella day select entity reading and writing."""
@@ -518,6 +598,30 @@ class TestDateTimeAndSwitches(unittest.TestCase):
         with self.assertRaises(HomeAssistantError) as ctx:
             asyncio.run(handler(call))
         self.assertIn("No configured instances", str(ctx.exception))
+
+    def test_ventilation_boost_switch(self) -> None:
+        """Test Intensive Ventilation Boost switch state and actions."""
+        sw = SaunierGeniaVentilationBoostSwitch(self.coord)
+
+        # Initially unknown when neither Z1Status nor VentilationBoost is populated
+        self.assertIsNone(sw.is_on)
+
+        # Falls back to VentilationBoost when Z1Status is missing
+        self.coord._state[("bass3", "ventilationboost")] = {"value": "on"}
+        self.assertTrue(sw.is_on)
+
+        # Authoritative Z1Status overrides fallback
+        self.coord._state[("bass3", "z1status")] = {"value": "auto"}
+        self.assertFalse(sw.is_on)
+
+        # Turn on & turn off commands
+        asyncio.run(sw.async_turn_on())
+        self.assertIn(("bass3", "VentilationBoost", "on"), self.coord.writes)
+        self.assertTrue(sw.is_on)
+
+        asyncio.run(sw.async_turn_off())
+        self.assertIn(("bass3", "VentilationBoost", "off"), self.coord.writes)
+        self.assertFalse(sw.is_on)
 
 
 if __name__ == "__main__":

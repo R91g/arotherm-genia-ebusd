@@ -45,6 +45,7 @@ from .const import (
     PLATFORMS,
     SERVICE_CANCEL_HOLIDAY_MODE,
     SERVICE_CANCEL_QUICK_VETO,
+    SERVICE_CANCEL_VENTILATION_BOOST,
     SERVICE_DUMP_MQTT_VALUES,
     SERVICE_FORCE_DHW_BOOST,
     SERVICE_QUICK_VETO,
@@ -54,6 +55,7 @@ from .const import (
     SERVICE_SET_HOLIDAY_MODE,
     SERVICE_SET_LEGIONELLA_PROTECTION,
     SERVICE_SET_WEEKLY_TIMER,
+    SERVICE_START_VENTILATION_BOOST,
     SERVICE_WRITE_PARAMETER,
     SET_CONFIRMATION_DELAY_SECONDS,
     TIMER_CIRCUIT_PREFIXES,
@@ -170,6 +172,8 @@ QUICK_VETO_SCHEMA = vol.Schema(
 )
 
 CANCEL_QUICK_VETO_SCHEMA = vol.Schema({})
+START_VENTILATION_BOOST_SCHEMA = vol.Schema({})
+CANCEL_VENTILATION_BOOST_SCHEMA = vol.Schema({})
 
 DUMP_MQTT_VALUES_SCHEMA = vol.Schema(
     {
@@ -416,6 +420,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             hass.services.async_remove(DOMAIN, SERVICE_CANCEL_HOLIDAY_MODE)
             hass.services.async_remove(DOMAIN, SERVICE_QUICK_VETO)
             hass.services.async_remove(DOMAIN, SERVICE_CANCEL_QUICK_VETO)
+            hass.services.async_remove(DOMAIN, SERVICE_START_VENTILATION_BOOST)
+            hass.services.async_remove(DOMAIN, SERVICE_CANCEL_VENTILATION_BOOST)
             hass.services.async_remove(DOMAIN, SERVICE_DUMP_MQTT_VALUES)
             hass.services.async_remove(DOMAIN, SERVICE_RECORD_TOPIC_CHANGES)
             hass.services.async_remove(DOMAIN, SERVICE_SEND_HEX_COMMAND)
@@ -1238,6 +1244,48 @@ def _async_register_services(hass: HomeAssistant) -> None:
             SERVICE_CANCEL_QUICK_VETO,
             _async_handle_cancel_quick_veto,
             schema=CANCEL_QUICK_VETO_SCHEMA,
+        )
+
+    async def _async_execute_ventilation_service(activate: bool) -> None:
+        """Execute intensive ventilation start/cancel across configured coordinators."""
+        coordinators: dict[str, SaunierGeniaCoordinator] = hass.data.get(DOMAIN, {})
+        if not coordinators:
+            raise HomeAssistantError(f"No configured instances of {DOMAIN} found.")
+
+        for coordinator in coordinators.values():
+            if not coordinator.is_ebus_operational:
+                raise HomeAssistantError(
+                    "Cannot execute service: eBUS communication is not operational."
+                )
+            if activate:
+                await coordinator.async_activate_ventilation_boost()
+            else:
+                await coordinator.async_cancel_ventilation_boost()
+
+    if not hass.services.has_service(DOMAIN, SERVICE_START_VENTILATION_BOOST):
+
+        async def _async_handle_start_ventilation_boost(call: ServiceCall) -> None:
+            """Handle arotherm_genia_ebusd.start_ventilation_boost service call."""
+            await _async_execute_ventilation_service(activate=True)
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_START_VENTILATION_BOOST,
+            _async_handle_start_ventilation_boost,
+            schema=START_VENTILATION_BOOST_SCHEMA,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_CANCEL_VENTILATION_BOOST):
+
+        async def _async_handle_cancel_ventilation_boost(call: ServiceCall) -> None:
+            """Handle arotherm_genia_ebusd.cancel_ventilation_boost service call."""
+            await _async_execute_ventilation_service(activate=False)
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_CANCEL_VENTILATION_BOOST,
+            _async_handle_cancel_ventilation_boost,
+            schema=CANCEL_VENTILATION_BOOST_SCHEMA,
         )
 
     if not hass.services.has_service(DOMAIN, SERVICE_DUMP_MQTT_VALUES):

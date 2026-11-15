@@ -271,6 +271,21 @@ cancel_quick_veto:
     Immediately cancels active heating or cooling Quick Veto on Zone 1 (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3)
     and restores the previous operating mode and manual setpoint.
 
+start_ventilation_boost:
+  name: Start Intensive Ventilation Boost
+  description: >
+    Activates Intensive Ventilation Boost (VentilationBoost = on) on the climate controller
+    (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3), pausing space heating for 30 minutes while
+    keeping frost protection, domestic hot water, and circulation active, then restoring the
+    previous operating mode automatically.
+
+cancel_ventilation_boost:
+  name: Cancel Intensive Ventilation Boost
+  description: >
+    Immediately cancels active Intensive Ventilation Boost (VentilationBoost = off) on the
+    climate controller (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3) and resumes the previous
+    operating mode.
+
 dump_mqtt_values:
   name: Dump MQTT Values (Diagnostics)
   description: >

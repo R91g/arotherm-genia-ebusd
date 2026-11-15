@@ -105,6 +105,13 @@
           "off": "mdi:bag-suitcase-off"
         }
       },
+      "ventilation_boost_switch": {
+        "default": "mdi:fan",
+        "state": {
+          "on": "mdi:fan",
+          "off": "mdi:fan-off"
+        }
+      },
       "global_system_off": {
         "default": "mdi:power",
         "state": {
@@ -455,6 +462,12 @@
       },
       "cooling_duration_remaining": {
         "default": "mdi:snowflake-check"
+      },
+      "quick_veto_remaining_time": {
+        "default": "mdi:timer-sand"
+      },
+      "ventilation_remaining_time": {
+        "default": "mdi:fan-clock"
       },
       "hmu_current_error": {
         "default": "mdi:alert-circle-outline"

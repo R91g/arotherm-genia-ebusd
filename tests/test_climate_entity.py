@@ -21,6 +21,7 @@ from custom_components.arotherm_genia_ebusd.climate import (
     PRESET_COMFORT,
     PRESET_ECO,
     PRESET_MANUAL,
+    PRESET_VENTILATION,
     SEASON_COOLING,
     SEASON_HEATING,
     SaunierGeniaZone1Climate,
@@ -147,12 +148,48 @@ class MockCoordinatorForClimate:
         await self.async_write_parameter(CIRCUIT_BASS3, "Z1QuickVetoDuration", dur_val)
         await self.async_write_parameter(CIRCUIT_BASS3, "Z1SFMode", "veto")
 
-    async def async_cancel_quick_veto(self) -> None:
+    async def async_cancel_quick_veto(self, *, restore_opmode: bool = True) -> None:
         await self.async_write_parameter(CIRCUIT_BASS3, "Z1SFMode", "auto")
         await self.async_write_parameter(CIRCUIT_BASS3, "Z1QuickVetoDuration", 0.0)
-        if getattr(self, "_pre_veto_opmode", None) == "off":
+        restored_off = (
+            restore_opmode and getattr(self, "_pre_veto_opmode", None) == "off"
+        )
+        if restored_off:
             await self.async_write_parameter(CIRCUIT_BASS3, "Z1OpMode", "off")
         self._pre_veto_opmode = None
+        if (self.get_str(CIRCUIT_BASS3, "Z1Status", "value") or "").lower() == "veto":
+            op_now = (self.get_str(CIRCUIT_BASS3, "Z1OpMode", "value") or "").lower()
+            self._state[(CIRCUIT_BASS3.lower(), "z1status")] = {
+                "value": "off" if (restored_off or op_now == "off") else "auto"
+            }
+
+    async def async_activate_holiday_mode(self) -> None:
+        self._state[(CIRCUIT_BASS3.lower(), "z1status")] = {"value": "holidayaway"}
+        self.writes.append((CIRCUIT_BASS3, "HolidayMode", "on"))
+
+    async def async_cancel_holiday_mode(self) -> None:
+        self.writes.append((CIRCUIT_BASS3, "HolidayCancel", 1))
+        if (
+            self.get_str(CIRCUIT_BASS3, "Z1Status", "value") or ""
+        ).lower() == "holidayaway":
+            op_now = (self.get_str(CIRCUIT_BASS3, "Z1OpMode", "value") or "").lower()
+            self._state[(CIRCUIT_BASS3.lower(), "z1status")] = {
+                "value": "off" if op_now == "off" else "auto"
+            }
+
+    async def async_activate_ventilation_boost(self) -> None:
+        self.writes.append((CIRCUIT_BASS3, "VentilationBoost", "on"))
+        self._state[(CIRCUIT_BASS3.lower(), "z1status")] = {"value": "ventilation"}
+
+    async def async_cancel_ventilation_boost(self) -> None:
+        self.writes.append((CIRCUIT_BASS3, "VentilationBoost", "off"))
+        if (
+            self.get_str(CIRCUIT_BASS3, "Z1Status", "value") or ""
+        ).lower() == "ventilation":
+            op_now = (self.get_str(CIRCUIT_BASS3, "Z1OpMode", "value") or "").lower()
+            self._state[(CIRCUIT_BASS3.lower(), "z1status")] = {
+                "value": "off" if op_now == "off" else "auto"
+            }
 
     def is_cooling_active(self) -> bool:
         cool_mode = (
@@ -271,6 +308,80 @@ class MockCoordinatorForClimate:
                 await self.async_write_parameter(
                     CIRCUIT_BASS3, "Z1CoolingTempDesired", pre_temp
                 )
+
+    def get_quick_veto_remaining_attributes(self) -> dict[str, Any]:
+        if self.cooling_quick_veto_active:
+            rem = self.cooling_quick_veto_remaining_minutes
+            return {
+                "is_active": True,
+                "remaining_minutes": rem,
+                "remaining_formatted": f"{rem} min" if rem is not None else None,
+                "end_time": None,
+            }
+        sf_mode = (self.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or "").lower()
+        if sf_mode == "veto":
+            return {
+                "is_active": True,
+                "remaining_minutes": 180,
+                "remaining_formatted": "3h",
+                "end_time": None,
+            }
+        return {
+            "is_active": False,
+            "remaining_minutes": 0,
+            "remaining_formatted": None,
+            "end_time": None,
+        }
+
+    def get_ventilation_remaining_attributes(self) -> dict[str, Any]:
+        z1_status = (self.get_str(CIRCUIT_BASS3, "Z1Status", "value") or "").lower()
+        if z1_status == "ventilation":
+            return {
+                "is_active": True,
+                "remaining_minutes": 30,
+                "remaining_formatted": "30 min",
+                "end_time": None,
+            }
+        return {
+            "is_active": False,
+            "remaining_minutes": 0,
+            "remaining_formatted": None,
+            "end_time": None,
+        }
+
+    def get_holiday_remaining_days(self) -> int | None:
+        z1_status = (self.get_str(CIRCUIT_BASS3, "Z1Status", "value") or "").lower()
+        if z1_status == "holidayaway":
+            return 5
+        return 0
+
+    def get_holiday_remaining_attributes(self) -> dict[str, Any]:
+        z1_status = (self.get_str(CIRCUIT_BASS3, "Z1Status", "value") or "").lower()
+        if z1_status == "holidayaway":
+            return {
+                "days_remaining": 5,
+                "remaining_hours": 4,
+                "remaining_minutes": 30,
+                "remaining_formatted": "5d 4h 30min",
+                "is_active": True,
+                "is_open_ended": False,
+                "start_date": "15/11/2026",
+                "start_time": "08:00:00",
+                "end_date": "20/11/2026",
+                "end_time": "18:30:00",
+            }
+        return {
+            "days_remaining": 0,
+            "remaining_hours": None,
+            "remaining_minutes": None,
+            "remaining_formatted": None,
+            "is_active": False,
+            "is_open_ended": False,
+            "start_date": None,
+            "start_time": None,
+            "end_date": None,
+            "end_time": None,
+        }
 
 
 class TestClimateEntity(unittest.TestCase):
@@ -537,14 +648,26 @@ class TestClimateEntity(unittest.TestCase):
         self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoDuration", 3.0), written)
         self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "veto"), written)
 
-        # 2. Cancel Boost by selecting Comfort
+        # 2. Direct cancellation (service/timeout equivalent) restores Z1OpMode to off
         written.clear()
-        asyncio.run(self.climate.async_set_preset_mode(PRESET_COMFORT))
-
-        # Must clear veto, duration to 0, and restore Z1OpMode to off
+        asyncio.run(self.coordinator.async_cancel_quick_veto())
         self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "auto"), written)
         self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoDuration", 0.0), written)
         self.assertIn((CIRCUIT_BASS3, "Z1OpMode", "off"), written)
+        self.assertEqual(self.climate.hvac_mode, HVACMode.OFF)
+
+        # 3. Activate Boost from OFF again, then switch explicitly to Comfort:
+        # must cancel veto and write Z1OpMode=auto directly without bouncing via 'off'
+        asyncio.run(self.climate.async_set_preset_mode(PRESET_BOOST))
+        written.clear()
+        asyncio.run(self.climate.async_set_preset_mode(PRESET_COMFORT))
+
+        self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "auto"), written)
+        self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoDuration", 0.0), written)
+        self.assertIn((CIRCUIT_BASS3, "Z1OpMode", "auto"), written)
+        self.assertNotIn((CIRCUIT_BASS3, "Z1OpMode", "off"), written)
+        self.assertEqual(self.climate.hvac_mode, HVACMode.HEAT)
+        self.assertEqual(self.climate.preset_mode, PRESET_COMFORT)
 
     def test_adjust_temperature_in_comfort_triggers_quick_veto(self) -> None:
         """Verify adjusting target temperature while in scheduled mode triggers Quick Veto."""
@@ -983,6 +1106,168 @@ class TestClimateEntity(unittest.TestCase):
         self.assertIn(
             (CIRCUIT_BASS3, "Z1CoolingTempDesired", 25.0), self.coordinator.writes
         )
+
+    def test_z1status_veto_cancelled_on_preset_switch_even_if_sfmode_stale(
+        self,
+    ) -> None:
+        """Switching Boost -> Manual/Comfort cancels veto even when only Z1Status reports 'veto'."""
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "auto"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "off"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1sfmode")] = {"value": "auto"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1status")] = {"value": "veto"}
+        self.assertEqual(self.climate.preset_mode, PRESET_BOOST)
+        self.coordinator.writes.clear()
+
+        asyncio.run(self.climate.async_set_preset_mode(PRESET_MANUAL))
+
+        self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "auto"), self.coordinator.writes)
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1QuickVetoDuration", 0.0), self.coordinator.writes
+        )
+        self.assertIn((CIRCUIT_BASS3, "Z1OpMode", "day"), self.coordinator.writes)
+        self.assertEqual(self.climate.preset_mode, PRESET_MANUAL)
+
+    def test_preset_away_cancels_active_heating_and_cooling_vetos(self) -> None:
+        """Switching from Boost to Away clears active heating/cooling quick vetos first."""
+        # 1. Heating veto -> Away
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "auto"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1sfmode")] = {"value": "veto"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1status")] = {"value": "veto"}
+        self.coordinator.writes.clear()
+
+        asyncio.run(self.climate.async_set_preset_mode(PRESET_AWAY))
+        self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "auto"), self.coordinator.writes)
+        self.assertIn((CIRCUIT_BASS3, "HolidayMode", "on"), self.coordinator.writes)
+
+        # 2. Cooling veto -> Away
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "off"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "auto"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "coolingreleasestatus")] = {
+            "value": "on"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1status")] = {"value": "auto"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1coolingmanualtemp")] = {
+            "value": 25.0
+        }
+        asyncio.run(self.climate.async_set_preset_mode(PRESET_BOOST))
+        self.assertTrue(self.coordinator.cooling_quick_veto_active)
+        self.coordinator.writes.clear()
+
+        asyncio.run(self.climate.async_set_preset_mode(PRESET_AWAY))
+        self.assertFalse(self.coordinator.cooling_quick_veto_active)
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1CoolingManualTemp", 25.0), self.coordinator.writes
+        )
+        self.assertIn((CIRCUIT_BASS3, "HolidayMode", "on"), self.coordinator.writes)
+
+    def test_hvac_heat_from_off_clears_stale_veto_and_holidayaway(self) -> None:
+        """Turning HEAT on from OFF never accidentally applies Holiday/Away or Quick Veto."""
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "off"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "off"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1sfmode")] = {"value": "veto"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1status")] = {
+            "value": "holidayaway"
+        }
+        self.coordinator.writes.clear()
+
+        asyncio.run(self.climate.async_set_hvac_mode(HVACMode.HEAT))
+
+        self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "auto"), self.coordinator.writes)
+        self.assertIn((CIRCUIT_BASS3, "HolidayCancel", 1), self.coordinator.writes)
+        self.assertIn((CIRCUIT_BASS3, "Z1OpMode", "auto"), self.coordinator.writes)
+        self.assertEqual(self.climate.hvac_mode, HVACMode.HEAT)
+        self.assertEqual(self.climate.preset_mode, PRESET_COMFORT)
+
+    def test_hvac_cool_cancels_active_heating_veto(self) -> None:
+        """Switching to COOL while heating quick veto is active cancels heating veto."""
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "auto"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1sfmode")] = {"value": "veto"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1status")] = {"value": "veto"}
+        self.coordinator.writes.clear()
+
+        asyncio.run(self.climate.async_set_hvac_mode(HVACMode.COOL))
+
+        self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "auto"), self.coordinator.writes)
+        self.assertIn((CIRCUIT_BASS3, "Z1OpMode", "off"), self.coordinator.writes)
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1OpModeCooling", "auto"), self.coordinator.writes
+        )
+        self.assertEqual(self.climate.hvac_mode, HVACMode.COOL)
+        self.assertEqual(self.climate.preset_mode, PRESET_COMFORT)
+
+    def test_ventilation_preset_state_and_target_temp_guard(self) -> None:
+        """Active ventilation exposes PRESET_VENTILATION, hides target temp, and rejects temp writes."""
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "day"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1manualtemp")] = {
+            "value": 23.0
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1actualroomtempdesired")] = {
+            "value": 0.0
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1status")] = {
+            "value": "ventilation"
+        }
+
+        self.assertIn(PRESET_VENTILATION, self.climate._attr_preset_modes)
+        self.assertEqual(self.climate.hvac_mode, HVACMode.HEAT)
+        self.assertEqual(self.climate.preset_mode, PRESET_VENTILATION)
+        self.assertIsNone(self.climate.native_target_temperature)
+        attrs = self.climate.extra_state_attributes
+        self.assertEqual(attrs["ventilation_remaining_minutes"], 30)
+        self.assertEqual(attrs["active_preset_remaining"], "30 min")
+        with self.assertRaises(HomeAssistantError):
+            asyncio.run(self.climate.async_set_temperature(temperature=21.5))
+
+    def test_ventilation_preset_activation_and_exit_transitions(self) -> None:
+        """Selecting ventilation activates boost; changing preset or HVAC mode cancels it."""
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "auto"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1status")] = {"value": "auto"}
+        self.coordinator.writes.clear()
+
+        # Activate from comfort/auto
+        asyncio.run(self.climate.async_set_preset_mode(PRESET_VENTILATION))
+        self.assertIn(
+            (CIRCUIT_BASS3, "VentilationBoost", "on"), self.coordinator.writes
+        )
+        self.assertEqual(self.climate.preset_mode, PRESET_VENTILATION)
+
+        # Exiting via preset change cancels ventilation before writing Z1OpMode
+        self.coordinator.writes.clear()
+        asyncio.run(self.climate.async_set_preset_mode(PRESET_MANUAL))
+        vent_idx = self.coordinator.writes.index(
+            (CIRCUIT_BASS3, "VentilationBoost", "off")
+        )
+        op_idx = self.coordinator.writes.index((CIRCUIT_BASS3, "Z1OpMode", "day"))
+        self.assertLess(vent_idx, op_idx)
+        self.assertEqual(self.climate.preset_mode, PRESET_MANUAL)
+
+        # Exiting via HVACMode.OFF cancels ventilation before turning Z1OpMode off
+        asyncio.run(self.climate.async_set_preset_mode(PRESET_VENTILATION))
+        self.coordinator.writes.clear()
+        asyncio.run(self.climate.async_set_hvac_mode(HVACMode.OFF))
+        vent_idx = self.coordinator.writes.index(
+            (CIRCUIT_BASS3, "VentilationBoost", "off")
+        )
+        off_idx = self.coordinator.writes.index((CIRCUIT_BASS3, "Z1OpMode", "off"))
+        self.assertLess(vent_idx, off_idx)
+
+        # Exiting via HVACMode.COOL cancels ventilation before opening cooling
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "auto"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1status")] = {
+            "value": "ventilation"
+        }
+        self.coordinator.writes.clear()
+        asyncio.run(self.climate.async_set_hvac_mode(HVACMode.COOL))
+        self.assertIn(
+            (CIRCUIT_BASS3, "VentilationBoost", "off"), self.coordinator.writes
+        )
+        self.assertEqual(self.climate.hvac_mode, HVACMode.COOL)
 
 
 if __name__ == "__main__":

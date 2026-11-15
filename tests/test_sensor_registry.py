@@ -289,6 +289,59 @@ class TestSensorRegistry(unittest.TestCase):
         }
         self.assertEqual(computed_suffixes, set(HMUX0_ONLY_SENSOR_UNIQUE_ID_SUFFIXES))
 
+    def test_quick_veto_remaining_time_sensor_description(self) -> None:
+        """Verify unified quick_veto_remaining_time sensor definition and subscriptions."""
+        from unittest.mock import MagicMock
+
+        from homeassistant.components.sensor import (
+            SensorDeviceClass,
+            SensorStateClass,
+        )
+        from homeassistant.const import UnitOfTime
+
+        from custom_components.arotherm_genia_ebusd.const import (
+            CALC_CIRCUIT,
+            CIRCUIT_BASS3,
+            DEVICE_CLIMATE_CONTROLLER,
+        )
+        from custom_components.arotherm_genia_ebusd.sensor import SaunierGeniaSensor
+
+        descs = [d for d in SENSOR_DESCRIPTIONS if d.key == "quick_veto_remaining_time"]
+        self.assertEqual(len(descs), 1)
+        desc = descs[0]
+        self.assertEqual(desc.device_key, DEVICE_CLIMATE_CONTROLLER)
+        self.assertEqual(desc.circuit, CALC_CIRCUIT)
+        self.assertEqual(desc.device_class, SensorDeviceClass.DURATION)
+        self.assertEqual(desc.state_class, SensorStateClass.MEASUREMENT)
+        self.assertEqual(desc.native_unit_of_measurement, UnitOfTime.MINUTES)
+
+        mock_coord = MagicMock()
+        mock_coord.entry_id = "test_entry"
+        mock_coord.get_quick_veto_remaining_minutes.return_value = 45
+        mock_coord.get_quick_veto_remaining_attributes.return_value = {
+            "is_active": True,
+            "veto_type": "cooling",
+            "end_time": "2026-11-15T20:00:00",
+            "target_temperature": 19.0,
+            "remaining_minutes": 45,
+        }
+        sensor_ent = SaunierGeniaSensor(mock_coord, desc)
+        self.assertEqual(sensor_ent.native_value, 45)
+        self.assertEqual(sensor_ent.native_unit_of_measurement, UnitOfTime.MINUTES)
+        self.assertEqual(
+            sensor_ent.extra_state_attributes,
+            {
+                "is_active": True,
+                "veto_type": "cooling",
+                "end_time": "2026-11-15T20:00:00",
+                "target_temperature": 19.0,
+                "remaining_minutes": 45,
+            },
+        )
+        self.assertIn((CALC_CIRCUIT, "QuickVetoRemaining"), sensor_ent._subscriptions)
+        self.assertIn((CIRCUIT_BASS3, "Z1SFMode"), sensor_ent._subscriptions)
+        self.assertIn((CIRCUIT_BASS3, "Z1OpModeCooling"), sensor_ent._subscriptions)
+
     def test_z1_room_humidity_sensor_and_bounds(self) -> None:
         """Verify z1_room_humidity sensor description and physical bounds filter."""
         from unittest.mock import MagicMock

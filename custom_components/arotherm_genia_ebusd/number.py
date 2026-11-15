@@ -456,10 +456,9 @@ class SaunierGeniaNumber(SaunierGeniaEntity, NumberEntity):
             await self.coordinator.async_write_parameter(
                 CIRCUIT_BASS3, "Z1SFMode", "veto"
             )
-            if self.coordinator.pre_veto_opmode == "off":
-                await self.coordinator.async_refresh_heating_veto_duration(
-                    float(payload_val)
-                )
+            await self.coordinator.async_refresh_heating_veto_duration(
+                float(payload_val)
+            )
             return
 
         await self.coordinator.async_write_parameter(

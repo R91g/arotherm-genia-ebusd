@@ -304,10 +304,6 @@ CALC_HEATING_TOTAL_ENERGY = "calculated_heating_total_energy"
 CALC_DHW_TOTAL_ENERGY = "calculated_dhw_total_energy"
 CALC_SYSTEM_TOTAL_ENERGY = "calculated_system_total_energy"
 
-# Duration sensor states
-STATE_INACTIVE = "Inactive"
-STATE_OPEN_ENDED = "Open-ended"
-
 # Deprecated unique_id suffixes automatically removed from entity_registry on setup
 DEPRECATED_UNIQUE_ID_SUFFIXES: tuple[str, ...] = (
     "number_bass3_z1daytemp_value",
@@ -375,6 +371,8 @@ SERVICE_SET_HOLIDAY_MODE = "set_holiday_mode"
 SERVICE_CANCEL_HOLIDAY_MODE = "cancel_holiday_mode"
 SERVICE_QUICK_VETO = "quick_veto"
 SERVICE_CANCEL_QUICK_VETO = "cancel_quick_veto"
+SERVICE_START_VENTILATION_BOOST = "start_ventilation_boost"
+SERVICE_CANCEL_VENTILATION_BOOST = "cancel_ventilation_boost"
 SERVICE_DUMP_MQTT_VALUES = "dump_mqtt_values"
 SERVICE_RECORD_TOPIC_CHANGES = "record_topic_changes"
 SERVICE_SEND_HEX_COMMAND = "send_hex_command"
@@ -391,6 +389,8 @@ PRESET_MANUAL = "manual"
 PRESET_ECO = "eco"
 PRESET_BOOST = "boost"
 PRESET_AWAY = "away"
+PRESET_VENTILATION = "ventilation"
+VENTILATION_BOOST_DURATION_MINUTES = 30
 
 # Holiday / Away Mode defaults and sentinels
 DEFAULT_HOLIDAY_TEMP = 15.0
@@ -428,11 +428,33 @@ TIMER_CIRCUIT_PREFIXES: dict[str, str] = {
     "silent": "SilentTimer",
 }
 
-# Essential eBUSd messages for Initial Staggered Hydration (/get queue)
-# Prioritizes active read setpoints, energy counters, and initial startup telemetry.
-# General passive messages (temperatures, live modes, runstats) are populated
-# automatically via retained MQTT topics and periodic master broadcasts (f1 / 10).
+# Essential eBUSd messages for Initial Staggered Hydration and No-MiGo Fallback Polling (/get queue)
+# Includes controller live modes/states, DHW/climate setpoints, energy counters, and core telemetry
+# so both clean startups without retained MQTT payloads and setups with has_migo_link=False stay in sync.
 ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
+    # Climate Controller (15.bass3) - Live operational modes, states & Zone 1 / DHW telemetry
+    (CIRCUIT_BASS3, "Z1SFMode"),
+    (CIRCUIT_BASS3, "Z1Status"),
+    (CIRCUIT_BASS3, "Z1OpMode"),
+    (CIRCUIT_BASS3, "Z1OpModeCooling"),
+    (CIRCUIT_BASS3, "Z1RoomTemp"),
+    (CIRCUIT_BASS3, "Z1ActualRoomTempDesired"),
+    (CIRCUIT_BASS3, "Z1CoolingTempDesired"),
+    (CIRCUIT_BASS3, "Z1CoolingTemp"),
+    (CIRCUIT_BASS3, "Z1HeatingState"),
+    (CIRCUIT_BASS3, "SystemOperatingState"),
+    (CIRCUIT_BASS3, "HwcOpMode"),
+    (CIRCUIT_BASS3, "HwcTempDesired"),
+    (CIRCUIT_BASS3, "HwcStatus"),
+    (CIRCUIT_BASS3, "HwcStorageTemp"),
+    (CIRCUIT_BASS3, "HwcLegionellaDay"),
+    (CIRCUIT_BASS3, "HwcLegionellaTime"),
+    (CIRCUIT_BASS3, "DisplayedOutsideTemp"),
+    (CIRCUIT_BASS3, "WaterPressure"),
+    (CIRCUIT_BASS3, "Hc1FlowTemp"),
+    (CIRCUIT_BASS3, "Hc1ActualFlowTempDesired"),
+    (CIRCUIT_BASS3, "Currenterror"),
+    (CIRCUIT_BASS3, "Hc1PumpStatus"),
     # Climate Controller (15.bass3) - Actively readable setpoints, offsets & energy counters (r / r9)
     (CIRCUIT_BASS3, "Z1ManualTemp"),
     (CIRCUIT_BASS3, "Z1CoolingManualTemp"),
@@ -458,6 +480,10 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
         CIRCUIT_BASS3,
         "SilentTimer_Slots",
     ),  # Probes for modern v1.3.0+ weekly schedule timer support
+    (
+        CIRCUIT_BASS3,
+        "VentilationBoost",
+    ),  # Probes for intensive ventilation boost (30 min heating pause) support
     (CIRCUIT_BASS3, "CoolingReleaseStatus"),
     (CIRCUIT_BASS3, "HwcSFMode"),
     (CIRCUIT_BASS3, "HwcFlowTemp"),

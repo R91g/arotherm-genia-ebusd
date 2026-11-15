@@ -205,6 +205,10 @@ w,,,HolidayEndTime,holiday end time,,,b524,02010000f500,hours,,UCH,,,,minutes,,U
 r;u,,,HolidayCancel,holiday cancel trigger,,,b524,02000000f700,ign,,IGN:4,,,,value,,UCH,,,holiday cancel trigger
 w,,,HolidayCancel,holiday cancel trigger,,,b524,02010000f700,value,,UCH,,,holiday cancel trigger
 
+# 4c. INTENSIVE VENTILATION BOOST (GLOBAL 00 00)
+r;u,,,VentilationBoost,intensive ventilation boost,,,b524,02000000f900,ign,,IGN:4,,,,value,,UCH,0=off;1=on,,Intensive ventilation boost (30 min heating pause)
+w,,,VentilationBoost,intensive ventilation boost,,,b524,02010000f900,value,,UCH,0=off;1=on,,Intensive ventilation boost (30 min heating pause)
+
 
 # ==============================================================================
 # 5. DIAGNOSTICS AND ERROR LOGGING

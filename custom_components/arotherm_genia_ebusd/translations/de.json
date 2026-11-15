@@ -100,7 +100,7 @@
     },
     "outdated_controller_csv": {
       "title": "Veraltete Regler-Konfigurationsdatei (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3)",
-      "description": "Deine `ebusd`-Instanz verwendet eine veraltete Version von `vaillant/15.bass3.csv`, `15.basv3.csv`, `15.ctlv2.csv` oder `15.ctlv3.csv` (meldet veraltete `Z1HolidayTemp`- oder `Z1DayTemp`-Register oder fehlende Unterstützung für Wochen-Zeitpläne des Flüstermodus `SilentTimer`). Bitte kopiere die aktualisierten Dateien `ebusd-configuration/vaillant/*.csv` in dein eBUSd-Konfigurationsverzeichnis und starte `ebusd` neu, um die Abwesenheitsmodus-Synchronisation, die manuelle Kühlsollwert-Vorgabe (`Z1CoolingManualTemp`) und die Zeitpläne des Flüstermodus zu aktivieren. Dieser Hinweis verschwindet automatisch, sobald `ebusd` die neue CSV lädt."
+      "description": "Deine `ebusd`-Instanz verwendet eine veraltete Version von `vaillant/15.bass3.csv`, `15.basv3.csv`, `15.ctlv2.csv` oder `15.ctlv3.csv` (meldet veraltete `Z1HolidayTemp`- oder `Z1DayTemp`-Register oder fehlende Unterstützung für Wochen-Zeitpläne des Flüstermodus `SilentTimer` bzw. Stoßlüftung `VentilationBoost`). Bitte kopiere die aktualisierten Dateien `ebusd-configuration/vaillant/*.csv` in dein eBUSd-Konfigurationsverzeichnis und starte `ebusd` neu, um die Abwesenheitsmodus-Synchronisation, die manuelle Kühlsollwert-Vorgabe (`Z1CoolingManualTemp`), die Zeitpläne des Flüstermodus und Stoßlüftung (`VentilationBoost`) zu aktivieren. Dieser Hinweis verschwindet automatisch, sobald `ebusd` die neue CSV lädt."
     },
     "missing_custom_csv": {
       "title": "Angepasste eBUSd-Konfigurationsdateien nicht gefunden",
@@ -129,7 +129,8 @@
               "comfort": "Zeitgesteuert (Komfort)",
               "manual": "Dauernd Manuell",
               "eco": "Eco (Nachtabsenkung)",
-              "boost": "Schnell-Veto Übersteuerung"
+              "boost": "Schnell-Veto Übersteuerung",
+              "ventilation": "Stoßlüften (30 Min.)"
             }
           }
         }
@@ -309,6 +310,9 @@
       "holiday_mode_switch": {
         "name": "Abwesenheitsmodus"
       },
+      "ventilation_boost_switch": {
+        "name": "Stoßlüften (30 Min.)"
+      },
       "adapt_heat_curve": {
         "name": "Adaptive Heizkurve"
       },
@@ -321,10 +325,10 @@
     },
     "datetime": {
       "holiday_start_datetime": {
-        "name": "Startdatum Abwesenheitsmodus"
+        "name": "Startdatum und -zeit Abwesenheitsmodus"
       },
       "holiday_end_datetime": {
-        "name": "Enddatum Abwesenheitsmodus"
+        "name": "Enddatum und -zeit Abwesenheitsmodus"
       },
       "cooling_start_datetime": {
         "name": "Startdatum Manueller Kühlbetrieb"
@@ -677,6 +681,12 @@
       "cooling_duration_remaining": {
         "name": "Verbleibende Kühldauer"
       },
+      "quick_veto_remaining_time": {
+        "name": "Verbleibende Schnell-Veto-Dauer"
+      },
+      "ventilation_remaining_time": {
+        "name": "Verbleibende Stoßlüften-Dauer"
+      },
       "bass3_energy_hc_this_month": {
         "name": "Heizenergie-Verbrauch aktueller Monat (BASS3)"
       },
@@ -964,6 +974,14 @@
     "cancel_quick_veto": {
       "name": "Quick Veto abbrechen",
       "description": "Beendet das aktive Quick Veto (Heizen oder Kühlen) für Zone 1 (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3) sofort und stellt die vorherige Betriebsart und manuelle Solltemperatur wieder her."
+    },
+    "start_ventilation_boost": {
+      "name": "Stoßlüftung starten",
+      "description": "Aktiviert die Stoßlüftung (VentilationBoost = on) am Regler (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3), pausiert die Heizung für 30 Minuten bei aktivem Frostschutz, Warmwasser und Zirkulation."
+    },
+    "cancel_ventilation_boost": {
+      "name": "Stoßlüftung abbrechen",
+      "description": "Beendet die aktive Stoßlüftung (VentilationBoost = off) am Regler (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3) sofort und kehrt zur vorherigen Betriebsart zurück."
     },
     "dump_mqtt_values": {
       "name": "MQTT-Werte ausgeben (Diagnose)",

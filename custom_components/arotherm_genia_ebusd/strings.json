@@ -100,7 +100,7 @@
     },
     "outdated_controller_csv": {
       "title": "Outdated controller CSV file in eBUSd",
-      "description": "Your `ebusd` instance is using an older version of `vaillant/15.bass3.csv`, `15.basv3.csv`, `15.ctlv2.csv`, or `15.ctlv3.csv` (reporting legacy `Z1HolidayTemp` or `Z1DayTemp`, or missing `SilentTimer` weekly schedule programming support). Please copy the updated `ebusd-configuration/vaillant/*.csv` into your `ebusd` configuration folder and restart `ebusd` to enable real-time Holiday Mode synchronization, active cooling manual setpoint (`Z1CoolingManualTemp`), and silent mode weekly schedules. This repair notice will clear automatically once `ebusd` reloads the updated CSV."
+      "description": "Your `ebusd` instance is using an older version of `vaillant/15.bass3.csv`, `15.basv3.csv`, `15.ctlv2.csv`, or `15.ctlv3.csv` (reporting legacy `Z1HolidayTemp` or `Z1DayTemp`, or missing `SilentTimer` weekly schedules or `VentilationBoost`). Please copy the updated `ebusd-configuration/vaillant/*.csv` into your `ebusd` configuration folder and restart `ebusd` to enable real-time Holiday Mode synchronization, active cooling manual setpoint (`Z1CoolingManualTemp`), silent mode weekly schedules, and intensive ventilation boost (`VentilationBoost`). This repair notice will clear automatically once `ebusd` reloads the updated CSV."
     },
     "missing_custom_csv": {
       "title": "Custom eBUSd CSV files not loaded or incomplete scan",
@@ -129,7 +129,8 @@
               "comfort": "Scheduled (Comfort)",
               "manual": "Continuous Manual",
               "eco": "Eco (Night setback)",
-              "boost": "Quick Veto Override"
+              "boost": "Quick Veto Override",
+              "ventilation": "Intensive Ventilation (30 min)"
             }
           }
         }
@@ -309,6 +310,9 @@
       "holiday_mode_switch": {
         "name": "Away Mode"
       },
+      "ventilation_boost_switch": {
+        "name": "Intensive Ventilation Boost (30 min)"
+      },
       "adapt_heat_curve": {
         "name": "Adaptive Heating Curve"
       },
@@ -321,10 +325,10 @@
     },
     "datetime": {
       "holiday_start_datetime": {
-        "name": "Away Mode Start Date"
+        "name": "Away Mode Start Date & Time"
       },
       "holiday_end_datetime": {
-        "name": "Away Mode End Date"
+        "name": "Away Mode End Date & Time"
       },
       "cooling_start_datetime": {
         "name": "Manual Cooling Start Date"
@@ -677,6 +681,12 @@
       "cooling_duration_remaining": {
         "name": "Cooling Duration Remaining"
       },
+      "quick_veto_remaining_time": {
+        "name": "Quick Veto Remaining Time"
+      },
+      "ventilation_remaining_time": {
+        "name": "Intensive Ventilation Remaining Time"
+      },
       "bass3_energy_hc_this_month": {
         "name": "Heating Energy Consumed This Month (BASS3)"
       },
@@ -964,6 +974,14 @@
     "cancel_quick_veto": {
       "name": "Cancel Quick Veto",
       "description": "Immediately cancels active heating or cooling Quick Veto on Zone 1 (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3) and restores the previous operating mode and manual setpoint."
+    },
+    "start_ventilation_boost": {
+      "name": "Start Intensive Ventilation Boost",
+      "description": "Activates Intensive Ventilation Boost (VentilationBoost = on) on the climate controller (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3), pausing space heating for 30 minutes while keeping frost protection, DHW, and circulation active."
+    },
+    "cancel_ventilation_boost": {
+      "name": "Cancel Intensive Ventilation Boost",
+      "description": "Immediately cancels active Intensive Ventilation Boost (VentilationBoost = off) on the climate controller (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3) and resumes the previous operating mode."
     },
     "dump_mqtt_values": {
       "name": "Dump MQTT Values (Diagnostics)",

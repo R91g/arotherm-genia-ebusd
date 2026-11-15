@@ -2,7 +2,7 @@
 
 **🇬🇧 English** | [🇪🇸 Versión en Español](services_es.md)
 
-The integration registers twelve custom actions under the `arotherm_genia_ebusd` domain, available in **Developer Tools → Actions** and in automations and scripts.
+The integration registers fourteen custom actions under the `arotherm_genia_ebusd` domain, available in **Developer Tools → Actions** and in automations and scripts.
 
 | # | Action | Purpose |
 | :---: | :--- | :--- |
@@ -18,6 +18,8 @@ The integration registers twelve custom actions under the `arotherm_genia_ebusd`
 | 10 | [`send_hex_command`](#10-arotherm_genia_ebusdsend_hex_command) | Send a raw hex telegram (opt-in diagnostic) |
 | 11 | [`read_parameter`](#11-arotherm_genia_ebusdread_parameter) | Read a symbolic eBUS register |
 | 12 | [`write_parameter`](#12-arotherm_genia_ebusdwrite_parameter) | Write a symbolic eBUS register |
+| 13 | [`start_ventilation_boost`](#13-arotherm_genia_ebusdstart_ventilation_boost) | Start the 30-minute intensive ventilation boost |
+| 14 | [`cancel_ventilation_boost`](#14-arotherm_genia_ebusdcancel_ventilation_boost) | Cancel active intensive ventilation boost |
 
 ---
 
@@ -267,4 +269,24 @@ Writes a symbolic value to an eBUS register over MQTT (`SupportsResponse.OPTIONA
 | `value` | Yes | String / Number / Boolean | Value to write. |
 
 > Writes go onto the physical eBUS. Check the allowed range of each register in the CSV definition before writing, and avoid high-frequency writes from automations: the bus runs at 2400 baud and shares the medium with your wall controller.
+
+---
+
+## 13. `arotherm_genia_ebusd.start_ventilation_boost`
+
+Activates Intensive Ventilation Boost (`VentilationBoost = on`) on the climate controller (`15.bass3` / `15.basv3` / `15.ctlv2` / `15.ctlv3`). Space heating is paused for **30 minutes** (while frost protection, domestic hot water, and circulation remain active), and the controller automatically resumes its prior operating mode when the 30 minutes elapse. Home Assistant persists the 30-minute countdown in `Store` (`ventilation_remaining_time` sensor and `climate.active_preset_remaining`). No parameters.
+
+```yaml
+action: arotherm_genia_ebusd.start_ventilation_boost
+```
+
+---
+
+## 14. `arotherm_genia_ebusd.cancel_ventilation_boost`
+
+Immediately cancels an active Intensive Ventilation Boost (`VentilationBoost = off`), clears the persisted countdown timer, and resumes the previous operating mode. No parameters.
+
+```yaml
+action: arotherm_genia_ebusd.cancel_ventilation_boost
+```
 

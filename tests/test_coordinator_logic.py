@@ -70,10 +70,12 @@ from custom_components.arotherm_genia_ebusd.const import (
     OUTDOOR_CIRCUITS,
     SERVICE_CANCEL_HOLIDAY_MODE,
     SERVICE_CANCEL_QUICK_VETO,
+    SERVICE_CANCEL_VENTILATION_BOOST,
     SERVICE_FORCE_DHW_BOOST,
     SERVICE_QUICK_VETO,
     SERVICE_SET_HOLIDAY_MODE,
     SERVICE_SET_WEEKLY_TIMER,
+    SERVICE_START_VENTILATION_BOOST,
 )
 from custom_components.arotherm_genia_ebusd.coordinator import (
     DATE_WRITE_FIELDS,
@@ -278,6 +280,11 @@ class TestCoordinatorLogic(unittest.TestCase):
                 SaunierGeniaCoordinator.async_cancel_holiday_mode
             )
 
+            def _optimistically_clear_z1_status(
+                self, expected_status: str, *, force_off: bool = False
+            ) -> None:
+                return None
+
         coord = MockCoordinator()
 
         with patch("asyncio.sleep", new_callable=AsyncMock):
@@ -328,19 +335,19 @@ class TestCoordinatorLogic(unittest.TestCase):
             )
 
     def test_holiday_and_cooling_remaining_days_states(self) -> None:
-        """Test remaining days calculations: Inactive, Open-ended, and positive day counts."""
+        """Test remaining days calculations: 0 (inactive), None (open-ended), and positive/same-day counts."""
         coord = SaunierGeniaCoordinator(MagicMock(), MagicMock())
         c_bass3 = CIRCUIT_BASS3.lower()
 
-        # 1. Holiday mode inactive: returns 'Inactive'
+        # 1. Holiday mode inactive: returns 0 with is_active=False
         coord._state[(c_bass3, "Z1Status")] = {"value": "auto"}
-        self.assertEqual(coord.get_holiday_remaining_days(), "Inactive")
+        self.assertEqual(coord.get_holiday_remaining_days(), 0)
         attrs = coord.get_holiday_remaining_attributes()
         self.assertEqual(attrs["days_remaining"], 0)
         self.assertFalse(attrs["is_active"])
         self.assertFalse(attrs["is_open_ended"])
 
-        # 2. Holiday mode active with open-ended date (year 99): returns 'Open-ended'
+        # 2. Holiday mode active with open-ended date (year 99): returns None
         coord._state[(c_bass3, "Z1Status")] = {"value": "holidayaway"}
         coord._state[(c_bass3, "HolidayStartDate")] = {
             "day": 30,
@@ -348,38 +355,79 @@ class TestCoordinatorLogic(unittest.TestCase):
             "year": 26,
         }
         coord._state[(c_bass3, "HolidayEndDate")] = {"day": 1, "month": 1, "year": 99}
-        self.assertEqual(coord.get_holiday_remaining_days(), "Open-ended")
+        self.assertIsNone(coord.get_holiday_remaining_days())
         attrs = coord.get_holiday_remaining_attributes()
         self.assertIsNone(attrs["days_remaining"])
+        self.assertIsNone(attrs["remaining_formatted"])
         self.assertTrue(attrs["is_active"])
         self.assertTrue(attrs["is_open_ended"])
 
-        # 3. Holiday mode active with timed window (e.g. 5 days in future)
-        future_date = datetime.now().date() + timedelta(days=5)
-        coord._state[(c_bass3, "HolidayEndDate")] = {
-            "day": future_date.day,
-            "month": future_date.month,
-            "year": future_date.year % 100,
+        # 3. Holiday mode active with timed window (e.g. ~2 days 4h 30m in future)
+        future_dt = (datetime.now() + timedelta(days=2, hours=4, minutes=30)).replace(
+            second=0, microsecond=0
+        )
+        coord._state[(c_bass3, "HolidayStartTime")] = {
+            "hours": 8,
+            "minutes": 15,
+            "seconds": 0,
         }
-        self.assertEqual(coord.get_holiday_remaining_days(), 5)
+        coord._state[(c_bass3, "HolidayEndDate")] = {
+            "day": future_dt.day,
+            "month": future_dt.month,
+            "year": future_dt.year % 100,
+        }
+        coord._state[(c_bass3, "HolidayEndTime")] = {
+            "hours": future_dt.hour,
+            "minutes": future_dt.minute,
+            "seconds": future_dt.second,
+        }
+        expected_days = (future_dt.date() - datetime.now().date()).days
+        self.assertEqual(coord.get_holiday_remaining_days(), expected_days)
         attrs = coord.get_holiday_remaining_attributes()
-        self.assertEqual(attrs["days_remaining"], 5)
+        self.assertEqual(attrs["days_remaining"], expected_days)
+        self.assertEqual(attrs["start_time"], "08:15:00")
+        self.assertEqual(
+            attrs["end_time"],
+            f"{future_dt.hour:02d}:{future_dt.minute:02d}:{future_dt.second:02d}",
+        )
+        self.assertEqual(attrs["remaining_hours"], 4)
+        self.assertIn(attrs["remaining_minutes"], (29, 30))
+        self.assertIsNotNone(attrs["remaining_formatted"])
+        self.assertTrue(attrs["remaining_formatted"].startswith("2d 4h "))
         self.assertTrue(attrs["is_active"])
         self.assertFalse(attrs["is_open_ended"])
 
-        # 4. Cooling inactive (year 19 or release status off): returns 'Inactive'
+        # 3b. Same-day holiday ending later today (0 calendar days left, still active)
+        today_end = datetime.now() + timedelta(minutes=90)
+        if today_end.date() == datetime.now().date():
+            coord._state[(c_bass3, "HolidayEndDate")] = {
+                "day": today_end.day,
+                "month": today_end.month,
+                "year": today_end.year % 100,
+            }
+            coord._state[(c_bass3, "HolidayEndTime")] = {
+                "hours": today_end.hour,
+                "minutes": today_end.minute,
+                "seconds": today_end.second,
+            }
+            self.assertEqual(coord.get_holiday_remaining_days(), 0)
+            today_attrs = coord.get_holiday_remaining_attributes()
+            self.assertTrue(today_attrs["is_active"])
+            self.assertFalse(today_attrs["is_open_ended"])
+
+        # 4. Cooling inactive (year 19 or release status off): returns 0 with is_active=False
         coord._state[(c_bass3, "CoolingEndDate")] = {"day": 1, "month": 1, "year": 19}
-        self.assertEqual(coord.get_cooling_remaining_days(), "Inactive")
+        self.assertEqual(coord.get_cooling_remaining_days(), 0)
         c_attrs = coord.get_cooling_remaining_attributes()
         self.assertEqual(c_attrs["days_remaining"], 0)
         self.assertFalse(c_attrs["is_active"])
         self.assertFalse(c_attrs["is_open_ended"])
 
-        # 5. Cooling active with open-ended date (year 99): returns 'Open-ended'
+        # 5. Cooling active with open-ended date (year 99): returns None
         coord._state[(c_bass3, "CoolingEndDate")] = {"day": 1, "month": 1, "year": 99}
         coord._state[(c_bass3, "CoolingReleaseStatus")] = {"value": "on"}
         coord._state[(c_bass3, "Z1OpModeCooling")] = {"value": "day"}
-        self.assertEqual(coord.get_cooling_remaining_days(), "Open-ended")
+        self.assertIsNone(coord.get_cooling_remaining_days())
         c_attrs = coord.get_cooling_remaining_attributes()
         self.assertIsNone(c_attrs["days_remaining"])
         self.assertTrue(c_attrs["is_active"])
@@ -1497,6 +1545,31 @@ class TestCoordinatorLogic(unittest.TestCase):
             self.assertIn((CIRCUIT_HMUX0, "PrEnergyElectricHc"), hmux0_poll_queue)
             self.assertIn((CIRCUIT_VWZIO, "PrEnergyElectricHc"), hmux0_poll_queue)
             self.assertNotIn((CIRCUIT_HMU, "YieldHc"), hmux0_poll_queue)
+            for msg in (
+                "Z1SFMode",
+                "Z1Status",
+                "Z1OpMode",
+                "Z1OpModeCooling",
+                "Z1RoomTemp",
+                "Z1ActualRoomTempDesired",
+                "Z1CoolingTempDesired",
+                "Z1CoolingTemp",
+                "Z1HeatingState",
+                "SystemOperatingState",
+                "HwcOpMode",
+                "HwcTempDesired",
+                "HwcStatus",
+                "HwcStorageTemp",
+                "HwcLegionellaDay",
+                "HwcLegionellaTime",
+                "DisplayedOutsideTemp",
+                "WaterPressure",
+                "Hc1FlowTemp",
+                "Hc1ActualFlowTempDesired",
+                "Currenterror",
+                "Hc1PumpStatus",
+            ):
+                self.assertIn((CIRCUIT_BASS3, msg), hmux0_poll_queue)
 
         # 2. Fallback poll on HMU
         coord_hmu = SaunierGeniaCoordinator(hass, entry)
@@ -1878,7 +1951,22 @@ class TestCoordinatorLogic(unittest.TestCase):
         push_mqtt("ebusd/bass3/Z1CoolingManualTemp", "ERR: element not found")
         self.assertIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
 
+        # Unrelated modern telemetry does not falsely clear while Z1CoolingManualTemp is missing
         push_mqtt("ebusd/bass3/HolidayTemp", '{"value": {"value": 16.0}}')
+        self.assertIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+
+        push_mqtt("ebusd/bass3/Z1CoolingManualTemp", '{"value": {"value": 21.0}}')
+        self.assertNotIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+
+        # Missing VentilationBoost (ERR: element not found) raises outdated_controller_csv
+        # even when other v1.3.0 registers (SilentTimer_Slots, HolidayTemp) succeed
+        push_mqtt("ebusd/bass3/VentilationBoost", "ERR: element not found")
+        self.assertIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+
+        push_mqtt("ebusd/bass3/HolidayTemp", '{"value": {"value": 16.0}}')
+        self.assertIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+
+        push_mqtt("ebusd/bass3/VentilationBoost", '{"value": {"value": "off"}}')
         self.assertNotIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
 
         # 7. CompressorSilentOperationLevel error vs valid on hmux0
@@ -2160,6 +2248,7 @@ class TestCoordinatorLogic(unittest.TestCase):
         hass = MagicMock()
         hass.services.has_service = lambda domain, s: s in registered_services
         hass.services.async_register = mock_register
+        hass.async_create_task.side_effect = lambda coro: coro.close()
         hass.data = {}
 
         entry = MagicMock()
@@ -2259,6 +2348,27 @@ class TestCoordinatorLogic(unittest.TestCase):
         asyncio.run(registered_services[SERVICE_CANCEL_QUICK_VETO](call))
         self.assertFalse(coord.cooling_quick_veto_active)
         self.assertIn((CIRCUIT_BASS3, "Z1OpModeCooling", "auto"), writes)
+
+        # 8. Start and cancel Intensive Ventilation Boost via services
+        self.assertIn(SERVICE_START_VENTILATION_BOOST, registered_services)
+        self.assertIn(SERVICE_CANCEL_VENTILATION_BOOST, registered_services)
+
+        writes.clear()
+        coord._state[("global", "signal")] = {"value": "false"}
+        with self.assertRaises(HomeAssistantError):
+            asyncio.run(registered_services[SERVICE_START_VENTILATION_BOOST](call))
+
+        coord._state[("global", "signal")] = {"value": "true"}
+        asyncio.run(registered_services[SERVICE_START_VENTILATION_BOOST](call))
+        self.assertIn((CIRCUIT_BASS3, "VentilationBoost", "on"), writes)
+        self.assertTrue(coord.get_ventilation_remaining_attributes()["is_active"])
+        self.assertGreater(coord.get_ventilation_remaining_minutes(), 0)
+
+        writes.clear()
+        asyncio.run(registered_services[SERVICE_CANCEL_VENTILATION_BOOST](call))
+        self.assertIn((CIRCUIT_BASS3, "VentilationBoost", "off"), writes)
+        self.assertFalse(coord.get_ventilation_remaining_attributes()["is_active"])
+        self.assertEqual(coord.get_ventilation_remaining_minutes(), 0)
 
     def test_currenterror_sensors_outdoor_controller_and_vwzio(self) -> None:
         """Verify Currenterror diagnostic sensor parsing, fallback and subscriptions across all 3 devices."""
@@ -3364,6 +3474,9 @@ class TestCoordinatorLogic(unittest.TestCase):
             # find SilentTimer_Slots -> missing
             b"ERR: element not found\n",
             b"\n",
+            # find VentilationBoost -> missing
+            b"ERR: element not found\n",
+            b"\n",
             # find CompressorSilentOperationLevel -> missing
             b"ERR: element not found\n",
             b"\n",
@@ -3385,6 +3498,7 @@ class TestCoordinatorLogic(unittest.TestCase):
         self.assertIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
         mock_writer.write.assert_any_call(b"find HwcLegionellaDay\n")
         mock_writer.write.assert_any_call(b"find SilentTimer_Slots\n")
+        mock_writer.write.assert_any_call(b"find VentilationBoost\n")
         mock_writer.write.assert_any_call(b"find CompressorSilentOperationLevel\n")
         mock_writer.write.assert_any_call(b"find RunDataElectricPowerConsumption\n")
         mock_writer.write.assert_any_call(b"quit\n")
@@ -3399,6 +3513,8 @@ class TestCoordinatorLogic(unittest.TestCase):
             b"bass3 HwcLegionellaDay = off\n",
             b"\n",
             b"bass3 SilentTimer_Slots = 0\n",
+            b"\n",
+            b"bass3 VentilationBoost = off\n",
             b"\n",
             b"hmux0 CompressorSilentOperationLevel = 0\n",
             b"\n",
@@ -3418,6 +3534,37 @@ class TestCoordinatorLogic(unittest.TestCase):
 
         self.assertNotIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
         self.assertNotIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
+
+        # 3. Only VentilationBoost missing on TCP find -> outdated_controller_csv still raised
+        tcp_responses_only_vent_missing = [
+            b"version: ebusd 26.1.26.1\n",
+            b"scan: finished\n",
+            b'address 08: slave #11, scanned "MF=Vaillant;ID=HMUX0;SW=0407;HW=0504", loaded "vaillant/08.hmux0.csv"\n',
+            b'address 15: slave #12, scanned "MF=Vaillant;ID=BASS3;SW=0708;HW=4304", loaded "vaillant/15.bass3.csv"\n',
+            b"\n",
+            b"bass3 HwcLegionellaDay = off\n",
+            b"\n",
+            b"bass3 SilentTimer_Slots = 0\n",
+            b"\n",
+            b"ERR: element not found\n",
+            b"\n",
+            b"hmux0 CompressorSilentOperationLevel = 0\n",
+            b"\n",
+            b"hmux0 RunDataElectricPowerConsumption = 450\n",
+            b"\n",
+        ]
+        mock_reader3 = AsyncMock()
+        mock_reader3.readline = AsyncMock(side_effect=tcp_responses_only_vent_missing)
+        mock_writer3 = MagicMock()
+        mock_writer3.drain = AsyncMock()
+        mock_writer3.wait_closed = AsyncMock()
+
+        with patch(
+            "asyncio.open_connection", return_value=(mock_reader3, mock_writer3)
+        ):
+            asyncio.run(coord._async_fetch_ebusd_tcp_info())
+
+        self.assertIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
 
     def test_real_coordinator_dhw_boost_persistence_across_restart(self) -> None:
         """Verify forced DHW boost elevation persists across restarts, updates on manual override, and restores offline expiry."""
@@ -4099,6 +4246,581 @@ class TestCoordinatorLogic(unittest.TestCase):
 
             await coord.async_unload()
             await coord2.async_unload()
+
+        asyncio.run(_run())
+
+    def test_unified_quick_veto_remaining_heating_auto_and_cooling(self) -> None:
+        """Unified quick_veto_remaining_time sensor tracks heating (any mode), duration changes, cooling, restarts, and expiration."""
+        from custom_components.arotherm_genia_ebusd.const import (
+            CALC_CIRCUIT,
+            CIRCUIT_BASS3,
+        )
+        from custom_components.arotherm_genia_ebusd.coordinator import (
+            SaunierGeniaCoordinator,
+        )
+
+        async def _run() -> None:
+            created_tasks: list[asyncio.Task[Any]] = []
+            hass = MagicMock()
+
+            def _create_task(coro):
+                task = asyncio.get_running_loop().create_task(coro)
+                created_tasks.append(task)
+                return task
+
+            hass.async_create_task = _create_task
+            entry = MagicMock(entry_id="unified_veto_test_entry")
+            entry.data = {"mqtt_prefix": "ebusd"}
+            entry.options = {}
+            coord = SaunierGeniaCoordinator(hass, entry)
+            coord._state[(CIRCUIT_BASS3.lower(), "Status01")] = {"temp1": 35.0}
+            coord._state[(CIRCUIT_BASS3.lower(), "Z1OpMode")] = {"value": "auto"}
+            coord._state[(CIRCUIT_BASS3.lower(), "Z1SFMode")] = {"value": "auto"}
+            coord._state[(CIRCUIT_BASS3.lower(), "Z1QuickVetoTemp")] = {"value": 23.5}
+            coord._state[(CIRCUIT_BASS3.lower(), "Z1OpModeCooling")] = {"value": "auto"}
+            coord._state[(CIRCUIT_BASS3.lower(), "Z1CoolingTempDesired")] = {
+                "value": 24.0
+            }
+            coord._last_telemetry_time = time.monotonic()
+
+            notifications: list[str] = []
+            unsub = coord.async_add_listener(
+                CALC_CIRCUIT,
+                "QuickVetoRemaining",
+                lambda: notifications.append("tick"),
+            )
+
+            # Inactive initially
+            self.assertEqual(coord.get_quick_veto_remaining_minutes(), 0)
+            attrs = coord.get_quick_veto_remaining_attributes()
+            self.assertFalse(attrs["is_active"])
+            self.assertIsNone(attrs["veto_type"])
+
+            published: list[tuple[str, str]] = []
+
+            async def _fake_publish(_h, topic, payload, **_k):
+                published.append((topic, payload))
+
+            with (
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                    side_effect=_fake_publish,
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.asyncio.sleep",
+                    new=AsyncMock(return_value=None),
+                ),
+            ):
+                # 1. Activate heating quick veto from 'auto' with 2.5h
+                await coord.async_set_quick_veto(temperature=23.5, duration=2.5)
+                coord._state[(CIRCUIT_BASS3.lower(), "Z1SFMode")] = {"value": "veto"}
+
+                rem = coord.get_quick_veto_remaining_minutes()
+                self.assertEqual(rem, 150)
+                attrs = coord.get_quick_veto_remaining_attributes()
+                self.assertTrue(attrs["is_active"])
+                self.assertEqual(attrs["veto_type"], "heating")
+                self.assertEqual(attrs["target_temperature"], 23.5)
+                self.assertGreaterEqual(len(notifications), 1)
+
+                # 2. Adjust duration mid-veto to 1.0h
+                await coord.async_refresh_heating_veto_duration(1.0)
+                self.assertEqual(coord.get_quick_veto_remaining_minutes(), 60)
+
+                # 3. Simulate HA restart preserving 'auto' heating countdown
+                coord2 = SaunierGeniaCoordinator(hass, entry)
+                coord2._state[(CIRCUIT_BASS3.lower(), "Status01")] = {"temp1": 35.0}
+                coord2._state[(CIRCUIT_BASS3.lower(), "Z1SFMode")] = {"value": "veto"}
+                coord2._last_telemetry_time = time.monotonic()
+                await coord2._async_restore_persisted_heating_veto()
+                self.assertEqual(coord2._pre_veto_opmode, "auto")
+                rem2 = coord2.get_quick_veto_remaining_minutes()
+                assert rem2 is not None
+                self.assertGreaterEqual(rem2, 59)
+
+                # 4. Natural timer expiry from 'auto' clears state without forcing Z1OpMode='off'
+                published.clear()
+                coord2._async_on_heating_veto_timeout(datetime.now())
+                if created_tasks:
+                    await asyncio.gather(*created_tasks)
+                    created_tasks.clear()
+                self.assertIsNone(coord2._heating_veto_end_time)
+                self.assertIsNone(coord2._pre_veto_opmode)
+                self.assertNotIn(("ebusd/bass3/Z1OpMode/set", "off"), published)
+                coord2._state[(CIRCUIT_BASS3.lower(), "Z1SFMode")] = {"value": "auto"}
+                self.assertEqual(coord2.get_quick_veto_remaining_minutes(), 0)
+                self.assertIsNone(await coord2._heating_veto_store.async_load())
+
+                # 5. Cancel heating veto cleanly on coord -> 0, then activate cooling quick veto (2.0h) and cancel
+                await coord.async_cancel_quick_veto()
+                coord._state[(CIRCUIT_BASS3.lower(), "Z1SFMode")] = {"value": "auto"}
+                self.assertEqual(coord.get_quick_veto_remaining_minutes(), 0)
+
+                await coord.async_set_cooling_quick_veto(temperature=19.0, duration=2.0)
+                self.assertEqual(coord.get_quick_veto_remaining_minutes(), 120)
+                cool_attrs = coord.get_quick_veto_remaining_attributes()
+                self.assertTrue(cool_attrs["is_active"])
+                self.assertEqual(cool_attrs["veto_type"], "cooling")
+                self.assertEqual(cool_attrs["target_temperature"], 19.0)
+
+                await coord.async_cancel_cooling_quick_veto(restore=True)
+                self.assertEqual(coord.get_quick_veto_remaining_minutes(), 0)
+                self.assertFalse(
+                    coord.get_quick_veto_remaining_attributes()["is_active"]
+                )
+
+            unsub()
+            await coord.async_unload()
+            await coord2.async_unload()
+
+        asyncio.run(_run())
+
+    def test_unified_quick_veto_external_transition_and_watchdog(self) -> None:
+        """Initial unknown Z1SFMode=veto reports None, while live Z1SFMode->veto starts countdown and watchdog notifies."""
+        from types import SimpleNamespace
+
+        from custom_components.arotherm_genia_ebusd.const import (
+            CALC_CIRCUIT,
+            CIRCUIT_BASS3,
+        )
+        from custom_components.arotherm_genia_ebusd.coordinator import (
+            SaunierGeniaCoordinator,
+        )
+
+        async def _run() -> None:
+            created_tasks: list[asyncio.Task[Any]] = []
+            hass = MagicMock()
+
+            def _create_task(coro):
+                task = asyncio.get_running_loop().create_task(coro)
+                created_tasks.append(task)
+                return task
+
+            hass.async_create_task = _create_task
+            entry = MagicMock(entry_id="unified_veto_test_entry")
+            entry.data = {"mqtt_prefix": "ebusd"}
+            entry.options = {}
+            coord = SaunierGeniaCoordinator(hass, entry)
+            coord._state[(CIRCUIT_BASS3.lower(), "Z1OpMode")] = {"value": "auto"}
+            coord._state[(CIRCUIT_BASS3.lower(), "Z1QuickVetoDuration")] = {
+                "value": 1.5
+            }
+
+            ticks: list[int] = []
+            unsub = coord.async_add_listener(
+                CALC_CIRCUIT,
+                "QuickVetoRemaining",
+                lambda: ticks.append(1),
+            )
+
+            # First boot message already in veto -> unknown remaining (None)
+            coord._async_on_mqtt_message(
+                SimpleNamespace(topic="ebusd/bass3/Z1SFMode", payload="veto")
+            )
+            self.assertIsNone(coord._heating_veto_end_time)
+            self.assertIsNone(coord.get_quick_veto_remaining_minutes())
+            attrs = coord.get_quick_veto_remaining_attributes()
+            self.assertTrue(attrs["is_active"])
+            self.assertEqual(attrs["veto_type"], "heating")
+            self.assertIsNone(attrs["end_time"])
+
+            # Clear back to auto -> 0
+            coord._async_on_mqtt_message(
+                SimpleNamespace(topic="ebusd/bass3/Z1SFMode", payload="auto")
+            )
+            self.assertEqual(coord.get_quick_veto_remaining_minutes(), 0)
+
+            # Live external transition auto -> veto starts 1.5h (90 min) countdown
+            ticks.clear()
+            coord._async_on_mqtt_message(
+                SimpleNamespace(topic="ebusd/bass3/Z1SFMode", payload="veto")
+            )
+            await asyncio.sleep(0)
+            self.assertIsNotNone(coord._heating_veto_end_time)
+            self.assertEqual(coord.get_quick_veto_remaining_minutes(), 90)
+            self.assertGreaterEqual(len(ticks), 1)
+
+            # Periodic 60s watchdog notifies countdown listener while active
+            before_watchdog = len(ticks)
+            coord._async_check_watchdog(datetime.now())
+            self.assertEqual(len(ticks), before_watchdog + 1)
+
+            # Live exit back to auto clears software timer cleanly
+            coord._async_on_mqtt_message(
+                SimpleNamespace(topic="ebusd/bass3/Z1SFMode", payload="auto")
+            )
+            await asyncio.sleep(0)
+            self.assertIsNone(coord._heating_veto_end_time)
+            self.assertEqual(coord.get_quick_veto_remaining_minutes(), 0)
+
+            unsub()
+            await coord.async_unload()
+
+        asyncio.run(_run())
+
+    def test_heating_veto_external_duration_sync_and_z1status_unstick(self) -> None:
+        """External Z1QuickVetoDuration change (0.5h) updates countdown, and Z1Status exiting 'veto' requests Z1SFMode."""
+        from types import SimpleNamespace
+
+        async def _run() -> None:
+            created_tasks: list[asyncio.Task[Any]] = []
+            hass = MagicMock()
+
+            def _create_task(coro):
+                task = asyncio.get_running_loop().create_task(coro)
+                created_tasks.append(task)
+                return task
+
+            hass.async_create_task = _create_task
+            entry = MagicMock(entry_id="veto_app_sync_entry")
+            entry.data = {"mqtt_prefix": "ebusd"}
+            entry.options = {}
+            coord = SaunierGeniaCoordinator(hass, entry)
+            coord._state[(CIRCUIT_BASS3.lower(), "Status01")] = {"temp1": 35.0}
+            coord._state[(CIRCUIT_BASS3.lower(), "Z1OpMode")] = {"value": "auto"}
+            coord._state[(CIRCUIT_BASS3.lower(), "Z1SFMode")] = {"value": "auto"}
+            coord._state[(CIRCUIT_BASS3.lower(), "Z1Status")] = {"value": "auto"}
+            coord._state[(CIRCUIT_BASS3.lower(), "Z1QuickVetoDuration")] = {
+                "value": 3.0
+            }
+            coord._last_telemetry_time = time.monotonic()
+
+            published: list[tuple[str, str]] = []
+
+            async def _fake_publish(_h, topic, payload, **_k):
+                published.append((topic, payload))
+
+            with (
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                    side_effect=_fake_publish,
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.asyncio.sleep",
+                    new=AsyncMock(return_value=None),
+                ),
+            ):
+                # 1. Start 3h boost from HA
+                await coord.async_set_quick_veto(temperature=22.0, duration=3.0)
+                coord._async_on_mqtt_message(
+                    SimpleNamespace(topic="ebusd/bass3/Z1SFMode", payload="veto")
+                )
+                coord._async_on_mqtt_message(
+                    SimpleNamespace(topic="ebusd/bass3/Z1Status", payload="veto")
+                )
+                self.assertEqual(coord.get_quick_veto_remaining_minutes(), 180)
+
+                # 2. Official app adjusts duration to 0.5h over the bus
+                coord._async_on_mqtt_message(
+                    SimpleNamespace(
+                        topic="ebusd/bass3/Z1QuickVetoDuration", payload="0.5"
+                    )
+                )
+                if created_tasks:
+                    await asyncio.gather(*created_tasks)
+                    created_tasks.clear()
+                self.assertEqual(coord.get_quick_veto_remaining_minutes(), 30)
+
+                # 2b. Controller r9 poll reads back static 3.0h default while Z1Status is STILL 'veto'
+                #     -> must NOT overwrite the active 0.5h (30 min) countdown back to 3h!
+                coord._async_on_mqtt_message(
+                    SimpleNamespace(
+                        topic="ebusd/bass3/Z1QuickVetoDuration", payload="3.0"
+                    )
+                )
+                if created_tasks:
+                    await asyncio.gather(*created_tasks)
+                    created_tasks.clear()
+                rem_after_r9 = coord.get_quick_veto_remaining_minutes()
+                assert rem_after_r9 is not None
+                self.assertLessEqual(rem_after_r9, 30)
+
+                # 3. Hardware exits boost (Z1Status -> auto) while Z1SFMode stays stale 'veto'
+                published.clear()
+                coord._async_on_mqtt_message(
+                    SimpleNamespace(topic="ebusd/bass3/Z1Status", payload="auto")
+                )
+                if created_tasks:
+                    await asyncio.gather(*created_tasks)
+                    created_tasks.clear()
+                self.assertIn(("ebusd/bass3/Z1SFMode/get", ""), published)
+
+                # 4. Controller resets Z1QuickVetoDuration back to 3.0 after exit -> must NOT re-arm 3h veto
+                coord._async_on_mqtt_message(
+                    SimpleNamespace(
+                        topic="ebusd/bass3/Z1QuickVetoDuration", payload="3.0"
+                    )
+                )
+                if created_tasks:
+                    await asyncio.gather(*created_tasks)
+                    created_tasks.clear()
+                rem_before_reply = coord.get_quick_veto_remaining_minutes()
+                assert rem_before_reply is not None
+                self.assertLessEqual(rem_before_reply, 30)
+
+                # 5. Controller reply Z1SFMode=auto clears everything cleanly
+                coord._async_on_mqtt_message(
+                    SimpleNamespace(topic="ebusd/bass3/Z1SFMode", payload="auto")
+                )
+                if created_tasks:
+                    await asyncio.gather(*created_tasks)
+                    created_tasks.clear()
+                self.assertIsNone(coord._heating_veto_end_time)
+                self.assertEqual(coord.get_quick_veto_remaining_minutes(), 0)
+
+                # 6. Also verify timeout requests /get Z1SFMode even without Z1Status
+                await coord.async_set_quick_veto(temperature=22.0, duration=1.0)
+                coord._async_on_mqtt_message(
+                    SimpleNamespace(topic="ebusd/bass3/Z1SFMode", payload="veto")
+                )
+                published.clear()
+                coord._async_on_heating_veto_timeout(datetime.now())
+                if created_tasks:
+                    await asyncio.gather(*created_tasks)
+                    created_tasks.clear()
+                self.assertIn(("ebusd/bass3/Z1SFMode/get", ""), published)
+
+                # 7. Verify async_cancel_quick_veto clears Z1Status='veto' optimistically & schedules /get Z1Status,
+                #    and restore_opmode=False leaves Z1OpMode untouched even when started from 'off'.
+                coord._state[(CIRCUIT_BASS3, "z1opmode")] = {"value": "off"}
+                await coord.async_set_quick_veto(temperature=22.0, duration=1.0)
+                coord._async_on_mqtt_message(
+                    SimpleNamespace(topic="ebusd/bass3/Z1Status", payload="veto")
+                )
+                self.assertEqual(coord.get_str(CIRCUIT_BASS3, "Z1Status"), "veto")
+                published.clear()
+                await coord.async_cancel_quick_veto(restore_opmode=False)
+                self.assertNotIn(("ebusd/bass3/Z1OpMode/set", "off"), published)
+                self.assertEqual(coord.get_str(CIRCUIT_BASS3, "Z1Status"), "auto")
+
+                # External Z1Status='veto' while Z1SFMode is stale 'auto' requests /get Z1SFMode
+                coord._last_z1_sfmode_sync_time = 0.0
+                coord._state[(CIRCUIT_BASS3, "z1sfmode")] = {"value": "auto"}
+                coord._state[(CIRCUIT_BASS3, "z1status")] = {"value": "auto"}
+                published.clear()
+                coord._async_on_mqtt_message(
+                    SimpleNamespace(topic="ebusd/bass3/Z1Status", payload="veto")
+                )
+                if created_tasks:
+                    await asyncio.gather(*created_tasks)
+                    created_tasks.clear()
+                self.assertIn(("ebusd/bass3/Z1SFMode/get", ""), published)
+
+            await coord.async_unload()
+
+        asyncio.run(_run())
+
+    def test_heating_veto_from_off_extended_to_default_3h_defers_off_restore(
+        self,
+    ) -> None:
+        """Timeout verifies live controller state so app-extended 3.0h vetos still restore 'off' at true end."""
+        from types import SimpleNamespace
+
+        async def _run() -> None:
+            hass = MagicMock()
+            created_tasks: list[asyncio.Task[Any]] = []
+            hass.async_create_task.side_effect = lambda coro: (
+                created_tasks.append(asyncio.get_running_loop().create_task(coro))
+                or created_tasks[-1]
+            )
+            entry = MagicMock(entry_id="test_heating_veto_off_ext_3h")
+            entry.data = {"mqtt_prefix": "ebusd"}
+            entry.options = {}
+            coord = SaunierGeniaCoordinator(hass, entry)
+            coord._state[(CIRCUIT_BASS3.lower(), "Status01")] = {"temp1": 35.0}
+            coord._state[(CIRCUIT_BASS3.lower(), "Z1OpMode")] = {"value": "off"}
+            coord._last_telemetry_time = time.monotonic()
+
+            published: list[tuple[str, str]] = []
+            controller_veto_active = True
+
+            async def _fake_publish(
+                _hass: Any, topic: str, payload: str, **_kwargs: Any
+            ) -> None:
+                published.append((topic, str(payload)))
+                if topic == "ebusd/bass3/Z1Status/get":
+                    coord._async_on_mqtt_message(
+                        SimpleNamespace(
+                            topic="ebusd/bass3/Z1Status",
+                            payload="veto" if controller_veto_active else "auto",
+                        )
+                    )
+                elif topic == "ebusd/bass3/Z1SFMode/get":
+                    coord._async_on_mqtt_message(
+                        SimpleNamespace(
+                            topic="ebusd/bass3/Z1SFMode",
+                            payload="veto" if controller_veto_active else "auto",
+                        )
+                    )
+
+            timers: list[tuple[float, Any]] = []
+
+            with (
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                    side_effect=_fake_publish,
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.async_call_later",
+                    side_effect=lambda _h, d, cb: timers.append((d, cb)) or MagicMock(),
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.asyncio.sleep",
+                    new=AsyncMock(return_value=None),
+                ),
+            ):
+                # 1. Start 1.0h heating veto from 'off', then app extends it to 3.0h (default)
+                await coord.async_set_quick_veto(temperature=22.0, duration=1.0)
+                self.assertEqual(coord.pre_veto_opmode, "off")
+                coord._async_on_mqtt_message(
+                    SimpleNamespace(topic="ebusd/bass3/Z1SFMode", payload="veto")
+                )
+                coord._async_on_mqtt_message(
+                    SimpleNamespace(
+                        topic="ebusd/bass3/Z1QuickVetoDuration", payload="3.0"
+                    )
+                )
+
+                # 2. Local 1.0h backup timer fires while hardware is STILL in 'veto':
+                # must NOT force Z1OpMode='off' early; keeps pre_opmode='off' and arms 120s recheck
+                published.clear()
+                timers.clear()
+                coord._async_on_heating_veto_timeout(datetime.now())
+                if created_tasks:
+                    await asyncio.gather(*created_tasks)
+                    created_tasks.clear()
+
+                self.assertIn(("ebusd/bass3/Z1Status/get", ""), published)
+                self.assertIn(("ebusd/bass3/Z1SFMode/get", ""), published)
+                self.assertNotIn(("ebusd/bass3/Z1OpMode/set", "off"), published)
+                self.assertEqual(coord.pre_veto_opmode, "off")
+                self.assertIsNone(coord._heating_veto_end_time)
+                self.assertTrue(
+                    coord.get_quick_veto_remaining_attributes()["is_active"]
+                )
+                self.assertTrue(any(abs(d - 120.0) < 0.01 for d, _ in timers))
+                saved = await coord._heating_veto_store.async_load()
+                self.assertIsNotNone(saved)
+                self.assertEqual(saved["pre_opmode"], "off")
+
+                # 3. At 3.0h controller finishes veto -> next timeout recheck sees 'auto' & restores 'off'
+                controller_veto_active = False
+                published.clear()
+                recheck_cb = [cb for d, cb in timers if abs(d - 120.0) < 0.01][-1]
+                recheck_cb(datetime.now())
+                if created_tasks:
+                    await asyncio.gather(*created_tasks)
+                    created_tasks.clear()
+
+                self.assertIn(("ebusd/bass3/Z1OpMode/set", "off"), published)
+                self.assertIsNone(coord.pre_veto_opmode)
+                self.assertIsNone(await coord._heating_veto_store.async_load())
+
+            await coord.async_unload()
+
+        asyncio.run(_run())
+
+    def test_real_coordinator_ventilation_boost_and_z1status_sync(self) -> None:
+        """Verify VentilationBoost activation/cancellation and Z1ActualRoomTempDesired /get sync."""
+
+        async def _run() -> None:
+            hass = MagicMock()
+            created_tasks: list[asyncio.Task[Any]] = []
+            hass.async_create_task.side_effect = lambda coro: (
+                created_tasks.append(asyncio.ensure_future(coro)) or created_tasks[-1]
+            )
+            entry = MagicMock()
+            entry.entry_id = "test_vent_entry"
+            entry.data = {"mqtt_prefix": "ebusd"}
+            entry.options = {}
+            coord = SaunierGeniaCoordinator(hass, entry)
+
+            published: list[tuple[str, str]] = []
+            scheduled_timers: list[tuple[float, Any]] = []
+
+            async def _fake_publish(
+                _hass: Any, topic: str, payload: str, **_kwargs: Any
+            ) -> None:
+                published.append((topic, payload))
+
+            def _fake_call_later(_hass: Any, delay: float, action: Any) -> Any:
+                scheduled_timers.append((delay, action))
+                return lambda: None
+
+            coord._state[("bass3", "Z1OpMode")] = {"value": "auto"}
+            coord._canonical_names[("bass3", "z1opmode")] = "Z1OpMode"
+            coord._state[("bass3", "Z1Status")] = {"value": "auto"}
+            coord._canonical_names[("bass3", "z1status")] = "Z1Status"
+            coord._ebus_connected = True
+            coord._last_mqtt_message_time = 1e12
+
+            with (
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                    side_effect=_fake_publish,
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.async_call_later",
+                    side_effect=_fake_call_later,
+                ),
+            ):
+                # 1. Activate sets VentilationBoost=on, Z1Status=ventilation, 30 min countdown, schedules /get
+                await coord.async_activate_ventilation_boost()
+                self.assertIn(("ebusd/bass3/VentilationBoost/set", "on"), published)
+                self.assertEqual(
+                    coord.get_str("bass3", "Z1Status", "value"), "ventilation"
+                )
+                self.assertEqual(coord.get_ventilation_remaining_minutes(), 30)
+                vent_attrs = coord.get_ventilation_remaining_attributes()
+                self.assertTrue(vent_attrs["is_active"])
+                self.assertEqual(vent_attrs["remaining_minutes"], 30)
+                self.assertIsNotNone(vent_attrs["end_time"])
+                for _, cb in scheduled_timers:
+                    cb(datetime.now())
+                if created_tasks:
+                    await asyncio.gather(*created_tasks)
+                    created_tasks.clear()
+                self.assertIn(("ebusd/bass3/Z1Status/get", ""), published)
+                self.assertIn(
+                    ("ebusd/bass3/Z1ActualRoomTempDesired/get", ""), published
+                )
+
+                # 2. Cancel sets VentilationBoost=off, clears Z1Status back to auto & clears countdown
+                published.clear()
+                scheduled_timers.clear()
+                await coord.async_cancel_ventilation_boost()
+                self.assertIn(("ebusd/bass3/VentilationBoost/set", "off"), published)
+                self.assertEqual(coord.get_str("bass3", "Z1Status", "value"), "auto")
+                self.assertEqual(coord.get_ventilation_remaining_minutes(), 0)
+                self.assertIsNone(coord._ventilation_end_time)
+                if created_tasks:
+                    await asyncio.gather(*created_tasks)
+                    created_tasks.clear()
+
+                # 3. External Z1Status transition auto -> ventilation starts 30 min timer; ventilation -> auto clears it & /get desired temp
+                published.clear()
+                scheduled_timers.clear()
+                coord._async_on_mqtt_message(
+                    MagicMock(topic="ebusd/bass3/Z1Status", payload="ventilation")
+                )
+                self.assertEqual(coord.get_ventilation_remaining_minutes(), 30)
+                self.assertIsNotNone(coord._ventilation_end_time)
+
+                coord._async_on_mqtt_message(
+                    MagicMock(topic="ebusd/bass3/Z1Status", payload="auto")
+                )
+                self.assertEqual(coord.get_ventilation_remaining_minutes(), 0)
+                self.assertIsNone(coord._ventilation_end_time)
+                for _, cb in scheduled_timers:
+                    cb(datetime.now())
+                if created_tasks:
+                    await asyncio.gather(*created_tasks)
+                    created_tasks.clear()
+                self.assertIn(
+                    ("ebusd/bass3/Z1ActualRoomTempDesired/get", ""), published
+                )
+
+            await coord.async_unload()
 
         asyncio.run(_run())
 

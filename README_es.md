@@ -21,10 +21,10 @@ Las definiciones de registros que `ebusd` incluye por defecto son anteriores a e
 
 - Local push sobre la salida JSON MQTT de `ebusd`; sin entidades de autodescubrimiento de `ebusd` en Home Assistant.
 - Escucha pasiva del bus combinada con las lecturas programadas del propio `ebusd` (`r1` para potencia eléctrica, `r2` para impulsión/retorno/caudal); la integración añade un sondeo `/get` de respaldo suave solo cuando no hay pasarela cloud oficial.
-- Climatización de Zona 1 (calor / frío / apagado) con presets (programado, manual continuo, eco, quick veto, vacaciones), filtrado de valores centinela del firmware, gestión automática del calendario del doble bloqueo de refrigeración y prioridad del modo vacaciones sobre el frío.
+- Climatización de Zona 1 (calor / frío / apagado) con presets (programado, manual continuo, eco, quick veto, ventilación intensa, vacaciones), filtrado de valores centinela del firmware, gestión automática del calendario del doble bloqueo de refrigeración y prioridad del modo vacaciones sobre el frío.
 - ACS con carga puntual (boost) que eleva temporalmente la consigna para sortear la histéresis de carga de fábrica, además de control semanal de día y hora antilegionella.
 - Escritura de programaciones horarias de calefacción, refrigeración, ACS, circulación y modo silencioso, con hasta 3 franjas diarias y resolución de 1 minuto.
-- Quick veto nativo en calefacción y quick veto temporal persistente en refrigeración gestionado por la integración entre reinicios.
+- Quick veto nativo en calefacción, quick veto temporal persistente en refrigeración, refuerzo de ventilación intensa (30 minutos) y programación de vacaciones con fecha y hora y sensores unificados de tiempo restante entre reinicios.
 - Contadores de energía por modo con resolución de Wh, potencia térmica y COP/EER calculados, listos para el Panel de Energía.
 - Diagnóstico TCP opcional de `ebusd` (`info` y verificación CSV `find`), detección de CSV ausentes, volcados anonimizados y acciones de lectura/escritura simbólica de registros.
 - Interfaz en inglés, español y alemán.

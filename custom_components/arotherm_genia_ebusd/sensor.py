@@ -14,6 +14,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    CALC_CIRCUIT,
     CIRCUIT_BASS3,
     CIRCUIT_HMU,
     CIRCUIT_HMUX0,
@@ -87,7 +88,10 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
             subs.extend(
                 [
                     (CIRCUIT_BASS3, "HolidayStartDate"),
+                    (CIRCUIT_BASS3, "HolidayStartTime"),
+                    (CIRCUIT_BASS3, "HolidayEndTime"),
                     (CIRCUIT_BASS3, "Z1Status"),
+                    (CALC_CIRCUIT, "HolidayRemaining"),
                 ]
             )
         elif description.key == "cooling_duration_remaining":
@@ -96,6 +100,24 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
                     (CIRCUIT_BASS3, "CoolingStartDate"),
                     (CIRCUIT_BASS3, "CoolingReleaseStatus"),
                     (CIRCUIT_BASS3, "Z1OpModeCooling"),
+                ]
+            )
+        elif description.key == "quick_veto_remaining_time":
+            subs.extend(
+                [
+                    (CIRCUIT_BASS3, "Z1SFMode"),
+                    (CIRCUIT_BASS3, "Z1QuickVetoDuration"),
+                    (CIRCUIT_BASS3, "Z1QuickVetoTemp"),
+                    (CIRCUIT_BASS3, "Z1CoolingTempDesired"),
+                    (CIRCUIT_BASS3, "Z1CoolingManualTemp"),
+                    (CIRCUIT_BASS3, "Z1OpModeCooling"),
+                ]
+            )
+        elif description.key == "ventilation_remaining_time":
+            subs.extend(
+                [
+                    (CIRCUIT_BASS3, "Z1Status"),
+                    (CIRCUIT_BASS3, "Z1SFMode"),
                 ]
             )
         elif description.key == "electric_power_consumption":
@@ -180,11 +202,8 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
 
     @property
     def native_unit_of_measurement(self) -> str | None:
-        """Return the unit of measurement, suppressing it for non-numeric states (e.g. Inactive / Open-ended)."""
-        val = self.native_value
-        if isinstance(val, (int, float)):
-            return self.entity_description.native_unit_of_measurement
-        return None
+        """Return the unit of measurement defined on the entity description."""
+        return self.entity_description.native_unit_of_measurement
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:

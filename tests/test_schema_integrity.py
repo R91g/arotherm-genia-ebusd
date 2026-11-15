@@ -17,6 +17,7 @@ from custom_components.arotherm_genia_ebusd.const import (
     DOMAIN,
     SERVICE_CANCEL_HOLIDAY_MODE,
     SERVICE_CANCEL_QUICK_VETO,
+    SERVICE_CANCEL_VENTILATION_BOOST,
     SERVICE_DUMP_MQTT_VALUES,
     SERVICE_FORCE_DHW_BOOST,
     SERVICE_QUICK_VETO,
@@ -26,6 +27,7 @@ from custom_components.arotherm_genia_ebusd.const import (
     SERVICE_SET_HOLIDAY_MODE,
     SERVICE_SET_LEGIONELLA_PROTECTION,
     SERVICE_SET_WEEKLY_TIMER,
+    SERVICE_START_VENTILATION_BOOST,
     SERVICE_WRITE_PARAMETER,
 )
 
@@ -198,6 +200,8 @@ class TestSchemaIntegrity(unittest.TestCase):
         self.assertIn(f"{SERVICE_CANCEL_HOLIDAY_MODE}:", content)
         self.assertIn(f"{SERVICE_QUICK_VETO}:", content)
         self.assertIn(f"{SERVICE_CANCEL_QUICK_VETO}:", content)
+        self.assertIn(f"{SERVICE_START_VENTILATION_BOOST}:", content)
+        self.assertIn(f"{SERVICE_CANCEL_VENTILATION_BOOST}:", content)
         self.assertIn(f"{SERVICE_DUMP_MQTT_VALUES}:", content)
         self.assertIn(f"{SERVICE_RECORD_TOPIC_CHANGES}:", content)
         self.assertIn(f"{SERVICE_SEND_HEX_COMMAND}:", content)

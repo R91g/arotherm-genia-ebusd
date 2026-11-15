@@ -21,10 +21,10 @@ ebusd's default register definitions predate these R290 heat pump boards and do 
 
 - Local push over ebusd's MQTT JSON output; no ebusd MQTT auto-discovery entities in Home Assistant.
 - Passive bus listening combined with ebusd's scheduled reads (`r1` for electric power, `r2` for core flow/return/flow rate); the integration adds a gentle fallback polling loop only when no official cloud gateway is present.
-- Zone 1 climate (heat / cool / off) with presets (scheduled, continuous manual, eco, quick veto, holiday), firmware sentinel filtering, automatic cooling double-lock calendar handling and holiday priority over cooling.
+- Zone 1 climate (heat / cool / off) with presets (scheduled, continuous manual, eco, quick veto, intensive ventilation, holiday), firmware sentinel filtering, automatic cooling double-lock calendar handling and holiday priority over cooling.
 - Domestic hot water with one-time boost that temporarily raises the setpoint to work around the factory charging hysteresis, plus weekly anti-legionella day/time control.
 - Weekly schedule writing for heating, cooling, DHW, circulation and silent mode, up to 3 slots per day at 1-minute resolution.
-- Native heating quick veto and a persistent timed cooling quick veto managed by the integration across restarts.
+- Native heating quick veto, persistent timed cooling quick veto, 30-minute intensive ventilation boost, and full date/time holiday scheduling with unified remaining-duration sensors across restarts.
 - Wh-resolution energy counters per mode, computed thermal power and COP/EER, ready for the Energy Dashboard.
 - Optional ebusd TCP diagnostics (`info` and CSV `find` verification), missing-CSV detection, anonymized dumps and symbolic register read/write actions.
 - UI in English, Spanish and German.

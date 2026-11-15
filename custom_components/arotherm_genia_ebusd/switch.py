@@ -12,7 +12,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import CIRCUIT_BASS3, DEVICE_CLIMATE_CONTROLLER, DOMAIN, STATE_INACTIVE
+from .const import CIRCUIT_BASS3, DEVICE_CLIMATE_CONTROLLER, DOMAIN
 from .coordinator import SaunierGeniaCoordinator
 from .entity import SaunierGeniaEntity
 
@@ -75,6 +75,7 @@ async def async_setup_entry(
         SaunierGeniaDhwBoostSwitch(coordinator),
         SaunierGeniaCoolingSeasonSwitch(coordinator),
         SaunierGeniaHolidayModeSwitch(coordinator),
+        SaunierGeniaVentilationBoostSwitch(coordinator),
         *(
             SaunierGeniaStandardSwitch(coordinator, description)
             for description in STANDARD_SWITCH_DESCRIPTIONS
@@ -232,7 +233,9 @@ class SaunierGeniaHolidayModeSwitch(SaunierGeniaEntity, SwitchEntity):
                 (CIRCUIT_BASS3, "HwcStatus"),
                 (CIRCUIT_BASS3, "HolidayTemp"),
                 (CIRCUIT_BASS3, "HolidayStartDate"),
+                (CIRCUIT_BASS3, "HolidayStartTime"),
                 (CIRCUIT_BASS3, "HolidayEndDate"),
+                (CIRCUIT_BASS3, "HolidayEndTime"),
             ],
             unique_id_suffix="switch_bass3_holiday_mode",
         )
@@ -249,40 +252,30 @@ class SaunierGeniaHolidayModeSwitch(SaunierGeniaEntity, SwitchEntity):
         if start_year == 15 or end_year == 15:
             return False
         if end_year is not None and end_year != 15:
-            return self.coordinator.get_holiday_remaining_days() != STATE_INACTIVE
+            return bool(
+                self.coordinator.get_holiday_remaining_attributes().get("is_active")
+            )
         return (z1_status is not None and z1_status.lower() == "holidayaway") or (
             hwc_status is not None and hwc_status.lower() == "holidayaway"
         )
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return holiday diagnostic attributes including start/end dates."""
-        start_msg = self.coordinator.get_message(CIRCUIT_BASS3, "HolidayStartDate")
-        end_msg = self.coordinator.get_message(CIRCUIT_BASS3, "HolidayEndDate")
+        """Return holiday diagnostic attributes including start/end dates, times, and remaining duration."""
+        rem_attrs = self.coordinator.get_holiday_remaining_attributes()
         return {
             "holiday_ongoing": bool(self.is_on),
             "holiday_temp": self.coordinator.get_float(
                 CIRCUIT_BASS3, "HolidayTemp", "value"
             ),
             "holiday_remaining_days": self.coordinator.get_holiday_remaining_days(),
-            "holiday_start_date": (
-                f"{start_msg.get('day'):02d}/{start_msg.get('month'):02d}/20{start_msg.get('year'):02d}"
-                if start_msg
-                and all(
-                    isinstance(start_msg.get(k), int) for k in ("day", "month", "year")
-                )
-                and start_msg.get("year") != 15
-                else None
-            ),
-            "holiday_end_date": (
-                f"{end_msg.get('day'):02d}/{end_msg.get('month'):02d}/20{end_msg.get('year'):02d}"
-                if end_msg
-                and all(
-                    isinstance(end_msg.get(k), int) for k in ("day", "month", "year")
-                )
-                and end_msg.get("year") != 15
-                else None
-            ),
+            "holiday_remaining_hours": rem_attrs.get("remaining_hours"),
+            "holiday_remaining_minutes": rem_attrs.get("remaining_minutes"),
+            "holiday_remaining_formatted": rem_attrs.get("remaining_formatted"),
+            "holiday_start_date": rem_attrs.get("start_date"),
+            "holiday_start_time": rem_attrs.get("start_time"),
+            "holiday_end_date": rem_attrs.get("end_date"),
+            "holiday_end_time": rem_attrs.get("end_time"),
         }
 
     async def async_turn_on(self, **kwargs: Any) -> None:
@@ -292,6 +285,46 @@ class SaunierGeniaHolidayModeSwitch(SaunierGeniaEntity, SwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Cancel Holiday / Away Mode."""
         await self.coordinator.async_cancel_holiday_mode()
+
+
+class SaunierGeniaVentilationBoostSwitch(SaunierGeniaEntity, SwitchEntity):
+    """Switch for Intensive Ventilation Boost (30-minute heating pause)."""
+
+    _gate_availability_on_ebus = True
+
+    def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
+        """Initialize the Intensive Ventilation Boost switch."""
+        super().__init__(
+            coordinator=coordinator,
+            device_key=DEVICE_CLIMATE_CONTROLLER,
+            translation_key="ventilation_boost_switch",
+            subscriptions=[
+                (CIRCUIT_BASS3, "Z1Status"),
+                (CIRCUIT_BASS3, "VentilationBoost"),
+            ],
+            unique_id_suffix="switch_bass3_ventilation_boost",
+        )
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return True if intensive ventilation boost is currently active."""
+        z1_status = self.coordinator.get_str(CIRCUIT_BASS3, "Z1Status", "value")
+        if z1_status is not None:
+            return z1_status.lower() == "ventilation"
+        vent_boost = self.coordinator.get_str(
+            CIRCUIT_BASS3, "VentilationBoost", "value"
+        )
+        if vent_boost is None:
+            return None
+        return vent_boost.lower() in ("on", "1", "true", "yes")
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Activate Intensive Ventilation Boost."""
+        await self.coordinator.async_activate_ventilation_boost()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Cancel Intensive Ventilation Boost."""
+        await self.coordinator.async_cancel_ventilation_boost()
 
 
 class SaunierGeniaStandardSwitch(SaunierGeniaEntity, SwitchEntity):
