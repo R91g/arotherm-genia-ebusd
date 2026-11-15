@@ -130,6 +130,7 @@
               "manual": "Dauernd Manuell",
               "eco": "Eco (Nachtabsenkung)",
               "boost": "Schnell-Veto Übersteuerung",
+              "away": "Abwesend (Urlaub)",
               "ventilation": "Stoßlüften (30 Min.)"
             }
           }

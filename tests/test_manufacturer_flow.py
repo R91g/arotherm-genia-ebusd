@@ -130,6 +130,21 @@ class TestOptionsFlow(unittest.TestCase):
         self.assertTrue(result["data"][CONF_ENABLE_EBUSD_TCP])
         self.assertTrue(result["data"][CONF_ENABLE_SEND_HEX])
 
+        # Blank host string falls back to default 127.0.0.1
+        user_input_empty_host = {
+            CONF_FORCE_DHW_BOOST: True,
+            CONF_AUTO_COOLING_LOCK_BYPASS: False,
+            CONF_FALLBACK_POLL_INTERVAL: 180,
+            SECTION_ADVANCED_OPTIONS: {
+                CONF_ENABLE_EBUSD_TCP: True,
+                CONF_EBUSD_TCP_HOST: "   ",
+                CONF_EBUSD_TCP_PORT: 8888,
+                CONF_ENABLE_SEND_HEX: False,
+            },
+        }
+        result_empty = asyncio.run(handler.async_step_init(user_input_empty_host))
+        self.assertEqual(result_empty["data"][CONF_EBUSD_TCP_HOST], "127.0.0.1")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -17,6 +17,7 @@ from custom_components.arotherm_genia_ebusd.const import (
     CIRCUIT_BASS3,
     CIRCUIT_BROADCAST,
     CIRCUIT_GLOBAL,
+    CIRCUIT_HMU,
     CIRCUIT_HMUX0,
     CIRCUIT_NETX3,
     CIRCUIT_NETX3_ALT,
@@ -34,6 +35,8 @@ from custom_components.arotherm_genia_ebusd.sensor_descriptions import (
     SENSOR_DESCRIPTIONS,
     WEEKLY_SCHEDULE_SENSORS,
     _get_electric_power,
+    _get_vwzio_secondary_hwc_status,
+    _get_z1_actual_desired_filtered,
     _get_z1_room_humidity,
 )
 from custom_components.arotherm_genia_ebusd.switch import STANDARD_SWITCH_DESCRIPTIONS
@@ -359,6 +362,82 @@ class TestSensorRegistry(unittest.TestCase):
         for invalid in (None, 0.0, -1.0, 100.5, 255.0):
             coord.get_float.return_value = invalid
             self.assertIsNone(_get_z1_room_humidity(coord))
+
+    def test_subcooling_sensor_subscriptions_and_value(self) -> None:
+        """Verify subcooling sensor subscribes to condensation and condensate temperatures."""
+        from unittest.mock import MagicMock
+
+        from custom_components.arotherm_genia_ebusd.sensor import SaunierGeniaSensor
+
+        desc = next(d for d in SENSOR_DESCRIPTIONS if d.key == "subcooling")
+        mock_coord = MagicMock()
+        mock_coord.entry.entry_id = "test_entry"
+        mock_coord.get_float.side_effect = lambda c, m, _f: {
+            (CIRCUIT_HMUX0, "RunDataCondensationTemp"): 42.5,
+            (CIRCUIT_HMUX0, "RunDataCondensateTemp"): 37.2,
+        }.get((c, m))
+
+        sensor_ent = SaunierGeniaSensor(mock_coord, desc)
+        for expected_sub in (
+            (CIRCUIT_HMUX0, "RunDataCondensationTemp"),
+            (CIRCUIT_HMUX0, "RunDataCondensateTemp"),
+            (CIRCUIT_HMU, "RunDataCondensationTemp"),
+            (CIRCUIT_HMU, "RunDataCondensateTemp"),
+        ):
+            self.assertIn(expected_sub, sensor_ent._subscriptions)
+        self.assertEqual(sensor_ent.native_value, 5.3)
+
+    def test_vwzio_secondary_hwc_and_z1_desired_sentinel_filters(self) -> None:
+        """Verify vwzio_secondary_circuit_hwc subscriptions/parsing and Z1 5°C sentinel filtering."""
+        from unittest.mock import MagicMock
+
+        from custom_components.arotherm_genia_ebusd.sensor import SaunierGeniaSensor
+
+        hwc_desc = next(
+            d for d in SENSOR_DESCRIPTIONS if d.key == "vwzio_secondary_circuit_hwc"
+        )
+        mock_coord = MagicMock()
+        mock_coord.entry.entry_id = "test_entry"
+        hwc_ent = SaunierGeniaSensor(mock_coord, hwc_desc)
+        self.assertIn((CIRCUIT_VWZIO, "Status01"), hwc_ent._subscriptions)
+
+        mock_coord.get_str.side_effect = lambda _c, m, _f: {
+            "Status01": None,
+            "SecondaryCircuitStatusHwc": "00 00",
+        }.get(m)
+        self.assertEqual(_get_vwzio_secondary_hwc_status(mock_coord), "standby")
+
+        mock_coord.get_str.side_effect = lambda _c, m, _f: {
+            "Status01": None,
+            "SecondaryCircuitStatusHwc": "standby",
+        }.get(m)
+        self.assertEqual(_get_vwzio_secondary_hwc_status(mock_coord), "standby")
+
+        mock_coord.get_str.side_effect = lambda _c, m, _f: {
+            "Status01": None,
+            "SecondaryCircuitStatusHwc": "ERR: element not found",
+        }.get(m)
+        self.assertIsNone(_get_vwzio_secondary_hwc_status(mock_coord))
+
+        mock_coord.get_str.side_effect = lambda _c, m, _f: {
+            "Status01": None,
+            "SecondaryCircuitStatusHwc": "20 00",
+        }.get(m)
+        self.assertEqual(_get_vwzio_secondary_hwc_status(mock_coord), "dhw")
+
+        # Z1ActualRoomTempDesired sentinel checks
+        coord_z1 = MagicMock()
+        coord_z1.get_float.side_effect = lambda _c, m, _f: (
+            5.0 if m == "Z1ActualRoomTempDesired" else 21.5
+        )
+        coord_z1.get_str.return_value = "auto"
+        self.assertIsNone(_get_z1_actual_desired_filtered(coord_z1))
+
+        coord_z1.get_str.return_value = "manual"
+        self.assertEqual(_get_z1_actual_desired_filtered(coord_z1), 5.0)
+
+        coord_z1.get_str.return_value = "off"
+        self.assertEqual(_get_z1_actual_desired_filtered(coord_z1), 21.5)
 
 
 if __name__ == "__main__":

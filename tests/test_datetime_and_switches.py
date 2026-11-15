@@ -623,6 +623,34 @@ class TestDateTimeAndSwitches(unittest.TestCase):
         self.assertIn(("bass3", "VentilationBoost", "off"), self.coord.writes)
         self.assertFalse(sw.is_on)
 
+    def test_datetime_naive_input_and_ebus_availability_gate(self) -> None:
+        """DateTime entities normalize naive datetimes with tzinfo and gate availability on eBUS."""
+        self.coord._state[("bass3", "holidaystartdate")] = {
+            "day": 1,
+            "month": 1,
+            "year": 15,
+        }
+        start_dt = SaunierGeniaHolidayStartDateTime(self.coord)
+        end_dt = SaunierGeniaHolidayEndDateTime(self.coord)
+        cool_start = SaunierGeniaCoolingStartDateTime(self.coord)
+        cool_end = SaunierGeniaCoolingEndDateTime(self.coord)
+
+        for ent in (start_dt, end_dt, cool_start, cool_end):
+            self.assertTrue(ent._gate_availability_on_ebus)
+
+        self.coord.is_ebus_operational = False
+        self.assertFalse(start_dt.available)
+        self.coord.is_ebus_operational = True
+        self.assertTrue(start_dt.available)
+
+        naive_val = datetime(2026, 11, 20, 14, 30, 0)
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            asyncio.run(start_dt.async_set_value(naive_val))
+        stored = start_dt.native_value
+        self.assertIsNotNone(stored)
+        assert stored is not None
+        self.assertIsNotNone(stored.tzinfo)
+
 
 if __name__ == "__main__":
     unittest.main()

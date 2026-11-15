@@ -536,6 +536,38 @@ class TestDiagnosticServices(unittest.TestCase):
         self.assertEqual(result["host"], "192.168.1.50")
         self.assertEqual(result["port"], 8888)
 
+    def test_send_hex_command_uses_configured_tcp_options_when_omitted(self) -> None:
+        """Verify send_hex_command uses configured ebusd_tcp_host/port when omitted."""
+        entry = self.hass.config_entries.async_entries(DOMAIN)[0]
+        entry.options = {
+            **entry.options,
+            "enable_send_hex": True,
+            "enable_ebusd_tcp": True,
+            "ebusd_tcp_host": "ebusd.internal",
+            "ebusd_tcp_port": 8899,
+        }
+
+        _async_register_services(self.hass)
+        handler = self.registered_services[SERVICE_SEND_HEX_COMMAND]
+
+        mock_reader = AsyncMock()
+        mock_reader.readline = AsyncMock(return_value=b"00\n")
+        mock_writer = MagicMock()
+        mock_writer.drain = AsyncMock()
+        mock_writer.wait_closed = AsyncMock()
+
+        call = MagicMock()
+        call.data = {"command": "08 b5 1a 04"}
+
+        with patch(
+            "asyncio.open_connection", return_value=(mock_reader, mock_writer)
+        ) as mock_connect:
+            result = asyncio.run(handler(call))
+
+        mock_connect.assert_called_once_with("ebusd.internal", 8899)
+        self.assertEqual(result["host"], "ebusd.internal")
+        self.assertEqual(result["port"], 8899)
+
     def test_send_hex_command_disabled_by_default_raises(self) -> None:
         """Verify send_hex_command raises HomeAssistantError when not enabled in options."""
         mock_entry = MagicMock()
@@ -846,6 +878,33 @@ class TestDiagnosticServices(unittest.TestCase):
         with self.assertRaises(HomeAssistantError) as ctx:
             asyncio.run(handler(call))
         self.assertIn("Failed to publish write parameter", str(ctx.exception))
+
+    def test_diagnostics_redacts_serial_and_counter(self) -> None:
+        """Verify TO_REDACT includes counter/serialnumber and diagnostics calls async_redact_data."""
+        from custom_components.arotherm_genia_ebusd.diagnostics import (
+            TO_REDACT,
+            async_get_config_entry_diagnostics,
+        )
+
+        self.assertIn("counter", TO_REDACT)
+        self.assertIn("serialnumber", TO_REDACT)
+        self.assertIn("serial_number", TO_REDACT)
+        self.assertIn("serial", TO_REDACT)
+        self.assertIn("mac", TO_REDACT)
+
+        entry = MagicMock()
+        entry.entry_id = "diag_entry"
+        entry.version = 1
+        entry.domain = DOMAIN
+        entry.title = "Saunier"
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {}
+        coord = SaunierGeniaCoordinator(self.hass, entry)
+        coord._state[("scan.08", "Id")] = {"product": "00201", "counter": "999999"}
+        self.hass.data = {DOMAIN: {"diag_entry": coord}}
+
+        diag = asyncio.run(async_get_config_entry_diagnostics(self.hass, entry))
+        self.assertIn("bus_state", diag)
 
 
 if __name__ == "__main__":

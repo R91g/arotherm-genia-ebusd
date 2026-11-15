@@ -1269,6 +1269,98 @@ class TestClimateEntity(unittest.TestCase):
         )
         self.assertEqual(self.climate.hvac_mode, HVACMode.COOL)
 
+    def test_heat_cool_switch_preserves_manual_and_eco_presets(self) -> None:
+        """Switching HEAT <-> COOL must preserve MANUAL and ECO presets instead of dropping to COMFORT."""
+        # HEAT (MANUAL) -> COOL must write Z1OpModeCooling='day'
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "off"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "day"}
+        self.coordinator.writes.clear()
+        asyncio.run(self.climate.async_set_hvac_mode(HVACMode.COOL))
+        self.assertIn(
+            (CIRCUIT_BASS3, "Z1OpModeCooling", "day"), self.coordinator.writes
+        )
+        self.assertEqual(self.climate.preset_mode, PRESET_MANUAL)
+
+        # COOL (ECO) -> HEAT must write Z1OpMode='night'
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "night"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "off"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "coolingreleasestatus")] = {
+            "value": "on"
+        }
+        self.coordinator.writes.clear()
+        asyncio.run(self.climate.async_set_hvac_mode(HVACMode.HEAT))
+        self.assertIn((CIRCUIT_BASS3, "Z1OpMode", "night"), self.coordinator.writes)
+        self.assertEqual(self.climate.preset_mode, PRESET_ECO)
+
+    def test_reselecting_boost_preset_is_idempotent(self) -> None:
+        """Calling async_set_preset_mode(PRESET_BOOST) while already in BOOST must not re-stack delta."""
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "auto"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1actualroomtempdesired")] = {
+            "value": 20.0
+        }
+        asyncio.run(self.climate.async_set_preset_mode(PRESET_BOOST))
+        first_target = self.coordinator.get_float(
+            CIRCUIT_BASS3, "Z1QuickVetoTemp", "value"
+        )
+        self.assertEqual(first_target, 23.0)
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1actualroomtempdesired")] = {
+            "value": 23.0
+        }
+        self.coordinator.writes.clear()
+
+        asyncio.run(self.climate.async_set_preset_mode(PRESET_BOOST))
+        self.assertEqual(self.coordinator.writes, [])
+        self.assertEqual(
+            self.coordinator.get_float(CIRCUIT_BASS3, "Z1QuickVetoTemp", "value"), 23.0
+        )
+
+    def test_expired_cooling_lock_year_is_reopened_when_switching_to_cool(self) -> None:
+        """An expired CoolingEndDate (e.g. year=24 != 19) must be reopened when switching to COOL."""
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "auto"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "off"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "coolingstartdate")] = {
+            "day": 1,
+            "month": 6,
+            "year": 24,
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "coolingenddate")] = {
+            "day": 30,
+            "month": 9,
+            "year": 24,
+        }
+        self.coordinator.writes.clear()
+
+        asyncio.run(self.climate.async_set_hvac_mode(HVACMode.COOL))
+        self.assertIn(
+            (CIRCUIT_BASS3, "CoolingStartDate", "01;01;26"), self.coordinator.writes
+        )
+        self.assertIn(
+            (CIRCUIT_BASS3, "CoolingEndDate", "01;01;99"), self.coordinator.writes
+        )
+
+    def test_valid_five_degree_frost_setpoint_is_not_masked(self) -> None:
+        """An explicit 5.0 °C setpoint (min_temp) in Holiday/Eco/Manual must be returned, not masked."""
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "off"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {
+            "value": "night"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1nighttemp")] = {"value": 5.0}
+        self.assertEqual(self.climate.native_target_temperature, 5.0)
+
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1status")] = {
+            "value": "holidayaway"
+        }
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "holidaytemp")] = {"value": 5.0}
+        self.assertEqual(self.climate.native_target_temperature, 5.0)
+
 
 if __name__ == "__main__":
     unittest.main()

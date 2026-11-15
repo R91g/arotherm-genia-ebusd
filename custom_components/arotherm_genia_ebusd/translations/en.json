@@ -130,6 +130,7 @@
               "manual": "Continuous Manual",
               "eco": "Eco (Night setback)",
               "boost": "Quick Veto Override",
+              "away": "Away (Holiday)",
               "ventilation": "Intensive Ventilation (30 min)"
             }
           }

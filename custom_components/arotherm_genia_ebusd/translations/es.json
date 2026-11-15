@@ -130,6 +130,7 @@
               "manual": "Manual continuo",
               "eco": "Eco (Reducción nocturna)",
               "boost": "Anulación rápida (Quick Veto)",
+              "away": "Ausencia (Vacaciones)",
               "ventilation": "Ventilación intensiva (30 min)"
             }
           }

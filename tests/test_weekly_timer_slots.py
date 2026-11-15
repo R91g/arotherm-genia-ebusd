@@ -8,7 +8,7 @@ import sys
 import unittest
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 import setup_mocks  # noqa: F401
@@ -1036,6 +1036,45 @@ class TestWeeklyTimerSlots(unittest.TestCase):
         self.assertEqual(attrs["weekly_schedule"]["Monday"]["Slot 1"], "22:00 - 24:00")
         self.assertEqual(attrs["weekly_schedule"]["Monday"]["Slot 2"], "13:00 - 15:00")
         self.assertIsNone(attrs["weekly_schedule"]["Monday"]["Slot 3"])
+
+    def test_delete_slot_raises_when_remaining_slot_unhydrated(self) -> None:
+        """Deleting slot 1 must raise HomeAssistantError instead of zeroing unhydrated slot 2."""
+        hass = MagicMock()
+        services: dict[str, Any] = {}
+        hass.services.has_service.return_value = False
+        hass.services.async_register.side_effect = (
+            lambda d, s, h, schema=None, *args, **kwargs: services.update({s: h})
+        )
+
+        coord = SaunierGeniaCoordinator(hass, MagicMock(data={"mqtt_prefix": "ebusd"}))
+        coord._state[("hmux0", "status01")] = {"temp1": 35.0}
+        coord._state[("bass3", "HeatingTimer_Slots")] = {"mon": 2}
+        coord._state[("bass3", "HeatingTimer_Monday")] = {
+            "from_hour": 6,
+            "from_min": 0,
+            "to_hour": 9,
+            "to_min": 0,
+            "temp": 21.0,
+        }
+        coord.async_write_parameter = AsyncMock()
+        coord.async_request_get = AsyncMock()
+        hass.data = {DOMAIN: {"entry_id": coord}}
+        _async_register_services(hass)
+
+        call_del = MagicMock()
+        call_del.data = {
+            "circuit_type": "heating",
+            "day": "Monday",
+            "action": "delete",
+            "slot": 1,
+        }
+        with (
+            patch("asyncio.sleep", new_callable=AsyncMock),
+            self.assertRaises(HomeAssistantError),
+        ):
+            asyncio.run(services[SERVICE_SET_WEEKLY_TIMER](call_del))
+
+        coord.async_write_parameter.assert_not_called()
 
 
 if __name__ == "__main__":

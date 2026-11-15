@@ -7,6 +7,8 @@
     "cancel_holiday_mode": "mdi:bag-suitcase-off",
     "quick_veto": "mdi:timer-plus-outline",
     "cancel_quick_veto": "mdi:timer-off-outline",
+    "start_ventilation_boost": "mdi:fan",
+    "cancel_ventilation_boost": "mdi:fan-off",
     "dump_mqtt_values": "mdi:code-json",
     "record_topic_changes": "mdi:record-rec",
     "send_hex_command": "mdi:hexadecimal",

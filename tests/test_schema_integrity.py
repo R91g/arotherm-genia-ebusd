@@ -213,6 +213,12 @@ class TestSchemaIntegrity(unittest.TestCase):
         self.assertIn("description:", content)
         self.assertIn("fields:", content)
 
+        # send_hex_command optional host/port must not specify hardcoded defaults
+        # that override configured TCP integration options in Developer Tools UI.
+        send_hex_section = content.split(f"{SERVICE_SEND_HEX_COMMAND}:", 1)[1]
+        self.assertNotIn('default: "127.0.0.1"', send_hex_section)
+        self.assertNotIn("default: 8888", send_hex_section)
+
     def test_brand_assets(self) -> None:
         """Verify Home Assistant local brand icons exist as valid RGBA PNGs with exact dimensions."""
         brand_dir = os.path.join(self.component_dir, "brand")

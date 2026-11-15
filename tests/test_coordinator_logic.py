@@ -2006,11 +2006,36 @@ class TestCoordinatorLogic(unittest.TestCase):
         self.assertNotIn(ISSUE_OUTDATED_HMU_CSV, coord._active_repair_issues)
 
         # 8c. CompressorSilentOperationLevel ERR on HMU raises outdated_hmu_csv
+        #     and must NOT be falsely cleared by subsequent modern Status01 telemetry
         push_mqtt("ebusd/hmu/CompressorSilentOperationLevel", "ERR: element not found")
+        self.assertIn(ISSUE_OUTDATED_HMU_CSV, coord._active_repair_issues)
+
+        push_mqtt(
+            "ebusd/hmu/Status01",
+            '{"flow_temp": {"value": 35.0}, "return_temp": {"value": 30.0}}',
+        )
         self.assertIn(ISSUE_OUTDATED_HMU_CSV, coord._active_repair_issues)
 
         push_mqtt("ebusd/hmu/CompressorSilentOperationLevel", '{"value": {"value": 0}}')
         self.assertNotIn(ISSUE_OUTDATED_HMU_CSV, coord._active_repair_issues)
+
+        # 8c-2. CompressorSilentOperationLevel ERR on HMUX0 must NOT be falsely cleared
+        #       by subsequent modern StateCompressor / RunDataFlowRate / RunDataNominalFlowRate
+        push_mqtt(
+            "ebusd/hmux0/CompressorSilentOperationLevel", "ERR: element not found"
+        )
+        self.assertIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
+        push_mqtt(
+            "ebusd/hmux0/StateCompressor",
+            '{"flow_temp": {"value": 37.38}, "modulation": {"value": 0}}',
+        )
+        push_mqtt("ebusd/hmux0/RunDataFlowRate", '{"flow_rate": {"value": 1450}}')
+        push_mqtt("ebusd/hmux0/RunDataNominalFlowRate", '{"value": {"value": 900}}')
+        self.assertIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
+        push_mqtt(
+            "ebusd/hmux0/CompressorSilentOperationLevel", '{"value": {"value": 40}}'
+        )
+        self.assertNotIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
 
         # 8d. Also works on hmu00
         push_mqtt(
@@ -3180,7 +3205,7 @@ class TestCoordinatorLogic(unittest.TestCase):
                 coord3._async_on_mqtt_message(msg)
 
                 # Trigger deferred restore callback
-                restore_timers = [t for t in timers_p3 if abs(t[0] - 1.5) < 0.01]
+                restore_timers = [t for t in timers_p3 if abs(t[0] - 7.0) < 0.01]
                 self.assertEqual(len(restore_timers), 1)
                 restore_timers[0][1](datetime.now())
                 if tasks:
@@ -3717,7 +3742,7 @@ class TestCoordinatorLogic(unittest.TestCase):
                 msg_op.payload = b'{"value": {"value": 60.0}}'
                 coord3._async_on_mqtt_message(msg_op)
 
-                restore_timers = [t for t in timers_p3 if abs(t[0] - 1.5) < 0.01]
+                restore_timers = [t for t in timers_p3 if abs(t[0] - 7.0) < 0.01]
                 self.assertEqual(len(restore_timers), 1)
                 restore_timers[0][1](datetime.now())
                 if tasks:
@@ -3885,7 +3910,7 @@ class TestCoordinatorLogic(unittest.TestCase):
                 msg_op.payload = b'{"value": {"value": "auto"}}'
                 coord3._async_on_mqtt_message(msg_op)
 
-                restore_timers = [t for t in timers_p3 if abs(t[0] - 1.5) < 0.01]
+                restore_timers = [t for t in timers_p3 if abs(t[0] - 7.0) < 0.01]
                 self.assertEqual(len(restore_timers), 1)
                 restore_timers[0][1](datetime.now())
                 if tasks:
@@ -3939,7 +3964,7 @@ class TestCoordinatorLogic(unittest.TestCase):
                 msg_still_veto.payload = b'{"value": {"value": "veto"}}'
                 coord4._async_on_mqtt_message(msg_still_veto)
 
-                restore_timers4 = [t for t in timers_p4 if abs(t[0] - 1.5) < 0.01]
+                restore_timers4 = [t for t in timers_p4 if abs(t[0] - 7.0) < 0.01]
                 self.assertEqual(len(restore_timers4), 1)
                 restore_timers4[0][1](datetime.now())
                 if tasks:
@@ -4823,6 +4848,504 @@ class TestCoordinatorLogic(unittest.TestCase):
             await coord.async_unload()
 
         asyncio.run(_run())
+
+    def test_quick_veto_from_off_ignores_mid_activation_stale_mqtt(self) -> None:
+        """Stale Z1SFMode=auto/Z1Status arriving mid-activation from 'off' must not revert Z1OpMode to off."""
+
+        async def _run() -> None:
+            hass = MagicMock()
+            created_tasks: list[asyncio.Task[Any]] = []
+            hass.async_create_task.side_effect = lambda coro: (
+                created_tasks.append(asyncio.ensure_future(coro)) or created_tasks[-1]
+            )
+            hass.data = {}
+            entry = MagicMock()
+            entry.entry_id = "test_veto_off_mid_activation_race"
+            entry.data = {}
+            entry.options = {}
+
+            coord = SaunierGeniaCoordinator(hass, entry)
+            coord._state[(CIRCUIT_BASS3.lower(), "Status01")] = {"temp1": 35.0}
+            coord._state[(CIRCUIT_BASS3.lower(), "Z1OpMode")] = {"value": "off"}
+            coord._state[(CIRCUIT_BASS3.lower(), "Z1SFMode")] = {"value": "auto"}
+            coord._state[(CIRCUIT_BASS3.lower(), "Z1Status")] = {"value": "off"}
+            coord._last_telemetry_time = time.monotonic()
+
+            published: list[tuple[str, str]] = []
+
+            async def _fake_publish(
+                _h: Any, topic: str, payload: str, **kw: Any
+            ) -> None:
+                published.append((topic, str(payload)))
+
+            async def _sleep_with_stale_mqtt(_sec: float) -> None:
+                # Simulate stale MQTT packets arriving during the inter-write 0.3s sleeps
+                coord._async_on_mqtt_message(
+                    MagicMock(topic="ebusd/bass3/Z1SFMode", payload="auto")
+                )
+                coord._async_on_mqtt_message(
+                    MagicMock(topic="ebusd/bass3/Z1Status", payload="off")
+                )
+
+            with (
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                    side_effect=_fake_publish,
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.async_call_later",
+                    return_value=MagicMock(),
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.asyncio.sleep",
+                    side_effect=_sleep_with_stale_mqtt,
+                ),
+            ):
+                await coord.async_set_quick_veto(temperature=22.0, duration=1.5)
+                if created_tasks:
+                    await asyncio.gather(*created_tasks)
+                    created_tasks.clear()
+
+            self.assertNotIn(("ebusd/bass3/Z1OpMode/set", "off"), published)
+            self.assertEqual(coord.pre_veto_opmode, "off")
+            self.assertEqual(coord.get_str(CIRCUIT_BASS3, "Z1SFMode", "value"), "veto")
+            self.assertEqual(coord.get_quick_veto_remaining_minutes(), 90)
+            await coord.async_unload()
+
+        asyncio.run(_run())
+
+    def test_deferred_restore_epoch_iso_is_utc_and_platform_safe(self) -> None:
+        """Deferred offline store payloads must not invoke naive datetime.fromtimestamp(0.0)."""
+        from custom_components.arotherm_genia_ebusd.coordinator import (
+            _DEFERRED_RESTORE_END_ISO,
+        )
+
+        self.assertEqual(_DEFERRED_RESTORE_END_ISO, "1970-01-01T00:00:00+00:00")
+        self.assertEqual(
+            SaunierGeniaCoordinator._parse_persisted_end_timestamp(
+                {"end_time": _DEFERRED_RESTORE_END_ISO}
+            ),
+            0.0,
+        )
+
+        async def _run() -> None:
+            hass = MagicMock()
+            entry = MagicMock()
+            entry.entry_id = "test_deferred_utc_iso"
+            entry.data = {}
+            entry.options = {}
+            coord = SaunierGeniaCoordinator(hass, entry)
+            coord._last_telemetry_time = 0.0
+            coord._pre_veto_opmode = "off"
+            saved_payloads: list[dict[str, Any]] = []
+
+            async def _capture_save(
+                _store: Any, data: dict[str, Any], _lbl: str
+            ) -> None:
+                saved_payloads.append(dict(data))
+
+            with patch.object(coord, "_async_save_store", side_effect=_capture_save):
+                await coord._async_finish_heating_veto_off_restore("offline_test")
+
+            self.assertEqual(len(saved_payloads), 1)
+            self.assertEqual(saved_payloads[0]["end_timestamp"], 0.0)
+            self.assertEqual(saved_payloads[0]["end_time"], "1970-01-01T00:00:00+00:00")
+            await coord.async_unload()
+
+        asyncio.run(_run())
+
+    def test_ventilation_grace_ignores_stale_status_and_starts_on_initial_ventilation(
+        self,
+    ) -> None:
+        """Stale Z1Status='auto' right after HA activation must not wipe countdown; startup 'ventilation' starts countdown."""
+
+        async def _run() -> None:
+            hass = MagicMock()
+            created_tasks: list[asyncio.Task[Any]] = []
+            hass.async_create_task.side_effect = lambda coro: (
+                created_tasks.append(asyncio.ensure_future(coro)) or created_tasks[-1]
+            )
+            hass.data = {}
+            entry = MagicMock()
+            entry.entry_id = "test_ventilation_race_and_startup"
+            entry.data = {}
+            entry.options = {}
+
+            # 1. Startup with empty state receiving Z1Status='ventilation' -> starts 30 min countdown
+            coord = SaunierGeniaCoordinator(hass, entry)
+            coord._ebus_connected = True
+            coord._last_mqtt_message_time = 1e12
+            coord._async_on_mqtt_message(
+                MagicMock(topic="ebusd/bass3/Z1Status", payload="ventilation")
+            )
+            self.assertEqual(coord.get_ventilation_remaining_minutes(), 30)
+            self.assertIsNotNone(coord._ventilation_end_time)
+
+            # Clear to normal 'auto'
+            coord._async_on_mqtt_message(
+                MagicMock(topic="ebusd/bass3/Z1Status", payload="auto")
+            )
+            self.assertEqual(coord.get_ventilation_remaining_minutes(), 0)
+            self.assertIsNone(coord._ventilation_end_time)
+
+            # 2. Activate from HA, then receive stale Z1Status='auto' within grace window
+            published: list[tuple[str, str]] = []
+
+            async def _fake_publish(
+                _h: Any, topic: str, payload: str, **kw: Any
+            ) -> None:
+                published.append((topic, str(payload)))
+
+            scheduled_timers: list[tuple[float, Any]] = []
+
+            def _fake_call_later(_h: Any, delay: float, cb: Any) -> Any:
+                scheduled_timers.append((delay, cb))
+                return lambda: None
+
+            with (
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                    side_effect=_fake_publish,
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.async_call_later",
+                    side_effect=_fake_call_later,
+                ),
+            ):
+                await coord.async_activate_ventilation_boost()
+                coord._async_on_mqtt_message(
+                    MagicMock(topic="ebusd/bass3/Z1Status", payload="auto")
+                )
+                self.assertIsNotNone(coord._ventilation_end_time)
+                self.assertEqual(coord.get_ventilation_remaining_minutes(), 30)
+                self.assertEqual(
+                    coord.get_str("bass3", "Z1Status", "value"), "ventilation"
+                )
+
+                # Once controller confirms 'ventilation', subsequent 'auto' clears immediately
+                coord._async_on_mqtt_message(
+                    MagicMock(topic="ebusd/bass3/Z1Status", payload="ventilation")
+                )
+                coord._async_on_mqtt_message(
+                    MagicMock(topic="ebusd/bass3/Z1Status", payload="auto")
+                )
+                self.assertIsNone(coord._ventilation_end_time)
+                self.assertEqual(coord.get_ventilation_remaining_minutes(), 0)
+                if created_tasks:
+                    await asyncio.gather(*created_tasks)
+                    created_tasks.clear()
+
+            await coord.async_unload()
+
+        asyncio.run(_run())
+
+    def test_dhw_boost_offline_persists_deferred_restore_and_preserves_saved_temp(
+        self,
+    ) -> None:
+        """Offline timeout/completion persists deferred restore and re-triggering preserves baseline target."""
+
+        async def _run() -> None:
+            hass = MagicMock()
+            created_tasks: list[asyncio.Task[Any]] = []
+            hass.async_create_task.side_effect = lambda coro: (
+                created_tasks.append(asyncio.ensure_future(coro)) or created_tasks[-1]
+            )
+            hass.data = {}
+            entry = MagicMock()
+            entry.entry_id = "test_dhw_boost_offline"
+            entry.data = {}
+            entry.options = {"force_dhw_boost": True}
+
+            coord = SaunierGeniaCoordinator(hass, entry)
+            coord._state = {
+                ("bass3", "HwcTempDesired"): {"value": 56.0},
+                ("bass3", "HwcStorageTemp"): {"value": 55.0},
+                ("bass3", "CylinderChargeHyst"): {"value": 5.0},
+                ("bass3", "HwcSFMode"): {"value": "auto"},
+                ("bass3", "HwcStatus"): {"value": "load"},
+            }
+
+            saved_payloads: list[dict[str, Any]] = []
+
+            async def _capture_save(
+                _store: Any, data: dict[str, Any], _lbl: str
+            ) -> None:
+                saved_payloads.append(dict(data))
+
+            with patch.object(coord, "_async_save_store", side_effect=_capture_save):
+                # 1. Timeout while offline persists deferred payload
+                coord._state[("global", "running")] = {"value": "false"}
+                coord._dhw_boost_active = True
+                coord._saved_dhw_target_temp = 48.0
+                coord._async_on_dhw_boost_timeout(datetime.now())
+                if created_tasks:
+                    await asyncio.gather(*created_tasks)
+                    created_tasks.clear()
+
+                self.assertFalse(coord._dhw_boost_active)
+                self.assertTrue(coord._pending_dhw_boost_restore)
+                self.assertEqual(len(saved_payloads), 1)
+                self.assertEqual(saved_payloads[0]["saved_target_temp"], 48.0)
+                self.assertEqual(saved_payloads[0]["end_timestamp"], 0.0)
+                self.assertEqual(
+                    saved_payloads[0]["end_time"], "1970-01-01T00:00:00+00:00"
+                )
+
+                # 2. Completion check while offline also persists deferred payload
+                saved_payloads.clear()
+                coord._dhw_boost_active = True
+                coord._dhw_boost_seen_load = True
+                coord._dhw_boost_started_at = 0.0
+                coord._pending_dhw_boost_restore = False
+                coord._async_check_dhw_boost_restoration()
+                if created_tasks:
+                    await asyncio.gather(*created_tasks)
+                    created_tasks.clear()
+
+                self.assertFalse(coord._dhw_boost_active)
+                self.assertTrue(coord._pending_dhw_boost_restore)
+                self.assertEqual(len(saved_payloads), 1)
+                self.assertEqual(saved_payloads[0]["saved_target_temp"], 48.0)
+                self.assertEqual(saved_payloads[0]["end_timestamp"], 0.0)
+
+                # 3. Re-triggering while _pending_dhw_boost_restore is True must not overwrite 48.0 with 56.0
+                coord._state[("global", "running")] = {"value": "true"}
+                coord._last_telemetry_time = time.monotonic()
+                with (
+                    patch(
+                        "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                        new=AsyncMock(),
+                    ),
+                    patch(
+                        "custom_components.arotherm_genia_ebusd.coordinator.async_call_later",
+                        return_value=lambda: None,
+                    ),
+                ):
+                    await coord.async_trigger_dhw_boost()
+
+                self.assertEqual(coord._saved_dhw_target_temp, 48.0)
+                self.assertTrue(coord._dhw_boost_active)
+                if created_tasks:
+                    await asyncio.gather(*created_tasks)
+                    created_tasks.clear()
+
+                # 4. Lowercase MQTT topic 'ebusd/bass3/hwcsfmode' triggers DHW boost restoration check
+                coord._dhw_boost_active = True
+                coord._dhw_boost_seen_load = True
+                coord._dhw_boost_started_at = 0.0
+                coord._saved_dhw_target_temp = 48.0
+                with patch.object(
+                    coord, "async_write_parameter", new=AsyncMock()
+                ) as mock_write:
+                    coord._async_on_mqtt_message(
+                        MagicMock(topic="ebusd/bass3/hwcsfmode", payload="auto")
+                    )
+                    if created_tasks:
+                        await asyncio.gather(*created_tasks)
+                        created_tasks.clear()
+
+                self.assertFalse(coord._dhw_boost_active)
+                mock_write.assert_awaited_once_with("bass3", "HwcTempDesired", 48.0)
+
+            await coord.async_unload()
+
+        asyncio.run(_run())
+
+    def test_deferred_restore_delay_waits_for_hydration_on_startup(self) -> None:
+        """Deferred restore waits past INITIAL_HYDRATION_WAIT_SECONDS on startup and uses 1.5s post-hydration."""
+
+        async def _run() -> None:
+            hass = MagicMock()
+            hass.data = {}
+            entry = MagicMock()
+            entry.entry_id = "test_deferred_restore_delay"
+            entry.data = {}
+            entry.options = {}
+
+            coord = SaunierGeniaCoordinator(hass, entry)
+            coord._pending_heating_veto_restore = True
+            scheduled: list[float] = []
+
+            with patch(
+                "custom_components.arotherm_genia_ebusd.coordinator.async_call_later",
+                side_effect=lambda _h, delay, _cb: (
+                    scheduled.append(delay) or MagicMock()
+                ),
+            ):
+                coord._initial_hydration_started = False
+                coord._async_schedule_pending_restores()
+                coord._heating_veto_restore_unsub = None
+
+                coord._initial_hydration_started = True
+                coord._async_schedule_pending_restores()
+
+            self.assertEqual(scheduled, [7.0, 1.5])
+            await coord.async_unload()
+
+        asyncio.run(_run())
+
+    def test_repair_issue_clears_after_restart_and_without_migo(self) -> None:
+        """Clearing issues works even before creation in session, and slow polling clears without MiGo."""
+        import sys
+
+        ir_mod = sys.modules["homeassistant.helpers.issue_registry"]
+        ir_mod.async_create_issue.reset_mock()
+        ir_mod.async_delete_issue.reset_mock()
+
+        hass = MagicMock()
+        entry = MagicMock()
+        entry.entry_id = "test_repair_restart_and_no_migo"
+        entry.data = {"mqtt_prefix": "ebusd", CONF_HAS_MIGO_LINK: False}
+        entry.options = {}
+        coord = SaunierGeniaCoordinator(hass, entry)
+
+        # 1. Fresh coordinator calling active=False deletes any persisted registry issue once
+        coord._async_set_repair_issue(ISSUE_EBUSD_SLOW_POLLING_SEED, active=False)
+        ir_mod.async_delete_issue.assert_called_once_with(
+            hass, DOMAIN, ISSUE_EBUSD_SLOW_POLLING_SEED
+        )
+        ir_mod.async_delete_issue.reset_mock()
+        # Repeated active=False without re-raising is deduplicated
+        coord._async_set_repair_issue(ISSUE_EBUSD_SLOW_POLLING_SEED, active=False)
+        ir_mod.async_delete_issue.assert_not_called()
+
+        # 2. Without MiGo (fallback_poll_interval=300), >=450s triggers and 300s clears
+        def push_mqtt(topic: str, payload: str) -> None:
+            msg = MagicMock()
+            msg.topic = topic
+            msg.payload = payload.encode("utf-8")
+            coord._async_on_mqtt_message(msg)
+
+        push_mqtt("ebusd/global/signal", '{"value": {"value": true}}')
+        push_mqtt("ebusd/hmux0/Status01", '{"flow_temp": {"value": 35.0}}')
+
+        t0 = 1000.0
+        with patch("time.monotonic", return_value=t0):
+            push_mqtt(
+                "ebusd/hmux0/RunDataElectricPowerConsumption",
+                '{"energy": {"value": 450}}',
+            )
+        t1 = t0 + 500.0
+        with patch("time.monotonic", return_value=t1):
+            push_mqtt(
+                "ebusd/hmux0/RunDataElectricPowerConsumption",
+                '{"energy": {"value": 460}}',
+            )
+        self.assertIn(ISSUE_EBUSD_SLOW_POLLING_SEED, coord._active_repair_issues)
+
+        t2 = t1 + 300.0
+        with patch("time.monotonic", return_value=t2):
+            push_mqtt(
+                "ebusd/hmux0/RunDataElectricPowerConsumption",
+                '{"energy": {"value": 470}}',
+            )
+        self.assertNotIn(ISSUE_EBUSD_SLOW_POLLING_SEED, coord._active_repair_issues)
+        ir_mod.async_delete_issue.assert_called_with(
+            hass, DOMAIN, ISSUE_EBUSD_SLOW_POLLING_SEED
+        )
+
+    def test_scan_message_ignores_ebusd_err_payloads(self) -> None:
+        """Ensure scan.* error responses (e.g. 'ERR: element not found') are never stored as serial/SW/HW."""
+        entry = MagicMock()
+        entry.entry_id = "test_scan_err_ignore"
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {}
+        coord = SaunierGeniaCoordinator(MagicMock(), entry)
+
+        for topic, payload in (
+            ("ebusd/scan.08/Id", "ERR: element not found"),
+            ("ebusd/scan.08/Id", '{"serial": "ERR: element not found"}'),
+            ("ebusd/scan.08/Id", "ERR: arbitration lost 123456"),
+            ("ebusd/scan.08/", '{"sw": "ERR: read timeout"}'),
+        ):
+            msg = MagicMock()
+            msg.topic = topic
+            msg.payload = payload.encode("utf-8")
+            coord._async_on_mqtt_message(msg)
+
+        self.assertIsNone(coord.get_device_serial_number("hmu"))
+        self.assertIsNone(coord.get_device_sw_version("hmu"))
+        self.assertIsNone(coord.get_device_hw_version("hmu"))
+        self.assertFalse(
+            SaunierGeniaCoordinator._is_valid_serial_candidate(
+                "ERR: element not found", min_len=20
+            )
+        )
+        self.assertTrue(
+            SaunierGeniaCoordinator._is_valid_serial_candidate(
+                "21241000201234561234567890N1", exact_len=28
+            )
+        )
+
+    def test_write_parameter_does_not_mutate_state_on_publish_failure(self) -> None:
+        """Failed mqtt.async_publish must not apply optimistic state or notify listeners."""
+
+        async def _run() -> None:
+            entry = MagicMock()
+            entry.entry_id = "test_write_no_optimistic_on_fail"
+            entry.data = {"mqtt_prefix": "ebusd"}
+            entry.options = {}
+            coord = SaunierGeniaCoordinator(MagicMock(), entry)
+            coord._state[(CIRCUIT_BASS3, "Z1ManualTemp")] = {"temp": 20.0}
+
+            notified: list[tuple[str, str]] = []
+            coord.async_add_listener(
+                CIRCUIT_BASS3,
+                "Z1ManualTemp",
+                lambda: notified.append((CIRCUIT_BASS3, "Z1ManualTemp")),
+            )
+
+            with (
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                    side_effect=HomeAssistantError("Broker offline"),
+                ),
+                self.assertRaises(HomeAssistantError),
+            ):
+                await coord.async_write_parameter(CIRCUIT_BASS3, "Z1ManualTemp", 22.5)
+
+            self.assertEqual(
+                coord.get_float(CIRCUIT_BASS3, "Z1ManualTemp", "temp"), 20.0
+            )
+            self.assertEqual(notified, [])
+
+        asyncio.run(_run())
+
+    def test_ebus_operational_recovery_notifies_global_listeners(self) -> None:
+        """Traffic recovery after watchdog silence notifies (global, running/signal) listeners."""
+        entry = MagicMock()
+        entry.entry_id = "test_ebus_recovery_listeners"
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {}
+        coord = SaunierGeniaCoordinator(MagicMock(), entry)
+
+        running_notifs: list[bool] = []
+        coord.async_add_listener(
+            "global",
+            "running",
+            lambda: running_notifs.append(coord.is_ebus_operational),
+        )
+
+        with patch("time.monotonic", return_value=1000.0):
+            coord._async_on_mqtt_message(
+                MagicMock(topic="ebusd/hmux0/Status01", payload=b'{"flow_temp": 35.0}')
+            )
+            self.assertTrue(coord.is_ebus_operational)
+        self.assertEqual(running_notifs, [True])
+
+        # Silence timeout -> watchdog flips availability to False
+        with patch("time.monotonic", return_value=1700.0):
+            coord._async_check_watchdog(datetime.now())
+            self.assertFalse(coord.is_ebus_operational)
+        self.assertEqual(running_notifs, [True, False])
+
+        # Recovery via normal circuit message (without global/running) notifies True
+        with patch("time.monotonic", return_value=1705.0):
+            coord._async_on_mqtt_message(
+                MagicMock(topic="ebusd/hmux0/Status01", payload=b'{"flow_temp": 36.0}')
+            )
+            self.assertTrue(coord.is_ebus_operational)
+        self.assertEqual(running_notifs, [True, False, True])
 
 
 if __name__ == "__main__":

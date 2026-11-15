@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 import setup_mocks  # noqa: F401
-from homeassistant.components.number import NumberMode
+from homeassistant.components.number import NumberDeviceClass, NumberMode
 from homeassistant.const import PERCENTAGE, EntityCategory
 
 from custom_components.arotherm_genia_ebusd.const import (
@@ -365,6 +365,13 @@ class TestNumberPlatform(unittest.IsolatedAsyncioTestCase):
     async def test_quick_veto_boost_delta_entity(self) -> None:
         """Verify SaunierGeniaQuickVetoBoostDeltaNumber functionality and state restoration."""
         delta_entity = SaunierGeniaQuickVetoBoostDeltaNumber(self.coordinator)
+        self.assertNotEqual(
+            delta_entity._attr_device_class, NumberDeviceClass.TEMPERATURE
+        )
+        self.assertEqual(
+            delta_entity._attr_device_class,
+            getattr(NumberDeviceClass, "TEMPERATURE_DELTA", None),
+        )
         self.assertEqual(delta_entity.native_value, 3.0)
         self.assertEqual(delta_entity.native_min_value, 0.5)
         self.assertEqual(delta_entity.native_max_value, 10.0)
@@ -386,6 +393,13 @@ class TestNumberPlatform(unittest.IsolatedAsyncioTestCase):
     async def test_cooling_quick_veto_boost_delta_entity(self) -> None:
         """Verify SaunierGeniaCoolingQuickVetoBoostDeltaNumber functionality and state restoration."""
         delta_entity = SaunierGeniaCoolingQuickVetoBoostDeltaNumber(self.coordinator)
+        self.assertNotEqual(
+            delta_entity._attr_device_class, NumberDeviceClass.TEMPERATURE
+        )
+        self.assertEqual(
+            delta_entity._attr_device_class,
+            getattr(NumberDeviceClass, "TEMPERATURE_DELTA", None),
+        )
         self.assertEqual(delta_entity.native_value, 2.0)
         self.assertEqual(delta_entity.native_min_value, 0.5)
         self.assertEqual(delta_entity.native_max_value, 5.0)

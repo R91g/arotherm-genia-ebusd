@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from .const import DOMAIN
 from .coordinator import SaunierGeniaCoordinator
 
-TO_REDACT: list[str] = ["serial_number", "serial", "mac"]
+TO_REDACT: list[str] = ["serial_number", "serialnumber", "serial", "counter", "mac"]
 
 
 async def async_get_config_entry_diagnostics(

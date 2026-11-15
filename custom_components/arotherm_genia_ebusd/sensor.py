@@ -137,6 +137,15 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
             subs.append((CIRCUIT_BASS3, "PrEnergySumHc"))
         elif description.key == "energy_thermal_hwc":
             subs.append((CIRCUIT_BASS3, "PrEnergySumHwc"))
+        elif description.key == "subcooling":
+            subs.extend(
+                [
+                    (CIRCUIT_HMUX0, "RunDataCondensationTemp"),
+                    (CIRCUIT_HMUX0, "RunDataCondensateTemp"),
+                    (CIRCUIT_HMU, "RunDataCondensationTemp"),
+                    (CIRCUIT_HMU, "RunDataCondensateTemp"),
+                ]
+            )
 
         c = description.circuit.lower()
         m = description.message.lower()

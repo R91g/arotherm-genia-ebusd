@@ -365,17 +365,15 @@ send_hex_command:
         text:
     host:
       name: Host / IP Address (Optional)
-      description: IP address or hostname where eBUSd daemon is running (defaults to 127.0.0.1 or b4d7ad18-ebusd).
+      description: IP address or hostname where eBUSd daemon is running (leave empty to use the configured eBUSd TCP host or auto-detected default).
       required: false
-      default: "127.0.0.1"
       example: "127.0.0.1"
       selector:
         text:
     port:
       name: TCP Port (Optional)
-      description: eBUSd TCP daemon port (defaults to 8888).
+      description: eBUSd TCP daemon port (leave empty to use the configured eBUSd TCP port, default 8888).
       required: false
-      default: 8888
       example: 8888
       selector:
         number:

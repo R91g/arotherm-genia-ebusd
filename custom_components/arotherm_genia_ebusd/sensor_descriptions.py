@@ -219,15 +219,19 @@ def _get_vwzio_secondary_hwc_status(coord: SaunierGeniaCoordinator) -> str | Non
 
     msg = coord.get_str(CIRCUIT_VWZIO, "SecondaryCircuitStatusHwc", "status")
     if msg:
-        parts = msg.strip().split()
+        msg_clean = msg.strip()
+        if msg_clean.upper().startswith("ERR:"):
+            return None
+        parts = msg_clean.split()
         if parts:
             try:
                 b0 = int(parts[0], 16)
-                if b0 >= 0x20:
-                    return "dhw"
+                return "dhw" if b0 >= 0x20 else "standby"
             except ValueError:
-                pass
-        return "dhw"
+                token_lower = parts[0].lower()
+                if token_lower in ("dhw", "hwc", "on"):
+                    return "dhw"
+        return "standby"
     return "standby"
 
 
@@ -258,7 +262,7 @@ def _get_broadcast_datetime(coord: SaunierGeniaCoordinator) -> str | None:
 def _get_z1_actual_desired_filtered(
     coord: SaunierGeniaCoordinator,
 ) -> float | None:
-    """Return Z1ActualRoomTempDesired filtering the 5.0°C off sentinel."""
+    """Return Z1ActualRoomTempDesired filtering the 5.0°C off/setback sentinel."""
     val = coord.get_float(CIRCUIT_BASS3, "Z1ActualRoomTempDesired", "value")
     if val is None:
         return None
@@ -267,6 +271,8 @@ def _get_z1_actual_desired_filtered(
         if op_mode == "off":
             manual_temp = coord.get_float(CIRCUIT_BASS3, "Z1ManualTemp", "value")
             return manual_temp if manual_temp is not None else DEFAULT_COMFORT_TEMP
+        if op_mode != "manual":
+            return None
     return round(val, 2)
 
 
@@ -1725,6 +1731,9 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         field="status",
         device_class=SensorDeviceClass.ENUM,
         options=VWZIO_SECONDARY_HWC_OPTIONS,
+        fallback_circuit=CIRCUIT_VWZIO,
+        fallback_message="Status01",
+        fallback_field="pumpstate",
         value_fn=_get_vwzio_secondary_hwc_status,
         attr_fn=_get_vwzio_secondary_hwc_attrs,
     ),

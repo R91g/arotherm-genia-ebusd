@@ -332,9 +332,10 @@ class SaunierGeniaOptionsFlowHandler(OptionsFlow):
                 user_input.update(user_input.pop(SECTION_ADVANCED_OPTIONS))
 
             if CONF_EBUSD_TCP_HOST in user_input:
-                user_input[CONF_EBUSD_TCP_HOST] = str(
-                    user_input[CONF_EBUSD_TCP_HOST]
-                ).strip()
+                user_input[CONF_EBUSD_TCP_HOST] = (
+                    str(user_input[CONF_EBUSD_TCP_HOST]).strip()
+                    or DEFAULT_EBUSD_TCP_HOST
+                )
             if CONF_EBUSD_TCP_PORT in user_input:
                 user_input[CONF_EBUSD_TCP_PORT] = int(user_input[CONF_EBUSD_TCP_PORT])
             return self.async_create_entry(title="", data=user_input)

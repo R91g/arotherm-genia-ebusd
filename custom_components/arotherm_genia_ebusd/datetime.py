@@ -17,6 +17,13 @@ from .coordinator import SaunierGeniaCoordinator
 from .entity import SaunierGeniaEntity
 
 
+def _to_local_aware(value: datetime) -> datetime:
+    """Return a timezone-aware local datetime, attaching default TZ if naive."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=dt_util.get_default_time_zone())
+    return dt_util.as_local(value)
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -38,6 +45,7 @@ class SaunierGeniaHolidayStartDateTime(SaunierGeniaEntity, DateTimeEntity):
     """DateTime entity for Holiday / Away Mode Start Date and Time."""
 
     _attr_entity_category = EntityCategory.CONFIG
+    _gate_availability_on_ebus = True
 
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the Holiday Start DateTime entity."""
@@ -91,7 +99,7 @@ class SaunierGeniaHolidayStartDateTime(SaunierGeniaEntity, DateTimeEntity):
 
     async def async_set_value(self, value: datetime) -> None:
         """Set new holiday start date and time."""
-        loc_val = dt_util.as_local(value) if value.tzinfo else value
+        loc_val = _to_local_aware(value)
         self.coordinator.preselected_holiday_start_datetime = loc_val
 
         date_str = f"{loc_val.day:02d};{loc_val.month:02d};{loc_val.year % 100:02d}"
@@ -110,6 +118,7 @@ class SaunierGeniaHolidayEndDateTime(SaunierGeniaEntity, DateTimeEntity):
     """DateTime entity for Holiday / Away Mode End Date and Time."""
 
     _attr_entity_category = EntityCategory.CONFIG
+    _gate_availability_on_ebus = True
 
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the Holiday End DateTime entity."""
@@ -163,7 +172,7 @@ class SaunierGeniaHolidayEndDateTime(SaunierGeniaEntity, DateTimeEntity):
 
     async def async_set_value(self, value: datetime) -> None:
         """Set new holiday end date and time."""
-        loc_val = dt_util.as_local(value) if value.tzinfo else value
+        loc_val = _to_local_aware(value)
         self.coordinator.preselected_holiday_end_datetime = loc_val
 
         date_str = f"{loc_val.day:02d};{loc_val.month:02d};{loc_val.year % 100:02d}"
@@ -182,6 +191,7 @@ class SaunierGeniaCoolingStartDateTime(SaunierGeniaEntity, DateTimeEntity):
     """DateTime entity for Cooling Season Start Date (Lock 1)."""
 
     _attr_entity_category = EntityCategory.CONFIG
+    _gate_availability_on_ebus = True
 
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the Cooling Start DateTime entity."""
@@ -224,7 +234,7 @@ class SaunierGeniaCoolingStartDateTime(SaunierGeniaEntity, DateTimeEntity):
 
     async def async_set_value(self, value: datetime) -> None:
         """Set new cooling season start date."""
-        loc_val = dt_util.as_local(value) if value.tzinfo else value
+        loc_val = _to_local_aware(value)
         date_str = f"{loc_val.day:02d};{loc_val.month:02d};{loc_val.year % 100:02d}"
         self.coordinator.set_custom_cooling_start_date(date_str)
         await self.coordinator.async_write_parameter(
@@ -236,6 +246,7 @@ class SaunierGeniaCoolingEndDateTime(SaunierGeniaEntity, DateTimeEntity):
     """DateTime entity for Cooling Season End Date (Lock 1)."""
 
     _attr_entity_category = EntityCategory.CONFIG
+    _gate_availability_on_ebus = True
 
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the Cooling End DateTime entity."""
@@ -279,7 +290,7 @@ class SaunierGeniaCoolingEndDateTime(SaunierGeniaEntity, DateTimeEntity):
 
     async def async_set_value(self, value: datetime) -> None:
         """Set new cooling season end date."""
-        loc_val = dt_util.as_local(value) if value.tzinfo else value
+        loc_val = _to_local_aware(value)
         date_str = f"{loc_val.day:02d};{loc_val.month:02d};{loc_val.year % 100:02d}"
         self.coordinator.set_custom_cooling_end_date(date_str)
         await self.coordinator.async_write_parameter(

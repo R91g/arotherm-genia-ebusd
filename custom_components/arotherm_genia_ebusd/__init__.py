@@ -894,13 +894,13 @@ def _async_register_services(hass: HomeAssistant) -> None:
                                 plans.append((day_name, 0, writes))
                                 continue
 
-                            # Hydrate all active slots of this day to preserve remaining ones
+                            # Hydrate all remaining active slots of this day to preserve them
                             await _async_hydrate_day_schedule(
                                 coordinator=coordinator,
                                 prefix=prefix,
                                 day_name=day_name,
                                 active_count=active_count,
-                                exclude_slot=None,
+                                exclude_slot=slot,
                             )
 
                             if active_count <= 1:
@@ -922,20 +922,35 @@ def _async_register_services(hass: HomeAssistant) -> None:
                                         )
                                         or {}
                                     )
+                                    raw_fields = [
+                                        msg.get(k)
+                                        for k in (
+                                            "from_hour",
+                                            "from_min",
+                                            "to_hour",
+                                            "to_min",
+                                        )
+                                    ]
+                                    if any(v is None for v in raw_fields):
+                                        raise HomeAssistantError(
+                                            f"Cannot safely delete slot {slot} on {day_name}: "
+                                            f"current data of remaining slot {s_idx} is unknown, "
+                                            "rewriting would erase it. Wait for the schedule to be read from the bus and retry."
+                                        )
                                     try:
-                                        fh = int(msg.get("from_hour", 0))
-                                        fm = int(msg.get("from_min", 0))
-                                        th = int(msg.get("to_hour", 0))
-                                        tm = int(msg.get("to_min", 0))
+                                        fh, fm, th, tm = (
+                                            int(v) for v in raw_fields if v is not None
+                                        )
                                         raw_t = msg.get("temp", msg.get("cooling_temp"))
                                         st = (
                                             float(raw_t)
                                             if raw_t is not None
                                             else default_temp
                                         )
-                                    except (TypeError, ValueError):
-                                        fh = fm = th = tm = 0
-                                        st = default_temp
+                                    except (TypeError, ValueError) as err:
+                                        raise HomeAssistantError(
+                                            f"Invalid stored data for remaining slot {s_idx} on {day_name}."
+                                        ) from err
                                     remaining_slots.append((fh, fm, th, tm, st))
 
                                 new_total = len(remaining_slots)

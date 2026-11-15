@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable
+from datetime import date
 from typing import Any
 
 from homeassistant.components.climate import (
@@ -393,7 +394,7 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             holiday_temp = self.coordinator.get_float(
                 CIRCUIT_BASS3, "HolidayTemp", "value"
             )
-            if holiday_temp is not None and holiday_temp > 5.0:
+            if holiday_temp is not None and holiday_temp >= 5.0:
                 return round(holiday_temp, 1)
             return DEFAULT_HOLIDAY_TEMP
 
@@ -434,7 +435,7 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             veto_temp = self.coordinator.get_float(
                 CIRCUIT_BASS3, "Z1QuickVetoTemp", "value"
             )
-            if veto_temp is not None and veto_temp > 5.0:
+            if veto_temp is not None and veto_temp >= 5.0:
                 return round(veto_temp, 1)
             return self._saved_heating_target
 
@@ -442,7 +443,7 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             manual_temp = self.coordinator.get_float(
                 CIRCUIT_BASS3, "Z1ManualTemp", "value"
             )
-            if manual_temp is not None and manual_temp > 5.0:
+            if manual_temp is not None and manual_temp >= 5.0:
                 return round(manual_temp, 1)
             return self._saved_heating_target
 
@@ -450,7 +451,7 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             night_temp = self.coordinator.get_float(
                 CIRCUIT_BASS3, "Z1NightTemp", "value"
             )
-            if night_temp is not None and night_temp > 5.0:
+            if night_temp is not None and night_temp >= 5.0:
                 return round(night_temp, 1)
             return self._saved_heating_target
 
@@ -592,14 +593,49 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
     # Commands: Set HVAC Mode, Temperature, Preset
     # -------------------------------------------------------------------------
 
+    def _is_cooling_lock_currently_open(self) -> bool:
+        """Return True if Cooling Lock 1 holds an active window covering today (or open-ended 99)."""
+        end_msg = self.coordinator.get_message(CIRCUIT_BASS3, "CoolingEndDate")
+        if not isinstance(end_msg, dict):
+            return False
+        end_year = end_msg.get("year")
+        if not isinstance(end_year, int) or end_year == 19:
+            return False
+        if end_year == 99:
+            return True
+        end_month = end_msg.get("month")
+        end_day = end_msg.get("day")
+        if not isinstance(end_month, int) or not isinstance(end_day, int):
+            return False
+        try:
+            end_dt = date(2000 + end_year, end_month, end_day)
+        except ValueError:
+            return False
+
+        today = date.today()
+        if end_dt < today:
+            return False
+
+        start_msg = self.coordinator.get_message(CIRCUIT_BASS3, "CoolingStartDate")
+        if isinstance(start_msg, dict):
+            sy = start_msg.get("year")
+            sm = start_msg.get("month")
+            sd = start_msg.get("day")
+            if isinstance(sy, int) and isinstance(sm, int) and isinstance(sd, int):
+                try:
+                    if date(2000 + sy, sm, sd) > today:
+                        return False
+                except ValueError:
+                    return False
+        return True
+
     async def _async_ensure_cooling_lock_open(self) -> None:
         """Open Lock 1 (custom period if pre-set or 01;01;26 to 01;01;99: indefinite) if auto bypass enabled."""
         if not self.coordinator.auto_cooling_lock_bypass:
             return
 
-        end_year = self.coordinator.get_int(CIRCUIT_BASS3, "CoolingEndDate", "year")
-        # If already open with custom dates or open-ended 99, do not overwrite!
-        if end_year is not None and end_year != 19:
+        # If already open with active custom dates or open-ended 99, do not overwrite!
+        if self._is_cooling_lock_currently_open():
             return
 
         start_date = self.coordinator.custom_cooling_start_date or "01;01;26"
@@ -735,6 +771,9 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
                 await self.coordinator.async_cancel_holiday_mode()
                 await asyncio.sleep(0.5)
 
+            # Capture preset before turning off cooling so MANUAL/ECO survives COOL -> HEAT
+            desired_preset = self.preset_mode
+
             self._active_season = SEASON_HEATING
             await self.coordinator.async_write_parameter(
                 CIRCUIT_BASS3, "Z1OpModeCooling", "off"
@@ -745,14 +784,14 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
 
             target_opmode = (
                 "day"
-                if self.preset_mode == PRESET_MANUAL
-                else ("night" if self.preset_mode == PRESET_ECO else "auto")
+                if desired_preset == PRESET_MANUAL
+                else ("night" if desired_preset == PRESET_ECO else "auto")
             )
             await self.coordinator.async_write_parameter(
                 CIRCUIT_BASS3, "Z1OpMode", target_opmode
             )
 
-            if self.preset_mode == PRESET_MANUAL:
+            if desired_preset == PRESET_MANUAL:
                 await asyncio.sleep(0.3)
                 await self.coordinator.async_write_parameter(
                     CIRCUIT_BASS3, "Z1ManualTemp", self._saved_heating_target
@@ -776,6 +815,9 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
                 restore_cooling_temp=True,
             )
 
+            # Capture preset before turning off heating so MANUAL/ECO survives HEAT -> COOL
+            desired_preset = self.preset_mode
+
             self._active_season = SEASON_COOLING
             # 1. Turn off heating
             await self.coordinator.async_write_parameter(
@@ -787,8 +829,8 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             # 3. Set cooling mode (preserving preset or default to auto)
             target_opmode = (
                 "day"
-                if self.preset_mode == PRESET_MANUAL
-                else ("night" if self.preset_mode == PRESET_ECO else "auto")
+                if desired_preset == PRESET_MANUAL
+                else ("night" if desired_preset == PRESET_ECO else "auto")
             )
             await self.coordinator.async_write_parameter(
                 CIRCUIT_BASS3, "Z1OpModeCooling", target_opmode
@@ -933,9 +975,10 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
 
         if preset_mode == PRESET_BOOST:
             current_preset = self.preset_mode
-            if current_preset != PRESET_BOOST:
-                self._pre_boost_hvac_mode = self.hvac_mode
-                self._pre_boost_preset_mode = current_preset
+            if current_preset == PRESET_BOOST:
+                return
+            self._pre_boost_hvac_mode = self.hvac_mode
+            self._pre_boost_preset_mode = current_preset
 
             if self.hvac_mode == HVACMode.OFF:
                 await self.coordinator.async_set_quick_veto()
