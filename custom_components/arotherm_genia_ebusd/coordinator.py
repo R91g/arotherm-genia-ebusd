@@ -18,6 +18,7 @@ from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import async_call_later, async_track_time_interval
 from homeassistant.helpers.storage import Store
+from homeassistant.util import dt as dt_util
 
 from .const import (
     CALC_CIRCUIT,
@@ -1312,7 +1313,7 @@ class SaunierGeniaCoordinator:
             "z1status",
             "z1quickvetoduration",
         ):
-            self._async_check_quick_veto_restoration()
+            self._async_check_quick_veto_restoration(trigger_msg=msg_lower)
             if (
                 msg_lower == "z1sfmode"
                 and not self._heating_veto_activating
@@ -3316,19 +3317,25 @@ class SaunierGeniaCoordinator:
         end_time: str | None = None,
     ) -> None:
         """Activate Holiday / Away Mode with specified setback temperature and time window."""
-        now = datetime.now()
+        now = dt_util.now()
         cur_date_str = f"{now.day:02d};{now.month:02d};{now.year % 100:02d}"
         cur_time_str = f"{now.hour:02d};{now.minute:02d};{now.second:02d}"
 
         # If explicit arguments not supplied, check preselected datetime buffers
         if start_date is None and self._preselected_holiday_start_datetime is not None:
-            s_dt = self._preselected_holiday_start_datetime
+            raw_s_dt = self._preselected_holiday_start_datetime
+            s_dt = (
+                dt_util.as_local(raw_s_dt) if raw_s_dt.tzinfo is not None else raw_s_dt
+            )
             start_date = f"{s_dt.day:02d};{s_dt.month:02d};{s_dt.year % 100:02d}"
             if start_time is None:
                 start_time = f"{s_dt.hour:02d};{s_dt.minute:02d};{s_dt.second:02d}"
 
         if end_date is None and self._preselected_holiday_end_datetime is not None:
-            e_dt = self._preselected_holiday_end_datetime
+            raw_e_dt = self._preselected_holiday_end_datetime
+            e_dt = (
+                dt_util.as_local(raw_e_dt) if raw_e_dt.tzinfo is not None else raw_e_dt
+            )
             end_date = f"{e_dt.day:02d};{e_dt.month:02d};{e_dt.year % 100:02d}"
             if end_time is None:
                 end_time = f"{e_dt.hour:02d};{e_dt.minute:02d};{e_dt.second:02d}"
@@ -3412,7 +3419,7 @@ class SaunierGeniaCoordinator:
             return (None, True, True)
 
         try:
-            now = datetime.now()
+            now = dt_util.now()
             target_date = datetime(2000 + int(year), int(month), int(day)).date()
             diff = (target_date - now.date()).days
             if diff < 0:
@@ -3495,7 +3502,15 @@ class SaunierGeniaCoordinator:
         m = time_msg.get("minutes", 59)
         s = time_msg.get("seconds", 59)
         try:
-            return datetime(2000 + year, month, day, int(h), int(m), int(s))
+            return datetime(
+                2000 + year,
+                month,
+                day,
+                int(h),
+                int(m),
+                int(s),
+                tzinfo=dt_util.get_default_time_zone(),
+            )
         except (ValueError, TypeError, OverflowError):
             return None
 
@@ -3508,7 +3523,7 @@ class SaunierGeniaCoordinator:
         rem_formatted: str | None = None
         end_dt = self._get_holiday_end_datetime()
         if is_active and not is_open_ended and end_dt is not None:
-            diff_secs = (end_dt - datetime.now()).total_seconds()
+            diff_secs = (end_dt - dt_util.now()).total_seconds()
             total_mins = max(1, math.ceil(diff_secs / 60.0)) if diff_secs > 0 else 0
             _, rem_m_day = divmod(total_mins, 1440)
             rem_hours, rem_mins = divmod(rem_m_day, 60)
@@ -3572,7 +3587,7 @@ class SaunierGeniaCoordinator:
 
         try:
             target_date = datetime(2000 + int(year), int(month), int(day)).date()
-            diff = (target_date - datetime.now().date()).days
+            diff = (target_date - dt_util.now().date()).days
             if diff < 0:
                 return (0, False, False)
             return (diff, True, False)
@@ -3754,20 +3769,35 @@ class SaunierGeniaCoordinator:
                         before_sf_ts is None or after_sf_ts > before_sf_ts
                     )
                     z1_status_now = (
-                        self.get_str(CIRCUIT_BASS3, "Z1Status", "value") or ""
-                    ).lower()
+                        (self.get_str(CIRCUIT_BASS3, "Z1Status", "value") or "")
+                        .strip()
+                        .lower()
+                    )
                     sf_mode_now = (
-                        self.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or ""
-                    ).lower()
+                        (self.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or "")
+                        .strip()
+                        .lower()
+                    )
 
-                    confirmed_finished = (fresh_status and z1_status_now != "veto") or (
-                        fresh_sf and sf_mode_now != "veto"
+                    status_valid = (
+                        fresh_status
+                        and bool(z1_status_now)
+                        and not z1_status_now.startswith("err:")
                     )
-                    confirmed_active = not confirmed_finished and (
-                        (fresh_status and z1_status_now == "veto")
-                        or (fresh_sf and sf_mode_now == "veto")
+                    sf_valid = (
+                        fresh_sf
+                        and bool(sf_mode_now)
+                        and not sf_mode_now.startswith("err:")
                     )
-                    if confirmed_active:
+                    any_valid_veto = (status_valid and z1_status_now == "veto") or (
+                        sf_valid and sf_mode_now == "veto"
+                    )
+                    any_valid_finished = (status_valid and z1_status_now != "veto") or (
+                        sf_valid and sf_mode_now != "veto"
+                    )
+                    confirmed_active = any_valid_veto
+                    confirmed_finished = any_valid_finished and not any_valid_veto
+                    if confirmed_active or not confirmed_finished:
                         if self._heating_veto_started_mono <= 0.0:
                             self._heating_veto_started_mono = time.monotonic()
                         if (
@@ -3790,7 +3820,12 @@ class SaunierGeniaCoordinator:
                                 CALC_CIRCUIT, "QuickVetoRemaining"
                             )
                             _LOGGER.info(
-                                "Heating quick veto backup timer reached, but controller reports veto still active; deferring Z1OpMode='off' restoration"
+                                "Heating quick veto backup timer reached, %s; deferring Z1OpMode='off' restoration",
+                                (
+                                    "controller reports veto still active"
+                                    if confirmed_active
+                                    else "controller state not yet confirmed"
+                                ),
                             )
                             return
 
@@ -3819,12 +3854,23 @@ class SaunierGeniaCoordinator:
             self._async_notify_message_listeners(CALC_CIRCUIT, "QuickVetoRemaining")
 
     @callback
-    def _async_check_quick_veto_restoration(self) -> None:
+    def _async_check_quick_veto_restoration(
+        self, *, trigger_msg: str | None = None
+    ) -> None:
         """Check whether hardware countdown timer ended quick veto and restore prior state."""
         if self._heating_veto_activating:
             return
-        sf_mode = (self.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or "").lower()
-        if not sf_mode or sf_mode == "veto":
+        if trigger_msg is not None and trigger_msg != "z1sfmode":
+            return
+        sf_mode = (
+            (self.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or "").strip().lower()
+        )
+        if not sf_mode or sf_mode.startswith("err:") or sf_mode == "veto":
+            return
+        z1_status = (
+            (self.get_str(CIRCUIT_BASS3, "Z1Status", "value") or "").strip().lower()
+        )
+        if trigger_msg is None and z1_status == "veto":
             return
         if self._pre_veto_opmode != "off":
             if (
@@ -4706,24 +4752,39 @@ class SaunierGeniaCoordinator:
                 )
                 self._async_notify_message_listeners(CALC_CIRCUIT, "QuickVetoRemaining")
                 return
-            sf_mode = (self.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or "").lower()
+            sf_mode = (
+                (self.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or "").strip().lower()
+            )
+            z1_status = (
+                (self.get_str(CIRCUIT_BASS3, "Z1Status", "value") or "").strip().lower()
+            )
             if sf_mode == "veto":
                 return
-            if self.is_ebus_operational:
+            if (
+                self.is_ebus_operational
+                and sf_mode
+                and not sf_mode.startswith("err:")
+                and z1_status != "veto"
+            ):
                 await self._async_finish_heating_veto_off_restore(
                     "persisted veto expired during restart"
                 )
             else:
                 self._pending_heating_veto_restore = True
                 _LOGGER.info(
-                    "Persisted heating quick veto from 'off' expired while offline; deferring bus restoration until eBUS is operational"
+                    "Persisted heating quick veto from 'off' expired; deferring bus restoration until eBUS is operational and controller state is confirmed"
                 )
 
     async def _async_execute_pending_heating_veto_restore(self) -> None:
         """Execute deferred restoration for a persisted heating veto from 'off'."""
         if not self._pending_heating_veto_restore or not self.is_ebus_operational:
             return
-        sf_mode = (self.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or "").lower()
+        sf_mode = (
+            (self.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or "").strip().lower()
+        )
+        z1_status = (
+            (self.get_str(CIRCUIT_BASS3, "Z1Status", "value") or "").strip().lower()
+        )
         if sf_mode == "veto":
             # Controller still actively running veto (e.g. extended on wall unit);
             # let Z1SFMode transition handle restoration instead of forcing 'off' early.
@@ -4732,6 +4793,39 @@ class SaunierGeniaCoordinator:
                 "Deferred heating quick veto restore paused: controller reports Z1SFMode=veto still active"
             )
             return
+        if not sf_mode or sf_mode.startswith("err:") or z1_status == "veto":
+            now_mono = time.monotonic()
+            if (now_mono - self._last_z1_sfmode_sync_time) >= 30.0:
+                self._last_z1_sfmode_sync_time = now_mono
+                try:
+                    await self.async_request_get(CIRCUIT_BASS3, "Z1SFMode")
+                except HomeAssistantError as err:
+                    _LOGGER.debug(
+                        "Failed to query Z1SFMode before deferred heating veto restore: %s",
+                        err,
+                    )
+                    return
+                sf_mode = (
+                    (self.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or "")
+                    .strip()
+                    .lower()
+                )
+                z1_status = (
+                    (self.get_str(CIRCUIT_BASS3, "Z1Status", "value") or "")
+                    .strip()
+                    .lower()
+                )
+                if sf_mode == "veto":
+                    self._pending_heating_veto_restore = False
+                    _LOGGER.info(
+                        "Deferred heating quick veto restore paused: controller reports Z1SFMode=veto still active"
+                    )
+                    return
+            if not sf_mode or sf_mode.startswith("err:") or z1_status == "veto":
+                _LOGGER.debug(
+                    "Deferred heating quick veto restore waiting for controller Z1SFMode confirmation"
+                )
+                return
         try:
             await self._async_finish_heating_veto_off_restore(
                 "persisted heating quick veto expired while offline"

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Callable
 from datetime import date
 from typing import Any
 
@@ -152,6 +152,7 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
         # seasonal setpoint learning is paused so that intermediate optimistic states
         # are never erroneously memorized.
         self._transition_in_progress: bool = False
+        self._transition_lock: asyncio.Lock = asyncio.Lock()
 
     async def async_added_to_hass(self) -> None:
         """Restore previous season targets across Home Assistant restarts."""
@@ -278,15 +279,18 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
                     )
         super()._handle_coordinator_update()
 
-    async def _async_run_transition(self, sequence: Awaitable[None]) -> None:
-        """Run a multi-step eBUS write sequence with setpoint learning paused."""
-        self._transition_in_progress = True
-        try:
-            await sequence
-        finally:
-            self._transition_in_progress = False
-            self._async_refresh_derived_state()
-            self.async_write_ha_state()
+    async def _async_run_transition(
+        self, sequence_factory: Callable[[], Awaitable[None]]
+    ) -> None:
+        """Run a multi-step eBUS write sequence serialized with setpoint learning paused."""
+        async with self._transition_lock:
+            self._transition_in_progress = True
+            try:
+                await sequence_factory()
+            finally:
+                self._transition_in_progress = False
+                self._async_refresh_derived_state()
+                self.async_write_ha_state()
 
     @property
     def hvac_modes(self) -> list[HVACMode]:
@@ -727,7 +731,7 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set new target HVAC mode with transparent Double-Lock and seasonal setpoint memory."""
-        await self._async_run_transition(self._async_apply_hvac_mode(hvac_mode))
+        await self._async_run_transition(lambda: self._async_apply_hvac_mode(hvac_mode))
 
     async def _async_apply_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Write the eBUS sequence for a new HVAC mode (runs with learning paused).
@@ -853,7 +857,9 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
         if temperature is None:
             return
         temp_val = round(float(temperature) * 2.0) / 2.0
-        await self._async_run_transition(self._async_apply_temperature(temp_val))
+        await self._async_run_transition(
+            lambda: self._async_apply_temperature(temp_val)
+        )
 
     async def _async_apply_temperature(self, temp_val: float) -> None:
         """Write the eBUS sequence for a new target temperature (runs with learning paused)."""
@@ -939,7 +945,9 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Set preset mode (comfort, manual, eco, boost, away, ventilation)."""
-        await self._async_run_transition(self._async_apply_preset_mode(preset_mode))
+        await self._async_run_transition(
+            lambda: self._async_apply_preset_mode(preset_mode)
+        )
 
     async def _async_apply_preset_mode(self, preset_mode: str) -> None:
         """Write the eBUS sequence for a new preset (runs with learning paused)."""

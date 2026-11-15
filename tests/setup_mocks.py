@@ -381,12 +381,24 @@ sys.modules["homeassistant.data_entry_flow"].section = mock_section
 # Mock common string enums and constants
 from datetime import UTC, datetime
 
-sys.modules["homeassistant.util"].dt.get_default_time_zone.return_value = UTC
-sys.modules["homeassistant.util.dt"].get_default_time_zone.return_value = UTC
+_LOCAL_TZ = datetime.now().astimezone().tzinfo or UTC
+
+
+def _mock_dt_now(tz: Any = None) -> datetime:
+    """Return current time in requested or mocked default Home Assistant timezone."""
+    return datetime.now(
+        tz or sys.modules["homeassistant.util.dt"].get_default_time_zone()
+    )
+
+
+sys.modules["homeassistant.util"].dt.get_default_time_zone.return_value = _LOCAL_TZ
+sys.modules["homeassistant.util.dt"].get_default_time_zone.return_value = _LOCAL_TZ
 sys.modules["homeassistant.util"].dt.as_local.side_effect = lambda dt: dt
 sys.modules["homeassistant.util.dt"].as_local.side_effect = lambda dt: dt
 sys.modules["homeassistant.util"].dt.utcnow.side_effect = lambda: datetime.now(UTC)
 sys.modules["homeassistant.util.dt"].utcnow.side_effect = lambda: datetime.now(UTC)
+sys.modules["homeassistant.util"].dt.now.side_effect = _mock_dt_now
+sys.modules["homeassistant.util.dt"].now.side_effect = _mock_dt_now
 
 sys.modules["homeassistant.const"].PERCENTAGE = "%"
 sys.modules["homeassistant.const"].ATTR_TEMPERATURE = "temperature"

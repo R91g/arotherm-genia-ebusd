@@ -1361,6 +1361,56 @@ class TestClimateEntity(unittest.TestCase):
         self.coordinator._state[(CIRCUIT_BASS3.lower(), "holidaytemp")] = {"value": 5.0}
         self.assertEqual(self.climate.native_target_temperature, 5.0)
 
+    def test_concurrent_heat_and_cool_transitions_are_serialized(self) -> None:
+        """Concurrent HEAT and COOL transitions must serialize without leaving both auto."""
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "off"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "off"
+        }
+        self.coordinator.writes.clear()
+
+        async def _run_concurrent() -> None:
+            await asyncio.gather(
+                self.climate.async_set_hvac_mode(HVACMode.HEAT),
+                self.climate.async_set_hvac_mode(HVACMode.COOL),
+            )
+
+        asyncio.run(_run_concurrent())
+        self.assertEqual(
+            self.coordinator.get_str(CIRCUIT_BASS3, "Z1OpMode", "value"), "off"
+        )
+        self.assertEqual(
+            self.coordinator.get_str(CIRCUIT_BASS3, "Z1OpModeCooling", "value"),
+            "auto",
+        )
+        self.assertEqual(self.climate.hvac_mode, HVACMode.COOL)
+        self.assertFalse(self.climate._transition_in_progress)
+
+    def test_concurrent_mode_and_preset_transitions_are_serialized(self) -> None:
+        """Concurrent COOL mode + MANUAL preset must run strictly in order."""
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmode")] = {"value": "auto"}
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "z1opmodecooling")] = {
+            "value": "off"
+        }
+        self.coordinator.writes.clear()
+
+        async def _run_concurrent() -> None:
+            await asyncio.gather(
+                self.climate.async_set_hvac_mode(HVACMode.COOL),
+                self.climate.async_set_preset_mode(PRESET_MANUAL),
+            )
+
+        asyncio.run(_run_concurrent())
+        self.assertEqual(
+            self.coordinator.get_str(CIRCUIT_BASS3, "Z1OpMode", "value"), "off"
+        )
+        self.assertEqual(
+            self.coordinator.get_str(CIRCUIT_BASS3, "Z1OpModeCooling", "value"),
+            "day",
+        )
+        self.assertEqual(self.climate.hvac_mode, HVACMode.COOL)
+        self.assertEqual(self.climate.preset_mode, PRESET_MANUAL)
+
 
 if __name__ == "__main__":
     unittest.main()
