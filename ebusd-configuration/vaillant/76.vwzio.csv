@@ -17,10 +17,10 @@ r;u,,,Status01,circuit temperatures and pump state,,,b511,01,flow_temp,,D1C,,°C
 # Immersion heater runtime and start count by mode (Heating, DHW)
 r;u,,,RunStatsHeaterHc,immersion heater runtime and start count in heating mode,,,b511,1801,ign,,IGN:1,,,,runtime,,ULG,,min,"immersion heater runtime",cycles,,ULG,,,"start count"
 r;u,,,RunStatsHeaterHwc,immersion heater runtime and start count in hot water mode,,,b511,1802,ign,,IGN:1,,,,runtime,,ULG,,min,"immersion heater runtime",cycles,,ULG,,,"start count"
-r;u,,,SecondaryCircuitStatus,secondary pump and circuit status,,,b512,0f0201,status,,HEX:7,,,
-r;u,,,SecondaryCircuitStatusStandby,secondary pump and circuit status standby,,,b512,0f0001,status,,HEX:7,,,
-r;u,,,SecondaryCircuitStatusHwc,secondary pump and circuit status hwc,,,b512,0f0202,status,,HEX:7,,,
-r;u,,,SecondaryCircuitStatus03,secondary pump and circuit status 03,,,b512,0f0301,status,,HEX:7,,,
+u,,,SecondaryCircuitStatus,secondary pump and circuit status,,,b512,0f0201,status,,HEX:7,,,
+u,,,SecondaryCircuitStatusStandby,secondary pump and circuit status standby,,,b512,0f0001,status,,HEX:7,,,
+u,,,SecondaryCircuitStatusHwc,secondary pump and circuit status hwc,,,b512,0f0202,status,,HEX:7,,,
+u,,,SecondaryCircuitStatus03,secondary pump and circuit status 03,,,b512,0f0301,status,,HEX:7,,,
 u,,,StationState,hydraulic station pressure flow and operating state,,,b512,0f0613,ign,,IGN:3,,,,pressure,,UCH,10,bar,system pressure,flow,,UIN,,l/h,volumetric flow rate,state,,UCH,,,operating state
 
 # ==============================================================================
@@ -53,8 +53,8 @@ r;u,,,ErrorMemorySlot,error memory slot,,,b503,00,slot,m,UCH,,,,error,,UIN,,,err
 # 4. SERVICE MODE / RELAY TEST (ORIGINAL)
 # ==============================================================================
 w,,service,EnableTestThreeWayValve,enable test 3 way valve,,,b514,0502,ignore,,HEX:3,=03FFFF,,
-r,,service,TestThreeWayValve,3 way valve,,,b514,0502,ign,,IGN:2,,,,value,,UCH,0=heating;1=dhw,,
+u,,service,TestThreeWayValve,3 way valve,,,b514,0502,ign,,IGN:2,,,,value,,UCH,0=heating;1=dhw,,
 w,,service,EnableTestHwcTemp,enable test hwc temperature,,,b514,052c,ignore,,HEX:3,=03FFFF,,
-r,,service,TestHwcTemp,hwc temperature,,,b514,052c,ign,,IGN:2,,,,value,,SIN,10,°C,temperature
+u,,service,TestHwcTemp,hwc temperature,,,b514,052c,ign,,IGN:2,,,,value,,SIN,10,°C,temperature
 w,,service,EnableTestOutdoorTemp,enable test outdoor temperature,,,b514,05,ignore,,HEX:3,=03FFFF,,
-r,,service,TestOutdoorTemp,outdoor temperature,,,b514,0545,ign,,IGN:2,,,,value,,SIN,10,°C,temperature
+u,,service,TestOutdoorTemp,outdoor temperature,,,b514,0545,ign,,IGN:2,,,,value,,SIN,10,°C,temperature
