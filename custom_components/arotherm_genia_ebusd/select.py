@@ -149,9 +149,12 @@ class SaunierGeniaSelect(SaunierGeniaEntity, SelectEntity):
         if options and val_lower in options:
             return val_lower
         if self.entity_description.options_map:
-            rev_map = {v: k for k, v in self.entity_description.options_map.items()}
-            if val in rev_map:
-                return rev_map[val]
+            rev_map = {
+                str(v).lower(): k
+                for k, v in self.entity_description.options_map.items()
+            }
+            if val_lower in rev_map:
+                return rev_map[val_lower]
         return None
 
     async def async_select_option(self, option: str) -> None:

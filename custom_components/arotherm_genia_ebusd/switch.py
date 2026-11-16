@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from datetime import date
 from typing import Any
 
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
@@ -11,6 +12,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.util import dt as dt_util
 
 from .const import CIRCUIT_BASS3, DEVICE_CLIMATE_CONTROLLER, DOMAIN
 from .coordinator import SaunierGeniaCoordinator
@@ -148,19 +150,55 @@ class SaunierGeniaCoolingSeasonSwitch(SaunierGeniaEntity, SwitchEntity):
             ],
             unique_id_suffix="switch_bass3_coolinglock1_season",
         )
+        self._cooling_lock = asyncio.Lock()
 
     @property
     def is_on(self) -> bool | None:
-        """Return True if CoolingReleaseStatus is 'on' or CoolingEndDate year is 99."""
+        """Return True if Lock 1 is open (CoolingReleaseStatus='on', year 99, or active window)."""
         release_status = self.coordinator.get_str(
             CIRCUIT_BASS3, "CoolingReleaseStatus", "value"
         )
         end_year = self.coordinator.get_int(CIRCUIT_BASS3, "CoolingEndDate", "year")
         if release_status is None and end_year is None:
             return None
-        return (
-            release_status is not None and release_status.lower() == "on"
-        ) or end_year == 99
+        if release_status is not None and release_status.lower() == "on":
+            return True
+        if end_year == 99:
+            return True
+        if end_year == 19:
+            return False
+        if end_year is not None:
+            end_msg = self.coordinator.get_message(CIRCUIT_BASS3, "CoolingEndDate")
+            if isinstance(end_msg, dict):
+                ed = end_msg.get("day")
+                em = end_msg.get("month")
+                if isinstance(ed, int) and isinstance(em, int):
+                    try:
+                        end_dt = date(2000 + end_year, em, ed)
+                    except ValueError:
+                        return False
+                    today = dt_util.now().date()
+                    if end_dt < today:
+                        return False
+                    start_msg = self.coordinator.get_message(
+                        CIRCUIT_BASS3, "CoolingStartDate"
+                    )
+                    if isinstance(start_msg, dict):
+                        sy = start_msg.get("year")
+                        sm = start_msg.get("month")
+                        sd = start_msg.get("day")
+                        if (
+                            isinstance(sy, int)
+                            and isinstance(sm, int)
+                            and isinstance(sd, int)
+                        ):
+                            try:
+                                if date(2000 + sy, sm, sd) > today:
+                                    return False
+                            except ValueError:
+                                return False
+                    return True
+        return False
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -192,29 +230,31 @@ class SaunierGeniaCoolingSeasonSwitch(SaunierGeniaEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Open Lock 1 (custom period if pre-set or indefinite 01;01;26 to 01;01;99)."""
-        start_date = self.coordinator.custom_cooling_start_date or "01;01;26"
-        end_date = self.coordinator.custom_cooling_end_date or "01;01;99"
-        await self.coordinator.async_write_parameter(
-            CIRCUIT_BASS3, "CoolingStartDate", start_date
-        )
-        await asyncio.sleep(0.5)
-        await self.coordinator.async_write_parameter(
-            CIRCUIT_BASS3, "CoolingEndDate", end_date
-        )
+        async with self._cooling_lock:
+            start_date = self.coordinator.custom_cooling_start_date or "01;01;26"
+            end_date = self.coordinator.custom_cooling_end_date or "01;01;99"
+            await self.coordinator.async_write_parameter(
+                CIRCUIT_BASS3, "CoolingStartDate", start_date
+            )
+            await asyncio.sleep(0.5)
+            await self.coordinator.async_write_parameter(
+                CIRCUIT_BASS3, "CoolingEndDate", end_date
+            )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Close Lock 1 to epoch 2019 (01;01;19) and set Z1OpModeCooling='off'."""
-        await self.coordinator.async_write_parameter(
-            CIRCUIT_BASS3, "CoolingStartDate", "01;01;19"
-        )
-        await asyncio.sleep(0.5)
-        await self.coordinator.async_write_parameter(
-            CIRCUIT_BASS3, "CoolingEndDate", "01;01;19"
-        )
-        await asyncio.sleep(0.5)
-        await self.coordinator.async_write_parameter(
-            CIRCUIT_BASS3, "Z1OpModeCooling", "off"
-        )
+        async with self._cooling_lock:
+            await self.coordinator.async_write_parameter(
+                CIRCUIT_BASS3, "CoolingStartDate", "01;01;19"
+            )
+            await asyncio.sleep(0.5)
+            await self.coordinator.async_write_parameter(
+                CIRCUIT_BASS3, "CoolingEndDate", "01;01;19"
+            )
+            await asyncio.sleep(0.5)
+            await self.coordinator.async_write_parameter(
+                CIRCUIT_BASS3, "Z1OpModeCooling", "off"
+            )
 
 
 class SaunierGeniaHolidayModeSwitch(SaunierGeniaEntity, SwitchEntity):
@@ -249,15 +289,17 @@ class SaunierGeniaHolidayModeSwitch(SaunierGeniaEntity, SwitchEntity):
         start_year = self.coordinator.get_int(CIRCUIT_BASS3, "HolidayStartDate", "year")
         if z1_status is None and hwc_status is None and end_year is None:
             return None
+        if (z1_status is not None and z1_status.lower() == "holidayaway") or (
+            hwc_status is not None and hwc_status.lower() == "holidayaway"
+        ):
+            return True
         if start_year == 15 or end_year == 15:
             return False
-        if end_year is not None and end_year != 15:
+        if end_year is not None:
             return bool(
                 self.coordinator.get_holiday_remaining_attributes().get("is_active")
             )
-        return (z1_status is not None and z1_status.lower() == "holidayaway") or (
-            hwc_status is not None and hwc_status.lower() == "holidayaway"
-        )
+        return False
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

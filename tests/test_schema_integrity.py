@@ -186,6 +186,46 @@ class TestSchemaIntegrity(unittest.TestCase):
         check_translation_strings(es, "es.json")
         check_translation_strings(de, "de.json")
 
+        # Recursive key parity and {placeholder} parity across all 4 files
+        placeholder_re = re.compile(r"\{([a-zA-Z0-9_]+)\}")
+
+        def check_recursive_parity(
+            ref: dict | list | str,
+            other: dict | list | str,
+            other_name: str,
+            path: str = "",
+        ) -> None:
+            self.assertEqual(
+                type(ref),
+                type(other),
+                f"Type mismatch at '{path}' between strings.json and {other_name}",
+            )
+            if isinstance(ref, dict) and isinstance(other, dict):
+                self.assertEqual(
+                    set(ref.keys()),
+                    set(other.keys()),
+                    f"Key mismatch at '{path}' between strings.json and {other_name}",
+                )
+                for key in ref:
+                    check_recursive_parity(
+                        ref[key],
+                        other[key],
+                        other_name,
+                        f"{path}.{key}" if path else key,
+                    )
+            elif isinstance(ref, str) and isinstance(other, str):
+                ref_ph = set(placeholder_re.findall(ref))
+                other_ph = set(placeholder_re.findall(other))
+                self.assertEqual(
+                    ref_ph,
+                    other_ph,
+                    f"Placeholder mismatch at '{path}' between strings.json ({ref_ph}) and {other_name} ({other_ph})",
+                )
+
+        check_recursive_parity(strings, en, "en.json")
+        check_recursive_parity(strings, es, "es.json")
+        check_recursive_parity(strings, de, "de.json")
+
     def test_services_yaml(self) -> None:
         """Verify services.yaml exposes services registered in __init__.py."""
         self.assertTrue(os.path.exists(self.services_path), "services.yaml missing")
@@ -314,6 +354,26 @@ class TestSchemaIntegrity(unittest.TestCase):
         self.assertIn("zone_1_climate", icons["entity"]["climate"])
         self.assertIn("z1_op_mode", icons["entity"]["select"])
         self.assertIn("dhw_boost_switch", icons["entity"]["switch"])
+
+        # Verify 100% explicit MDI icon coverage for all hmu_status_code states
+        expected_hmu_states = set(
+            strings_entities["sensor"]["hmu_status_code"]["state"].keys()
+        )
+        icon_hmu_states = set(
+            icons["entity"]["sensor"]["hmu_status_code"]["state"].keys()
+        )
+        self.assertEqual(
+            expected_hmu_states - icon_hmu_states,
+            set(),
+            "Missing hmu_status_code state icons in icons.json",
+        )
+        for state_key, icon_val in icons["entity"]["sensor"]["hmu_status_code"][
+            "state"
+        ].items():
+            self.assertTrue(
+                isinstance(icon_val, str) and icon_val.startswith("mdi:"),
+                f"Invalid icon '{icon_val}' for hmu_status_code.{state_key}",
+            )
 
     def test_ebusd_csv_field_types(self) -> None:
         """Verify that all eBUSd CSV definitions contain strictly valid eBUSd data types."""

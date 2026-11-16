@@ -411,6 +411,47 @@ class TestDateTimeAndSwitches(unittest.TestCase):
         self.assertIn(("bass3", "CoolingStartDate", "01;07;26"), self.coord.writes)
         self.assertIn(("bass3", "CoolingEndDate", "15;08;26"), self.coord.writes)
 
+        # 3. Finite open cooling window is ON even while CoolingReleaseStatus='off'
+        self.coord._state[("bass3", "coolingreleasestatus")] = {"value": "off"}
+        self.coord._state[("bass3", "coolingstartdate")] = {
+            "day": 1,
+            "month": 1,
+            "year": 26,
+        }
+        self.coord._state[("bass3", "coolingenddate")] = {
+            "day": 31,
+            "month": 12,
+            "year": 29,
+        }
+        with patch(
+            "custom_components.arotherm_genia_ebusd.switch.dt_util.now",
+            return_value=datetime(2026, 11, 15, 12, 0),
+        ):
+            self.assertTrue(sw.is_on)
+
+        # Closed epoch 19 -> OFF
+        self.coord._state[("bass3", "coolingenddate")] = {
+            "day": 1,
+            "month": 1,
+            "year": 19,
+        }
+        self.assertFalse(sw.is_on)
+
+        # HolidayModeSwitch prioritizes holidayaway over stale year=15 sentinel
+        holiday_sw = SaunierGeniaHolidayModeSwitch(self.coord)
+        self.coord._state[("bass3", "z1status")] = {"value": "holidayaway"}
+        self.coord._state[("bass3", "holidaystartdate")] = {
+            "day": 1,
+            "month": 1,
+            "year": 15,
+        }
+        self.coord._state[("bass3", "holidayenddate")] = {
+            "day": 1,
+            "month": 1,
+            "year": 15,
+        }
+        self.assertTrue(holiday_sw.is_on)
+
     def test_remaining_duration_sensors_unified(self) -> None:
         """Test all 4 remaining-duration sensors share non-diagnostic Sensors category and numeric DURATION units."""
         from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
@@ -564,6 +605,21 @@ class TestDateTimeAndSwitches(unittest.TestCase):
         self.assertIn(("bass3", "HwcLegionellaDay", "3"), self.coord.writes)
         self.assertIn(("bass3", "HwcLegionellaTime", "04:00"), self.coord.writes)
 
+        # 2b. German day and disable alias ('Sonntag', 'aus')
+        self.coord.writes.clear()
+        call.data = {"day": "Sonntag", "time": "03:00"}
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            asyncio.run(handler(call))
+        self.assertIn(("bass3", "HwcLegionellaDay", "7"), self.coord.writes)
+        self.assertIn(("bass3", "HwcLegionellaTime", "03:00"), self.coord.writes)
+
+        self.coord.writes.clear()
+        call.data = {"day": "aus"}
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            asyncio.run(handler(call))
+        self.assertIn(("bass3", "HwcLegionellaDay", "0"), self.coord.writes)
+        self.assertFalse(any(m == "HwcLegionellaTime" for _, m, _ in self.coord.writes))
+
         # 3. Disabling protection ("off") -> does not write time
         self.coord.writes.clear()
         call.data = {"day": "off"}
@@ -638,10 +694,15 @@ class TestDateTimeAndSwitches(unittest.TestCase):
         for ent in (start_dt, end_dt, cool_start, cool_end):
             self.assertTrue(ent._gate_availability_on_ebus)
 
+        legionella_time = SaunierGeniaHwcLegionellaTime(self.coord)
+        self.assertTrue(legionella_time._gate_availability_on_ebus)
+
         self.coord.is_ebus_operational = False
         self.assertFalse(start_dt.available)
+        self.assertFalse(legionella_time.available)
         self.coord.is_ebus_operational = True
         self.assertTrue(start_dt.available)
+        self.assertTrue(legionella_time.available)
 
         naive_val = datetime(2026, 11, 20, 14, 30, 0)
         with patch("asyncio.sleep", new_callable=AsyncMock):
@@ -650,6 +711,106 @@ class TestDateTimeAndSwitches(unittest.TestCase):
         self.assertIsNotNone(stored)
         assert stored is not None
         self.assertIsNotNone(stored.tzinfo)
+
+    def test_cooling_switch_and_holiday_datetime_serialize_multistep_writes(
+        self,
+    ) -> None:
+        """Concurrent multi-step switch and datetime writes must serialize cleanly."""
+        real_sleep = asyncio.sleep
+
+        async def _fast_sleep(_delay: float) -> None:
+            await real_sleep(0.01)
+
+        async def _run() -> None:
+            sw = SaunierGeniaCoolingSeasonSwitch(self.coord)
+            with (
+                patch(
+                    "custom_components.arotherm_genia_ebusd.switch.asyncio.sleep",
+                    side_effect=_fast_sleep,
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.datetime.asyncio.sleep",
+                    side_effect=_fast_sleep,
+                ),
+            ):
+                t_on = asyncio.create_task(sw.async_turn_on())
+                await real_sleep(0.002)
+                t_off = asyncio.create_task(sw.async_turn_off())
+                await asyncio.gather(t_on, t_off)
+
+                self.assertEqual(
+                    self.coord.writes,
+                    [
+                        ("bass3", "CoolingStartDate", "01;01;26"),
+                        ("bass3", "CoolingEndDate", "01;01;99"),
+                        ("bass3", "CoolingStartDate", "01;01;19"),
+                        ("bass3", "CoolingEndDate", "01;01;19"),
+                        ("bass3", "Z1OpModeCooling", "off"),
+                    ],
+                )
+
+                self.coord.writes.clear()
+                dt_start = SaunierGeniaHolidayStartDateTime(self.coord)
+                t_dt1 = asyncio.create_task(
+                    dt_start.async_set_value(datetime(2026, 11, 20, 8, 0, 0))
+                )
+                await real_sleep(0.002)
+                t_dt2 = asyncio.create_task(
+                    dt_start.async_set_value(datetime(2026, 11, 21, 9, 30, 0))
+                )
+                await asyncio.gather(t_dt1, t_dt2)
+
+                self.assertEqual(
+                    self.coord.writes,
+                    [
+                        ("bass3", "HolidayStartDate", "20;11;26"),
+                        ("bass3", "HolidayStartTime", "08;00;00"),
+                        ("bass3", "HolidayStartDate", "21;11;26"),
+                        ("bass3", "HolidayStartTime", "09;30;00"),
+                    ],
+                )
+
+        asyncio.run(_run())
+
+    def test_select_rev_map_case_insensitive_and_entity_sub_dedup(self) -> None:
+        """Verify select rev_map matches case-insensitively and entity deduplicates availability subs."""
+        from custom_components.arotherm_genia_ebusd.const import CIRCUIT_GLOBAL
+        from custom_components.arotherm_genia_ebusd.entity import SaunierGeniaEntity
+        from custom_components.arotherm_genia_ebusd.select import (
+            SaunierGeniaSelectEntityDescription,
+        )
+
+        custom_desc = SaunierGeniaSelectEntityDescription(
+            key="custom_sel",
+            translation_key="custom_sel",
+            message="CustomMode",
+            field="value",
+            options=["opt_a", "opt_b"],
+            options_map={"opt_a": "ModeA", "opt_b": "ModeB"},
+        )
+        sel = SaunierGeniaSelect(self.coord, custom_desc)
+        self.coord._state[("bass3", "custommode")] = {"value": "modeb"}
+        self.assertEqual(sel.current_option, "opt_b")
+
+        class _GateEntity(SaunierGeniaEntity):
+            _gate_availability_on_ebus = True
+
+        registered: list[tuple[str, str]] = []
+
+        def _track_listener(circuit: str, message: str, _cb: Any) -> Any:
+            registered.append((circuit.lower(), message.lower()))
+            return lambda: None
+
+        self.coord.async_add_listener = _track_listener  # type: ignore[method-assign]
+        ent = _GateEntity(
+            self.coord,
+            device_key="outdoor_unit",
+            translation_key="gate_test",
+            subscriptions=[(CIRCUIT_GLOBAL.upper(), "RUNNING")],
+        )
+        asyncio.run(ent.async_added_to_hass())
+        self.assertEqual(registered.count((CIRCUIT_GLOBAL.lower(), "running")), 1)
+        self.assertEqual(registered.count((CIRCUIT_GLOBAL.lower(), "signal")), 1)
 
 
 if __name__ == "__main__":

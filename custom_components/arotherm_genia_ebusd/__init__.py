@@ -8,6 +8,7 @@ import json
 import logging
 import re
 from collections.abc import Callable
+from time import monotonic as _monotonic_time
 from typing import Any
 
 import voluptuous as vol
@@ -28,6 +29,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     CIRCUIT_BASS3,
+    CIRCUIT_GLOBAL,
     CONF_EBUSD_TCP_HOST,
     CONF_EBUSD_TCP_PORT,
     CONF_ENABLE_EBUSD_TCP,
@@ -98,11 +100,28 @@ DAY_NAME_MAPPING: dict[str, str] = {
     "todos": "All",
     "toda la semana": "All",
     "lunes a domingo": "All",
+    # German localized
+    "montag": "Monday",
+    "dienstag": "Tuesday",
+    "mittwoch": "Wednesday",
+    "donnerstag": "Thursday",
+    "freitag": "Friday",
+    "samstag": "Saturday",
+    "sonnabend": "Saturday",
+    "sonntag": "Sunday",
+    "werktags": "Weekdays",
+    "wochentage": "Weekdays",
+    "montag bis freitag": "Weekdays",
+    "wochenende": "Weekend",
+    "alle": "All",
+    "alle tage": "All",
+    "ganze woche": "All",
+    "jeden tag": "All",
 }
 
 
 def normalize_day_name(day_str: str) -> str:
-    """Normalize day string (in English or Spanish) to canonical day name."""
+    """Normalize day string (English, Spanish, or German) to canonical day name."""
     cleaned = day_str.strip().lower()
     canonical = DAY_NAME_MAPPING.get(cleaned)
     if canonical:
@@ -111,7 +130,7 @@ def normalize_day_name(day_str: str) -> str:
         if w.lower() == cleaned:
             return w
     raise HomeAssistantError(
-        f"Invalid day '{day_str}'. Valid days are Monday to Sunday (or Lunes a Domingo), "
+        f"Invalid day '{day_str}'. Valid days are Monday to Sunday (or Lunes a Domingo / Montag bis Sonntag), "
         "'Weekdays' ('Laborables'), 'Weekend' ('Fin de semana'), or 'All' ('Todos')."
     )
 
@@ -377,7 +396,10 @@ def _async_sync_tcp_diagnostic_entities(
     ] = []
     for reg_entry in er.async_entries_for_config_entry(ent_reg, entry.entry_id):
         if any(reg_entry.unique_id.endswith(sfx) for sfx in tcp_suffixes):
-            if is_tcp_enabled and reg_entry.disabled:
+            if (
+                is_tcp_enabled
+                and reg_entry.disabled_by == er.RegistryEntryDisabler.INTEGRATION
+            ):
                 entities_to_update.append((reg_entry, None))
             elif not is_tcp_enabled and not reg_entry.disabled:
                 entities_to_update.append(
@@ -526,6 +548,17 @@ def _get_default_circuit_temp(
     return 20.0
 
 
+def _normalize_slot_end_time(
+    from_hour: int, from_min: int, to_hour: int, to_min: int
+) -> tuple[int, int]:
+    """Normalize hardware 00:00 end sentinel (when start > 00:00) to 24:00."""
+    if to_hour == 24 or (
+        to_hour == 0 and to_min == 0 and (from_hour * 60 + from_min) > 0
+    ):
+        return 24, 0
+    return to_hour, to_min
+
+
 async def _async_collect_day_writes(
     coordinator: SaunierGeniaCoordinator,
     prefix: str,
@@ -600,12 +633,7 @@ async def _async_collect_day_writes(
                 ) from err
             fh = raw_fh
             fm = raw_fm
-            th = (
-                24
-                if (raw_th == 24 or (raw_th == 0 and raw_tm == 0 and raw_fh > 0))
-                else raw_th
-            )
-            tm = 0 if th == 24 else raw_tm
+            th, tm = _normalize_slot_end_time(raw_fh, raw_fm, raw_th, raw_tm)
             raw_temp = msg.get("temp", msg.get("cooling_temp")) if msg else None
             try:
                 slot_temp = float(raw_temp) if raw_temp is not None else default_temp
@@ -883,16 +911,21 @@ def _async_register_services(hass: HomeAssistant) -> None:
                             )
 
                         if action == "delete":
+                            if active_count <= 0 or slot > active_count:
+                                # Nothing to delete on this day; never wipe existing slots
+                                _LOGGER.debug(
+                                    "Skipping %s slot %d deletion on %s (active_count=%d)",
+                                    prefix,
+                                    slot,
+                                    day_name,
+                                    active_count,
+                                )
+                                continue
                             empty_payload = (
                                 "0;0;0;0;0"
                                 if prefix in ("CirculationTimer", "SilentTimer")
                                 else f"0;0;0;0;0;{default_temp:.1f}"
                             )
-                            if active_count == 0 or slot > active_count:
-                                # Day is already empty or slot does not exist: clear to 0 safely
-                                writes = [(f"{prefix}_{day_name}", empty_payload)]
-                                plans.append((day_name, 0, writes))
-                                continue
 
                             # Hydrate all remaining active slots of this day to preserve them
                             await _async_hydrate_day_schedule(
@@ -938,8 +971,11 @@ def _async_register_services(hass: HomeAssistant) -> None:
                                             "rewriting would erase it. Wait for the schedule to be read from the bus and retry."
                                         )
                                     try:
-                                        fh, fm, th, tm = (
+                                        fh, fm, raw_th, raw_tm = (
                                             int(v) for v in raw_fields if v is not None
+                                        )
+                                        th, tm = _normalize_slot_end_time(
+                                            fh, fm, raw_th, raw_tm
                                         )
                                         raw_t = msg.get("temp", msg.get("cooling_temp"))
                                         st = (
@@ -1099,7 +1135,14 @@ def _async_register_services(hass: HomeAssistant) -> None:
             raw_lower = raw_day.lower()
 
             day_code: str | None = None
-            if raw_lower in ("off", "disabled", "desactivado", "0"):
+            if raw_lower in (
+                "off",
+                "disabled",
+                "desactivado",
+                "aus",
+                "deaktiviert",
+                "0",
+            ):
                 day_code = "0"
             elif raw_lower in ("1", "2", "3", "4", "5", "6", "7"):
                 day_code = raw_lower
@@ -1249,7 +1292,9 @@ def _async_register_services(hass: HomeAssistant) -> None:
                 raise HomeAssistantError(f"No configured instances of {DOMAIN} found.")
 
             for coordinator in coordinators.values():
-                if coordinator.cooling_quick_veto_active:
+                if coordinator.cooling_quick_veto_active or getattr(
+                    coordinator, "pending_cooling_veto_restore", False
+                ):
                     await coordinator.async_cancel_cooling_quick_veto(restore=True)
                 else:
                     await coordinator.async_cancel_quick_veto()
@@ -1570,6 +1615,15 @@ def _async_register_services(hass: HomeAssistant) -> None:
 
     if not hass.services.has_service(DOMAIN, SERVICE_READ_PARAMETER):
 
+        def _select_service_coordinator(
+            coordinators: dict[str, SaunierGeniaCoordinator],
+        ) -> SaunierGeniaCoordinator:
+            """Return an operational coordinator first across configured instances."""
+            return next(
+                (c for c in coordinators.values() if c.is_ebus_operational),
+                next(iter(coordinators.values())),
+            )
+
         async def _async_handle_read_parameter(
             call: ServiceCall,
         ) -> ServiceResponse:
@@ -1577,7 +1631,7 @@ def _async_register_services(hass: HomeAssistant) -> None:
             coordinators: dict[str, SaunierGeniaCoordinator] = hass.data.get(DOMAIN, {})
             if not coordinators:
                 raise HomeAssistantError(f"No configured instances of {DOMAIN} found.")
-            coordinator = next(iter(coordinators.values()))
+            coordinator = _select_service_coordinator(coordinators)
 
             circuit = str(call.data["circuit"]).strip()
             name = str(call.data["name"]).strip()
@@ -1591,12 +1645,14 @@ def _async_register_services(hass: HomeAssistant) -> None:
 
             target_circuit = coordinator.resolve_circuit(circuit)
 
-            # Return immediately from cache if force is False and data is already cached
+            # Return immediately from cache if force is False and valid data is already cached
             if not force:
                 cached_msg = coordinator.get_message(
                     target_circuit, name
                 ) or coordinator.get_message(circuit, name)
-                if cached_msg is not None:
+                if cached_msg is not None and not coordinator._is_ebusd_err_msg(
+                    cached_msg
+                ):
                     return {
                         "circuit": circuit,
                         "target_circuit": target_circuit,
@@ -1604,6 +1660,19 @@ def _async_register_services(hass: HomeAssistant) -> None:
                         "value": cached_msg,
                         "cached": True,
                     }
+
+            signal_offline = any(
+                (coordinator.get_str(CIRCUIT_GLOBAL, m) or "").lower()
+                in ("false", "0", "no", "off")
+                for m in ("signal", "running")
+            )
+            if signal_offline or (
+                not coordinator.is_ebus_operational
+                and coordinator._last_telemetry_time is not None
+            ):
+                raise HomeAssistantError(
+                    "Cannot read parameter: eBUS communication is not operational."
+                )
 
             # Set up notification event for the response
             event = asyncio.Event()
@@ -1620,8 +1689,14 @@ def _async_register_services(hass: HomeAssistant) -> None:
                 else None
             )
 
+            req_mono = _monotonic_time()
             try:
-                await coordinator.async_request_get(circuit, name)
+                try:
+                    await coordinator.async_request_get(circuit, name)
+                except Exception as err:
+                    raise HomeAssistantError(
+                        f"Failed to request read parameter on '{target_circuit}/{name}': {err}"
+                    ) from err
                 try:
                     await asyncio.wait_for(event.wait(), timeout=timeout)
                 except TimeoutError as err:
@@ -1636,6 +1711,10 @@ def _async_register_services(hass: HomeAssistant) -> None:
             value = coordinator.get_message(
                 target_circuit, name
             ) or coordinator.get_message(circuit, name)
+            if value is None:
+                value = coordinator.get_recent_error(
+                    target_circuit, name, since_mono=req_mono
+                ) or coordinator.get_recent_error(circuit, name, since_mono=req_mono)
             return {
                 "circuit": circuit,
                 "target_circuit": target_circuit,
@@ -1661,7 +1740,10 @@ def _async_register_services(hass: HomeAssistant) -> None:
             coordinators: dict[str, SaunierGeniaCoordinator] = hass.data.get(DOMAIN, {})
             if not coordinators:
                 raise HomeAssistantError(f"No configured instances of {DOMAIN} found.")
-            coordinator = next(iter(coordinators.values()))
+            coordinator = next(
+                (c for c in coordinators.values() if c.is_ebus_operational),
+                next(iter(coordinators.values())),
+            )
 
             circuit = str(call.data["circuit"]).strip()
             name = str(call.data["name"]).strip()

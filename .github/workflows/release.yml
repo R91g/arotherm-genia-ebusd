@@ -30,6 +30,16 @@ jobs:
       - name: Run Unit Tests
         run: python -m unittest discover tests
 
+      - name: Verify Release Tag Matches manifest.json Version
+        if: github.event_name == 'release'
+        run: |
+          MANIFEST_VERSION=$(python -c 'import json; print(json.load(open("custom_components/arotherm_genia_ebusd/manifest.json", encoding="utf-8"))["version"])')
+          EXPECTED_TAG="v${MANIFEST_VERSION}"
+          if [ "${{ github.ref_name }}" != "$EXPECTED_TAG" ]; then
+            echo "Release tag '${{ github.ref_name }}' does not match manifest.json version '${EXPECTED_TAG}'"
+            exit 1
+          fi
+
       - name: Run Ruff Linter & Formatter Check
         run: |
           ruff check custom_components tests
@@ -71,7 +81,7 @@ jobs:
       - name: Build HACS ZIP Archive
         run: |
           cd custom_components/arotherm_genia_ebusd
-          zip -r ../../arotherm_genia_ebusd.zip .
+          zip -r ../../arotherm_genia_ebusd.zip . -x "*/__pycache__/*" "__pycache__/*" "*.pyc" "*.pyo" "*/.DS_Store"
           cd ../..
 
       - name: Upload ZIP to GitHub Release

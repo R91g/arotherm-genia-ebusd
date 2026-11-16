@@ -2102,7 +2102,7 @@ class TestCoordinatorLogic(unittest.TestCase):
             severity=ANY,
             translation_key=ISSUE_EBUSD_SLOW_POLLING_SEED,
             translation_placeholders={"interval": "5.8"},
-            learn_more_url="https://github.com/R91g/arotherm-genia-ebusd#step-1-deploy-optimized-ebusd-csv-configuration",
+            learn_more_url="https://github.com/R91g/arotherm-genia-ebusd/blob/main/docs/installation.md#2-deploy-the-ebusd-csv-configuration",
         )
 
         # 3. Fast arrival (interval <= 60s) clears the issue automatically
@@ -2877,6 +2877,16 @@ class TestCoordinatorLogic(unittest.TestCase):
         ):
             asyncio.run(coord.async_ebusd_tcp_reload())
 
+        with (
+            patch.object(
+                coord,
+                "_async_open_tcp_connection",
+                side_effect=OSError("Network down"),
+            ),
+            self.assertRaises(HomeAssistantError),
+        ):
+            asyncio.run(coord.async_ebusd_tcp_scan())
+
     def test_async_sync_tcp_diagnostic_entities(self) -> None:
         """Verify dynamic entity registry synchronization when TCP option changes."""
         from homeassistant.helpers import entity_registry as er
@@ -2897,26 +2907,37 @@ class TestCoordinatorLogic(unittest.TestCase):
         mock_entity_disabled.unique_id = "vaillant_global_symbol_rate_value"
         mock_entity_disabled.entity_id = "sensor.ebusd_symbol_rate"
         mock_entity_disabled.disabled = True
+        mock_entity_disabled.disabled_by = er.RegistryEntryDisabler.INTEGRATION
 
         mock_missing_disabled = MagicMock()
         mock_missing_disabled.unique_id = "vaillant_global_missing_csv_devices_value"
         mock_missing_disabled.entity_id = "sensor.ebusd_missing_csv_devices"
         mock_missing_disabled.disabled = True
+        mock_missing_disabled.disabled_by = er.RegistryEntryDisabler.INTEGRATION
 
         mock_btn_disabled = MagicMock()
         mock_btn_disabled.unique_id = "vaillant_button_ebusd_reload_csv"
         mock_btn_disabled.entity_id = "button.ebusd_reload_csv"
         mock_btn_disabled.disabled = True
+        mock_btn_disabled.disabled_by = er.RegistryEntryDisabler.INTEGRATION
+
+        mock_user_disabled = MagicMock()
+        mock_user_disabled.unique_id = "vaillant_ebusd_reconnects"
+        mock_user_disabled.entity_id = "sensor.ebusd_reconnects"
+        mock_user_disabled.disabled = True
+        mock_user_disabled.disabled_by = er.RegistryEntryDisabler.USER
 
         mock_unrelated_disabled = MagicMock()
         mock_unrelated_disabled.unique_id = "vaillant_unrelated_sensor"
         mock_unrelated_disabled.entity_id = "sensor.unrelated"
         mock_unrelated_disabled.disabled = True
+        mock_unrelated_disabled.disabled_by = er.RegistryEntryDisabler.INTEGRATION
 
         entries_phase1 = [
             mock_entity_disabled,
             mock_missing_disabled,
             mock_btn_disabled,
+            mock_user_disabled,
             mock_unrelated_disabled,
         ]
 
@@ -3066,6 +3087,10 @@ class TestCoordinatorLogic(unittest.TestCase):
                         ("ebusd/bass3/Z1CoolingManualTemp/set", "26.0"),
                     ],
                 )
+                # Cached Boost Z1CoolingTempDesired is invalidated immediately before /get returns
+                self.assertIsNone(
+                    coord.get_message(CIRCUIT_BASS3, "Z1CoolingTempDesired")
+                )
                 # A /get confirmation read for Z1CoolingTempDesired must be scheduled
                 self.assertEqual(len(scheduled_timers), 2)
                 self.assertAlmostEqual(scheduled_timers[1][0], 1.5)
@@ -3077,6 +3102,62 @@ class TestCoordinatorLogic(unittest.TestCase):
 
                 # Store cleared
                 self.assertIsNone(await coord._cooling_veto_store.async_load())
+
+        asyncio.run(_run())
+
+    def test_real_coordinator_schedule_cooling_desired_refresh(self) -> None:
+        """schedule_cooling_desired_refresh invalidates stale cache and schedules /get."""
+
+        async def _run() -> None:
+            hass = MagicMock()
+            tasks: list[asyncio.Task[Any]] = []
+            hass.async_create_task.side_effect = lambda coro: (
+                tasks.append(asyncio.get_running_loop().create_task(coro)) or tasks[-1]
+            )
+            entry = MagicMock(entry_id="cool_refresh_entry")
+            entry.data = {"mqtt_prefix": "ebusd"}
+            entry.options = {}
+            coord = SaunierGeniaCoordinator(hass, entry)
+            coord._state[(CIRCUIT_BASS3.lower(), "Z1CoolingTempDesired")] = {
+                "value": 21.0
+            }
+            coord._state[("ctlv3", "z1coolingtempdesired")] = {"value": 21.0}
+            coord._state[(CIRCUIT_HMUX0.lower(), "Status01")] = {"temp1": 28.0}
+
+            published: list[tuple[str, str]] = []
+            scheduled_timers: list[tuple[float, Any]] = []
+
+            async def _fake_publish(_h: Any, topic: str, payload: str, **kwargs: Any):
+                published.append((topic, str(payload)))
+
+            def _fake_call_later(_h: Any, delay: float, cb: Any):
+                scheduled_timers.append((delay, cb))
+                return MagicMock()
+
+            with (
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                    side_effect=_fake_publish,
+                ),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.async_call_later",
+                    side_effect=_fake_call_later,
+                ),
+            ):
+                coord.schedule_cooling_desired_refresh()
+
+                self.assertIsNone(
+                    coord.get_message(CIRCUIT_BASS3, "Z1CoolingTempDesired")
+                )
+                self.assertIsNone(coord.get_message("ctlv3", "Z1CoolingTempDesired"))
+                self.assertEqual(len(scheduled_timers), 1)
+                self.assertAlmostEqual(scheduled_timers[0][0], 1.5)
+
+                scheduled_timers[0][1](datetime.now())
+                if tasks:
+                    await asyncio.gather(*tasks)
+                    tasks.clear()
+                self.assertIn(("ebusd/bass3/Z1CoolingTempDesired/get", ""), published)
 
         asyncio.run(_run())
 
@@ -5607,6 +5688,509 @@ class TestCoordinatorLogic(unittest.TestCase):
                 self.assertEqual(coord.get_cooling_remaining_days(), 0)
 
             await coord.async_unload()
+
+        asyncio.run(_run())
+
+    def test_err_payloads_do_not_poison_state_getters_repairs_or_ventilation(
+        self,
+    ) -> None:
+        """ERR: payloads must never overwrite valid state, cancel ventilation, or satisfy has_message."""
+
+        async def _run() -> None:
+            from types import SimpleNamespace
+
+            from custom_components.arotherm_genia_ebusd import _async_register_services
+            from custom_components.arotherm_genia_ebusd.const import (
+                CIRCUIT_VWZIO,
+                SERVICE_READ_PARAMETER,
+            )
+
+            hass = MagicMock()
+            hass.async_create_task.side_effect = lambda coro: (
+                asyncio.get_running_loop().create_task(coro)
+            )
+            services: dict[str, Any] = {}
+            hass.services.has_service.return_value = False
+            hass.services.async_register.side_effect = (
+                lambda d, s, h, schema=None, *args, **kwargs: services.update({s: h})
+            )
+            entry = MagicMock(entry_id="err_guard_entry")
+            entry.data = {"mqtt_prefix": "ebusd"}
+            entry.options = {}
+            coord = SaunierGeniaCoordinator(hass, entry)
+            hass.data = {DOMAIN: {entry.entry_id: coord}}
+            _async_register_services(hass)
+
+            # 1. Start active ventilation >15s ago
+            coord._state[(CIRCUIT_BASS3, "Z1Status")] = {"value": "ventilation"}
+            coord._start_ventilation_countdown()
+            coord._ventilation_ha_activated_mono = time.monotonic() - 30.0
+            self.assertIsNotNone(coord._ventilation_end_time)
+
+            # Push ERR: timeout on Z1Status: must NOT clear ventilation or poison Z1Status
+            coord._async_on_mqtt_message(
+                SimpleNamespace(topic="ebusd/bass3/Z1Status", payload="ERR: timeout")
+            )
+            self.assertIsNotNone(coord._ventilation_end_time)
+            self.assertEqual(
+                coord.get_str(CIRCUIT_BASS3, "Z1Status", "value"), "ventilation"
+            )
+
+            # 2. ERR: on unseen register must NOT satisfy has_message, get_field/get_str, or clear missing CSV
+            coord._state[(CIRCUIT_HMUX0, "StateCompressor")] = {
+                "flow_temp": 35.0,
+                "modulation": 40,
+            }
+            coord._async_on_mqtt_message(
+                SimpleNamespace(
+                    topic="ebusd/vwzio/SecondaryCircuitStatus",
+                    payload="ERR: element not found",
+                )
+            )
+            self.assertFalse(coord.has_message(CIRCUIT_VWZIO, "SecondaryCircuitStatus"))
+            self.assertIsNone(
+                coord.get_str(CIRCUIT_VWZIO, "SecondaryCircuitStatus", "value")
+            )
+            self.assertIsNone(
+                coord.get_field(CIRCUIT_VWZIO, "SecondaryCircuitStatus", "value")
+            )
+            self.assertFalse(coord._has_all_required_csv_circuits())
+
+            # Defense-in-depth if ERR: exists directly in _state
+            coord._state[(CIRCUIT_VWZIO, "DirectErr")] = {"value": "ERR: read error"}
+            self.assertFalse(coord.has_message(CIRCUIT_VWZIO, "DirectErr"))
+            self.assertIsNone(coord.get_field(CIRCUIT_VWZIO, "DirectErr", "value"))
+            self.assertIsNone(coord.get_str(CIRCUIT_VWZIO, "DirectErr", "value"))
+
+            # 3. read_parameter service still receives transient ERR: response without storing in _state
+            async def _pub_err(_h: Any, topic: str, _p: str, **_kw: Any) -> None:
+                if topic == "ebusd/bass3/UnknownReg/get":
+                    coord._async_on_mqtt_message(
+                        SimpleNamespace(
+                            topic="ebusd/bass3/UnknownReg",
+                            payload="ERR: element not found",
+                        )
+                    )
+
+            with patch(
+                "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                side_effect=_pub_err,
+            ):
+                call = MagicMock()
+                call.data = {
+                    "circuit": CIRCUIT_BASS3,
+                    "name": "UnknownReg",
+                    "force": True,
+                    "timeout": 1.0,
+                }
+                resp = await services[SERVICE_READ_PARAMETER](call)
+
+            self.assertEqual(resp["value"], {"value": "ERR: element not found"})
+            self.assertFalse(coord.has_message(CIRCUIT_BASS3, "UnknownReg"))
+
+            coord._clear_ventilation_countdown()
+            await coord.async_unload()
+
+        asyncio.run(_run())
+
+    def test_pending_veto_restores_cancelled_by_service_and_inflight_get(
+        self,
+    ) -> None:
+        """Deferred veto restores do not clobber cancel_quick_veto or mid-await mode changes."""
+
+        async def _run() -> None:
+            from custom_components.arotherm_genia_ebusd import _async_register_services
+
+            hass = MagicMock()
+            hass.async_create_task.side_effect = lambda coro: (
+                asyncio.get_running_loop().create_task(coro)
+            )
+            services: dict[str, Any] = {}
+            hass.services.has_service.side_effect = lambda _d, name: name in services
+            hass.services.async_register.side_effect = (
+                lambda _d, name, handler, schema=None, *args, **kwargs: services.update(
+                    {name: handler}
+                )
+            )
+            entry = MagicMock(entry_id="entry_pending_race")
+            entry.data = {"mqtt_prefix": "ebusd", "ebusd_host": "localhost"}
+            entry.options = {}
+
+            coord = SaunierGeniaCoordinator(hass, entry)
+            coord._state[(CIRCUIT_BASS3, "z1opmodecooling")] = {"value": "day"}
+            coord._last_mqtt_message_time = time.monotonic()
+            hass.data = {DOMAIN: {entry.entry_id: coord}}
+            _async_register_services(hass)
+
+            writes: list[tuple[str, str, Any]] = []
+
+            async def _fake_write(circuit: str, name: str, value: Any) -> None:
+                writes.append((circuit, name, value))
+
+            # 1. Deferred cooling restore cancelled via cancel_quick_veto service
+            unsub_called = 0
+
+            def _cool_unsub() -> None:
+                nonlocal unsub_called
+                unsub_called += 1
+
+            coord._pending_cooling_veto_restore = True
+            coord._cooling_veto_restore_unsub = _cool_unsub
+            coord._pre_cooling_veto_opmode = "night"
+            coord._pre_cooling_veto_temp = 23.0
+
+            with (
+                patch.object(coord, "async_write_parameter", side_effect=_fake_write),
+                patch.object(coord, "schedule_cooling_desired_refresh"),
+                patch.object(coord, "_async_clear_cooling_veto_store"),
+            ):
+                await services["cancel_quick_veto"](MagicMock())
+
+            self.assertEqual(unsub_called, 1)
+            self.assertFalse(coord.pending_cooling_veto_restore)
+            self.assertIn((CIRCUIT_BASS3, "Z1OpModeCooling", "night"), writes)
+            self.assertIn((CIRCUIT_BASS3, "Z1CoolingManualTemp", 23.0), writes)
+            self.assertNotIn((CIRCUIT_BASS3, "Z1SFMode", "auto"), writes)
+
+            # 2. Deferred heating restore aborted if discarded during in-flight /get Z1SFMode
+            writes.clear()
+            coord._pending_heating_veto_restore = True
+            coord._pre_veto_opmode = "off"
+            coord._last_z1_sfmode_sync_time = 0.0
+
+            async def _get_and_discard(circuit: str, name: str) -> None:
+                coord._state[(circuit.lower(), name.lower())] = {"value": "auto"}
+                await coord.async_discard_pending_heating_restore()
+
+            with (
+                patch.object(coord, "async_request_get", side_effect=_get_and_discard),
+                patch.object(coord, "async_write_parameter", side_effect=_fake_write),
+            ):
+                await coord._async_execute_pending_heating_veto_restore()
+
+            self.assertFalse(coord.pending_heating_veto_restore)
+            self.assertEqual(writes, [])
+
+            await coord.async_unload()
+
+        asyncio.run(_run())
+
+    def test_dhw_boost_trigger_and_cancel_serialized_by_lock(self) -> None:
+        """Concurrent trigger and cancel DHW boost serialize writes without interleaving."""
+
+        async def _run() -> None:
+            hass = MagicMock()
+            hass.async_create_task.side_effect = lambda coro: (
+                asyncio.get_running_loop().create_task(coro)
+            )
+            entry = MagicMock(entry_id="dhw_lock_entry")
+            entry.data = {"mqtt_prefix": "ebusd"}
+            entry.options = {"force_dhw_boost": True}
+            coord = SaunierGeniaCoordinator(hass, entry)
+            coord._state[(CIRCUIT_BASS3, "hwcstoragetemp")] = {"value": 47.0}
+            coord._state[(CIRCUIT_BASS3, "hwctempdesired")] = {"value": 50.0}
+            coord._last_mqtt_message_time = time.monotonic()
+
+            writes: list[tuple[str, Any]] = []
+
+            async def _record_write(_c: str, name: str, val: Any) -> None:
+                writes.append((name, val))
+
+            real_sleep = asyncio.sleep
+
+            async def _short_sleep(_delay: float) -> None:
+                await real_sleep(0.02)
+
+            with (
+                patch.object(coord, "async_write_parameter", side_effect=_record_write),
+                patch.object(coord, "_async_save_dhw_boost_state"),
+                patch.object(coord, "_async_clear_store"),
+                patch(
+                    "custom_components.arotherm_genia_ebusd.coordinator.asyncio.sleep",
+                    side_effect=_short_sleep,
+                ),
+            ):
+                trigger_task = asyncio.create_task(coord.async_trigger_dhw_boost())
+                await real_sleep(0.005)
+                cancel_task = asyncio.create_task(coord.async_cancel_dhw_boost())
+                await asyncio.gather(trigger_task, cancel_task)
+
+            self.assertEqual(
+                writes,
+                [
+                    ("HwcTempDesired", 53.5),
+                    ("HwcSFMode", "load"),
+                    ("HwcSFMode", "auto"),
+                    ("HwcTempDesired", 50.0),
+                ],
+            )
+            self.assertFalse(coord.dhw_boost_forced_active)
+
+            await coord.async_unload()
+
+        asyncio.run(_run())
+
+    def test_midnight_watchdog_notifies_cooling_and_weekly_schedules(self) -> None:
+        """Crossing midnight in watchdog notifies CoolingEndDate, Holiday, and *_Slots."""
+        from datetime import date
+
+        hass = MagicMock()
+        entry = MagicMock(entry_id="midnight_entry")
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {}
+        coord = SaunierGeniaCoordinator(hass, entry)
+        coord._last_watchdog_date = date(2026, 11, 15)
+
+        notified: list[tuple[str, str]] = []
+        with (
+            patch.object(
+                coord,
+                "_async_notify_message_listeners",
+                side_effect=lambda c, m: notified.append((c, m)),
+            ),
+            patch(
+                "custom_components.arotherm_genia_ebusd.coordinator.dt_util.now",
+                return_value=datetime(2026, 11, 16, 0, 1),
+            ),
+        ):
+            coord._async_check_watchdog(datetime(2026, 11, 16, 0, 1))
+
+        self.assertIn((CIRCUIT_BASS3, "CoolingEndDate"), notified)
+        self.assertIn((CIRCUIT_BASS3, "Z1Timer_Slots"), notified)
+        self.assertIn((CIRCUIT_BASS3, "SilentTimer_Slots"), notified)
+        self.assertEqual(coord._last_watchdog_date, date(2026, 11, 16))
+
+    def test_cancel_quick_veto_preserves_tracking_on_write_failure(self) -> None:
+        """async_cancel_quick_veto keeps tracking and re-arms timer if bus writes fail."""
+        from datetime import timedelta
+
+        async def _run() -> None:
+            hass = MagicMock()
+            entry = MagicMock(entry_id="cancel_fail_entry")
+            entry.data = {"mqtt_prefix": "ebusd"}
+            entry.options = {}
+            coord = SaunierGeniaCoordinator(hass, entry)
+            coord._state[(CIRCUIT_BASS3, "z1sfmode")] = {"value": "veto"}
+            coord._last_mqtt_message_time = time.monotonic()
+            coord._pre_veto_opmode = "off"
+            coord._heating_veto_end_time = datetime.now() + timedelta(hours=1)
+            coord._last_heating_veto_duration = 1.0
+            coord._heating_veto_started_mono = time.monotonic()
+
+            with (
+                patch.object(
+                    coord,
+                    "async_write_parameter",
+                    side_effect=RuntimeError("MQTT timeout"),
+                ),
+                patch.object(coord, "_arm_heating_veto_timer") as mock_arm,
+                patch.object(coord, "_async_clear_store") as mock_clear,
+                self.assertRaises(RuntimeError),
+            ):
+                await coord.async_cancel_quick_veto()
+
+            self.assertEqual(coord._pre_veto_opmode, "off")
+            self.assertIsNotNone(coord._heating_veto_end_time)
+            self.assertEqual(coord._last_heating_veto_duration, 1.0)
+            self.assertGreater(coord._heating_veto_started_mono, 0.0)
+            mock_arm.assert_called_once()
+            mock_clear.assert_not_called()
+
+            await coord.async_unload()
+
+        asyncio.run(_run())
+
+    def test_polish_21_tcp_single_info_startup_throttle_and_legionella_probe(
+        self,
+    ) -> None:
+        """Verify TCP send avoids duplicate info call, -30s startup throttle, and hwclegionelladay ERR probe."""
+
+        async def _run() -> None:
+            hass = MagicMock()
+            entry = MagicMock(entry_id="polish21_entry")
+            entry.data = {"mqtt_prefix": "ebusd"}
+            entry.options = {"enable_ebusd_tcp": True}
+            coord = SaunierGeniaCoordinator(hass, entry)
+
+            self.assertLessEqual(coord._last_z1_sfmode_sync_time, -30.0)
+
+            coord._async_on_mqtt_message(
+                MagicMock(
+                    topic="ebusd/bass3/HwcLegionellaDay",
+                    payload=b"ERR: element not found",
+                )
+            )
+            self.assertIn("hwclegionelladay", coord._missing_controller_registers)
+
+            writer = MagicMock()
+            writer.close = MagicMock()
+            writer.wait_closed = AsyncMock()
+            writer.drain = AsyncMock()
+            reader = MagicMock()
+            reader.readline = AsyncMock(return_value=b"done\n")
+
+            with (
+                patch.object(
+                    coord,
+                    "_async_open_tcp_connection",
+                    AsyncMock(return_value=(reader, writer)),
+                ),
+                patch.object(
+                    coord, "_async_fetch_ebusd_tcp_info", new_callable=AsyncMock
+                ) as mock_info,
+            ):
+                resp = await coord.async_ebusd_tcp_reload()
+                self.assertEqual(resp, "done")
+                mock_info.assert_awaited_once()
+
+            await coord.async_unload()
+
+        asyncio.run(_run())
+
+    def test_flow_pressure_skipped_when_hmu_sw_below_902(self) -> None:
+        """Verify FlowPressure is skipped in hydration and poll when HMU SW < 0902."""
+        hass = MagicMock()
+        hass.async_create_background_task.side_effect = lambda coro, name=None: (
+            coro.close()
+        )
+        entry = MagicMock()
+        entry.entry_id = "test_n5_legacy_sw"
+        entry.data = {
+            CONF_MANUFACTURER: MANUFACTURER_VAILLANT,
+            CONF_HAS_MIGO_LINK: False,
+        }
+        entry.options = {}
+
+        # 1. Late HMU detection with SW=0804 (< 0902) via scan.08
+        coord_legacy = SaunierGeniaCoordinator(hass, entry)
+        coord_legacy._pending_hydration = [
+            (CIRCUIT_HMUX0, "RunDataFlowTemp"),
+            (CIRCUIT_HMU, "FlowPressure"),
+        ]
+        mock_task = MagicMock()
+        mock_task.done.return_value = False
+        coord_legacy._hydration_task = mock_task
+
+        coord_legacy._async_on_mqtt_message(
+            MagicMock(
+                topic="ebusd/scan.08",
+                payload='{"MF": "Vaillant", "ID": "HMU00", "SW": "0804", "HW": "5103"}',
+            )
+        )
+        self.assertEqual(coord_legacy.active_outdoor_circuit, CIRCUIT_HMU)
+        self.assertNotIn((CIRCUIT_HMU, "FlowPressure"), coord_legacy._pending_hydration)
+        self.assertIn((CIRCUIT_HMU, "YieldHc"), coord_legacy._pending_hydration)
+
+        # 2. Initial hydration with SW=0804 skips FlowPressure
+        coord_legacy._pending_hydration.clear()
+        coord_legacy._hydration_task = None
+        with patch.object(coord_legacy, "_async_run_hydration_queue") as mock_run:
+            coord_legacy._async_start_initial_hydration(datetime.now())
+            mock_run.assert_called_once()
+            init_queue = mock_run.call_args[0][0]
+            self.assertNotIn((CIRCUIT_HMU, "FlowPressure"), init_queue)
+            self.assertIn((CIRCUIT_HMU, "YieldHc"), init_queue)
+
+        # 3. Fallback poll with SW=0804 skips FlowPressure
+        with patch.object(
+            coord_legacy, "_async_force_poll_queue", return_value=None
+        ) as mock_poll:
+            asyncio.run(coord_legacy._async_run_fallback_poll(datetime.now()))
+            mock_poll.assert_called_once()
+            poll_queue = mock_poll.call_args[0][0]
+            self.assertNotIn((CIRCUIT_HMU, "FlowPressure"), poll_queue)
+            self.assertIn((CIRCUIT_HMU, "YieldHc"), poll_queue)
+
+        # 4. Updating SW to 0902 enables FlowPressure in hydration and poll
+        coord_legacy._async_on_mqtt_message(
+            MagicMock(
+                topic="ebusd/scan.08",
+                payload='{"MF": "Vaillant", "ID": "HMU00", "SW": "0902", "HW": "5103"}',
+            )
+        )
+        with patch.object(coord_legacy, "_async_run_hydration_queue") as mock_run_902:
+            coord_legacy._async_start_initial_hydration(datetime.now())
+            self.assertIn((CIRCUIT_HMU, "FlowPressure"), mock_run_902.call_args[0][0])
+
+        with patch.object(
+            coord_legacy, "_async_force_poll_queue", return_value=None
+        ) as mock_poll_902:
+            asyncio.run(coord_legacy._async_run_fallback_poll(datetime.now()))
+            self.assertIn((CIRCUIT_HMU, "FlowPressure"), mock_poll_902.call_args[0][0])
+
+        # 5. _async_run_hydration_queue skips pre-queued FlowPressure when SW < 902
+        coord_queue = SaunierGeniaCoordinator(hass, entry)
+        coord_queue._record_detected_outdoor_sw("0804")
+        requested: list[tuple[str, str]] = []
+
+        async def _capture_get(circuit: str, message: str) -> None:
+            requested.append((circuit, message))
+
+        with (
+            patch.object(coord_queue, "async_request_get", side_effect=_capture_get),
+            patch(
+                "custom_components.arotherm_genia_ebusd.coordinator.HYDRATION_STEP_DELAY_SECONDS",
+                0.0,
+            ),
+        ):
+            asyncio.run(
+                coord_queue._async_run_hydration_queue(
+                    [(CIRCUIT_HMU, "FlowPressure"), (CIRCUIT_HMU, "YieldHc")]
+                )
+            )
+        self.assertEqual(requested, [(CIRCUIT_HMU, "YieldHc")])
+
+    def test_flow_pressure_skipped_when_tcp_info_reports_sw_below_902(self) -> None:
+        """Verify TCP info SW<902 on address 08 also gates FlowPressure polling."""
+        hass = MagicMock()
+        hass.async_create_background_task.side_effect = lambda coro, name=None: (
+            coro.close()
+        )
+        entry = MagicMock()
+        entry.entry_id = "test_n5_tcp_sw"
+        entry.data = {
+            CONF_MANUFACTURER: MANUFACTURER_VAILLANT,
+            CONF_HAS_MIGO_LINK: False,
+        }
+        entry.options = {"enable_ebusd_tcp": True}
+
+        coord = SaunierGeniaCoordinator(hass, entry)
+        coord._active_outdoor_circuit = CIRCUIT_HMU
+
+        info_lines = [
+            b"version: ebusd 26.1\n",
+            b'address 08: slave #3, scanned "MF=Vaillant;ID=HMU00;SW=0804;HW=5103", loaded "vaillant/08.hmu.HW5103.csv"\n',
+            b"\n",
+        ]
+        reader = MagicMock()
+        reader.readline = AsyncMock(side_effect=info_lines)
+        writer = MagicMock()
+        writer.write = MagicMock()
+        writer.drain = AsyncMock()
+        writer.close = MagicMock()
+        writer.wait_closed = AsyncMock()
+
+        async def _run() -> None:
+            with (
+                patch.object(
+                    coord,
+                    "_async_open_tcp_connection",
+                    AsyncMock(return_value=(reader, writer)),
+                ),
+                patch.object(
+                    coord, "_async_verify_csvs_via_tcp", new_callable=AsyncMock
+                ),
+            ):
+                await coord._async_fetch_ebusd_tcp_info()
+
+            self.assertEqual(coord._detected_outdoor_sw, "0804")
+
+            with patch.object(
+                coord, "_async_force_poll_queue", return_value=None
+            ) as mock_poll:
+                await coord._async_run_fallback_poll(datetime.now())
+                poll_queue = mock_poll.call_args[0][0]
+                self.assertNotIn((CIRCUIT_HMU, "FlowPressure"), poll_queue)
 
         asyncio.run(_run())
 

@@ -188,9 +188,10 @@ class SaunierGeniaEntity(Entity):
         await super().async_added_to_hass()
         all_subs = list(self._subscriptions)
         if self._gate_availability_on_ebus:
-            if (CIRCUIT_GLOBAL, "running") not in all_subs:
+            existing = {(c.lower(), m.lower()) for c, m in all_subs}
+            if (CIRCUIT_GLOBAL.lower(), "running") not in existing:
                 all_subs.append((CIRCUIT_GLOBAL, "running"))
-            if (CIRCUIT_GLOBAL, "signal") not in all_subs:
+            if (CIRCUIT_GLOBAL.lower(), "signal") not in existing:
                 all_subs.append((CIRCUIT_GLOBAL, "signal"))
 
         for circuit, message in all_subs:

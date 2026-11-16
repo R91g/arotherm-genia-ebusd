@@ -1037,6 +1037,50 @@ class TestWeeklyTimerSlots(unittest.TestCase):
         self.assertEqual(attrs["weekly_schedule"]["Monday"]["Slot 2"], "13:00 - 15:00")
         self.assertIsNone(attrs["weekly_schedule"]["Monday"]["Slot 3"])
 
+        # Bool / invalid / missing slot counts normalize cleanly with default=1
+        coord_edge = FakeCoordinator(
+            {
+                "SilentTimer_Slots": {"mon": True, "tue": "2"},
+                "SilentTimer_Monday": {
+                    "from_hour": 6,
+                    "from_min": 0,
+                    "to_hour": 8,
+                    "to_min": 0,
+                },
+                "SilentTimer_Monday_Slot2": {
+                    "from_hour": 10,
+                    "from_min": 0,
+                    "to_hour": 12,
+                    "to_min": 0,
+                },
+                "SilentTimer_Tuesday": {
+                    "from_hour": 7,
+                    "from_min": 0,
+                    "to_hour": 9,
+                    "to_min": 0,
+                },
+                "SilentTimer_Tuesday_Slot2": {
+                    "from_hour": 14,
+                    "from_min": 0,
+                    "to_hour": 16,
+                    "to_min": 0,
+                },
+            }
+        )
+        coord_edge.entry = MagicMock(entry_id="edge_entry")
+        coord_edge.manufacturer = "Saunier Duval"
+        coord_edge.has_wireless_room_unit = False
+        edge_sensor = SaunierGeniaWeeklyScheduleSensor(
+            coord_edge, "silent_mode_weekly_schedule_summary", "SilentTimer"
+        )
+        self.assertEqual(edge_sensor._get_day_slots("Monday"), ["06:00 - 08:00"])
+        self.assertEqual(
+            edge_sensor._get_day_slots("Tuesday"), ["07:00 - 09:00", "14:00 - 16:00"]
+        )
+        edge_attrs = edge_sensor.extra_state_attributes
+        self.assertEqual(edge_attrs["weekly_schedule"]["Monday"]["active_slots"], 1)
+        self.assertEqual(edge_attrs["weekly_schedule"]["Tuesday"]["active_slots"], 2)
+
     def test_delete_slot_raises_when_remaining_slot_unhydrated(self) -> None:
         """Deleting slot 1 must raise HomeAssistantError instead of zeroing unhydrated slot 2."""
         hass = MagicMock()
@@ -1075,6 +1119,223 @@ class TestWeeklyTimerSlots(unittest.TestCase):
             asyncio.run(services[SERVICE_SET_WEEKLY_TIMER](call_del))
 
         coord.async_write_parameter.assert_not_called()
+
+    def test_delete_out_of_range_slot_does_not_wipe_existing_slots(self) -> None:
+        """Deleting slot > active_count must be a safe no-op and never wipe existing slots."""
+        hass = MagicMock()
+        services: dict[str, Any] = {}
+        hass.services.has_service.return_value = False
+        hass.services.async_register.side_effect = (
+            lambda d, s, h, schema=None, *args, **kwargs: services.update({s: h})
+        )
+
+        coord = SaunierGeniaCoordinator(hass, MagicMock(data={"mqtt_prefix": "ebusd"}))
+        coord._state[("hmux0", "status01")] = {"temp1": 35.0}
+        coord._state[("bass3", "Z1Timer_Slots")] = {"mon": 1, "tue": 2, "wed": 0}
+        coord._state[("bass3", "Z1Timer_Monday")] = {
+            "from_hour": 6,
+            "from_min": 0,
+            "to_hour": 22,
+            "to_min": 0,
+            "temp": 21.0,
+        }
+        coord._state[("bass3", "Z1Timer_Tuesday")] = {
+            "from_hour": 6,
+            "from_min": 0,
+            "to_hour": 10,
+            "to_min": 0,
+            "temp": 20.5,
+        }
+        coord._state[("bass3", "Z1Timer_Tuesday_Slot2")] = {
+            "from_hour": 18,
+            "from_min": 0,
+            "to_hour": 22,
+            "to_min": 0,
+            "temp": 21.5,
+        }
+
+        written_params: list[tuple[str, str, str]] = []
+
+        async def record_write(circuit: str, message: str, payload: str) -> None:
+            written_params.append((circuit, message, payload))
+
+        coord.async_write_parameter = AsyncMock(side_effect=record_write)
+        coord.async_request_get = AsyncMock()
+        hass.data = {DOMAIN: {"entry_id": coord}}
+        _async_register_services(hass)
+
+        # 1. Single-day out-of-range delete (slot 2 when Monday has 1 slot) -> zero writes
+        call_single = MagicMock()
+        call_single.data = {
+            "circuit_type": "heating",
+            "day": "Monday",
+            "action": "delete",
+            "slot": 2,
+        }
+        asyncio.run(services[SERVICE_SET_WEEKLY_TIMER](call_single))
+        self.assertEqual(written_params, [])
+        self.assertEqual(_get_active_slot_count(coord, "Z1Timer", "Monday"), 1)
+
+        # 2. Delete slot 2 across Mon-Wed: only Tuesday (2 slots) is rewritten; Monday (1) & Wednesday (0) untouched
+        coord._state[("bass3", "Z1Timer_Slots")] = {
+            "mon": 1,
+            "tue": 2,
+            "wed": 0,
+            "thu": 0,
+            "fri": 0,
+            "sat": 0,
+            "sun": 0,
+        }
+        call_all = MagicMock()
+        call_all.data = {
+            "circuit_type": "heating",
+            "day": "All",
+            "action": "delete",
+            "slot": 2,
+        }
+        asyncio.run(services[SERVICE_SET_WEEKLY_TIMER](call_all))
+        self.assertEqual(
+            written_params,
+            [(CIRCUIT_BASS3, "Z1Timer_Tuesday", "1;6;0;10;0;20.5")],
+        )
+        self.assertEqual(_get_active_slot_count(coord, "Z1Timer", "Monday"), 1)
+        self.assertEqual(_get_active_slot_count(coord, "Z1Timer", "Tuesday"), 1)
+        self.assertEqual(_get_active_slot_count(coord, "Z1Timer", "Wednesday"), 0)
+
+    def test_midnight_end_normalization_for_0015_and_delete_shift(self) -> None:
+        """Normalize 00:00 hardware end sentinel to 24:00 for 00:15 start and delete slot shifting."""
+        hass = MagicMock()
+        services: dict[str, Any] = {}
+        hass.services.has_service.return_value = False
+        hass.services.async_register.side_effect = (
+            lambda d, s, h, schema=None, *args, **kwargs: services.update({s: h})
+        )
+
+        coord = SaunierGeniaCoordinator(hass, MagicMock(data={"mqtt_prefix": "ebusd"}))
+        coord._is_ebus_operational_override = True
+        type(coord).is_ebus_operational = property(lambda self: True)
+
+        written_params: list[tuple[str, str, Any]] = []
+
+        async def mock_write(circuit: str, param: str, val: Any) -> bool:
+            written_params.append((circuit, param, val))
+            return True
+
+        coord.async_write_parameter = mock_write
+        hass.data = {DOMAIN: {"entry_id": coord}}
+        _async_register_services(hass)
+
+        # Case A: Slot 1 is 00:15 - 24:00 (hardware stores to_hour=0, to_min=0),
+        # and user sets Slot 1 leaving another 00:15-24:00 slot untouched via Slot 2 add -> Slot 1 rewrite.
+        # Setup: Slot 1 = 00:15-24:00 (0,15,0,0), Slot 2 = 23:00-24:00? Test directly via Slot 1 = 00:15-24:00
+        # being preserved when modifying Slot 1/2 -> put Slot 1 = 00:15-24:00 (raw 0;15;0;0) and delete Slot 2!
+        coord._state[("bass3", "Z1Timer_Slots")] = {
+            "mon": 2,
+            "tue": 0,
+            "wed": 0,
+            "thu": 0,
+            "fri": 0,
+            "sat": 0,
+            "sun": 0,
+        }
+        coord._state[("bass3", "Z1Timer_Monday")] = {
+            "total_slots": 2,
+            "from_hour": 0,
+            "from_min": 15,
+            "to_hour": 0,
+            "to_min": 0,
+            "temp": 20.5,
+        }
+        coord._state[("bass3", "Z1Timer_Monday_Slot2")] = {
+            "total_slots": 2,
+            "from_hour": 20,
+            "from_min": 0,
+            "to_hour": 0,
+            "to_min": 0,
+            "temp": 21.0,
+        }
+
+        # Delete Slot 1 -> Slot 2 (20:00 - 24:00 stored as 0;0) shifts to Slot 1 with 24;0!
+        call_del = MagicMock()
+        call_del.data = {
+            "circuit_type": "heating",
+            "day": "Monday",
+            "action": "delete",
+            "slot": 1,
+        }
+        asyncio.run(services[SERVICE_SET_WEEKLY_TIMER](call_del))
+        self.assertEqual(
+            written_params,
+            [(CIRCUIT_BASS3, "Z1Timer_Monday", "1;20;0;24;0;21.0")],
+        )
+
+        # Case B: Setting Slot 2 after Slot 1 = 00:15-12:00 and wait: test _async_collect_day_writes directly
+        # when Slot 1 = 00:15-24:00 (raw 0,15,0,0) and user edits Slot 2 -> must write Slot 1 with 24;0!
+        written_params.clear()
+        coord._state[("bass3", "Z1Timer_Slots")]["mon"] = 2
+        coord._state[("bass3", "Z1Timer_Monday")] = {
+            "total_slots": 2,
+            "from_hour": 0,
+            "from_min": 15,
+            "to_hour": 0,
+            "to_min": 0,
+            "temp": 20.5,
+        }
+        # Give Slot 1 00:15-10:00 when validating non-overlap, wait: Slot 1 = 00:15-24:00 overlaps Slot 2,
+        # OR Slot 2 = 00:15-24:00? Actually Slot 1 = 00:15-24:00 when deleting Slot 2!
+        call_del2 = MagicMock()
+        call_del2.data = {
+            "circuit_type": "heating",
+            "day": "Monday",
+            "action": "delete",
+            "slot": 2,
+        }
+        asyncio.run(services[SERVICE_SET_WEEKLY_TIMER](call_del2))
+        self.assertEqual(
+            written_params,
+            [(CIRCUIT_BASS3, "Z1Timer_Monday", "1;0;15;24;0;20.5")],
+        )
+
+        # Also test _async_collect_day_writes directly with raw 00:15 - 00:00 stored on slot 1
+        from custom_components.arotherm_genia_ebusd import _async_collect_day_writes
+
+        writes = asyncio.run(
+            _async_collect_day_writes(
+                coord,
+                "Z1Timer",
+                "Monday",
+                2,
+                2,
+                21,
+                0,
+                22,
+                0,
+                19.5,
+                20.0,
+            )
+        )
+        self.assertEqual(
+            writes,
+            [
+                ("Z1Timer_Monday", "2;0;15;24;0;20.5"),
+                ("Z1Timer_Monday_Slot2", "2;21;0;22;0;19.5"),
+            ],
+        )
+
+    def test_german_weekday_names_supported(self) -> None:
+        """normalize_day_name accepts German weekdays and range aliases."""
+        from custom_components.arotherm_genia_ebusd import normalize_day_name
+
+        self.assertEqual(normalize_day_name("Montag"), "Monday")
+        self.assertEqual(normalize_day_name("Dienstag"), "Tuesday")
+        self.assertEqual(normalize_day_name("Mittwoch"), "Wednesday")
+        self.assertEqual(normalize_day_name("Donnerstag"), "Thursday")
+        self.assertEqual(normalize_day_name("Freitag"), "Friday")
+        self.assertEqual(normalize_day_name("Samstag"), "Saturday")
+        self.assertEqual(normalize_day_name("Sonntag"), "Sunday")
+        self.assertEqual(normalize_day_name("Werktags"), "Weekdays")
+        self.assertEqual(normalize_day_name("Wochenende"), "Weekend")
+        self.assertEqual(normalize_day_name("Alle"), "All")
 
 
 if __name__ == "__main__":

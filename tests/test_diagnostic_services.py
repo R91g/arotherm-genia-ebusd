@@ -898,13 +898,58 @@ class TestDiagnosticServices(unittest.TestCase):
         entry.domain = DOMAIN
         entry.title = "Saunier"
         entry.data = {"mqtt_prefix": "ebusd"}
-        entry.options = {}
+        entry.options = {"ebusd_tcp_host": "192.168.1.50", "api_token": "secret-val"}
         coord = SaunierGeniaCoordinator(self.hass, entry)
-        coord._state[("scan.08", "Id")] = {"product": "00201", "counter": "999999"}
+        coord._state[("scan.08", "Id")] = {
+            "product": "00201",
+            "counter": "999999",
+            "SerialNumber": "SN-12345",
+        }
         self.hass.data = {DOMAIN: {"diag_entry": coord}}
 
         diag = asyncio.run(async_get_config_entry_diagnostics(self.hass, entry))
         self.assertIn("bus_state", diag)
+        self.assertEqual(diag["entry"]["options"]["ebusd_tcp_host"], "**REDACTED**")
+        self.assertEqual(diag["entry"]["options"]["api_token"], "**REDACTED**")
+        self.assertEqual(diag["bus_state"]["scan.08"]["Id"]["counter"], "**REDACTED**")
+        self.assertEqual(
+            diag["bus_state"]["scan.08"]["Id"]["SerialNumber"], "**REDACTED**"
+        )
+        self.assertEqual(diag["bus_state"]["scan.08"]["Id"]["product"], "00201")
+
+    def test_read_parameter_offline_and_multi_instance_selection(self) -> None:
+        """read_parameter fails fast offline and prefers operational multi-instance coordinator."""
+        entry_off = MagicMock()
+        entry_off.data = {"mqtt_prefix": "ebusd_off"}
+        coord_off = SaunierGeniaCoordinator(self.hass, entry_off)
+        coord_off._state[("global", "signal")] = {"value": "false"}
+        coord_off.async_request_get = AsyncMock()
+
+        self.hass.data = {DOMAIN: {"e_off": coord_off}}
+        _async_register_services(self.hass)
+        handler = self.registered_services[SERVICE_READ_PARAMETER]
+
+        call_off = MagicMock()
+        call_off.data = {"circuit": "08", "name": "Status01", "force": True}
+        with self.assertRaises(HomeAssistantError):
+            asyncio.run(handler(call_off))
+        coord_off.async_request_get.assert_not_called()
+
+        entry_on = MagicMock()
+        entry_on.data = {"mqtt_prefix": "ebusd_on"}
+        coord_on = SaunierGeniaCoordinator(self.hass, entry_on)
+        coord_on._active_outdoor_circuit = "hmux0"
+        coord_on._state[("hmux0", "Status01")] = {"temp1": 33.5}
+        coord_on._last_telemetry_time = 999999999.0
+        coord_on.async_request_get = AsyncMock()
+
+        with patch("time.monotonic", return_value=999999999.0):
+            self.hass.data = {DOMAIN: {"e_off": coord_off, "e_on": coord_on}}
+            call_on = MagicMock()
+            call_on.data = {"circuit": "hmu", "name": "Status01", "force": False}
+            result = asyncio.run(handler(call_on))
+            self.assertTrue(result["cached"])
+            self.assertEqual(result["value"], {"temp1": 33.5})
 
 
 if __name__ == "__main__":

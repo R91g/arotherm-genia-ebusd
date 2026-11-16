@@ -2,10 +2,11 @@
 
 import os
 import sys
+import time
 import unittest
 from datetime import datetime, timedelta
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 import setup_mocks  # noqa: F401
@@ -338,9 +339,12 @@ class TestNumberPlatform(unittest.IsolatedAsyncioTestCase):
         await dur_entity.async_set_native_value(2.0)
         self.assertEqual(written, [(CIRCUIT_BASS3, "Z1QuickVetoDuration", 2.0)])
 
-        # 2. When in veto: writes duration AND re-affirms Z1SFMode = veto
+        # 2. When in veto (freshly confirmed): writes duration AND re-affirms Z1SFMode = veto
         written.clear()
         self.coordinator._state[(CIRCUIT_BASS3.lower(), "Z1SFMode")] = {"value": "veto"}
+        self.coordinator._message_timestamps[(CIRCUIT_BASS3.lower(), "z1sfmode")] = (
+            time.time()
+        )
         await dur_entity.async_set_native_value(4.5)
         self.assertEqual(
             written,
@@ -360,6 +364,18 @@ class TestNumberPlatform(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(written, [(CIRCUIT_BASS3, "Z1QuickVetoDuration", 3.5)])
         self.coordinator.async_set_cooling_quick_veto.assert_awaited_once_with(
             temperature=21.0, duration=3.5
+        )
+
+        # 4. When in cooling veto without tracked target_temp (None): refreshes duration only
+        written.clear()
+        self.coordinator.async_set_cooling_quick_veto.reset_mock()
+        self.coordinator.async_refresh_cooling_veto_duration = AsyncMock()
+        self.coordinator._cooling_veto_active_temp = None
+        await dur_entity.async_set_native_value(4.0)
+        self.assertEqual(written, [(CIRCUIT_BASS3, "Z1QuickVetoDuration", 4.0)])
+        self.coordinator.async_set_cooling_quick_veto.assert_not_called()
+        self.coordinator.async_refresh_cooling_veto_duration.assert_awaited_once_with(
+            4.0
         )
 
     async def test_quick_veto_boost_delta_entity(self) -> None:
@@ -382,10 +398,13 @@ class TestNumberPlatform(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(delta_entity.native_value, 5.0)
         self.assertEqual(self.coordinator.quick_veto_boost_delta, 5.0)
 
-        # State restoration
+        # State restoration in native units (ignores converted display state in °F)
         mock_state = MagicMock()
-        mock_state.state = "4.5"
+        mock_state.state = "8.1"
         delta_entity._mock_last_state = mock_state
+        mock_num_data = MagicMock()
+        mock_num_data.native_value = 4.5
+        delta_entity._mock_last_number_data = mock_num_data
         await delta_entity.async_added_to_hass()
         self.assertEqual(delta_entity.native_value, 4.5)
         self.assertEqual(self.coordinator.quick_veto_boost_delta, 4.5)
@@ -410,13 +429,175 @@ class TestNumberPlatform(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(delta_entity.native_value, 3.5)
         self.assertEqual(self.coordinator.cooling_quick_veto_boost_delta, 3.5)
 
-        # State restoration
+        # State restoration in native units (ignores converted display state in °F)
         mock_state = MagicMock()
-        mock_state.state = "1.5"
+        mock_state.state = "2.7"
         delta_entity._mock_last_state = mock_state
+        mock_num_data = MagicMock()
+        mock_num_data.native_value = 1.5
+        delta_entity._mock_last_number_data = mock_num_data
         await delta_entity.async_added_to_hass()
         self.assertEqual(delta_entity.native_value, 1.5)
         self.assertEqual(self.coordinator.cooling_quick_veto_boost_delta, 1.5)
+
+    def test_delta_numbers_use_celsius_and_temperature_delta(self) -> None:
+        """Verify all delta/offset numbers use UnitOfTemperature.CELSIUS and TEMPERATURE_DELTA."""
+        from homeassistant.const import UnitOfTemperature
+
+        expected_delta_keys = {
+            "hc1_excess_temp",
+            "cylinder_charge_hyst",
+            "cylinder_charge_offset",
+            "buffer_charge_offset",
+        }
+        expected_dc = getattr(NumberDeviceClass, "TEMPERATURE_DELTA", None)
+        found = set()
+        for desc in NUMBER_DESCRIPTIONS:
+            self.assertNotEqual(
+                desc.native_unit_of_measurement,
+                "K",
+                f"Unexpected legacy Kelvin unit on {desc.key}",
+            )
+            if desc.key in expected_delta_keys:
+                found.add(desc.key)
+                self.assertEqual(
+                    desc.native_unit_of_measurement, UnitOfTemperature.CELSIUS
+                )
+                self.assertEqual(desc.device_class, expected_dc)
+        self.assertEqual(found, expected_delta_keys)
+
+    async def test_quick_veto_duration_stale_veto_no_reply_does_not_rearm(
+        self,
+    ) -> None:
+        """Stale Z1SFMode=veto without fresh /get confirmation must NOT re-arm veto."""
+        dur_desc = next(
+            d for d in NUMBER_DESCRIPTIONS if d.key == "z1_quick_veto_duration"
+        )
+        dur_entity = SaunierGeniaNumber(self.coordinator, dur_desc)
+
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "Z1SFMode")] = {"value": "veto"}
+        self.coordinator._message_timestamps[(CIRCUIT_BASS3.lower(), "z1sfmode")] = (
+            time.time() - 3600.0
+        )
+
+        written: list[tuple[str, str, Any]] = []
+        requested_gets: list[tuple[str, str]] = []
+
+        async def _record_write(circuit: str, message: str, value: Any) -> None:
+            written.append((circuit, message, value))
+
+        async def _record_get(circuit: str, message: str) -> None:
+            requested_gets.append((circuit, message))
+
+        self.coordinator.async_write_parameter = AsyncMock(side_effect=_record_write)
+        self.coordinator.async_request_get = AsyncMock(side_effect=_record_get)
+        self.coordinator.async_refresh_heating_veto_duration = AsyncMock()
+
+        with (
+            patch.object(
+                type(self.coordinator),
+                "is_ebus_operational",
+                new_callable=PropertyMock,
+                return_value=True,
+            ),
+            patch(
+                "custom_components.arotherm_genia_ebusd.coordinator.SET_CONFIRMATION_DELAY_SECONDS",
+                0.05,
+            ),
+        ):
+            await dur_entity.async_set_native_value(1.5)
+
+        self.assertEqual(requested_gets, [(CIRCUIT_BASS3, "Z1SFMode")])
+        self.assertEqual(written, [(CIRCUIT_BASS3, "Z1QuickVetoDuration", 1.5)])
+        self.coordinator.async_refresh_heating_veto_duration.assert_not_awaited()
+
+    async def test_quick_veto_duration_stale_veto_refreshed_to_auto_does_not_rearm(
+        self,
+    ) -> None:
+        """Stale Z1SFMode=veto refreshed via /get to auto must NOT re-arm veto."""
+        dur_desc = next(
+            d for d in NUMBER_DESCRIPTIONS if d.key == "z1_quick_veto_duration"
+        )
+        dur_entity = SaunierGeniaNumber(self.coordinator, dur_desc)
+
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "Z1SFMode")] = {"value": "veto"}
+        self.coordinator._message_timestamps[(CIRCUIT_BASS3.lower(), "z1sfmode")] = (
+            time.time() - 3600.0
+        )
+
+        written: list[tuple[str, str, Any]] = []
+
+        async def _record_write(circuit: str, message: str, value: Any) -> None:
+            written.append((circuit, message, value))
+
+        async def _reply_auto(circuit: str, message: str) -> None:
+            self.coordinator._state[(circuit.lower(), message)] = {"value": "auto"}
+            self.coordinator._message_timestamps[(circuit.lower(), message.lower())] = (
+                time.time()
+            )
+
+        self.coordinator.async_write_parameter = AsyncMock(side_effect=_record_write)
+        self.coordinator.async_request_get = AsyncMock(side_effect=_reply_auto)
+        self.coordinator.async_refresh_heating_veto_duration = AsyncMock()
+
+        with patch.object(
+            type(self.coordinator),
+            "is_ebus_operational",
+            new_callable=PropertyMock,
+            return_value=True,
+        ):
+            await dur_entity.async_set_native_value(2.0)
+
+        self.assertEqual(written, [(CIRCUIT_BASS3, "Z1QuickVetoDuration", 2.0)])
+        self.coordinator.async_refresh_heating_veto_duration.assert_not_awaited()
+
+    async def test_quick_veto_duration_stale_veto_confirmed_veto_rearms(
+        self,
+    ) -> None:
+        """Stale Z1SFMode=veto confirmed active via /get DOES re-arm and refresh."""
+        dur_desc = next(
+            d for d in NUMBER_DESCRIPTIONS if d.key == "z1_quick_veto_duration"
+        )
+        dur_entity = SaunierGeniaNumber(self.coordinator, dur_desc)
+
+        self.coordinator._state[(CIRCUIT_BASS3.lower(), "Z1SFMode")] = {"value": "veto"}
+        self.coordinator._message_timestamps[(CIRCUIT_BASS3.lower(), "z1sfmode")] = (
+            time.time() - 3600.0
+        )
+
+        written: list[tuple[str, str, Any]] = []
+
+        async def _record_write(circuit: str, message: str, value: Any) -> None:
+            written.append((circuit, message, value))
+
+        async def _reply_veto(circuit: str, message: str) -> None:
+            self.coordinator._state[(circuit.lower(), message)] = {"value": "veto"}
+            self.coordinator._message_timestamps[(circuit.lower(), message.lower())] = (
+                time.time()
+            )
+
+        self.coordinator.async_write_parameter = AsyncMock(side_effect=_record_write)
+        self.coordinator.async_request_get = AsyncMock(side_effect=_reply_veto)
+        self.coordinator.async_refresh_heating_veto_duration = AsyncMock()
+
+        with patch.object(
+            type(self.coordinator),
+            "is_ebus_operational",
+            new_callable=PropertyMock,
+            return_value=True,
+        ):
+            await dur_entity.async_set_native_value(4.0)
+
+        self.assertEqual(
+            written,
+            [
+                (CIRCUIT_BASS3, "Z1QuickVetoDuration", 4.0),
+                (CIRCUIT_BASS3, "Z1SFMode", "veto"),
+            ],
+        )
+        self.coordinator.async_refresh_heating_veto_duration.assert_awaited_once_with(
+            4.0
+        )
 
 
 if __name__ == "__main__":

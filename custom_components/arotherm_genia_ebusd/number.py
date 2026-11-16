@@ -10,6 +10,7 @@ from homeassistant.components.number import (
     NumberEntity,
     NumberEntityDescription,
     NumberMode,
+    RestoreNumber,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -20,7 +21,6 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import (
     CIRCUIT_BASS3,
@@ -45,6 +45,11 @@ class SaunierGeniaNumberEntityDescription(NumberEntityDescription):
     mode: NumberMode = NumberMode.BOX
 
 
+TEMP_DELTA_NUMBER_DEVICE_CLASS: NumberDeviceClass | None = getattr(
+    NumberDeviceClass, "TEMPERATURE_DELTA", None
+)
+
+
 NUMBER_DESCRIPTIONS: tuple[SaunierGeniaNumberEntityDescription, ...] = (
     SaunierGeniaNumberEntityDescription(
         key="hc1_heat_curve",
@@ -64,7 +69,8 @@ NUMBER_DESCRIPTIONS: tuple[SaunierGeniaNumberEntityDescription, ...] = (
         native_min_value=0.0,
         native_max_value=35.0,
         native_step=1.0,
-        native_unit_of_measurement="K",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=TEMP_DELTA_NUMBER_DEVICE_CLASS,
         entity_category=EntityCategory.CONFIG,
     ),
     SaunierGeniaNumberEntityDescription(
@@ -272,7 +278,8 @@ NUMBER_DESCRIPTIONS: tuple[SaunierGeniaNumberEntityDescription, ...] = (
         native_min_value=2.0,
         native_max_value=15.0,
         native_step=0.5,
-        native_unit_of_measurement="K",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=TEMP_DELTA_NUMBER_DEVICE_CLASS,
         entity_category=EntityCategory.CONFIG,
     ),
     SaunierGeniaNumberEntityDescription(
@@ -283,7 +290,8 @@ NUMBER_DESCRIPTIONS: tuple[SaunierGeniaNumberEntityDescription, ...] = (
         native_min_value=0.0,
         native_max_value=25.0,
         native_step=1.0,
-        native_unit_of_measurement="K",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=TEMP_DELTA_NUMBER_DEVICE_CLASS,
         entity_category=EntityCategory.CONFIG,
     ),
     SaunierGeniaNumberEntityDescription(
@@ -320,7 +328,8 @@ NUMBER_DESCRIPTIONS: tuple[SaunierGeniaNumberEntityDescription, ...] = (
         native_min_value=0.0,
         native_max_value=20.0,
         native_step=1.0,
-        native_unit_of_measurement="K",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=TEMP_DELTA_NUMBER_DEVICE_CLASS,
         entity_category=EntityCategory.CONFIG,
     ),
     SaunierGeniaNumberEntityDescription(
@@ -434,31 +443,15 @@ class SaunierGeniaNumber(SaunierGeniaEntity, NumberEntity):
                 self.entity_description.message,
                 payload_val,
             )
-            await self.coordinator.async_set_cooling_quick_veto(
-                temperature=self.coordinator.cooling_quick_veto_target_temp,
-                duration=float(payload_val),
-            )
-            return
-
-        if (
-            self.entity_description.message == "Z1QuickVetoDuration"
-            and (
-                self.coordinator.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or ""
-            ).lower()
-            == "veto"
-        ):
-            await self.coordinator.async_write_parameter(
-                self.entity_description.circuit,
-                self.entity_description.message,
-                payload_val,
-            )
-            await asyncio.sleep(0.3)
-            await self.coordinator.async_write_parameter(
-                CIRCUIT_BASS3, "Z1SFMode", "veto"
-            )
-            await self.coordinator.async_refresh_heating_veto_duration(
-                float(payload_val)
-            )
+            if self.coordinator.cooling_quick_veto_target_temp is not None:
+                await self.coordinator.async_set_cooling_quick_veto(
+                    temperature=self.coordinator.cooling_quick_veto_target_temp,
+                    duration=float(payload_val),
+                )
+            else:
+                await self.coordinator.async_refresh_cooling_veto_duration(
+                    float(payload_val)
+                )
             return
 
         await self.coordinator.async_write_parameter(
@@ -466,14 +459,20 @@ class SaunierGeniaNumber(SaunierGeniaEntity, NumberEntity):
             self.entity_description.message,
             payload_val,
         )
+        if (
+            self.entity_description.message == "Z1QuickVetoDuration"
+            and await self.coordinator.async_confirm_heating_veto_active()
+        ):
+            await asyncio.sleep(0.3)
+            await self.coordinator.async_write_parameter(
+                CIRCUIT_BASS3, "Z1SFMode", "veto"
+            )
+            await self.coordinator.async_refresh_heating_veto_duration(
+                float(payload_val)
+            )
 
 
-TEMP_DELTA_NUMBER_DEVICE_CLASS: NumberDeviceClass | None = getattr(
-    NumberDeviceClass, "TEMPERATURE_DELTA", None
-)
-
-
-class _SaunierGeniaBoostDeltaNumber(SaunierGeniaEntity, NumberEntity, RestoreEntity):
+class _SaunierGeniaBoostDeltaNumber(SaunierGeniaEntity, RestoreNumber):
     """Shared base for HA-persisted Quick Veto boost temperature delta numbers."""
 
     _attr_mode = NumberMode.BOX
@@ -487,12 +486,12 @@ class _SaunierGeniaBoostDeltaNumber(SaunierGeniaEntity, NumberEntity, RestoreEnt
     _coord_attr: str
 
     async def async_added_to_hass(self) -> None:
-        """Restore last configured boost delta on restart."""
+        """Restore last configured boost delta in native units on restart."""
         await super().async_added_to_hass()
-        last_state = await self.async_get_last_state()
-        if last_state and last_state.state not in (None, "unknown", "unavailable"):
+        last_data = await self.async_get_last_number_data()
+        if last_data is not None and last_data.native_value is not None:
             try:
-                val = float(last_state.state)
+                val = round(float(last_data.native_value), 1)
                 max_val = self._attr_native_max_value
                 if 0.5 <= val <= max_val:
                     setattr(self.coordinator, self._coord_attr, val)

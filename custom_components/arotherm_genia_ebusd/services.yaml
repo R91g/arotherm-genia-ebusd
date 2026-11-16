@@ -1,7 +1,7 @@
 set_weekly_timer:
   name: Set Weekly Schedule Timer (b5 55)
   description: >
-    Configures a weekly schedule time slot on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3)
+    Configures a weekly schedule time slot on the climate controller (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3)
     for Zone 1 Heating, Domestic Hot Water (DHW), Cooling, Circulation, or Silent Mode. Supports configuring slots (1, 2, 3),
     deleting individual slots, or clearing the entire day.
   fields:
@@ -25,32 +25,32 @@ set_weekly_timer:
               value: "silent"
     day:
       name: Day of the Week
-      description: Specific day of the week (e.g. Monday / Lunes), Weekdays (Laborables), Weekend (Fin de semana), or All Days (Toda la semana). Accepts English and Spanish names.
+      description: Specific day of the week (e.g. Monday / Lunes / Montag), Weekdays (Laborables / Werktags), Weekend (Fin de semana / Wochenende), or All Days (Toda la semana / Alle). Accepts English, Spanish, and German names.
       required: true
       example: "Monday"
       selector:
         select:
           custom_value: true
           options:
-            - label: "Monday / Lunes"
+            - label: "Monday / Lunes / Montag"
               value: "Monday"
-            - label: "Tuesday / Martes"
+            - label: "Tuesday / Martes / Dienstag"
               value: "Tuesday"
-            - label: "Wednesday / Miércoles"
+            - label: "Wednesday / Miércoles / Mittwoch"
               value: "Wednesday"
-            - label: "Thursday / Jueves"
+            - label: "Thursday / Jueves / Donnerstag"
               value: "Thursday"
-            - label: "Friday / Viernes"
+            - label: "Friday / Viernes / Freitag"
               value: "Friday"
-            - label: "Saturday / Sábado"
+            - label: "Saturday / Sábado / Samstag"
               value: "Saturday"
-            - label: "Sunday / Domingo"
+            - label: "Sunday / Domingo / Sonntag"
               value: "Sunday"
-            - label: "Weekdays / Laborables (Lunes - Viernes)"
+            - label: "Weekdays / Laborables / Werktags (Mon - Fri)"
               value: "Weekdays"
-            - label: "Weekend / Fin de semana (Sábado - Domingo)"
+            - label: "Weekend / Fin de semana / Wochenende (Sat - Sun)"
               value: "Weekend"
-            - label: "All Days / Toda la semana (Lunes - Domingo)"
+            - label: "All Days / Toda la semana / Alle Tage (Mon - Sun)"
               value: "All"
     action:
       name: Action
@@ -139,7 +139,7 @@ set_legionella_protection:
   name: Set Anti-Legionella Protection Schedule
   description: >
     Configures the weekly anti-legionella thermal disinfection schedule on the climate controller
-    (15.bass3 / 15.ctlv2 / 15.ctlv3). Sets the day of the week and target execution time.
+    (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3). Sets the day of the week and target execution time.
   fields:
     day:
       name: Day of the Week
@@ -149,21 +149,21 @@ set_legionella_protection:
       selector:
         select:
           options:
-            - label: "Disabled / Desactivado (off)"
+            - label: "Disabled / Desactivado / Deaktiviert (off)"
               value: "off"
-            - label: "Monday / Lunes"
+            - label: "Monday / Lunes / Montag"
               value: "Monday"
-            - label: "Tuesday / Martes"
+            - label: "Tuesday / Martes / Dienstag"
               value: "Tuesday"
-            - label: "Wednesday / Miércoles"
+            - label: "Wednesday / Miércoles / Mittwoch"
               value: "Wednesday"
-            - label: "Thursday / Jueves"
+            - label: "Thursday / Jueves / Donnerstag"
               value: "Thursday"
-            - label: "Friday / Viernes"
+            - label: "Friday / Viernes / Freitag"
               value: "Friday"
-            - label: "Saturday / Sábado"
+            - label: "Saturday / Sábado / Samstag"
               value: "Saturday"
-            - label: "Sunday / Domingo"
+            - label: "Sunday / Domingo / Sonntag"
               value: "Sunday"
     time:
       name: Execution Time (Optional)
@@ -176,7 +176,7 @@ set_legionella_protection:
 set_holiday_mode:
   name: Set Holiday / Away Mode
   description: >
-    Activates Holiday/Away Mode on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3),
+    Activates Holiday/Away Mode on the climate controller (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3),
     suspending hot water production and reducing heating setpoint to setback temperature
     during a timed or open-ended window.
   fields:
@@ -225,7 +225,7 @@ set_holiday_mode:
 cancel_holiday_mode:
   name: Cancel Holiday / Away Mode
   description: >
-    Immediately cancels Holiday/Away Mode on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3)
+    Immediately cancels Holiday/Away Mode on the climate controller (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3)
     and restores automatic schedule operation for heating and domestic hot water.
 
 quick_veto:

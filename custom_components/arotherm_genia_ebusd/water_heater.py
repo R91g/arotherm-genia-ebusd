@@ -11,6 +11,7 @@ from homeassistant.components.water_heater import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
@@ -158,18 +159,29 @@ class SaunierGeniaWaterHeater(SaunierGeniaEntity, WaterHeaterEntity):
             await self.coordinator.async_trigger_dhw_boost()
             return
 
+        bass3_mode = HA_TO_BASS3_OP_MAP.get(operation_mode)
+        if bass3_mode is None:
+            raise HomeAssistantError(
+                f"Unsupported water heater operation mode: {operation_mode}"
+            )
+
         # If cancelling boost while switching to another mode, restore setpoint and HwcSFMode=auto
         sf_mode = (
             self.coordinator.get_str(CIRCUIT_BASS3, "HwcSFMode", "value") or ""
         ).lower()
-        if sf_mode == "load" or self.coordinator.dhw_boost_forced_active:
+        hwc_status = (
+            self.coordinator.get_str(CIRCUIT_BASS3, "HwcStatus", "value") or ""
+        ).lower()
+        if (
+            sf_mode == "load"
+            or hwc_status == "load"
+            or self.coordinator.dhw_boost_forced_active
+        ):
             await self.coordinator.async_cancel_dhw_boost()
 
-        bass3_mode = HA_TO_BASS3_OP_MAP.get(operation_mode)
-        if bass3_mode is not None:
-            await self.coordinator.async_write_parameter(
-                CIRCUIT_BASS3, "HwcOpMode", bass3_mode
-            )
+        await self.coordinator.async_write_parameter(
+            CIRCUIT_BASS3, "HwcOpMode", bass3_mode
+        )
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set new target temperature for the DHW cylinder."""

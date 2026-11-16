@@ -18,8 +18,8 @@ La integración registra catorce acciones personalizadas bajo el dominio `arothe
 | 10 | [`send_hex_command`](#10-arotherm_genia_ebusdsend_hex_command) | Enviar un telegrama HEX directo (diagnóstico opt-in) |
 | 11 | [`read_parameter`](#11-arotherm_genia_ebusdread_parameter) | Leer un registro eBUS simbólico |
 | 12 | [`write_parameter`](#12-arotherm_genia_ebusdwrite_parameter) | Escribir un registro eBUS simbólico |
-| 13 | [`start_ventilation_boost`](#13-arotherm_genia_ebusdstart_ventilation_boost) | Iniciar el refuerzo de ventilación intensa (30 minutos) |
-| 14 | [`cancel_ventilation_boost`](#14-arotherm_genia_ebusdcancel_ventilation_boost) | Cancelar el refuerzo de ventilación intensa activo |
+| 13 | [`start_ventilation_boost`](#13-arotherm_genia_ebusdstart_ventilation_boost) | Iniciar el refuerzo de ventilación intensiva (30 minutos) |
+| 14 | [`cancel_ventilation_boost`](#14-arotherm_genia_ebusdcancel_ventilation_boost) | Cancelar el refuerzo de ventilación intensiva activo |
 
 ---
 
@@ -274,7 +274,7 @@ Escribe un valor simbólico en un registro eBUS por MQTT (`SupportsResponse.OPTI
 
 ## 13. `arotherm_genia_ebusd.start_ventilation_boost`
 
-Activa el refuerzo de ventilación intensa (`VentilationBoost = on`) en el regulador climático (`15.bass3` / `15.basv3` / `15.ctlv2` / `15.ctlv3`). Detiene la calefacción durante **30 minutos** (manteniendo activas la protección antihielo, el ACS y la circulación) y reanuda automáticamente el modo de funcionamiento anterior al finalizar. Home Assistant guarda la cuenta atrás de 30 minutos en `Store` (sensor `ventilation_remaining_time` y atributo `climate.active_preset_remaining`). Sin parámetros.
+Activa el refuerzo de ventilación intensiva (`VentilationBoost = on`) en el regulador climático (`15.bass3` / `15.basv3` / `15.ctlv2` / `15.ctlv3`). Detiene la calefacción durante **30 minutos** (manteniendo activas la protección antihielo, el ACS y la circulación) y reanuda automáticamente el modo de funcionamiento anterior al finalizar. Home Assistant guarda la cuenta atrás de 30 minutos en `Store` (sensor `ventilation_remaining_time` y atributo `climate.active_preset_remaining`). Sin parámetros.
 
 ```yaml
 action: arotherm_genia_ebusd.start_ventilation_boost
@@ -284,7 +284,7 @@ action: arotherm_genia_ebusd.start_ventilation_boost
 
 ## 14. `arotherm_genia_ebusd.cancel_ventilation_boost`
 
-Cancela inmediatamente el refuerzo de ventilación intensa activo (`VentilationBoost = off`), limpia el temporizador persistido y reanuda el modo de funcionamiento anterior. Sin parámetros.
+Cancela inmediatamente el refuerzo de ventilación intensiva activo (`VentilationBoost = off`), limpia el temporizador persistido y reanuda el modo de funcionamiento anterior. Sin parámetros.
 
 ```yaml
 action: arotherm_genia_ebusd.cancel_ventilation_boost

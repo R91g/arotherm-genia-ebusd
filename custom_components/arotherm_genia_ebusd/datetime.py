@@ -60,6 +60,7 @@ class SaunierGeniaHolidayStartDateTime(SaunierGeniaEntity, DateTimeEntity):
             ],
             unique_id_suffix="datetime_bass3_holiday_start",
         )
+        self._write_lock = asyncio.Lock()
 
     @property
     def native_value(self) -> datetime | None:
@@ -99,19 +100,20 @@ class SaunierGeniaHolidayStartDateTime(SaunierGeniaEntity, DateTimeEntity):
 
     async def async_set_value(self, value: datetime) -> None:
         """Set new holiday start date and time."""
-        loc_val = _to_local_aware(value)
-        self.coordinator.preselected_holiday_start_datetime = loc_val
+        async with self._write_lock:
+            loc_val = _to_local_aware(value)
+            self.coordinator.preselected_holiday_start_datetime = loc_val
 
-        date_str = f"{loc_val.day:02d};{loc_val.month:02d};{loc_val.year % 100:02d}"
-        time_str = f"{loc_val.hour:02d};{loc_val.minute:02d};{loc_val.second:02d}"
+            date_str = f"{loc_val.day:02d};{loc_val.month:02d};{loc_val.year % 100:02d}"
+            time_str = f"{loc_val.hour:02d};{loc_val.minute:02d};{loc_val.second:02d}"
 
-        await self.coordinator.async_write_parameter(
-            CIRCUIT_BASS3, "HolidayStartDate", date_str
-        )
-        await asyncio.sleep(0.4)
-        await self.coordinator.async_write_parameter(
-            CIRCUIT_BASS3, "HolidayStartTime", time_str
-        )
+            await self.coordinator.async_write_parameter(
+                CIRCUIT_BASS3, "HolidayStartDate", date_str
+            )
+            await asyncio.sleep(0.4)
+            await self.coordinator.async_write_parameter(
+                CIRCUIT_BASS3, "HolidayStartTime", time_str
+            )
 
 
 class SaunierGeniaHolidayEndDateTime(SaunierGeniaEntity, DateTimeEntity):
@@ -133,6 +135,7 @@ class SaunierGeniaHolidayEndDateTime(SaunierGeniaEntity, DateTimeEntity):
             ],
             unique_id_suffix="datetime_bass3_holiday_end",
         )
+        self._write_lock = asyncio.Lock()
 
     @property
     def native_value(self) -> datetime | None:
@@ -172,19 +175,20 @@ class SaunierGeniaHolidayEndDateTime(SaunierGeniaEntity, DateTimeEntity):
 
     async def async_set_value(self, value: datetime) -> None:
         """Set new holiday end date and time."""
-        loc_val = _to_local_aware(value)
-        self.coordinator.preselected_holiday_end_datetime = loc_val
+        async with self._write_lock:
+            loc_val = _to_local_aware(value)
+            self.coordinator.preselected_holiday_end_datetime = loc_val
 
-        date_str = f"{loc_val.day:02d};{loc_val.month:02d};{loc_val.year % 100:02d}"
-        time_str = f"{loc_val.hour:02d};{loc_val.minute:02d};{loc_val.second:02d}"
+            date_str = f"{loc_val.day:02d};{loc_val.month:02d};{loc_val.year % 100:02d}"
+            time_str = f"{loc_val.hour:02d};{loc_val.minute:02d};{loc_val.second:02d}"
 
-        await self.coordinator.async_write_parameter(
-            CIRCUIT_BASS3, "HolidayEndDate", date_str
-        )
-        await asyncio.sleep(0.4)
-        await self.coordinator.async_write_parameter(
-            CIRCUIT_BASS3, "HolidayEndTime", time_str
-        )
+            await self.coordinator.async_write_parameter(
+                CIRCUIT_BASS3, "HolidayEndDate", date_str
+            )
+            await asyncio.sleep(0.4)
+            await self.coordinator.async_write_parameter(
+                CIRCUIT_BASS3, "HolidayEndTime", time_str
+            )
 
 
 class SaunierGeniaCoolingStartDateTime(SaunierGeniaEntity, DateTimeEntity):

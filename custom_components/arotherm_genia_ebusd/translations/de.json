@@ -103,8 +103,8 @@
       "description": "Deine `ebusd`-Instanz verwendet eine veraltete Version von `vaillant/15.bass3.csv`, `15.basv3.csv`, `15.ctlv2.csv` oder `15.ctlv3.csv` (meldet veraltete `Z1HolidayTemp`- oder `Z1DayTemp`-Register oder fehlende Unterstützung für Wochen-Zeitpläne des Flüstermodus `SilentTimer` bzw. Stoßlüftung `VentilationBoost`). Bitte kopiere die aktualisierten Dateien `ebusd-configuration/vaillant/*.csv` in dein eBUSd-Konfigurationsverzeichnis und starte `ebusd` neu, um die Abwesenheitsmodus-Synchronisation, die manuelle Kühlsollwert-Vorgabe (`Z1CoolingManualTemp`), die Zeitpläne des Flüstermodus und Stoßlüftung (`VentilationBoost`) zu aktivieren. Dieser Hinweis verschwindet automatisch, sobald `ebusd` die neue CSV lädt."
     },
     "missing_custom_csv": {
-      "title": "Angepasste eBUSd-Konfigurationsdateien nicht gefunden",
-      "description": "Es wurden noch nicht alle optimierten CSV-Dateien für dein System erkannt. Bitte kopiere die entsprechenden Dateien aus dem Ordner `ebusd-configuration` dieses Projekts in dein eBUSd-Verzeichnis."
+      "title": "Angepasste eBUSd-Konfigurationsdateien nicht gefunden oder Scan unvollständig",
+      "description": "Deine `ebusd`-Instanz empfängt zwar ein aktives eBUS-Signal, aber mindestens einer der erforderlichen CSV-Schaltkreise (`08.hmux0.csv`/`08.hmu.HW5103.csv`, `15.bass3.csv`/`15.basv3.csv`/`15.ctlv2.csv`/`15.ctlv3.csv` oder `76.vwzio.csv`) wurde nicht geladen oder hat beim initialen Scan eine Zeitüberschreitung erlitten (`scan config ERR: read timeout`). Bitte prüfe, ob `broadcast.csv` und `vaillant/*.csv` aus `ebusd-configuration/` in dein `ebusd`-Verzeichnis (`--configpath`) kopiert wurden, und starte `ebusd` neu. Dieser Hinweis verschwindet automatisch, sobald alle drei Schaltkreise Telemetrie senden."
     },
     "no_ebusd_mqtt_traffic": {
       "title": "Kein MQTT-Verkehr unter Präfix {mqtt_prefix}",
@@ -112,7 +112,7 @@
     },
     "mqttjson_not_enabled": {
       "title": "eBUSd --mqttjson ist nicht aktiviert",
-      "description": "Der eBUSd-Daemon sendet keine JSON-formatierten MQTT-Nachrichten. Stelle sicher, dass eBUSd mit dem Parameter `--mqttjson` gestartet wird."
+      "description": "Deine `ebusd`-Instanz sendet Klartextwerte (durch Semikolon getrennt) anstelle von JSON-Objekten. Bitte ergänze deine Startoptionen von `ebusd` um `--mqttjson` und starte `ebusd` neu, damit mehrfeldrige Telemetriedaten (Kompressorstatus, Wochen-Zeitpläne, Datumsangaben und Echtzeit-Stromverbrauch) korrekt dekodiert werden können. Dieser Hinweis verschwindet automatisch, sobald JSON-Nachrichten eingehen."
     },
     "ebusd_slow_polling_seed": {
       "title": "Sehr langsame eBUSd-Telemetrie-Aktualisierung (mögliches Problem mit seed_mqtt_cfg)",
@@ -868,7 +868,7 @@
   "services": {
     "set_weekly_timer": {
       "name": "Wöchentlichen Zeitplan konfigurieren (b5 55)",
-      "description": "Konfiguriert oder löscht wöchentliche Zeitfenster am Klimaregler (15.bass3 / 15.ctlv2 / 15.ctlv3) für Heizkreis Zone 1, Warmwasser (DHW), Kühlung, Zirkulation oder Flüstermodus. Unterstützt Zeitfenster (1, 2, 3), das Löschen einzelner Zeitfenster oder das Leeren des gesamten Tages.",
+      "description": "Konfiguriert oder löscht wöchentliche Zeitfenster am Klimaregler (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3) für Heizkreis Zone 1, Warmwasser (DHW), Kühlung, Zirkulation oder Flüstermodus. Unterstützt Zeitfenster (1, 2, 3), das Löschen einzelner Zeitfenster oder das Leeren des gesamten Tages.",
       "fields": {
         "circuit_type": {
           "name": "Schaltkreis",
@@ -876,7 +876,7 @@
         },
         "day": {
           "name": "Wochentag",
-          "description": "Bestimmter Wochentag (z. B. Monday, Tuesday), Werktage (Weekdays), Wochenende (Weekend) oder alle Tage (All)."
+          "description": "Bestimmter Wochentag (z. B. Montag / Monday / Lunes), Werktage (Weekdays / Werktags), Wochenende (Weekend) oder alle Tage (All / Alle). Akzeptiert deutsche, englische und spanische Namen."
         },
         "action": {
           "name": "Aktion",
@@ -916,7 +916,7 @@
     },
     "set_legionella_protection": {
       "name": "Legionellenschutz-Zeitplan einstellen",
-      "description": "Konfiguriert den wöchentlichen thermischen Legionellenschutz-Desinfektionszeitplan am Systemregler (15.bass3 / 15.ctlv2 / 15.ctlv3). Legt den Wochentag und die Zielausführungszeit fest.",
+      "description": "Konfiguriert den wöchentlichen thermischen Legionellenschutz-Desinfektionszeitplan am Systemregler (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3). Legt den Wochentag und die Zielausführungszeit fest.",
       "fields": {
         "day": {
           "name": "Wochentag",
@@ -930,7 +930,7 @@
     },
     "set_holiday_mode": {
       "name": "Urlaubs- / Abwesenheitsmodus aktivieren",
-      "description": "Aktiviert den Urlaubs-/Abwesenheitsmodus am Klimaregler (15.bass3 / 15.ctlv2 / 15.ctlv3), pausiert die Warmwasserbereitung und senkt die Heiz-Solltemperatur für einen zeitgesteuerten oder unbefristeten Zeitraum.",
+      "description": "Aktiviert den Urlaubs-/Abwesenheitsmodus am Klimaregler (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3), pausiert die Warmwasserbereitung und senkt die Heiz-Solltemperatur für einen zeitgesteuerten oder unbefristeten Zeitraum.",
       "fields": {
         "temperature": {
           "name": "Absenktemperatur",
@@ -956,7 +956,7 @@
     },
     "cancel_holiday_mode": {
       "name": "Urlaubs- / Abwesenheitsmodus abbrechen",
-      "description": "Beendet den Urlaubs-/Abwesenheitsmodus am Klimaregler (15.bass3 / 15.ctlv2 / 15.ctlv3) sofort und stellt den normalen Automatikbetrieb für Heizung und Warmwasser wieder her."
+      "description": "Beendet den Urlaubs-/Abwesenheitsmodus am Klimaregler (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3) sofort und stellt den normalen Automatikbetrieb für Heizung und Warmwasser wieder her."
     },
     "quick_veto": {
       "name": "Quick Veto / Temporärer Boost (Zone 1)",

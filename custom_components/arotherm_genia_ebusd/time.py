@@ -30,6 +30,7 @@ class SaunierGeniaHwcLegionellaTime(SaunierGeniaEntity, TimeEntity):
     """Time entity for Anti-Legionella disinfection execution time."""
 
     _attr_entity_category = EntityCategory.CONFIG
+    _gate_availability_on_ebus = True
 
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the Legionella Time entity."""

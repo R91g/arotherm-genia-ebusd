@@ -9,7 +9,7 @@ import logging
 import math
 import time
 from collections.abc import Callable, Coroutine
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from homeassistant.components import mqtt
@@ -86,6 +86,8 @@ from .const import (
     ELECTRIC_POWER_STALE_TIMEOUT_SECONDS,
     ELECTRIC_POWER_UNAVAILABLE_TIMEOUT_SECONDS,
     ESSENTIAL_HYDRATION_MESSAGES,
+    HEATING_VETO_SFMODE_FRESHNESS_SECONDS,
+    HMU_FLOW_PRESSURE_MIN_SW,
     HMU_HW5103_HYDRATION_MESSAGES,
     HMUX0_CUSTOM_SIGNATURE_MESSAGES,
     HMUX0_EXCLUSIVE_MESSAGES,
@@ -341,6 +343,7 @@ class SaunierGeniaCoordinator:
         self._dhw_boost_timeout_unsub: CALLBACK_TYPE | None = None
         self._dhw_boost_restore_unsub: CALLBACK_TYPE | None = None
         self._pending_dhw_boost_restore: bool = False
+        self._dhw_boost_lock: asyncio.Lock = asyncio.Lock()
         self._dhw_boost_store: Store[dict[str, Any]] = Store(
             hass, 1, f"{DOMAIN}_{entry.entry_id}_dhw_boost"
         )
@@ -362,7 +365,7 @@ class SaunierGeniaCoordinator:
         self._heating_veto_activating: bool = False
         self._heating_veto_started_mono: float = 0.0
         self._last_heating_veto_duration: float | None = None
-        self._last_z1_sfmode_sync_time: float = 0.0
+        self._last_z1_sfmode_sync_time: float = -30.0
         self._heating_veto_store: Store[dict[str, Any]] = Store(
             hass, 1, f"{DOMAIN}_{entry.entry_id}_heating_veto"
         )
@@ -397,6 +400,8 @@ class SaunierGeniaCoordinator:
         self._device_versions: dict[str, dict[str, str | None]] = {
             k: dict(v) for k, v in DEFAULT_DEVICE_VERSIONS.items()
         }
+        # Confirmed outdoor unit SW version from scan.08 or TCP info (excludes default placeholder)
+        self._detected_outdoor_sw: str | None = None
 
         # Root outdoor device registry ID for child device topology (via_device_id)
         self._outdoor_device_id: str | None = None
@@ -421,12 +426,17 @@ class SaunierGeniaCoordinator:
         self._active_repair_issues: set[str] = set()
         self._cleared_repair_issues: set[str] = set()
         self._missing_controller_registers: set[str] = set()
+        self._missing_outdoor_silent_circuits: set[str] = set()
+        self._last_err_responses: dict[
+            tuple[str, str], tuple[float, dict[str, Any]]
+        ] = {}
 
         # Silence watchdog and last telemetry timestamp
         self._last_telemetry_time: float | None = None
         self._last_ebus_operational: bool = False
         self._watchdog_unsub: CALLBACK_TYPE | None = None
         self._last_watchdog_elec_power: float | None = None
+        self._last_watchdog_date: date = dt_util.now().date()
         self._last_power_consumption_receive_time: float | None = None
 
         # Lock to serialize multi-slot weekly timer operations and prevent bus collisions
@@ -622,6 +632,30 @@ class SaunierGeniaCoordinator:
         return self._pending_dhw_boost_restore
 
     @property
+    def pending_heating_veto_restore(self) -> bool:
+        """Return True if an expired heating quick veto from 'off' is awaiting restoration."""
+        return self._pending_heating_veto_restore
+
+    @property
+    def pending_cooling_veto_restore(self) -> bool:
+        """Return True if an expired cooling quick veto is awaiting bus restoration."""
+        return self._pending_cooling_veto_restore
+
+    async def async_discard_pending_heating_restore(self) -> None:
+        """Cancel any deferred heating quick veto 'off' restore without writing Z1OpMode."""
+        if self._heating_veto_restore_unsub is not None:
+            self._heating_veto_restore_unsub()
+            self._heating_veto_restore_unsub = None
+        if not self._pending_heating_veto_restore:
+            return
+        self._pending_heating_veto_restore = False
+        self._pre_veto_opmode = None
+        self._last_heating_veto_duration = None
+        self._heating_veto_started_mono = 0.0
+        await self._async_clear_store(self._heating_veto_store, "heating quick veto")
+        self._async_notify_message_listeners(CALC_CIRCUIT, "QuickVetoRemaining")
+
+    @property
     def custom_cooling_start_date(self) -> str | None:
         """Return custom cooling start date if configured."""
         return self._custom_cooling_start_date
@@ -689,19 +723,29 @@ class SaunierGeniaCoordinator:
     def cooling_quick_veto_boost_delta(self, val: float) -> None:
         self._cooling_quick_veto_boost_delta = max(0.5, min(5.0, round(float(val), 1)))
 
+    @staticmethod
+    def _utc_deadline(delta: timedelta) -> datetime:
+        """Return a local timezone-aware deadline offset from UTC now by delta."""
+        return dt_util.as_local(dt_util.utcnow() + delta)
+
+    @staticmethod
+    def _seconds_until(target_dt: datetime) -> float:
+        """Return seconds remaining until target_dt using unambiguous UTC timestamps."""
+        return target_dt.timestamp() - dt_util.utcnow().timestamp()
+
     @property
     def cooling_quick_veto_active(self) -> bool:
         """Return True if cooling quick veto is currently active."""
         if self._cooling_veto_end_time is None:
             return False
-        return datetime.now() < self._cooling_veto_end_time
+        return self._seconds_until(self._cooling_veto_end_time) > 0
 
     @property
     def cooling_quick_veto_remaining_minutes(self) -> int | None:
         """Return remaining minutes of active cooling quick veto."""
         if not self.cooling_quick_veto_active or self._cooling_veto_end_time is None:
             return None
-        diff = (self._cooling_veto_end_time - datetime.now()).total_seconds()
+        diff = self._seconds_until(self._cooling_veto_end_time)
         if diff <= 0:
             return None
         return max(1, math.ceil(diff / 60.0))
@@ -733,10 +777,8 @@ class SaunierGeniaCoordinator:
         self,
     ) -> tuple[int | None, dict[str, Any]]:
         """Compute unified quick veto remaining minutes and attributes."""
-        now = datetime.now()
-
         if self.cooling_quick_veto_active and self._cooling_veto_end_time is not None:
-            diff = (self._cooling_veto_end_time - now).total_seconds()
+            diff = self._seconds_until(self._cooling_veto_end_time)
             rem = max(1, math.ceil(diff / 60.0)) if diff > 0 else 0
             return rem, {
                 "is_active": True,
@@ -752,20 +794,18 @@ class SaunierGeniaCoordinator:
         sf_mode = (self.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or "").lower()
         target_temp = self.get_float(CIRCUIT_BASS3, "Z1QuickVetoTemp", "value")
 
-        if (
-            self._heating_veto_end_time is not None
-            and now < self._heating_veto_end_time
-        ):
-            diff = (self._heating_veto_end_time - now).total_seconds()
-            rem = max(1, math.ceil(diff / 60.0))
-            return rem, {
-                "is_active": True,
-                "veto_type": "heating",
-                "end_time": self._heating_veto_end_time.isoformat(),
-                "target_temperature": target_temp,
-                "remaining_minutes": rem,
-                "remaining_formatted": self._format_remaining_duration(rem),
-            }
+        if self._heating_veto_end_time is not None:
+            diff = self._seconds_until(self._heating_veto_end_time)
+            if diff > 0:
+                rem = max(1, math.ceil(diff / 60.0))
+                return rem, {
+                    "is_active": True,
+                    "veto_type": "heating",
+                    "end_time": self._heating_veto_end_time.isoformat(),
+                    "target_temperature": target_temp,
+                    "remaining_minutes": rem,
+                    "remaining_formatted": self._format_remaining_duration(rem),
+                }
 
         if sf_mode == "veto":
             if self._heating_veto_end_time is not None:
@@ -828,7 +868,7 @@ class SaunierGeniaCoordinator:
                 "remaining_formatted": None,
             }
 
-        diff = (self._ventilation_end_time - datetime.now()).total_seconds()
+        diff = self._seconds_until(self._ventilation_end_time)
         rem = max(1, math.ceil(diff / 60.0)) if diff > 0 else 0
         return rem, {
             "is_active": True,
@@ -924,7 +964,6 @@ class SaunierGeniaCoordinator:
         )
 
     @callback
-    @callback
     def _async_sync_ebus_operational_listeners(self) -> None:
         """Notify availability-gated entities whenever is_ebus_operational transitions."""
         curr_op = self.is_ebus_operational
@@ -968,7 +1007,7 @@ class SaunierGeniaCoordinator:
                 CALC_CIRCUIT, "VentilationBoostRemaining"
             )
             if (
-                datetime.now() >= self._ventilation_end_time
+                self._seconds_until(self._ventilation_end_time) <= 0
                 and self.is_ebus_operational
                 and (self.get_str(CIRCUIT_BASS3, "Z1Status", "value") or "").lower()
                 == "ventilation"
@@ -981,6 +1020,21 @@ class SaunierGeniaCoordinator:
             self.get_str(CIRCUIT_BASS3, "Z1Status", "value") or ""
         ).lower() == "holidayaway":
             self._async_notify_message_listeners(CALC_CIRCUIT, "HolidayRemaining")
+
+        today_date = dt_util.now().date()
+        if today_date != self._last_watchdog_date:
+            self._last_watchdog_date = today_date
+            self._async_notify_message_listeners(CIRCUIT_BASS3, "CoolingEndDate")
+            self._async_notify_message_listeners(CIRCUIT_BASS3, "HolidayEndDate")
+            self._async_notify_message_listeners(CALC_CIRCUIT, "HolidayRemaining")
+            for prefix in (
+                "Z1Timer",
+                "HwcTimer",
+                "CoolingTimer",
+                "CirculationTimer",
+                "SilentTimer",
+            ):
+                self._async_notify_message_listeners(CIRCUIT_BASS3, f"{prefix}_Slots")
 
         # Check for slow power telemetry / seed_mqtt_cfg issue:
         # If RunDataElectricPowerConsumption has been seen at least once, but its age exceeds threshold
@@ -1143,6 +1197,33 @@ class SaunierGeniaCoordinator:
 
         circuit_key = circuit_raw.lower()
         msg_lower = message_name.lower()
+
+        is_err_payload = raw_payload.strip().startswith(
+            "ERR:"
+        ) or self._is_ebusd_err_msg(parsed)
+        if is_err_payload:
+            # Record transient error for explicit read_parameter diagnostics and run CSV
+            # Repair checks, but NEVER poison coordinator._state, timestamps, hydration,
+            # or active overrides (e.g. ventilation countdown / quick veto tracking).
+            now_mono = time.monotonic()
+            self._last_err_responses[(circuit_key, msg_lower)] = (now_mono, parsed)
+            canonical_alias = MESSAGE_ALIASES.get(msg_lower)
+            if canonical_alias and canonical_alias != message_name:
+                self._last_err_responses[(circuit_key, canonical_alias.lower())] = (
+                    now_mono,
+                    parsed,
+                )
+            self._async_check_csv_compatibility_on_message(
+                circuit_key, msg_lower, parsed, raw_payload
+            )
+            for listener_msg in dict.fromkeys(
+                [msg_lower] + ([canonical_alias.lower()] if canonical_alias else [])
+            ):
+                for cb in list(self._listeners.get((circuit_key, listener_msg), [])):
+                    cb()
+            return
+
+        self._last_err_responses.pop((circuit_key, msg_lower), None)
 
         # If ebusd published a subfield topic <prefix>/<circuit>/<message>/<field>
         if len(parts) == 3:
@@ -1343,7 +1424,7 @@ class SaunierGeniaCoordinator:
                     sf_mode_now == "veto"
                     and z1_status_now in ("", "veto")
                     and self._heating_veto_end_time is not None
-                    and datetime.now() < self._heating_veto_end_time
+                    and self._seconds_until(self._heating_veto_end_time) > 0
                     and new_dur is not None
                     and new_dur >= 0.5
                     # Controller r9 polls read back the static 3.0h default even during an
@@ -1502,7 +1583,7 @@ class SaunierGeniaCoordinator:
                 severity=ir.IssueSeverity.WARNING,
                 translation_key=issue_id,
                 translation_placeholders=placeholders,
-                learn_more_url="https://github.com/R91g/arotherm-genia-ebusd#step-1-deploy-optimized-ebusd-csv-configuration",
+                learn_more_url="https://github.com/R91g/arotherm-genia-ebusd/blob/main/docs/installation.md#2-deploy-the-ebusd-csv-configuration",
             )
         else:
             if (
@@ -1539,8 +1620,11 @@ class SaunierGeniaCoordinator:
             and "value" in flow_msg
             and "flow_rate" not in flow_msg
         )
-        is_silent_err = self._is_ebusd_err_msg(
-            self.get_message(CIRCUIT_HMUX0, "CompressorSilentOperationLevel")
+        is_silent_err = (
+            CIRCUIT_HMUX0 in self._missing_outdoor_silent_circuits
+            or self._is_ebusd_err_msg(
+                self.get_message(CIRCUIT_HMUX0, "CompressorSilentOperationLevel")
+            )
         )
         return has_legacy_sc or has_legacy_flow or is_silent_err
 
@@ -1552,8 +1636,11 @@ class SaunierGeniaCoordinator:
             and "temp_1" in status_msg
             and "flow_temp" not in status_msg
         )
-        is_silent_err = self._is_ebusd_err_msg(
-            self.get_message(circuit_key, "CompressorSilentOperationLevel")
+        is_silent_err = (
+            circuit_key in self._missing_outdoor_silent_circuits
+            or self._is_ebusd_err_msg(
+                self.get_message(circuit_key, "CompressorSilentOperationLevel")
+            )
         )
         return has_legacy_status or is_silent_err
 
@@ -1617,9 +1704,14 @@ class SaunierGeniaCoordinator:
 
             elif msg_lower == "compressorsilentoperationlevel":
                 if raw_payload.strip().startswith("ERR:"):
+                    self._missing_outdoor_silent_circuits.add(circuit_key)
                     self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=True)
-                elif not self._has_hmux0_csv_incompatibility():
-                    self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=False)
+                else:
+                    self._missing_outdoor_silent_circuits.discard(circuit_key)
+                    if not self._has_hmux0_csv_incompatibility():
+                        self._async_set_repair_issue(
+                            ISSUE_OUTDATED_HMUX0_CSV, active=False
+                        )
 
         # 2a. Detect legacy/upstream vs custom 08.hmu.csv / 08.hmu.HW5103.csv
         if circuit_key in (CIRCUIT_HMU, CIRCUIT_HMU00):
@@ -1642,14 +1734,20 @@ class SaunierGeniaCoordinator:
 
             elif msg_lower == "compressorsilentoperationlevel":
                 if raw_payload.strip().startswith("ERR:"):
+                    self._missing_outdoor_silent_circuits.add(circuit_key)
                     self._async_set_repair_issue(ISSUE_OUTDATED_HMU_CSV, active=True)
-                elif not self._has_hmu_csv_incompatibility(circuit_key):
-                    self._async_set_repair_issue(ISSUE_OUTDATED_HMU_CSV, active=False)
+                else:
+                    self._missing_outdoor_silent_circuits.discard(circuit_key)
+                    if not self._has_hmu_csv_incompatibility(circuit_key):
+                        self._async_set_repair_issue(
+                            ISSUE_OUTDATED_HMU_CSV, active=False
+                        )
 
         # 2b. Detect legacy vs modern controller CSVs (Z1HolidayTemp/Z1DayTemp vs HolidayTemp/Z1CoolingManualTemp/SilentTimer/VentilationBoost)
         if circuit_key in CONTROLLER_CIRCUITS:
             is_err = raw_payload.strip().startswith("ERR:")
             probe_registers = (
+                "hwclegionelladay",
                 "silenttimer_slots",
                 "z1coolingmanualtemp",
                 "ventilationboost",
@@ -1664,6 +1762,7 @@ class SaunierGeniaCoordinator:
                     self._missing_controller_registers.discard(msg_lower)
                 if msg_lower in (
                     "holidaytemp",
+                    "hwclegionelladay",
                     "z1coolingmanualtemp",
                     "silenttimer_slots",
                     "ventilationboost",
@@ -1709,8 +1808,14 @@ class SaunierGeniaCoordinator:
             for c in OUTDOOR_CIRCUITS
             for m in HMUX0_CUSTOM_SIGNATURE_MESSAGES
         )
-        has_controller = any(c in CONTROLLER_CIRCUITS for c, _ in self._state)
-        has_vwzio = any(c == CIRCUIT_VWZIO for c, _ in self._state)
+        has_controller = any(
+            c in CONTROLLER_CIRCUITS and not self._is_ebusd_err_msg(v)
+            for (c, _), v in self._state.items()
+        )
+        has_vwzio = any(
+            c == CIRCUIT_VWZIO and not self._is_ebusd_err_msg(v)
+            for (c, _), v in self._state.items()
+        )
         return has_custom_outdoor and has_controller and has_vwzio
 
     @callback
@@ -1728,8 +1833,9 @@ class SaunierGeniaCoordinator:
 
         signal_raw = (self.get_str(CIRCUIT_GLOBAL, "signal") or "").lower()
         has_bus_traffic = signal_raw in ("1", "true", "yes", "on") or any(
-            c in OUTDOOR_CIRCUITS or c in CONTROLLER_CIRCUITS or c == CIRCUIT_VWZIO
-            for c, _ in self._state
+            (c in OUTDOOR_CIRCUITS or c in CONTROLLER_CIRCUITS or c == CIRCUIT_VWZIO)
+            and not self._is_ebusd_err_msg(v)
+            for (c, _), v in self._state.items()
         )
         if not has_bus_traffic:
             return
@@ -1777,11 +1883,29 @@ class SaunierGeniaCoordinator:
     # -------------------------------------------------------------------------
 
     def has_message(self, circuit: str, message: str) -> bool:
-        """Return True if we have received data for (circuit, message)."""
+        """Return True if we have received valid non-error data for (circuit, message)."""
         c_key = circuit.lower()
         m_lower = message.lower()
         canonical = self._canonical_names.get((c_key, m_lower), message)
-        return (c_key, canonical) in self._state or (c_key, m_lower) in self._state
+        for key in ((c_key, canonical), (c_key, m_lower)):
+            if key in self._state and not self._is_ebusd_err_msg(self._state[key]):
+                return True
+        return False
+
+    def get_recent_error(
+        self, circuit: str, message: str, *, since_mono: float = 0.0
+    ) -> dict[str, Any] | None:
+        """Return recent ERR: payload recorded for (circuit, message) since since_mono."""
+        c_key = circuit.lower()
+        m_lower = message.lower()
+        entry = self._last_err_responses.get((c_key, m_lower))
+        if entry is None:
+            resolved = self.resolve_circuit(circuit).lower()
+            if resolved != c_key:
+                entry = self._last_err_responses.get((resolved, m_lower))
+        if entry is not None and entry[0] >= since_mono:
+            return entry[1]
+        return None
 
     def get_message(self, circuit: str, message: str) -> dict[str, Any] | None:
         """Return the full normalized dict for (circuit, message), or None."""
@@ -1808,6 +1932,13 @@ class SaunierGeniaCoordinator:
                     return res
         return None
 
+    @staticmethod
+    def _sanitize_field_value(val: Any, default: Any) -> Any:
+        """Never propagate raw eBUSd 'ERR: ...' strings to callers."""
+        if isinstance(val, str) and val.strip().startswith("ERR:"):
+            return default
+        return val
+
     def get_field(
         self,
         circuit: str,
@@ -1822,34 +1953,34 @@ class SaunierGeniaCoordinator:
 
         # 1. Exact field match
         if field in msg_data and msg_data[field] is not None:
-            return msg_data[field]
+            return self._sanitize_field_value(msg_data[field], default)
 
         # 2. Fallback to 'value' or 'flow_rate' (standard single-field names in 15.bass3.csv & 08.hmux0.csv)
         for single_alias in ("value", "flow_rate"):
             if single_alias in msg_data and msg_data[single_alias] is not None:
-                return msg_data[single_alias]
+                return self._sanitize_field_value(msg_data[single_alias], default)
 
         # 3. Specific multi-field alias mappings between specification and CSVs
         if field in ("temp1", "flow_temp", "temp"):
             for alias in ("temp", "flow_temp", "temp1"):
                 if alias in msg_data and msg_data[alias] is not None:
-                    return msg_data[alias]
+                    return self._sanitize_field_value(msg_data[alias], default)
         elif field in ("return_temp", "temp_1"):
             for alias in ("temp_1", "return_temp"):
                 if alias in msg_data and msg_data[alias] is not None:
-                    return msg_data[alias]
+                    return self._sanitize_field_value(msg_data[alias], default)
         elif field in ("cooling_temp", "temp") and "cooling_temp" in msg_data:
-            return msg_data["cooling_temp"]
+            return self._sanitize_field_value(msg_data["cooling_temp"], default)
         elif field in ("pumpstate", "status"):
             for alias in ("pumpstate", "status", "value"):
                 if alias in msg_data and msg_data[alias] is not None:
-                    return msg_data[alias]
+                    return self._sanitize_field_value(msg_data[alias], default)
 
         # 4. If the message has only 1 field in the JSON dict, return its value
         if len(msg_data) == 1:
             only_val = next(iter(msg_data.values()))
             if only_val is not None:
-                return only_val
+                return self._sanitize_field_value(only_val, default)
 
         return default
 
@@ -2210,6 +2341,27 @@ class SaunierGeniaCoordinator:
             ):
                 ent_reg.async_update_entity(reg_entry.entity_id, disabled_by=None)
 
+    def _is_hmu_flow_pressure_supported(self) -> bool:
+        """Return True unless outdoor SW is confirmed below 0902 ([id_sw>=902])."""
+        if self._detected_outdoor_sw is None:
+            return True
+        sw_str = self._detected_outdoor_sw.strip()
+        if not sw_str.isdigit():
+            return True
+        return int(sw_str) >= HMU_FLOW_PRESSURE_MIN_SW
+
+    def _record_detected_outdoor_sw(self, sw_ver: str | None) -> None:
+        """Record confirmed outdoor SW version and drop FlowPressure if SW < 902."""
+        if not sw_ver or not sw_ver.strip():
+            return
+        self._detected_outdoor_sw = sw_ver.strip()
+        if not self._is_hmu_flow_pressure_supported():
+            self._pending_hydration = [
+                (c, m)
+                for (c, m) in self._pending_hydration
+                if not (c in OUTDOOR_CIRCUITS and m == "FlowPressure")
+            ]
+
     @callback
     def _async_on_outdoor_circuit_changed(self, new_circuit: str) -> None:
         """Handle outdoor circuit transition (e.g. late HMU detection)."""
@@ -2221,12 +2373,19 @@ class SaunierGeniaCoordinator:
                 (c, m)
                 for (c, m) in self._pending_hydration
                 if not (c in OUTDOOR_CIRCUITS and m in HMUX0_EXCLUSIVE_MESSAGES)
+                and not (
+                    c in OUTDOOR_CIRCUITS
+                    and m == "FlowPressure"
+                    and not self._is_hmu_flow_pressure_supported()
+                )
             ]
             # 2. Find missing HMU specific messages
             missing_hmu = [
                 (c, m)
                 for (c, m) in HMU_HW5103_HYDRATION_MESSAGES
-                if not self.has_message(c, m) and (c, m) not in self._pending_hydration
+                if not self.has_message(c, m)
+                and (c, m) not in self._pending_hydration
+                and (m != "FlowPressure" or self._is_hmu_flow_pressure_supported())
             ]
             if missing_hmu:
                 if self._hydration_task is not None and not self._hydration_task.done():
@@ -2256,6 +2415,11 @@ class SaunierGeniaCoordinator:
                 and not self.has_message(circuit, message)
             ]
             for circuit, message in HMU_HW5103_HYDRATION_MESSAGES:
+                if (
+                    message == "FlowPressure"
+                    and not self._is_hmu_flow_pressure_supported()
+                ):
+                    continue
                 if not self.has_message(circuit, message):
                     missing.append((circuit, message))
         else:
@@ -2298,6 +2462,12 @@ class SaunierGeniaCoordinator:
                     self._active_outdoor_circuit in (CIRCUIT_HMU, CIRCUIT_HMU00)
                     and circuit in OUTDOOR_CIRCUITS
                     and message in HMUX0_EXCLUSIVE_MESSAGES
+                ):
+                    continue
+                if (
+                    circuit in OUTDOOR_CIRCUITS
+                    and message == "FlowPressure"
+                    and not self._is_hmu_flow_pressure_supported()
                 ):
                     continue
                 await self.async_request_get(circuit, message)
@@ -2344,6 +2514,12 @@ class SaunierGeniaCoordinator:
                 (CIRCUIT_VWZIO, "PrEnergyThermalHc"),
                 (CIRCUIT_VWZIO, "PrEnergyThermalHwc"),
             ]
+            if not self._is_hmu_flow_pressure_supported():
+                fallback_energy_messages = [
+                    item
+                    for item in fallback_energy_messages
+                    if item[1] != "FlowPressure"
+                ]
         else:
             fallback_energy_messages = [
                 (CIRCUIT_HMUX0, "HMUStatusCode"),
@@ -2529,6 +2705,15 @@ class SaunierGeniaCoordinator:
                 await _tcp_find("CompressorSilentOperationLevel"),
                 await _tcp_find("RunDataElectricPowerConsumption"),
             ]
+            silent_resp = out_probes[0]
+            active_out_circuits = (
+                (CIRCUIT_HMUX0,) if is_hmux0_csv else (CIRCUIT_HMU, CIRCUIT_HMU00)
+            )
+            if silent_resp is not None and silent_resp.startswith("ERR:"):
+                self._missing_outdoor_silent_circuits.update(active_out_circuits)
+            elif silent_resp is not None:
+                for c_out in active_out_circuits:
+                    self._missing_outdoor_silent_circuits.discard(c_out)
             if any(r is not None and r.startswith("ERR:") for r in out_probes):
                 self._async_set_repair_issue(outdoor_issue, active=True)
             elif all(r is not None and not r.startswith("ERR:") for r in out_probes):
@@ -2638,6 +2823,8 @@ class SaunierGeniaCoordinator:
                     dev_id = fields.get("ID", addr)
                     sw_ver = fields.get("SW", "")
                     hw_ver = fields.get("HW", "")
+                    if addr.lower() == "08" and sw_ver:
+                        self._record_detected_outdoor_sw(sw_ver)
                     if ', loaded "' in val:
                         csv_file = val.partition(', loaded "')[2].rstrip('"')
                         loaded_csv_devices.append(
@@ -2755,7 +2942,6 @@ class SaunierGeniaCoordinator:
             with contextlib.suppress(OSError):
                 await writer.wait_closed()
 
-        await self._async_fetch_ebusd_tcp_info()
         return resp
 
     # -------------------------------------------------------------------------
@@ -2990,6 +3176,13 @@ class SaunierGeniaCoordinator:
         self, override_boost_temp: float | None = None
     ) -> None:
         """Activate DHW One-Time Boost (HwcSFMode=load), dynamically overcoming hysteresis."""
+        async with self._dhw_boost_lock:
+            await self._async_trigger_dhw_boost_locked(override_boost_temp)
+
+    async def _async_trigger_dhw_boost_locked(
+        self, override_boost_temp: float | None = None
+    ) -> None:
+        """Execute DHW boost activation while holding self._dhw_boost_lock."""
         storage_temp = self.get_float(CIRCUIT_BASS3, "HwcStorageTemp", "value")
         target_temp = self.get_float(CIRCUIT_BASS3, "HwcTempDesired", "value") or 50.0
         hyst = (
@@ -3044,7 +3237,7 @@ class SaunierGeniaCoordinator:
                 self._dhw_boost_restore_unsub = None
             self._pending_dhw_boost_restore = False
 
-            now_wall = datetime.now()
+            now_utc = dt_util.utcnow()
             self._dhw_boost_active = True
             self._dhw_boost_goal_temp = (
                 override_boost_temp
@@ -3052,9 +3245,9 @@ class SaunierGeniaCoordinator:
                 else self._saved_dhw_target_temp
             )
             self._dhw_boost_started_at = time.monotonic()
-            self._dhw_boost_started_ts = now_wall.timestamp()
-            self._dhw_boost_end_time = now_wall + timedelta(
-                seconds=DHW_BOOST_MAX_TIMEOUT_SECONDS
+            self._dhw_boost_started_ts = now_utc.timestamp()
+            self._dhw_boost_end_time = dt_util.as_local(
+                now_utc + timedelta(seconds=DHW_BOOST_MAX_TIMEOUT_SECONDS)
             )
             self._dhw_boost_seen_load = False
 
@@ -3134,11 +3327,14 @@ class SaunierGeniaCoordinator:
 
     async def async_cancel_dhw_boost(self) -> None:
         """Cancel DHW One-Time Boost (HwcSFMode=auto) and restore original setpoint if elevated."""
-        await self.async_write_parameter(CIRCUIT_BASS3, "HwcSFMode", "auto")
-        if (
-            self._dhw_boost_active or self._pending_dhw_boost_restore
-        ) and self._saved_dhw_target_temp is not None:
-            await self._async_restore_dhw_target_temp("user cancelled boost")
+        async with self._dhw_boost_lock:
+            await self.async_write_parameter(CIRCUIT_BASS3, "HwcSFMode", "auto")
+            if (
+                self._dhw_boost_active or self._pending_dhw_boost_restore
+            ) and self._saved_dhw_target_temp is not None:
+                await self._async_restore_dhw_target_temp_unlocked(
+                    "user cancelled boost"
+                )
 
     @callback
     def _defer_dhw_boost_restore_offline(self) -> None:
@@ -3242,7 +3438,12 @@ class SaunierGeniaCoordinator:
             self._defer_dhw_boost_restore_offline()
 
     async def _async_restore_dhw_target_temp(self, reason: str) -> None:
-        """Restore HwcTempDesired to its pre-boost setpoint and clear boost state."""
+        """Acquire the DHW boost lock and restore HwcTempDesired."""
+        async with self._dhw_boost_lock:
+            await self._async_restore_dhw_target_temp_unlocked(reason)
+
+    async def _async_restore_dhw_target_temp_unlocked(self, reason: str) -> None:
+        """Restore HwcTempDesired to its pre-boost setpoint while holding self._dhw_boost_lock."""
         saved_temp = self._saved_dhw_target_temp
         self._dhw_boost_active = False
         self._dhw_boost_goal_temp = None
@@ -3647,7 +3848,9 @@ class SaunierGeniaCoordinator:
 
     def _start_ventilation_countdown(self) -> None:
         """Start and persist the 30-minute ventilation countdown timer."""
-        end_dt = datetime.now() + timedelta(minutes=VENTILATION_BOOST_DURATION_MINUTES)
+        end_dt = self._utc_deadline(
+            timedelta(minutes=VENTILATION_BOOST_DURATION_MINUTES)
+        )
         self._ventilation_end_time = end_dt
         self.hass.async_create_task(
             self._async_save_store(
@@ -3680,10 +3883,12 @@ class SaunierGeniaCoordinator:
         if data is None:
             return
         end_ts = self._parse_persisted_end_timestamp(data)
-        if end_ts is None or end_ts <= datetime.now().timestamp():
+        if end_ts is None or end_ts <= dt_util.utcnow().timestamp():
             await self._async_clear_store(self._ventilation_store, "ventilation boost")
             return
-        self._ventilation_end_time = datetime.fromtimestamp(end_ts)
+        self._ventilation_end_time = dt_util.as_local(
+            datetime.fromtimestamp(end_ts, tz=UTC)
+        )
         self._async_notify_message_listeners(CALC_CIRCUIT, "VentilationBoostRemaining")
 
     async def async_activate_ventilation_boost(self) -> None:
@@ -3805,7 +4010,7 @@ class SaunierGeniaCoordinator:
                         ) < 43200.0:
                             self._heating_veto_end_time = None
                             self._last_heating_veto_duration = None
-                            now_dt = datetime.now()
+                            now_dt = dt_util.now()
                             await self._async_save_store(
                                 self._heating_veto_store,
                                 {
@@ -3999,12 +4204,48 @@ class SaunierGeniaCoordinator:
             self._pre_veto_opmode = (
                 current_opmode if current_opmode != "off" else "auto"
             )
-        self._heating_veto_end_time = datetime.now() + timedelta(hours=dur_val)
+        self._heating_veto_end_time = self._utc_deadline(timedelta(hours=dur_val))
         self._heating_veto_started_mono = time.monotonic()
         self._last_heating_veto_duration = dur_val
         self._arm_heating_veto_timer(dur_val * 3600.0)
         self.hass.async_create_task(self._async_save_heating_veto_state())
         self._async_notify_message_listeners(CALC_CIRCUIT, "QuickVetoRemaining")
+
+    async def async_confirm_heating_veto_active(self) -> bool:
+        """Return True only when heating Quick Veto is freshly confirmed on eBUS."""
+        sf_mode = (
+            (self.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or "").strip().lower()
+        )
+        if sf_mode != "veto":
+            return False
+
+        age = self.get_message_age(CIRCUIT_BASS3, "Z1SFMode")
+        if age is not None and age <= HEATING_VETO_SFMODE_FRESHNESS_SECONDS:
+            return True
+
+        if not self.is_ebus_operational:
+            return False
+
+        before_ts = self.get_message_timestamp(CIRCUIT_BASS3, "Z1SFMode")
+        try:
+            await self.async_request_get(CIRCUIT_BASS3, "Z1SFMode")
+        except HomeAssistantError:
+            return False
+
+        deadline = time.monotonic() + SET_CONFIRMATION_DELAY_SECONDS
+        while True:
+            after_ts = self.get_message_timestamp(CIRCUIT_BASS3, "Z1SFMode")
+            if after_ts is not None and (before_ts is None or after_ts > before_ts):
+                fresh_sf = (
+                    (self.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or "")
+                    .strip()
+                    .lower()
+                )
+                return fresh_sf == "veto"
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return False
+            await asyncio.sleep(min(0.1, remaining))
 
     async def async_refresh_heating_veto_duration(self, duration: float) -> None:
         """Update persisted heating quick veto deadline when duration changes mid-veto."""
@@ -4021,7 +4262,7 @@ class SaunierGeniaCoordinator:
         dur_val = max(0.5, min(12.0, round(float(duration), 1)))
         self._heating_veto_started_mono = time.monotonic()
         self._last_heating_veto_duration = dur_val
-        self._heating_veto_end_time = datetime.now() + timedelta(hours=dur_val)
+        self._heating_veto_end_time = self._utc_deadline(timedelta(hours=dur_val))
         self._arm_heating_veto_timer(dur_val * 3600.0)
         await self._async_save_heating_veto_state()
         self._async_notify_message_listeners(CALC_CIRCUIT, "QuickVetoRemaining")
@@ -4049,7 +4290,9 @@ class SaunierGeniaCoordinator:
         if self._heating_veto_restore_unsub is not None:
             self._heating_veto_restore_unsub()
             self._heating_veto_restore_unsub = None
-        self._pending_heating_veto_restore = False
+        if self._pending_heating_veto_restore:
+            self._pending_heating_veto_restore = False
+            self._pre_veto_opmode = None
 
         current_opmode = (
             self.get_str(CIRCUIT_BASS3, "Z1OpMode", "value") or "auto"
@@ -4118,7 +4361,7 @@ class SaunierGeniaCoordinator:
             self._heating_veto_started_mono = time.monotonic()
             await self.async_write_parameter(CIRCUIT_BASS3, "Z1SFMode", "veto")
 
-            self._heating_veto_end_time = datetime.now() + timedelta(hours=dur_val)
+            self._heating_veto_end_time = self._utc_deadline(timedelta(hours=dur_val))
             self._arm_heating_veto_timer(dur_val * 3600.0)
             await self._async_save_heating_veto_state()
             self._async_notify_message_listeners(CALC_CIRCUIT, "QuickVetoRemaining")
@@ -4138,21 +4381,34 @@ class SaunierGeniaCoordinator:
         if self._heating_veto_restore_unsub is not None:
             self._heating_veto_restore_unsub()
             self._heating_veto_restore_unsub = None
-        self._pending_heating_veto_restore = False
+
+        was_pending_restore = self._pending_heating_veto_restore
+        restored_off = (
+            restore_opmode
+            and not was_pending_restore
+            and self._pre_veto_opmode == "off"
+        )
+
+        _LOGGER.info("Cancelling Quick Veto and restoring auto operation")
+        try:
+            await self.async_write_parameter(CIRCUIT_BASS3, "Z1SFMode", "auto")
+            await asyncio.sleep(0.3)
+            await self.async_write_parameter(CIRCUIT_BASS3, "Z1QuickVetoDuration", 0.0)
+            if restored_off:
+                await asyncio.sleep(0.3)
+                await self.async_write_parameter(CIRCUIT_BASS3, "Z1OpMode", "off")
+        except Exception:
+            if self._heating_veto_end_time is not None:
+                remaining = self._seconds_until(self._heating_veto_end_time)
+                self._arm_heating_veto_timer(max(0.0, remaining))
+            raise
+
+        if was_pending_restore:
+            self._pending_heating_veto_restore = False
+        self._pre_veto_opmode = None
         self._heating_veto_end_time = None
         self._last_heating_veto_duration = None
         self._heating_veto_started_mono = 0.0
-
-        _LOGGER.info("Cancelling Quick Veto and restoring auto operation")
-        await self.async_write_parameter(CIRCUIT_BASS3, "Z1SFMode", "auto")
-        await asyncio.sleep(0.3)
-        await self.async_write_parameter(CIRCUIT_BASS3, "Z1QuickVetoDuration", 0.0)
-
-        restored_off = restore_opmode and self._pre_veto_opmode == "off"
-        if restored_off:
-            await asyncio.sleep(0.3)
-            await self.async_write_parameter(CIRCUIT_BASS3, "Z1OpMode", "off")
-        self._pre_veto_opmode = None
 
         self._optimistically_clear_z1_status("veto", force_off=restored_off)
 
@@ -4208,7 +4464,10 @@ class SaunierGeniaCoordinator:
             self._cooling_veto_restore_unsub()
             self._cooling_veto_restore_unsub = None
 
-        self._pending_cooling_veto_restore = False
+        if self._pending_cooling_veto_restore:
+            self._pending_cooling_veto_restore = False
+            self._pre_cooling_veto_opmode = None
+            self._pre_cooling_veto_temp = None
 
         current_opmode = (
             self.get_str(CIRCUIT_BASS3, "Z1OpModeCooling", "value") or "auto"
@@ -4299,7 +4558,7 @@ class SaunierGeniaCoordinator:
         )
 
         self._cooling_veto_active_temp = target_temp
-        self._cooling_veto_end_time = datetime.now() + timedelta(hours=dur_val)
+        self._cooling_veto_end_time = self._utc_deadline(timedelta(hours=dur_val))
 
         seconds = dur_val * 3600.0
         self._arm_cooling_veto_timer(seconds)
@@ -4333,6 +4592,16 @@ class SaunierGeniaCoordinator:
         self._cooling_veto_unsub = async_call_later(
             self.hass, max(0.0, float(delay_seconds)), _async_on_cooling_veto_timeout
         )
+
+    async def async_refresh_cooling_veto_duration(self, duration: float) -> None:
+        """Update cooling veto timer and persisted deadline without rewriting temperature."""
+        if not self.cooling_quick_veto_active:
+            return
+        dur_val = max(0.5, min(12.0, round(float(duration), 1)))
+        self._cooling_veto_end_time = self._utc_deadline(timedelta(hours=dur_val))
+        self._arm_cooling_veto_timer(dur_val * 3600.0)
+        await self._async_save_cooling_veto_state()
+        self._async_notify_message_listeners(CALC_CIRCUIT, "QuickVetoRemaining")
 
     async def async_update_cooling_quick_veto_temperature(
         self, temperature: float
@@ -4413,7 +4682,7 @@ class SaunierGeniaCoordinator:
                 self._pre_cooling_veto_opmode = pre_opmode
                 self._pre_cooling_veto_temp = pre_temp
                 if end_time is not None:
-                    remaining = end_time.timestamp() - datetime.now().timestamp()
+                    remaining = self._seconds_until(end_time)
                     self._arm_cooling_veto_timer(max(0.0, remaining))
                 raise HomeAssistantError(
                     "Cannot cancel cooling quick veto: eBUS communication is not operational."
@@ -4476,7 +4745,7 @@ class SaunierGeniaCoordinator:
                     self._pre_cooling_veto_opmode = pre_opmode
                     self._pre_cooling_veto_temp = pre_temp
                     if end_time is not None:
-                        remaining = end_time.timestamp() - datetime.now().timestamp()
+                        remaining = self._seconds_until(end_time)
                         self._arm_cooling_veto_timer(max(0.0, remaining))
                     _LOGGER.warning(
                         "Failed to restore cooling quick veto setpoint during cancellation: %s",
@@ -4484,22 +4753,11 @@ class SaunierGeniaCoordinator:
                     )
                 raise
 
-            # Returning to auto/night: schedule a confirmation read of Z1CoolingTempDesired
-            # so HA picks up the controller's real schedule/setback setpoint (or 99 °C sentinel).
+            # Returning to auto/night: invalidate stale veto setpoint and schedule
+            # confirmation read of Z1CoolingTempDesired so HA picks up the controller's
+            # real schedule/setback setpoint (or 99 °C sentinel).
             if restore and pre_opmode != "day":
-
-                @callback
-                def _async_refresh_cooling_desired(_now: datetime) -> None:
-                    self._cooling_veto_get_unsub = None
-                    self.hass.async_create_task(
-                        self.async_request_get(CIRCUIT_BASS3, "Z1CoolingTempDesired")
-                    )
-
-                self._cooling_veto_get_unsub = async_call_later(
-                    self.hass,
-                    SET_CONFIRMATION_DELAY_SECONDS,
-                    _async_refresh_cooling_desired,
-                )
+                self.schedule_cooling_desired_refresh(notify=False)
 
         self._cooling_veto_end_time = None
         self._cooling_veto_active_temp = None
@@ -4512,6 +4770,37 @@ class SaunierGeniaCoordinator:
         self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1OpModeCooling")
         self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1CoolingManualTemp")
         self._async_notify_message_listeners(CALC_CIRCUIT, "QuickVetoRemaining")
+
+    def schedule_cooling_desired_refresh(
+        self, *, invalidate_cached: bool = True, notify: bool = True
+    ) -> None:
+        """Invalidate cached boost Z1CoolingTempDesired and schedule a delayed /get read."""
+        if invalidate_cached:
+            for key in list(self._state):
+                if (
+                    key[0].lower() in CONTROLLER_CIRCUITS
+                    and key[1].lower() == "z1coolingtempdesired"
+                ):
+                    self._state.pop(key, None)
+
+        if self._cooling_veto_get_unsub is not None:
+            self._cooling_veto_get_unsub()
+            self._cooling_veto_get_unsub = None
+
+        @callback
+        def _async_refresh_cooling_desired(_now: datetime) -> None:
+            self._cooling_veto_get_unsub = None
+            self.hass.async_create_task(
+                self.async_request_get(CIRCUIT_BASS3, "Z1CoolingTempDesired")
+            )
+
+        self._cooling_veto_get_unsub = async_call_later(
+            self.hass,
+            SET_CONFIRMATION_DELAY_SECONDS,
+            _async_refresh_cooling_desired,
+        )
+        if notify:
+            self._async_notify_message_listeners(CIRCUIT_BASS3, "Z1CoolingTempDesired")
 
     @staticmethod
     def _parse_persisted_end_timestamp(data: dict[str, Any]) -> float | None:
@@ -4649,9 +4938,11 @@ class SaunierGeniaCoordinator:
             else None
         )
 
-        remaining = end_ts - datetime.now().timestamp()
+        remaining = end_ts - dt_util.utcnow().timestamp()
         if remaining > 0:
-            self._cooling_veto_end_time = datetime.fromtimestamp(end_ts)
+            self._cooling_veto_end_time = dt_util.as_local(
+                datetime.fromtimestamp(end_ts, tz=UTC)
+            )
             self._arm_cooling_veto_timer(remaining)
             _LOGGER.info(
                 "Restored active cooling quick veto after restart (%.0fs remaining, active_temp=%s, pre_opmode=%s, pre_temp=%s)",
@@ -4733,9 +5024,11 @@ class SaunierGeniaCoordinator:
             return
 
         self._pre_veto_opmode = pre_opmode
-        remaining = end_ts - datetime.now().timestamp()
+        remaining = end_ts - dt_util.utcnow().timestamp()
         if remaining > 0:
-            self._heating_veto_end_time = datetime.fromtimestamp(end_ts)
+            self._heating_veto_end_time = dt_util.as_local(
+                datetime.fromtimestamp(end_ts, tz=UTC)
+            )
             self._arm_heating_veto_timer(remaining)
             _LOGGER.info(
                 "Restored active heating quick veto from '%s' after restart (%.0fs remaining)",
@@ -4804,6 +5097,11 @@ class SaunierGeniaCoordinator:
                         "Failed to query Z1SFMode before deferred heating veto restore: %s",
                         err,
                     )
+                    return
+                if (
+                    not self._pending_heating_veto_restore
+                    or not self.is_ebus_operational
+                ):
                     return
                 sf_mode = (
                     (self.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or "")
@@ -4880,14 +5178,16 @@ class SaunierGeniaCoordinator:
         )
         seen_load = bool(data.get("seen_load", False))
 
-        now_ts = datetime.now().timestamp()
+        now_ts = dt_util.utcnow().timestamp()
         remaining = end_ts - now_ts
         if remaining > 0:
             self._saved_dhw_target_temp = saved_temp
             self._dhw_boost_goal_temp = goal_temp
             self._dhw_boost_active = True
             self._dhw_boost_started_ts = started_ts
-            self._dhw_boost_end_time = datetime.fromtimestamp(end_ts)
+            self._dhw_boost_end_time = dt_util.as_local(
+                datetime.fromtimestamp(end_ts, tz=UTC)
+            )
             self._dhw_boost_seen_load = seen_load
             elapsed_since_start = max(0.0, now_ts - started_ts)
             self._dhw_boost_started_at = time.monotonic() - elapsed_since_start
@@ -4923,17 +5223,18 @@ class SaunierGeniaCoordinator:
 
     async def _async_execute_pending_dhw_boost_restore(self) -> None:
         """Execute deferred restoration of pre-boost HwcTempDesired after restart/offline expiry."""
-        if not self._pending_dhw_boost_restore or not self.is_ebus_operational:
-            return
-        try:
-            await self._async_restore_dhw_target_temp(
-                "deferred DHW boost setpoint restoration"
-            )
-        except HomeAssistantError as err:
-            _LOGGER.debug(
-                "Deferred DHW boost restore failed; will retry on next telemetry: %s",
-                err,
-            )
+        async with self._dhw_boost_lock:
+            if not self._pending_dhw_boost_restore or not self.is_ebus_operational:
+                return
+            try:
+                await self._async_restore_dhw_target_temp_unlocked(
+                    "deferred DHW boost setpoint restoration"
+                )
+            except HomeAssistantError as err:
+                _LOGGER.debug(
+                    "Deferred DHW boost restore failed; will retry on next telemetry: %s",
+                    err,
+                )
 
     # -------------------------------------------------------------------------
     # Passive Scan & Hardware/Software Version Detection
@@ -4983,75 +5284,6 @@ class SaunierGeniaCoordinator:
         if payload_str.upper().startswith("ERR:") or self._is_ebusd_err_msg(parsed):
             return
         val_str = str(parsed.get("value", "") or payload_str).strip()
-
-        # Passive detection of active controller circuit from address 15 scan
-        if addr == "15":
-            payload_upper = (
-                f"{val_str} {parsed.get('id', '')} {parsed.get('ID', '')}"
-            ).upper()
-            if (
-                "CTLV3" in payload_upper
-                and self._active_controller_circuit != CIRCUIT_CTLV3
-            ):
-                _LOGGER.info(
-                    "Detected Vaillant sensoCOMFORT (CTLV3) on eBUS address 15; setting controller circuit to %s",
-                    CIRCUIT_CTLV3,
-                )
-                self._active_controller_circuit = CIRCUIT_CTLV3
-            elif (
-                "CTLV2" in payload_upper
-                and self._active_controller_circuit != CIRCUIT_CTLV2
-            ):
-                _LOGGER.info(
-                    "Detected Vaillant sensoCOMFORT (CTLV2) on eBUS address 15; setting controller circuit to %s",
-                    CIRCUIT_CTLV2,
-                )
-                self._active_controller_circuit = CIRCUIT_CTLV2
-            elif (
-                "BASV" in payload_upper
-                and self._active_controller_circuit != CIRCUIT_BASV3
-            ):
-                _LOGGER.info(
-                    "Detected Vaillant sensoCOMFORT (BASV3) on eBUS address 15; setting controller circuit to %s",
-                    CIRCUIT_BASV3,
-                )
-                self._active_controller_circuit = CIRCUIT_BASV3
-            elif (
-                "BASS" in payload_upper
-                and self._active_controller_circuit != CIRCUIT_BASS3
-            ):
-                _LOGGER.info(
-                    "Detected Saunier Duval MiPro Sense (BASS3) on eBUS address 15; setting controller circuit to %s",
-                    CIRCUIT_BASS3,
-                )
-                self._active_controller_circuit = CIRCUIT_BASS3
-
-        # Passive detection of active outdoor unit circuit from address 08 scan
-        if addr == "08":
-            payload_upper = (
-                f"{val_str} {parsed.get('id', '')} {parsed.get('ID', '')}"
-            ).upper()
-            if (
-                ("HMU00" in payload_upper or "HMU" in payload_upper)
-                and "HMUX" not in payload_upper
-                and self._active_outdoor_circuit != CIRCUIT_HMU
-            ):
-                _LOGGER.info(
-                    "Detected Vaillant aroTHERM HMU00 on eBUS address 08; setting outdoor circuit to %s",
-                    CIRCUIT_HMU,
-                )
-                self._active_outdoor_circuit = CIRCUIT_HMU
-                self._async_on_outdoor_circuit_changed(CIRCUIT_HMU)
-            elif (
-                "HMUX" in payload_upper
-                and self._active_outdoor_circuit != CIRCUIT_HMUX0
-            ):
-                _LOGGER.info(
-                    "Detected Saunier Duval / Vaillant HMUX0 on eBUS address 08; setting outdoor circuit to %s",
-                    CIRCUIT_HMUX0,
-                )
-                self._active_outdoor_circuit = CIRCUIT_HMUX0
-                self._async_on_outdoor_circuit_changed(CIRCUIT_HMUX0)
 
         detected_sw: str | None = None
         detected_hw: str | None = None
@@ -5128,6 +5360,79 @@ class SaunierGeniaCoordinator:
             clean_val = val_str.replace(";", "").replace(" ", "").strip()
             if self._is_valid_serial_candidate(clean_val, exact_len=28):
                 detected_serial = clean_val
+
+        # Record outdoor SW before _async_on_outdoor_circuit_changed runs hydration logic
+        if device_key == DEVICE_OUTDOOR_UNIT and detected_sw:
+            self._record_detected_outdoor_sw(detected_sw)
+
+        # Passive detection of active controller circuit from address 15 scan
+        if addr == "15":
+            payload_upper = (
+                f"{val_str} {parsed.get('id', '')} {parsed.get('ID', '')}"
+            ).upper()
+            if (
+                "CTLV3" in payload_upper
+                and self._active_controller_circuit != CIRCUIT_CTLV3
+            ):
+                _LOGGER.info(
+                    "Detected Vaillant sensoCOMFORT (CTLV3) on eBUS address 15; setting controller circuit to %s",
+                    CIRCUIT_CTLV3,
+                )
+                self._active_controller_circuit = CIRCUIT_CTLV3
+            elif (
+                "CTLV2" in payload_upper
+                and self._active_controller_circuit != CIRCUIT_CTLV2
+            ):
+                _LOGGER.info(
+                    "Detected Vaillant sensoCOMFORT (CTLV2) on eBUS address 15; setting controller circuit to %s",
+                    CIRCUIT_CTLV2,
+                )
+                self._active_controller_circuit = CIRCUIT_CTLV2
+            elif (
+                "BASV" in payload_upper
+                and self._active_controller_circuit != CIRCUIT_BASV3
+            ):
+                _LOGGER.info(
+                    "Detected Vaillant sensoCOMFORT (BASV3) on eBUS address 15; setting controller circuit to %s",
+                    CIRCUIT_BASV3,
+                )
+                self._active_controller_circuit = CIRCUIT_BASV3
+            elif (
+                "BASS" in payload_upper
+                and self._active_controller_circuit != CIRCUIT_BASS3
+            ):
+                _LOGGER.info(
+                    "Detected Saunier Duval MiPro Sense (BASS3) on eBUS address 15; setting controller circuit to %s",
+                    CIRCUIT_BASS3,
+                )
+                self._active_controller_circuit = CIRCUIT_BASS3
+
+        # Passive detection of active outdoor unit circuit from address 08 scan
+        if addr == "08":
+            payload_upper = (
+                f"{val_str} {parsed.get('id', '')} {parsed.get('ID', '')}"
+            ).upper()
+            if (
+                ("HMU00" in payload_upper or "HMU" in payload_upper)
+                and "HMUX" not in payload_upper
+                and self._active_outdoor_circuit != CIRCUIT_HMU
+            ):
+                _LOGGER.info(
+                    "Detected Vaillant aroTHERM HMU00 on eBUS address 08; setting outdoor circuit to %s",
+                    CIRCUIT_HMU,
+                )
+                self._active_outdoor_circuit = CIRCUIT_HMU
+                self._async_on_outdoor_circuit_changed(CIRCUIT_HMU)
+            elif (
+                "HMUX" in payload_upper
+                and self._active_outdoor_circuit != CIRCUIT_HMUX0
+            ):
+                _LOGGER.info(
+                    "Detected Saunier Duval / Vaillant HMUX0 on eBUS address 08; setting outdoor circuit to %s",
+                    CIRCUIT_HMUX0,
+                )
+                self._active_outdoor_circuit = CIRCUIT_HMUX0
+                self._async_on_outdoor_circuit_changed(CIRCUIT_HMUX0)
 
         # Update cache and notify Device Registry if any property changed
         target_dict = self._device_versions.setdefault(device_key, {})

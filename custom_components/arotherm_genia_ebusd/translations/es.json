@@ -868,7 +868,7 @@
   "services": {
     "set_weekly_timer": {
       "name": "Configurar programación horaria semanal (b5 55)",
-      "description": "Modifica o borra franjas horarias semanales en el regulador climático (15.bass3 / 15.ctlv2 / 15.ctlv3) para Calefacción Zona 1, Agua Caliente Sanitaria (ACS), Refrigeración, Recirculación o Modo silencioso. Permite configurar ranuras (1, 2, 3), borrar ranuras sueltas o limpiar el día entero.",
+      "description": "Modifica o borra franjas horarias semanales en el regulador climático (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3) para Calefacción Zona 1, Agua Caliente Sanitaria (ACS), Refrigeración, Recirculación o Modo silencioso. Permite configurar ranuras (1, 2, 3), borrar ranuras sueltas o limpiar el día entero.",
       "fields": {
         "circuit_type": {
           "name": "Circuito",
@@ -876,7 +876,7 @@
         },
         "day": {
           "name": "Día de la semana",
-          "description": "Día específico (ej. Lunes / Monday), Laborables (Weekdays), Fin de semana (Weekend) o Toda la semana (All). Acepta nombres en español e inglés."
+          "description": "Día específico (ej. Lunes / Monday / Montag), Laborables (Weekdays), Fin de semana (Weekend) o Toda la semana (All). Acepta nombres en español, inglés y alemán."
         },
         "action": {
           "name": "Acción",
@@ -916,7 +916,7 @@
     },
     "set_legionella_protection": {
       "name": "Configurar programación de protección antilegionela",
-      "description": "Configura la programación semanal de desinfección térmica antilegionela en el controlador de climatización (15.bass3 / 15.ctlv2 / 15.ctlv3). Establece el día de la semana y la hora de ejecución objetivo.",
+      "description": "Configura la programación semanal de desinfección térmica antilegionela en el controlador de climatización (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3). Establece el día de la semana y la hora de ejecución objetivo.",
       "fields": {
         "day": {
           "name": "Día de la semana",
@@ -930,7 +930,7 @@
     },
     "set_holiday_mode": {
       "name": "Activar Modo Ausencia / Vacaciones",
-      "description": "Activa el Modo Ausencia en el regulador climático (15.bass3 / 15.ctlv2 / 15.ctlv3), suspendiendo la producción de ACS y reduciendo la consigna de calefacción a la temperatura de mantenimiento seleccionada durante una ventana temporal o indefinida.",
+      "description": "Activa el Modo Ausencia en el regulador climático (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3), suspendiendo la producción de ACS y reduciendo la consigna de calefacción a la temperatura de mantenimiento seleccionada durante una ventana temporal o indefinida.",
       "fields": {
         "temperature": {
           "name": "Temperatura de ausencia",
@@ -956,7 +956,7 @@
     },
     "cancel_holiday_mode": {
       "name": "Cancelar Modo Ausencia / Vacaciones",
-      "description": "Cancela de forma inmediata el Modo Ausencia en el regulador climático (15.bass3 / 15.ctlv2 / 15.ctlv3) y restablece el funcionamiento automático en calefacción y agua caliente sanitaria (ACS)."
+      "description": "Cancela de forma inmediata el Modo Ausencia en el regulador climático (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3) y restablece el funcionamiento automático en calefacción y agua caliente sanitaria (ACS)."
     },
     "quick_veto": {
       "name": "Quick Veto / Boost Temporal (Zona 1)",

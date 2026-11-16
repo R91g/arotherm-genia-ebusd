@@ -19,7 +19,7 @@ The developer's reference installation is a `15.bass3` controller with an `08.hm
 
 | Component Type | Vaillant Models | Saunier Duval Models |
 | :--- | :--- | :--- |
-| **Wall Hydraulic Module (with backup heater)** | `VWZ MEH 97/7` | `HPIM 7 230V` / `Módulo Hidráulico HE 9-7 W` |
+| **Wall Hydraulic Module (with backup heater)** | `VWZ MEH 97/7` | `HPIM 7 230V` / `Hydraulic Module HE 9-7 W` |
 | **Wall Hydraulic Module / Appliance Interface** | `VWZ MH 97/7` / `VWZ AI 7/230V` | `HPIM 7 230V` |
 | **All-in-One Hydraulic Tower (Integrated DHW)** | `uniTOWER VIH QW 190/7` | `GeniaSet FEW/FIW 200-7` |
 

@@ -88,8 +88,8 @@ Home Assistant computes hourly, daily, monthly and yearly deltas from these Wh-r
 Instantaneous electrical power prioritizes `RunDataElectricPowerConsumption` (`r1;u`) while fresh (`<= 180 s`), dynamically falling back to `PowerStatus` if stale, and expiring both live power and Live COP to `unavailable` after `600 s` (`10 min`) without updates:
 
 ```text
-Primary ΔT (K)               = T_flow (RunDataFlowTemp) - T_return (RunDataReturnTemp)
-Instantaneous Thermal Power  = Flow_Rate (L/h) × |ΔT| (K) × 1.163   [Watts]
+Primary ΔT (°C)              = T_flow (RunDataFlowTemp) - T_return (RunDataReturnTemp)
+Instantaneous Thermal Power  = Flow_Rate (L/h) × |ΔT| (°C) × 1.163   [Watts]
 Live Instantaneous COP / EER = Thermal_Power (W) / Electric_Power (W)
 Mode & Global COP / EER      = (HMUX0_Thermal_Wh + VWZIO_Thermal_Wh) / (HMUX0_Elec_Wh + VWZIO_Elec_Wh)
 Total System Energy (Wh)     = Heating_Total_Wh + DHW_Total_Wh + Cooling_Total_Wh

@@ -346,6 +346,7 @@ DEPRECATED_UNIQUE_ID_SUFFIXES: tuple[str, ...] = (
 INITIAL_HYDRATION_WAIT_SECONDS = 5.0
 HYDRATION_STEP_DELAY_SECONDS = 0.8
 SET_CONFIRMATION_DELAY_SECONDS = 1.5
+HEATING_VETO_SFMODE_FRESHNESS_SECONDS = 15.0
 DHW_BOOST_MAX_TIMEOUT_SECONDS = 3600  # 60 minutes safety timeout
 ELECTRIC_POWER_STALE_TIMEOUT_SECONDS: float = (
     180.0  # 3 minutes staleness fallback threshold
@@ -573,6 +574,9 @@ HMUX0_ONLY_SENSOR_UNIQUE_ID_SUFFIXES: frozenset[str] = frozenset(
         "hmux0_prenergyelectrichwc_energy",
     }
 )
+
+# Minimum HMU firmware SW version required by [id_sw>=902] for FlowPressure in 08.hmu*.csv
+HMU_FLOW_PRESSURE_MIN_SW = 902
 
 # Additional eBUSd messages for Vaillant HMU00 (HW=5103) outdoor units
 HMU_HW5103_HYDRATION_MESSAGES: list[tuple[str, str]] = [

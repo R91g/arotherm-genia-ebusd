@@ -868,7 +868,7 @@
   "services": {
     "set_weekly_timer": {
       "name": "Set Weekly Schedule Timer (b5 55)",
-      "description": "Configures a weekly schedule time slot on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3) for Zone 1 Heating, Domestic Hot Water (DHW), Cooling, Circulation, or Silent Mode. Supports configuring slots (1, 2, 3), deleting individual slots, or clearing the entire day.",
+      "description": "Configures a weekly schedule time slot on the climate controller (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3) for Zone 1 Heating, Domestic Hot Water (DHW), Cooling, Circulation, or Silent Mode. Supports configuring slots (1, 2, 3), deleting individual slots, or clearing the entire day.",
       "fields": {
         "circuit_type": {
           "name": "Circuit Type",
@@ -876,7 +876,7 @@
         },
         "day": {
           "name": "Day of the Week",
-          "description": "Specific day of the week, Weekdays, Weekend, or All Days. Accepts English and Spanish names."
+          "description": "Specific day of the week, Weekdays, Weekend, or All Days. Accepts English, Spanish, and German names."
         },
         "action": {
           "name": "Action",
@@ -916,7 +916,7 @@
     },
     "set_legionella_protection": {
       "name": "Set Anti-Legionella Protection Schedule",
-      "description": "Configures the weekly anti-legionella thermal disinfection schedule on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3). Sets the day of the week and target execution time.",
+      "description": "Configures the weekly anti-legionella thermal disinfection schedule on the climate controller (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3). Sets the day of the week and target execution time.",
       "fields": {
         "day": {
           "name": "Day of the Week",
@@ -930,7 +930,7 @@
     },
     "set_holiday_mode": {
       "name": "Set Holiday / Away Mode",
-      "description": "Activates Holiday/Away Mode on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3), suspending hot water production and reducing heating setpoint to setback temperature during a timed or open-ended window.",
+      "description": "Activates Holiday/Away Mode on the climate controller (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3), suspending hot water production and reducing heating setpoint to setback temperature during a timed or open-ended window.",
       "fields": {
         "temperature": {
           "name": "Setback Temperature",
@@ -956,7 +956,7 @@
     },
     "cancel_holiday_mode": {
       "name": "Cancel Holiday / Away Mode",
-      "description": "Immediately cancels Holiday/Away Mode on the climate controller (15.bass3 / 15.ctlv2 / 15.ctlv3) and restores automatic schedule operation for heating and domestic hot water."
+      "description": "Immediately cancels Holiday/Away Mode on the climate controller (15.bass3 / 15.basv3 / 15.ctlv2 / 15.ctlv3) and restores automatic schedule operation for heating and domestic hot water."
     },
     "quick_veto": {
       "name": "Quick Veto (Zone 1 Boost)",

@@ -78,12 +78,7 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
         if description.fallback_circuit and description.fallback_message:
             subs.append((description.fallback_circuit, description.fallback_message))
         if description.key == "z1_actual_room_temp_desired":
-            subs.extend(
-                [
-                    (CIRCUIT_BASS3, "Z1OpMode"),
-                    (CIRCUIT_BASS3, "Z1ManualTemp"),
-                ]
-            )
+            subs.append((CIRCUIT_BASS3, "Z1OpMode"))
         elif description.key == "holiday_duration_remaining":
             subs.extend(
                 [
@@ -100,6 +95,13 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
                     (CIRCUIT_BASS3, "CoolingStartDate"),
                     (CIRCUIT_BASS3, "CoolingReleaseStatus"),
                     (CIRCUIT_BASS3, "Z1OpModeCooling"),
+                ]
+            )
+        elif description.key == "vwzio_secondary_circuit_status":
+            subs.extend(
+                [
+                    (CIRCUIT_BASS3, "Hc1PumpStatus"),
+                    (CIRCUIT_BASS3, "CoolingReleaseStatus"),
                 ]
             )
         elif description.key == "quick_veto_remaining_time":
@@ -291,17 +293,29 @@ class SaunierGeniaWeeklyScheduleSensor(SaunierGeniaEntity, SensorEntity):
                 pass
         return slot_str
 
+    def _parse_day_slot_count(
+        self, slots_msg: dict[str, Any], day: str, *, default: int = 1
+    ) -> int:
+        """Parse active slot count (0..3) for a day, ignoring bools and invalid values."""
+        short_key = DAY_SHORT_KEYS[day]
+        raw_count = slots_msg.get(short_key)
+        if raw_count is None or isinstance(raw_count, bool):
+            return default
+        try:
+            parsed = (
+                int(float(raw_count)) if isinstance(raw_count, str) else int(raw_count)
+            )
+        except (ValueError, TypeError):
+            return default
+        return parsed if 0 <= parsed <= 3 else default
+
     def _get_day_slots(self, day: str) -> list[str]:
         """Return list of formatted active slots for the given day."""
         slots_msg = (
             self.coordinator.get_message(CIRCUIT_BASS3, f"{self._timer_prefix}_Slots")
             or {}
         )
-        short_key = DAY_SHORT_KEYS[day]
-        active_count = slots_msg.get(short_key)
-        max_slots = 3
-        if isinstance(active_count, (int, float)) and 0 <= int(active_count) <= 3:
-            max_slots = int(active_count)
+        max_slots = self._parse_day_slot_count(slots_msg, day)
 
         formatted: list[str] = []
         for s_idx in range(1, max_slots + 1):
@@ -331,12 +345,7 @@ class SaunierGeniaWeeklyScheduleSensor(SaunierGeniaEntity, SensorEntity):
         )
         schedule_dict: dict[str, dict[str, Any]] = {}
         for day in WEEKDAYS_LIST:
-            short_key = DAY_SHORT_KEYS[day]
-            raw_count = slots_msg.get(short_key)
-            try:
-                active_count = int(raw_count) if raw_count is not None else 1
-            except (ValueError, TypeError):
-                active_count = 1
+            active_count = self._parse_day_slot_count(slots_msg, day)
             schedule_dict[day] = {
                 "active_slots": active_count,
                 "Slot 1": self._format_slot(day, 1) if active_count >= 1 else None,

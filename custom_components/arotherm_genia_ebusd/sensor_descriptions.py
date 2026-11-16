@@ -58,7 +58,6 @@ from .const import (
     CIRCUIT_NETX3_ALT,
     CIRCUIT_VWZIO,
     CONTROLLER_CIRCUITS,
-    DEFAULT_COMFORT_TEMP,
     DEVICE_CLIMATE_CONTROLLER,
     DEVICE_HYDRAULIC_INTERFACE,
     DEVICE_OUTDOOR_UNIT,
@@ -177,7 +176,7 @@ def _get_vwzio_secondary_status(coord: SaunierGeniaCoordinator) -> str | None:
     if hc1_pump == 0:
         return "standby"
 
-    return "standby"
+    return None
 
 
 def _get_vwzio_secondary_attrs(
@@ -232,7 +231,7 @@ def _get_vwzio_secondary_hwc_status(coord: SaunierGeniaCoordinator) -> str | Non
                 if token_lower in ("dhw", "hwc", "on"):
                     return "dhw"
         return "standby"
-    return "standby"
+    return None
 
 
 def _get_vwzio_secondary_hwc_attrs(
@@ -268,10 +267,7 @@ def _get_z1_actual_desired_filtered(
         return None
     if val <= SENTINEL_HEATING_THRESHOLD:
         op_mode = (coord.get_str(CIRCUIT_BASS3, "Z1OpMode", "value") or "").lower()
-        if op_mode == "off":
-            manual_temp = coord.get_float(CIRCUIT_BASS3, "Z1ManualTemp", "value")
-            return manual_temp if manual_temp is not None else DEFAULT_COMFORT_TEMP
-        if op_mode != "manual":
+        if op_mode != "day":
             return None
     return round(val, 2)
 
@@ -503,7 +499,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         circuit=CALC_CIRCUIT,
         message=CALC_DELTA_T,
         field="value",
-        native_unit_of_measurement="K",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=TEMP_DELTA_DEVICE_CLASS,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
@@ -766,7 +762,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         fallback_circuit=CIRCUIT_HMU,
         fallback_message="RunDataSuperheat",
         fallback_field="value",
-        native_unit_of_measurement="K",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=TEMP_DELTA_DEVICE_CLASS,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
@@ -779,7 +775,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         message="Subcooling",
         field="value",
         value_fn=_get_subcooling,
-        native_unit_of_measurement="K",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=TEMP_DELTA_DEVICE_CLASS,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
@@ -1050,6 +1046,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTime.HOURS,
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(
@@ -1065,6 +1062,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTime.HOURS,
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(
@@ -1078,6 +1076,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         fallback_message="CompressorStarts",
         fallback_field="value",
         state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(
@@ -1090,6 +1089,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTime.HOURS,
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(
@@ -1103,6 +1103,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         fallback_message="RunStatsHcStarts",
         fallback_field="value",
         state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(
@@ -1115,6 +1116,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTime.HOURS,
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(
@@ -1124,7 +1126,11 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         circuit=CIRCUIT_HMUX0,
         message="RunStatsHwcStarts",
         field="value",
+        fallback_circuit=CIRCUIT_VWZIO,
+        fallback_message="RunStatsHwcStarts",
+        fallback_field="value",
         state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(
@@ -1137,6 +1143,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTime.HOURS,
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(
@@ -1147,6 +1154,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         message="RunStatsBuildingCPumpStarts",
         field="value",
         state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(
@@ -1159,6 +1167,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTime.HOURS,
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(
@@ -1169,6 +1178,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         message="RunStats4PortValveSwitches",
         field="value",
         state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(
@@ -1184,6 +1194,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTime.HOURS,
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(
@@ -1197,6 +1208,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         fallback_message="RunStatsFan1Starts",
         fallback_field="value",
         state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(
@@ -1212,6 +1224,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTime.HOURS,
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_integer=True,
         entity_registry_enabled_default=False,
     ),
@@ -1226,6 +1239,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         fallback_message="RunStatsFan2Starts",
         fallback_field="value",
         state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_integer=True,
         entity_registry_enabled_default=False,
     ),
@@ -1242,6 +1256,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTime.HOURS,
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(
@@ -1255,6 +1270,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         fallback_message="RunStatsDeiceStarts",
         fallback_field="value",
         state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(
@@ -1270,6 +1286,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTime.HOURS,
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_integer=True,
         entity_registry_enabled_default=False,
     ),
@@ -1284,6 +1301,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         fallback_message="RunStatsImmersionHeaterStarts",
         fallback_field="value",
         state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_integer=True,
         entity_registry_enabled_default=False,
     ),
@@ -1302,6 +1320,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.TOTAL_INCREASING,
         suggested_display_precision=1,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     SaunierGeniaSensorEntityDescription(
         key="stats_compressor_hc_starts",
@@ -1314,6 +1333,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         fallback_message="CompressorHc",
         fallback_field="cycles",
         state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(
@@ -1331,6 +1351,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.TOTAL_INCREASING,
         suggested_display_precision=1,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     SaunierGeniaSensorEntityDescription(
         key="stats_compressor_hwc_starts",
@@ -1343,6 +1364,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         fallback_message="CompressorHwc",
         fallback_field="cycles",
         state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(
@@ -1360,6 +1382,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.TOTAL_INCREASING,
         suggested_display_precision=1,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     SaunierGeniaSensorEntityDescription(
         key="stats_compressor_cool_starts",
@@ -1372,6 +1395,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         fallback_message="CompressorCool",
         fallback_field="cycles",
         state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_integer=True,
     ),
     # =========================================================================
@@ -1848,6 +1872,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.TOTAL_INCREASING,
         suggested_display_precision=1,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     SaunierGeniaSensorEntityDescription(
         key="stats_vwzio_heater_hc_starts",
@@ -1857,6 +1882,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         message="RunStatsHeaterHc",
         field="cycles",
         state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(
@@ -1871,6 +1897,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.TOTAL_INCREASING,
         suggested_display_precision=1,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     SaunierGeniaSensorEntityDescription(
         key="stats_vwzio_heater_hwc_starts",
@@ -1880,6 +1907,7 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         message="RunStatsHeaterHwc",
         field="cycles",
         state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(

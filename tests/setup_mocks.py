@@ -222,6 +222,13 @@ class MockRestoreEntity:
         return getattr(self, "_mock_last_state", None)
 
 
+class MockRestoreNumber(MockEntity, MockRestoreEntity):
+    """Mock base class for RestoreNumber."""
+
+    async def async_get_last_number_data(self) -> Any:
+        return getattr(self, "_mock_last_number_data", None)
+
+
 class MockSelectEntity(MockEntity):
     """Mock SelectEntity with options property."""
 
@@ -289,6 +296,7 @@ sys.modules["homeassistant.helpers.device_registry"].DeviceInfo = dict
 sys.modules["homeassistant.components.sensor"].SensorEntity = MockEntity
 sys.modules["homeassistant.components.binary_sensor"].BinarySensorEntity = MockEntity
 sys.modules["homeassistant.components.number"].NumberEntity = MockEntity
+sys.modules["homeassistant.components.number"].RestoreNumber = MockRestoreNumber
 sys.modules["homeassistant.components.select"].SelectEntity = MockSelectEntity
 sys.modules["homeassistant.components.switch"].SwitchEntity = MockEntity
 sys.modules["homeassistant.components.climate"].ClimateEntity = MockEntity

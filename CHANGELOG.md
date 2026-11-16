@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.3.0] - Unreleased
+## [1.3.0] - 2026-11-16
 
 > [!IMPORTANT]
 > **Action required when updating:**
@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > 4. The old `Z1DayTemp` setpoint entity is removed automatically; the cooling manual setpoint now lives in a new entity (`Z1CoolingManualTemp`). If your automations, scripts or dashboards referenced the old one, point them to the new entity.
 > 5. `Z1MaxFlowTempDesired` was actually Zone 1 room humidity; it now appears as the "Zone 1 Room Humidity" sensor and as `current_humidity` on the climate entity.
 > 6. Default device names migrate from Spanish to English automatically; any names you customized are preserved.
+> 7. **Temperature-delta units unified from `K` to `°C`:** Temperature difference/offset controls and sensors (`calculated_delta_t`, `superheat`, `subcooling`, `hc1_excess_temp`, `cylinder_charge_hyst`, `cylinder_charge_offset`, `buffer_charge_offset`) now use `°C` (`TEMPERATURE_DELTA`, `1 K = 1 °C`). When upgrading from `v1.2.x` (or dev builds), go to **Developer Tools → Statistics** and click **Fix issue** on `calculated_delta_t` (and `superheat`/`subcooling` if present) to accept the unit update without value conversion.
 
 ### Added
 - **New hardware: CTLV2 / CTLV3 controllers (`sensoHOME` / `sensoCOMFORT` / `MiSet`) and Vaillant HMU00 (HW5103) / aroTHERM Split outdoor units.** New ebusd CSV templates (`15.ctlv2.csv`, `15.ctlv3.csv`, `08.hmu.HW5103.csv`) with automatic scan detection and circuit aliasing; Split water pressure, silent mode levels, compressor hours/starts fallbacks and native COP registers. Also added UK `aroTHERM pro 7.1` and `aroTHERM plus 8.1` models. Developed with the help of community testers and not yet validated on every model; please report any mismatch in GitHub issues.

@@ -1,6 +1,6 @@
 # Optimized eBUSd CSV Configuration — aroTHERM & GeniaAir (eBUS)
 
-**🇬🇧 English** | [🇪🇸 Documentación en Español](../README_es.md#paso-1-desplegar-los-archivos-csv-optimizados-en-ebusd) | [🇬🇧 Main README](../README.md#step-1-deploy-optimized-ebusd-csv-configuration)
+**🇬🇧 English** | [🇪🇸 Guía de instalación en Español](../docs/installation_es.md#2-desplegar-los-archivos-csv-de-ebusd) | [🇬🇧 Installation Guide](../docs/installation.md#2-deploy-the-ebusd-csv-configuration) | [🇬🇧 Main README](../README.md)
 
 This directory contains **reverse-engineered and collision-free** eBUS message definitions (`.csv`) purpose-built for modern **Vaillant** and **Saunier Duval** R290 air-to-water heat pump installations (replacing upstream default `ebusd` CSVs, which target legacy boilers/controllers and are incompatible with these platforms):
 
