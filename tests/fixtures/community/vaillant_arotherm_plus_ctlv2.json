@@ -1,0 +1,2933 @@
+{
+  "domain": "arotherm_genia_ebusd",
+  "entry_id": "fixture_vaillant_arotherm_plus_ctlv2",
+  "anonymized": true,
+  "mqtt_prefix": "ebusd",
+  "is_ebus_operational": true,
+  "outdoor_model": "aroTHERM plus VWL 75/6 A 230V (Legacy)",
+  "indoor_model": "uniTOWER VIH QW 190/7",
+  "active_outdoor_circuit": "hmu",
+  "active_controller_circuit": "ctlv2",
+  "cached_messages_count": 652,
+  "values": {
+    "global": {
+      "running": {
+        "value": true
+      },
+      "updatecheck": {
+        "value": "version 26.1 available, device firmware v5 1[631e] available"
+      },
+      "signal": {
+        "value": true
+      },
+      "scan": {
+        "value": "finished"
+      },
+      "uptime": {
+        "value": 36608
+      }
+    },
+    "hmu": {
+      "SetMode": {
+        "hcmode": "auto",
+        "flowtempdesired": 0,
+        "hwctempdesired": null,
+        "hwcflowtempdesired": null,
+        "disablehc": 1,
+        "disablehwctapping": 1,
+        "disablehwcload": 1,
+        "remotecontrolhcpump": 0,
+        "releasebackup": 0,
+        "releasecooling": 0
+      },
+      "Status01": {
+        "flow_temp": 22.5,
+        "return_temp": 25,
+        "outside_temp": null,
+        "hwc_temp": null,
+        "storage_temp": null,
+        "pumpstate": "off"
+      },
+      "RunDataFlowRate": {
+        "value": 0
+      },
+      "StateCompressor": {
+        "flow_temp": 22.56,
+        "modulation": 0,
+        "mode_flags": 0,
+        "state_bytes": "00 00 00 00"
+      },
+      "StatusCirPump": {
+        "value": "off"
+      },
+      "PowerStatus": {
+        "status": "standby",
+        "power": 9.5,
+        "fuel_power": 0
+      },
+      "YieldHcDay": {
+        "value": 44.2
+      },
+      "YieldCoolDay": {
+        "value": 0
+      },
+      "YieldHwcDay": {
+        "value": 3.3
+      },
+      "YieldHcMonth": {
+        "value": 205.8
+      },
+      "YieldHc": {
+        "value": 12816
+      },
+      "YieldHwcMonth": {
+        "value": 25.5
+      },
+      "YieldHwc": {
+        "value": 3105
+      },
+      "SupplyTempWeighted": {
+        "value": 22.81
+      },
+      "RunDataFlowTemp": {
+        "value": 22.62
+      },
+      "EnergyIntegral": {
+        "value": -180
+      },
+      "CurrentYieldPower": {
+        "value": 0
+      },
+      "CurrentConsumedPower": {
+        "value": 0
+      },
+      "YieldCoolingMonth": {
+        "value": 0
+      },
+      "YieldCooling": {
+        "value": 0
+      },
+      "TotalEnergyUsage": {
+        "value": 5285
+      },
+      "CompressorHours": {
+        "value": 3760
+      },
+      "CompressorStarts": {
+        "value": 950
+      },
+      "HMUStatusCode": {
+        "status": "standby"
+      },
+      "RunDataBuildingCPumpPower": {
+        "value": 0
+      },
+      "RunDataElectricPowerConsumption": {
+        "power": 9.5
+      },
+      "RunDataCompressorInletTemp": {
+        "value": 10.9623
+      },
+      "RunDataCompressorOutletTemp": {
+        "value": 13.5714
+      },
+      "RunDataEEVOutletTemp": {
+        "value": 6.44144
+      },
+      "RunDataAirInletTemp": {
+        "value": 3.52814
+      },
+      "RunDataReturnTemp": {
+        "value": 25.2874
+      },
+      "RunDataHighPressure": {
+        "value": 4.35897
+      },
+      "RunStatsHMUHours": {
+        "value": 16038
+      },
+      "RunStatsHcHours": {
+        "value": 3466
+      },
+      "RunStatsHwcHours": {
+        "value": 756
+      },
+      "RunStatsCompressorHours": {
+        "value": 3760
+      },
+      "RunStatsCompressorStarts": {
+        "value": 950
+      },
+      "RunStatsBuildingPumpHours": {
+        "value": 4768
+      },
+      "RunStatsBuildingCPumpStarts": {
+        "value": 4744
+      },
+      "RunStats4PortValveHours": {
+        "value": 441
+      },
+      "RunStatsFan1Hours": {
+        "value": 3734
+      },
+      "RunStatsFan1Starts": {
+        "value": 1836
+      },
+      "RunStatsFan2Hours": {
+        "value": 0
+      },
+      "RunStatsFan2Starts": {
+        "value": 0
+      },
+      "Currenterror": {
+        "error": null,
+        "error_1": null,
+        "error_2": null,
+        "error_3": null,
+        "error_4": null
+      },
+      "CompressorSilentOperationLevel": {
+        "value": 40
+      },
+      "RunDataCompressorSpeed": {
+        "value": 0
+      },
+      "RunDataFan1Speed": {
+        "value": 0
+      },
+      "FlowPressure": {
+        "value": 1.52
+      }
+    },
+    "hmux0": {
+      "SetMode": {
+        "hcmode": "auto",
+        "flowtempdesired": 0,
+        "hwctempdesired": null,
+        "hwcflowtempdesired": null,
+        "disablehc": 1,
+        "disablehwctapping": 1,
+        "disablehwcload": 1,
+        "remotecontrolhcpump": 0,
+        "releasebackup": 0,
+        "releasecooling": 0
+      },
+      "Status01": {
+        "flow_temp": 22.5,
+        "return_temp": 25,
+        "outside_temp": null,
+        "hwc_temp": null,
+        "storage_temp": null,
+        "pumpstate": "off"
+      },
+      "RunDataFlowRate": {
+        "value": 0
+      },
+      "StateCompressor": {
+        "flow_temp": 22.56,
+        "modulation": 0,
+        "mode_flags": 0,
+        "state_bytes": "00 00 00 00"
+      },
+      "StatusCirPump": {
+        "value": "off"
+      },
+      "PowerStatus": {
+        "status": "standby",
+        "power": 9.5,
+        "fuel_power": 0
+      },
+      "YieldHcDay": {
+        "value": 44.2
+      },
+      "YieldCoolDay": {
+        "value": 0
+      },
+      "YieldHwcDay": {
+        "value": 3.3
+      },
+      "YieldHcMonth": {
+        "value": 205.8
+      },
+      "YieldHc": {
+        "value": 12816
+      },
+      "YieldHwcMonth": {
+        "value": 25.5
+      },
+      "YieldHwc": {
+        "value": 3105
+      },
+      "SupplyTempWeighted": {
+        "value": 22.81
+      },
+      "RunDataFlowTemp": {
+        "value": 22.62
+      },
+      "EnergyIntegral": {
+        "value": -180
+      },
+      "CurrentYieldPower": {
+        "value": 0
+      },
+      "CurrentConsumedPower": {
+        "value": 0
+      },
+      "YieldCoolingMonth": {
+        "value": 0
+      },
+      "YieldCooling": {
+        "value": 0
+      },
+      "TotalEnergyUsage": {
+        "value": 5285
+      },
+      "CompressorHours": {
+        "value": 3760
+      },
+      "CompressorStarts": {
+        "value": 950
+      },
+      "HMUStatusCode": {
+        "status": "standby"
+      },
+      "RunDataBuildingCPumpPower": {
+        "value": 0
+      },
+      "RunDataElectricPowerConsumption": {
+        "power": 9.5
+      },
+      "RunDataCompressorInletTemp": {
+        "value": 10.9623
+      },
+      "RunDataCompressorOutletTemp": {
+        "value": 13.5714
+      },
+      "RunDataEEVOutletTemp": {
+        "value": 6.44144
+      },
+      "RunDataAirInletTemp": {
+        "value": 3.52814
+      },
+      "RunDataReturnTemp": {
+        "value": 25.2874
+      },
+      "RunDataHighPressure": {
+        "value": 4.35897
+      },
+      "RunStatsHMUHours": {
+        "value": 16038
+      },
+      "RunStatsHcHours": {
+        "value": 3466
+      },
+      "RunStatsHwcHours": {
+        "value": 756
+      },
+      "RunStatsCompressorHours": {
+        "value": 3760
+      },
+      "RunStatsCompressorStarts": {
+        "value": 950
+      },
+      "RunStatsBuildingPumpHours": {
+        "value": 4768
+      },
+      "RunStatsBuildingCPumpStarts": {
+        "value": 4744
+      },
+      "RunStats4PortValveHours": {
+        "value": 441
+      },
+      "RunStatsFan1Hours": {
+        "value": 3734
+      },
+      "RunStatsFan1Starts": {
+        "value": 1836
+      },
+      "RunStatsFan2Hours": {
+        "value": 0
+      },
+      "RunStatsFan2Starts": {
+        "value": 0
+      },
+      "Currenterror": {
+        "error": null,
+        "error_1": null,
+        "error_2": null,
+        "error_3": null,
+        "error_4": null
+      },
+      "CompressorSilentOperationLevel": {
+        "value": 40
+      },
+      "RunDataCompressorSpeed": {
+        "value": 0
+      },
+      "RunDataFan1Speed": {
+        "value": 0
+      },
+      "FlowPressure": {
+        "value": 1.52
+      }
+    },
+    "hmu00": {
+      "SetMode": {
+        "hcmode": "auto",
+        "flowtempdesired": 0,
+        "hwctempdesired": null,
+        "hwcflowtempdesired": null,
+        "disablehc": 1,
+        "disablehwctapping": 1,
+        "disablehwcload": 1,
+        "remotecontrolhcpump": 0,
+        "releasebackup": 0,
+        "releasecooling": 0
+      },
+      "Status01": {
+        "flow_temp": 22.5,
+        "return_temp": 25,
+        "outside_temp": null,
+        "hwc_temp": null,
+        "storage_temp": null,
+        "pumpstate": "off"
+      },
+      "RunDataFlowRate": {
+        "value": 0
+      },
+      "StateCompressor": {
+        "flow_temp": 22.56,
+        "modulation": 0,
+        "mode_flags": 0,
+        "state_bytes": "00 00 00 00"
+      },
+      "StatusCirPump": {
+        "value": "off"
+      },
+      "PowerStatus": {
+        "status": "standby",
+        "power": 9.5,
+        "fuel_power": 0
+      },
+      "YieldHcDay": {
+        "value": 44.2
+      },
+      "YieldCoolDay": {
+        "value": 0
+      },
+      "YieldHwcDay": {
+        "value": 3.3
+      },
+      "YieldHcMonth": {
+        "value": 205.8
+      },
+      "YieldHc": {
+        "value": 12816
+      },
+      "YieldHwcMonth": {
+        "value": 25.5
+      },
+      "YieldHwc": {
+        "value": 3105
+      },
+      "SupplyTempWeighted": {
+        "value": 22.81
+      },
+      "RunDataFlowTemp": {
+        "value": 22.62
+      },
+      "EnergyIntegral": {
+        "value": -180
+      },
+      "CurrentYieldPower": {
+        "value": 0
+      },
+      "CurrentConsumedPower": {
+        "value": 0
+      },
+      "YieldCoolingMonth": {
+        "value": 0
+      },
+      "YieldCooling": {
+        "value": 0
+      },
+      "TotalEnergyUsage": {
+        "value": 5285
+      },
+      "CompressorHours": {
+        "value": 3760
+      },
+      "CompressorStarts": {
+        "value": 950
+      },
+      "HMUStatusCode": {
+        "status": "standby"
+      },
+      "RunDataBuildingCPumpPower": {
+        "value": 0
+      },
+      "RunDataElectricPowerConsumption": {
+        "power": 9.5
+      },
+      "RunDataCompressorInletTemp": {
+        "value": 10.9623
+      },
+      "RunDataCompressorOutletTemp": {
+        "value": 13.5714
+      },
+      "RunDataEEVOutletTemp": {
+        "value": 6.44144
+      },
+      "RunDataAirInletTemp": {
+        "value": 3.52814
+      },
+      "RunDataReturnTemp": {
+        "value": 25.2874
+      },
+      "RunDataHighPressure": {
+        "value": 4.35897
+      },
+      "RunStatsHMUHours": {
+        "value": 16038
+      },
+      "RunStatsHcHours": {
+        "value": 3466
+      },
+      "RunStatsHwcHours": {
+        "value": 756
+      },
+      "RunStatsCompressorHours": {
+        "value": 3760
+      },
+      "RunStatsCompressorStarts": {
+        "value": 950
+      },
+      "RunStatsBuildingPumpHours": {
+        "value": 4768
+      },
+      "RunStatsBuildingCPumpStarts": {
+        "value": 4744
+      },
+      "RunStats4PortValveHours": {
+        "value": 441
+      },
+      "RunStatsFan1Hours": {
+        "value": 3734
+      },
+      "RunStatsFan1Starts": {
+        "value": 1836
+      },
+      "RunStatsFan2Hours": {
+        "value": 0
+      },
+      "RunStatsFan2Starts": {
+        "value": 0
+      },
+      "Currenterror": {
+        "error": null,
+        "error_1": null,
+        "error_2": null,
+        "error_3": null,
+        "error_4": null
+      },
+      "CompressorSilentOperationLevel": {
+        "value": 40
+      },
+      "RunDataCompressorSpeed": {
+        "value": 0
+      },
+      "RunDataFan1Speed": {
+        "value": 0
+      },
+      "FlowPressure": {
+        "value": 1.52
+      }
+    },
+    "vwzio": {
+      "SetMode": {
+        "hcmode": "auto",
+        "flowtempdesired": 0,
+        "hwctempdesired": null,
+        "hwcflowtempdesired": null,
+        "flags": "ff 05"
+      },
+      "Status01": {
+        "flow_temp": 27,
+        "return_temp": null,
+        "outside_temp": 3.469,
+        "hwc_temp": null,
+        "storage_temp": 50.5,
+        "pumpstate": "off"
+      },
+      "SecondaryCircuitStatusStandby": {
+        "status": "2b 03 00 b2 01 0f ff"
+      },
+      "PrEnergyThermalHc": {
+        "energy": 47713.9
+      },
+      "PrEnergyThermalHwc": {
+        "energy": 0
+      },
+      "PrEnergyElectricHc": {
+        "energy": 47713.9
+      },
+      "PrEnergyElectricHwc": {
+        "energy": 0
+      },
+      "PowerStatus": {
+        "status": "standby",
+        "power": 3,
+        "fuel_power": 0
+      },
+      "SecondaryCircuitStatus": {
+        "status": "2f 03 00 89 01 0f ff"
+      },
+      "Currenterror": {
+        "error": null,
+        "error_1": null,
+        "error_2": null,
+        "error_3": null,
+        "error_4": null
+      }
+    },
+    "calculated": {
+      "calculated_delta_t": {
+        "value": -2.67
+      },
+      "calculated_cool_eer": {
+        "value": 0
+      },
+      "calculated_thermal_power": {
+        "value": 0
+      },
+      "calculated_heating_total_energy": {
+        "value": 47713.9
+      },
+      "calculated_hc_cop": {
+        "value": 1
+      },
+      "calculated_dhw_total_energy": {
+        "value": 0
+      },
+      "calculated_system_total_energy": {
+        "value": 47713.9
+      },
+      "calculated_hwc_cop": {
+        "value": 0
+      },
+      "calculated_global_efficiency": {
+        "value": 1
+      },
+      "calculated_live_cop": {
+        "value": 0
+      }
+    },
+    "ctlv2": {
+      "HwcStatus": {
+        "value": "auto"
+      },
+      "HolidayTemp": {
+        "value": 13
+      },
+      "HolidayStartDate": {
+        "day": 1,
+        "month": 1,
+        "year": 15
+      },
+      "HolidayStartTime": {
+        "hours": 0,
+        "minutes": 0,
+        "seconds": 0
+      },
+      "HolidayEndDate": {
+        "day": 1,
+        "month": 1,
+        "year": 15
+      },
+      "HolidayEndTime": {
+        "hours": 0,
+        "minutes": 0,
+        "seconds": 0
+      },
+      "CoolingStartDate": {
+        "day": 1,
+        "month": 1,
+        "year": 19
+      },
+      "CoolingEndDate": {
+        "day": 1,
+        "month": 1,
+        "year": 19
+      },
+      "CoolingReleaseStatus": {
+        "value": "on"
+      },
+      "HwcSFMode": {
+        "value": "auto"
+      },
+      "HwcFlowTemp": {
+        "value": 0
+      },
+      "Hc1HeatCurve": {
+        "value": 0.2
+      },
+      "PrEnergySolarTotal": {
+        "energy": 0
+      },
+      "CirculationTimer_Slots": {
+        "mon": 3,
+        "tue": 3,
+        "wed": 3,
+        "thu": 3,
+        "fri": 3,
+        "sat": 3,
+        "sun": 3
+      },
+      "CoolingTimer_Slots": {
+        "mon": 1,
+        "tue": 1,
+        "wed": 1,
+        "thu": 1,
+        "fri": 1,
+        "sat": 1,
+        "sun": 1
+      },
+      "HwcTimer_Slots": {
+        "mon": 1,
+        "tue": 1,
+        "wed": 1,
+        "thu": 1,
+        "fri": 1,
+        "sat": 1,
+        "sun": 1
+      },
+      "Z1Timer_Slots": {
+        "mon": 3,
+        "tue": 3,
+        "wed": 3,
+        "thu": 2,
+        "fri": 3,
+        "sat": 3,
+        "sun": 3
+      },
+      "CirculationTimer_Monday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "CirculationTimer_Tuesday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "CirculationTimer_Wednesday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "CirculationTimer_Thursday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "CirculationTimer_Friday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "CirculationTimer_Saturday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "CirculationTimer_Sunday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "Z1Timer_Monday_Slot2": {
+        "from_hour": 19,
+        "from_min": 20,
+        "to_hour": 19,
+        "to_min": 30
+      },
+      "Z1Timer_Tuesday_Slot2": {
+        "from_hour": 19,
+        "from_min": 20,
+        "to_hour": 19,
+        "to_min": 30
+      },
+      "Z1Timer_Wednesday_Slot2": {
+        "from_hour": 19,
+        "from_min": 20,
+        "to_hour": 19,
+        "to_min": 30
+      },
+      "Z1Timer_Thursday_Slot2": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Z1Timer_Friday_Slot2": {
+        "from_hour": 19,
+        "from_min": 20,
+        "to_hour": 19,
+        "to_min": 30
+      },
+      "Z1Timer_Saturday_Slot2": {
+        "from_hour": 11,
+        "from_min": 30,
+        "to_hour": 11,
+        "to_min": 40
+      },
+      "Z1Timer_Sunday_Slot2": {
+        "from_hour": 11,
+        "from_min": 30,
+        "to_hour": 11,
+        "to_min": 40
+      },
+      "CirculationTimer_Monday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CirculationTimer_Tuesday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CirculationTimer_Wednesday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CirculationTimer_Thursday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CirculationTimer_Friday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CirculationTimer_Saturday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CirculationTimer_Sunday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CoolingTimer_Monday": {
+        "from_hour": 8,
+        "from_min": 30,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "CoolingTimer_Tuesday": {
+        "from_hour": 11,
+        "from_min": 0,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "CoolingTimer_Wednesday": {
+        "from_hour": 8,
+        "from_min": 30,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "CoolingTimer_Thursday": {
+        "from_hour": 8,
+        "from_min": 30,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "CoolingTimer_Friday": {
+        "from_hour": 8,
+        "from_min": 30,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "CoolingTimer_Saturday": {
+        "from_hour": 8,
+        "from_min": 30,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "CoolingTimer_Sunday": {
+        "from_hour": 8,
+        "from_min": 30,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "HwcTimer_Monday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "HwcTimer_Tuesday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "HwcTimer_Wednesday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "HwcTimer_Thursday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "HwcTimer_Friday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "HwcTimer_Saturday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "HwcTimer_Sunday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "Z1Timer_Monday": {
+        "from_hour": 6,
+        "from_min": 0,
+        "to_hour": 6,
+        "to_min": 10
+      },
+      "Z1Timer_Tuesday": {
+        "from_hour": 6,
+        "from_min": 0,
+        "to_hour": 6,
+        "to_min": 10
+      },
+      "Z1Timer_Wednesday": {
+        "from_hour": 6,
+        "from_min": 0,
+        "to_hour": 6,
+        "to_min": 10
+      },
+      "Z1Timer_Thursday": {
+        "from_hour": 19,
+        "from_min": 0,
+        "to_hour": 19,
+        "to_min": 10
+      },
+      "Z1Timer_Friday": {
+        "from_hour": 6,
+        "from_min": 0,
+        "to_hour": 6,
+        "to_min": 10
+      },
+      "Z1Timer_Saturday": {
+        "from_hour": 7,
+        "from_min": 30,
+        "to_hour": 7,
+        "to_min": 40
+      },
+      "Z1Timer_Sunday": {
+        "from_hour": 7,
+        "from_min": 30,
+        "to_hour": 7,
+        "to_min": 40
+      },
+      "CirculationTimer_Monday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "CirculationTimer_Tuesday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "CirculationTimer_Wednesday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "CirculationTimer_Thursday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "CirculationTimer_Friday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "CirculationTimer_Saturday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "CirculationTimer_Sunday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "Z1Timer_Monday_Slot3": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Z1Timer_Tuesday_Slot3": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Z1Timer_Wednesday_Slot3": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Z1Timer_Friday_Slot3": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Z1Timer_Saturday_Slot3": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Z1Timer_Sunday_Slot3": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Hc1ActualFlowTempDesired": {
+        "value": 0
+      },
+      "HwcStorageTemp": {
+        "value": 50.5
+      },
+      "Hc1FlowTemp": {
+        "value": 22.5
+      },
+      "Z1RoomTemp": {
+        "value": 22.725
+      },
+      "Z1Status": {
+        "value": "auto"
+      },
+      "Hc1HeatCurveAdaption": {
+        "value": 0
+      },
+      "DisplayedOutsideTemp": {
+        "value": 3.58594
+      },
+      "Hc1ExcessTemp": {
+        "value": 0
+      },
+      "Z1QuickVetoTemp": {
+        "value": 25.3
+      },
+      "Z1NightTemp": {
+        "value": 19
+      },
+      "MaxRoomHumidity": {
+        "value": 40
+      },
+      "Hc1AutoOffMode": {
+        "value": "eco"
+      },
+      "Z1SFMode": {
+        "value": "auto"
+      },
+      "Hc1MinFlowTempDesired": {
+        "value": 24
+      },
+      "Z1ValveStatus": {
+        "value": 0
+      },
+      "Hc1MaxFlowTempDesired": {
+        "value": 35
+      },
+      "CoolingFlowTempDesiredMin": {
+        "value": 17
+      },
+      "AdaptHeatCurve": {
+        "value": "yes"
+      },
+      "Hc1SummerTempLimit": {
+        "value": 23
+      },
+      "Hc1RoomTempSwitchOn": {
+        "value": "modulating"
+      },
+      "Hc1Status": {
+        "value": 0
+      },
+      "CoolingFlowTempDesiredMax": {
+        "value": 20
+      },
+      "HwcMaxFlowTempDesired": {
+        "value": 80
+      },
+      "PrEnergySumHcThisMonth": {
+        "value": 49
+      },
+      "PrEnergySumHcLastMonth": {
+        "value": 163
+      },
+      "PrEnergySumHwcThisMonth": {
+        "value": 9
+      },
+      "PrEnergySumHc": {
+        "value": 3735
+      },
+      "PrEnergySumHwcLastMonth": {
+        "value": 53
+      },
+      "PrEnergySumHwc": {
+        "value": 1362
+      },
+      "CylinderChargeHyst": {
+        "value": 7
+      },
+      "ErrorMemorySlot": {
+        "slot": 2,
+        "error": null,
+        "data": "ff ff ff ff ff ff ff ff"
+      },
+      "Currenterror": {
+        "error": null,
+        "error_1": null,
+        "error_2": null,
+        "error_3": null,
+        "error_4": null
+      },
+      "CylinderChargeOffset": {
+        "value": 7
+      },
+      "MaxCylinderChargeTime": {
+        "value": 120
+      },
+      "HwcLockTime": {
+        "value": 60
+      },
+      "HwcParallelLoading": {
+        "value": "off"
+      },
+      "BufferChargeOffset": {
+        "value": 0
+      },
+      "BivalencePointHc": {
+        "value": -15
+      },
+      "BivalencePointHwc": {
+        "value": -15
+      },
+      "AlternativePoint": {
+        "value": -21
+      },
+      "GlobalSystemOff": {
+        "value": "no"
+      },
+      "Z1OpMode": {
+        "value": "auto"
+      },
+      "Z1ActualRoomTempDesired": {
+        "value": 6.5
+      },
+      "Z1CoolingTempDesired": {
+        "value": 99
+      },
+      "Hc1PumpStatus": {
+        "value": 0
+      },
+      "Z1ManualTemp": {
+        "value": 11
+      },
+      "SystemOperatingState": {
+        "value": "standby"
+      }
+    },
+    "bass3": {
+      "HwcStatus": {
+        "value": "auto"
+      },
+      "HolidayTemp": {
+        "value": 13
+      },
+      "HolidayStartDate": {
+        "day": 1,
+        "month": 1,
+        "year": 15
+      },
+      "HolidayStartTime": {
+        "hours": 0,
+        "minutes": 0,
+        "seconds": 0
+      },
+      "HolidayEndDate": {
+        "day": 1,
+        "month": 1,
+        "year": 15
+      },
+      "HolidayEndTime": {
+        "hours": 0,
+        "minutes": 0,
+        "seconds": 0
+      },
+      "CoolingStartDate": {
+        "day": 1,
+        "month": 1,
+        "year": 19
+      },
+      "CoolingEndDate": {
+        "day": 1,
+        "month": 1,
+        "year": 19
+      },
+      "CoolingReleaseStatus": {
+        "value": "on"
+      },
+      "HwcSFMode": {
+        "value": "auto"
+      },
+      "HwcFlowTemp": {
+        "value": 0
+      },
+      "Hc1HeatCurve": {
+        "value": 0.2
+      },
+      "PrEnergySolarTotal": {
+        "energy": 0
+      },
+      "CirculationTimer_Slots": {
+        "mon": 3,
+        "tue": 3,
+        "wed": 3,
+        "thu": 3,
+        "fri": 3,
+        "sat": 3,
+        "sun": 3
+      },
+      "CoolingTimer_Slots": {
+        "mon": 1,
+        "tue": 1,
+        "wed": 1,
+        "thu": 1,
+        "fri": 1,
+        "sat": 1,
+        "sun": 1
+      },
+      "HwcTimer_Slots": {
+        "mon": 1,
+        "tue": 1,
+        "wed": 1,
+        "thu": 1,
+        "fri": 1,
+        "sat": 1,
+        "sun": 1
+      },
+      "Z1Timer_Slots": {
+        "mon": 3,
+        "tue": 3,
+        "wed": 3,
+        "thu": 2,
+        "fri": 3,
+        "sat": 3,
+        "sun": 3
+      },
+      "CirculationTimer_Monday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "CirculationTimer_Tuesday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "CirculationTimer_Wednesday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "CirculationTimer_Thursday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "CirculationTimer_Friday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "CirculationTimer_Saturday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "CirculationTimer_Sunday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "Z1Timer_Monday_Slot2": {
+        "from_hour": 19,
+        "from_min": 20,
+        "to_hour": 19,
+        "to_min": 30
+      },
+      "Z1Timer_Tuesday_Slot2": {
+        "from_hour": 19,
+        "from_min": 20,
+        "to_hour": 19,
+        "to_min": 30
+      },
+      "Z1Timer_Wednesday_Slot2": {
+        "from_hour": 19,
+        "from_min": 20,
+        "to_hour": 19,
+        "to_min": 30
+      },
+      "Z1Timer_Thursday_Slot2": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Z1Timer_Friday_Slot2": {
+        "from_hour": 19,
+        "from_min": 20,
+        "to_hour": 19,
+        "to_min": 30
+      },
+      "Z1Timer_Saturday_Slot2": {
+        "from_hour": 11,
+        "from_min": 30,
+        "to_hour": 11,
+        "to_min": 40
+      },
+      "Z1Timer_Sunday_Slot2": {
+        "from_hour": 11,
+        "from_min": 30,
+        "to_hour": 11,
+        "to_min": 40
+      },
+      "CirculationTimer_Monday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CirculationTimer_Tuesday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CirculationTimer_Wednesday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CirculationTimer_Thursday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CirculationTimer_Friday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CirculationTimer_Saturday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CirculationTimer_Sunday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CoolingTimer_Monday": {
+        "from_hour": 8,
+        "from_min": 30,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "CoolingTimer_Tuesday": {
+        "from_hour": 11,
+        "from_min": 0,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "CoolingTimer_Wednesday": {
+        "from_hour": 8,
+        "from_min": 30,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "CoolingTimer_Thursday": {
+        "from_hour": 8,
+        "from_min": 30,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "CoolingTimer_Friday": {
+        "from_hour": 8,
+        "from_min": 30,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "CoolingTimer_Saturday": {
+        "from_hour": 8,
+        "from_min": 30,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "CoolingTimer_Sunday": {
+        "from_hour": 8,
+        "from_min": 30,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "HwcTimer_Monday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "HwcTimer_Tuesday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "HwcTimer_Wednesday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "HwcTimer_Thursday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "HwcTimer_Friday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "HwcTimer_Saturday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "HwcTimer_Sunday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "Z1Timer_Monday": {
+        "from_hour": 6,
+        "from_min": 0,
+        "to_hour": 6,
+        "to_min": 10
+      },
+      "Z1Timer_Tuesday": {
+        "from_hour": 6,
+        "from_min": 0,
+        "to_hour": 6,
+        "to_min": 10
+      },
+      "Z1Timer_Wednesday": {
+        "from_hour": 6,
+        "from_min": 0,
+        "to_hour": 6,
+        "to_min": 10
+      },
+      "Z1Timer_Thursday": {
+        "from_hour": 19,
+        "from_min": 0,
+        "to_hour": 19,
+        "to_min": 10
+      },
+      "Z1Timer_Friday": {
+        "from_hour": 6,
+        "from_min": 0,
+        "to_hour": 6,
+        "to_min": 10
+      },
+      "Z1Timer_Saturday": {
+        "from_hour": 7,
+        "from_min": 30,
+        "to_hour": 7,
+        "to_min": 40
+      },
+      "Z1Timer_Sunday": {
+        "from_hour": 7,
+        "from_min": 30,
+        "to_hour": 7,
+        "to_min": 40
+      },
+      "CirculationTimer_Monday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "CirculationTimer_Tuesday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "CirculationTimer_Wednesday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "CirculationTimer_Thursday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "CirculationTimer_Friday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "CirculationTimer_Saturday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "CirculationTimer_Sunday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "Z1Timer_Monday_Slot3": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Z1Timer_Tuesday_Slot3": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Z1Timer_Wednesday_Slot3": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Z1Timer_Friday_Slot3": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Z1Timer_Saturday_Slot3": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Z1Timer_Sunday_Slot3": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Hc1ActualFlowTempDesired": {
+        "value": 0
+      },
+      "HwcStorageTemp": {
+        "value": 50.5
+      },
+      "Hc1FlowTemp": {
+        "value": 22.5
+      },
+      "Z1RoomTemp": {
+        "value": 22.725
+      },
+      "Z1Status": {
+        "value": "auto"
+      },
+      "Hc1HeatCurveAdaption": {
+        "value": 0
+      },
+      "DisplayedOutsideTemp": {
+        "value": 3.58594
+      },
+      "Hc1ExcessTemp": {
+        "value": 0
+      },
+      "Z1QuickVetoTemp": {
+        "value": 25.3
+      },
+      "Z1NightTemp": {
+        "value": 19
+      },
+      "MaxRoomHumidity": {
+        "value": 40
+      },
+      "Hc1AutoOffMode": {
+        "value": "eco"
+      },
+      "Z1SFMode": {
+        "value": "auto"
+      },
+      "Hc1MinFlowTempDesired": {
+        "value": 24
+      },
+      "Z1ValveStatus": {
+        "value": 0
+      },
+      "Hc1MaxFlowTempDesired": {
+        "value": 35
+      },
+      "CoolingFlowTempDesiredMin": {
+        "value": 17
+      },
+      "AdaptHeatCurve": {
+        "value": "yes"
+      },
+      "Hc1SummerTempLimit": {
+        "value": 23
+      },
+      "Hc1RoomTempSwitchOn": {
+        "value": "modulating"
+      },
+      "Hc1Status": {
+        "value": 0
+      },
+      "CoolingFlowTempDesiredMax": {
+        "value": 20
+      },
+      "HwcMaxFlowTempDesired": {
+        "value": 80
+      },
+      "PrEnergySumHcThisMonth": {
+        "value": 49
+      },
+      "PrEnergySumHcLastMonth": {
+        "value": 163
+      },
+      "PrEnergySumHwcThisMonth": {
+        "value": 9
+      },
+      "PrEnergySumHc": {
+        "value": 3735
+      },
+      "PrEnergySumHwcLastMonth": {
+        "value": 53
+      },
+      "PrEnergySumHwc": {
+        "value": 1362
+      },
+      "CylinderChargeHyst": {
+        "value": 7
+      },
+      "ErrorMemorySlot": {
+        "slot": 2,
+        "error": null,
+        "data": "ff ff ff ff ff ff ff ff"
+      },
+      "Currenterror": {
+        "error": null,
+        "error_1": null,
+        "error_2": null,
+        "error_3": null,
+        "error_4": null
+      },
+      "CylinderChargeOffset": {
+        "value": 7
+      },
+      "MaxCylinderChargeTime": {
+        "value": 120
+      },
+      "HwcLockTime": {
+        "value": 60
+      },
+      "HwcParallelLoading": {
+        "value": "off"
+      },
+      "BufferChargeOffset": {
+        "value": 0
+      },
+      "BivalencePointHc": {
+        "value": -15
+      },
+      "BivalencePointHwc": {
+        "value": -15
+      },
+      "AlternativePoint": {
+        "value": -21
+      },
+      "GlobalSystemOff": {
+        "value": "no"
+      },
+      "Z1OpMode": {
+        "value": "auto"
+      },
+      "Z1ActualRoomTempDesired": {
+        "value": 6.5
+      },
+      "Z1CoolingTempDesired": {
+        "value": 99
+      },
+      "Hc1PumpStatus": {
+        "value": 0
+      },
+      "Z1ManualTemp": {
+        "value": 11
+      },
+      "SystemOperatingState": {
+        "value": "standby"
+      }
+    },
+    "basv3": {
+      "HwcStatus": {
+        "value": "auto"
+      },
+      "HolidayTemp": {
+        "value": 13
+      },
+      "HolidayStartDate": {
+        "day": 1,
+        "month": 1,
+        "year": 15
+      },
+      "HolidayStartTime": {
+        "hours": 0,
+        "minutes": 0,
+        "seconds": 0
+      },
+      "HolidayEndDate": {
+        "day": 1,
+        "month": 1,
+        "year": 15
+      },
+      "HolidayEndTime": {
+        "hours": 0,
+        "minutes": 0,
+        "seconds": 0
+      },
+      "CoolingStartDate": {
+        "day": 1,
+        "month": 1,
+        "year": 19
+      },
+      "CoolingEndDate": {
+        "day": 1,
+        "month": 1,
+        "year": 19
+      },
+      "CoolingReleaseStatus": {
+        "value": "on"
+      },
+      "HwcSFMode": {
+        "value": "auto"
+      },
+      "HwcFlowTemp": {
+        "value": 0
+      },
+      "Hc1HeatCurve": {
+        "value": 0.2
+      },
+      "PrEnergySolarTotal": {
+        "energy": 0
+      },
+      "CirculationTimer_Slots": {
+        "mon": 3,
+        "tue": 3,
+        "wed": 3,
+        "thu": 3,
+        "fri": 3,
+        "sat": 3,
+        "sun": 3
+      },
+      "CoolingTimer_Slots": {
+        "mon": 1,
+        "tue": 1,
+        "wed": 1,
+        "thu": 1,
+        "fri": 1,
+        "sat": 1,
+        "sun": 1
+      },
+      "HwcTimer_Slots": {
+        "mon": 1,
+        "tue": 1,
+        "wed": 1,
+        "thu": 1,
+        "fri": 1,
+        "sat": 1,
+        "sun": 1
+      },
+      "Z1Timer_Slots": {
+        "mon": 3,
+        "tue": 3,
+        "wed": 3,
+        "thu": 2,
+        "fri": 3,
+        "sat": 3,
+        "sun": 3
+      },
+      "CirculationTimer_Monday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "CirculationTimer_Tuesday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "CirculationTimer_Wednesday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "CirculationTimer_Thursday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "CirculationTimer_Friday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "CirculationTimer_Saturday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "CirculationTimer_Sunday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "Z1Timer_Monday_Slot2": {
+        "from_hour": 19,
+        "from_min": 20,
+        "to_hour": 19,
+        "to_min": 30
+      },
+      "Z1Timer_Tuesday_Slot2": {
+        "from_hour": 19,
+        "from_min": 20,
+        "to_hour": 19,
+        "to_min": 30
+      },
+      "Z1Timer_Wednesday_Slot2": {
+        "from_hour": 19,
+        "from_min": 20,
+        "to_hour": 19,
+        "to_min": 30
+      },
+      "Z1Timer_Thursday_Slot2": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Z1Timer_Friday_Slot2": {
+        "from_hour": 19,
+        "from_min": 20,
+        "to_hour": 19,
+        "to_min": 30
+      },
+      "Z1Timer_Saturday_Slot2": {
+        "from_hour": 11,
+        "from_min": 30,
+        "to_hour": 11,
+        "to_min": 40
+      },
+      "Z1Timer_Sunday_Slot2": {
+        "from_hour": 11,
+        "from_min": 30,
+        "to_hour": 11,
+        "to_min": 40
+      },
+      "CirculationTimer_Monday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CirculationTimer_Tuesday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CirculationTimer_Wednesday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CirculationTimer_Thursday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CirculationTimer_Friday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CirculationTimer_Saturday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CirculationTimer_Sunday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CoolingTimer_Monday": {
+        "from_hour": 8,
+        "from_min": 30,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "CoolingTimer_Tuesday": {
+        "from_hour": 11,
+        "from_min": 0,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "CoolingTimer_Wednesday": {
+        "from_hour": 8,
+        "from_min": 30,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "CoolingTimer_Thursday": {
+        "from_hour": 8,
+        "from_min": 30,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "CoolingTimer_Friday": {
+        "from_hour": 8,
+        "from_min": 30,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "CoolingTimer_Saturday": {
+        "from_hour": 8,
+        "from_min": 30,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "CoolingTimer_Sunday": {
+        "from_hour": 8,
+        "from_min": 30,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "HwcTimer_Monday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "HwcTimer_Tuesday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "HwcTimer_Wednesday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "HwcTimer_Thursday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "HwcTimer_Friday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "HwcTimer_Saturday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "HwcTimer_Sunday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "Z1Timer_Monday": {
+        "from_hour": 6,
+        "from_min": 0,
+        "to_hour": 6,
+        "to_min": 10
+      },
+      "Z1Timer_Tuesday": {
+        "from_hour": 6,
+        "from_min": 0,
+        "to_hour": 6,
+        "to_min": 10
+      },
+      "Z1Timer_Wednesday": {
+        "from_hour": 6,
+        "from_min": 0,
+        "to_hour": 6,
+        "to_min": 10
+      },
+      "Z1Timer_Thursday": {
+        "from_hour": 19,
+        "from_min": 0,
+        "to_hour": 19,
+        "to_min": 10
+      },
+      "Z1Timer_Friday": {
+        "from_hour": 6,
+        "from_min": 0,
+        "to_hour": 6,
+        "to_min": 10
+      },
+      "Z1Timer_Saturday": {
+        "from_hour": 7,
+        "from_min": 30,
+        "to_hour": 7,
+        "to_min": 40
+      },
+      "Z1Timer_Sunday": {
+        "from_hour": 7,
+        "from_min": 30,
+        "to_hour": 7,
+        "to_min": 40
+      },
+      "CirculationTimer_Monday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "CirculationTimer_Tuesday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "CirculationTimer_Wednesday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "CirculationTimer_Thursday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "CirculationTimer_Friday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "CirculationTimer_Saturday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "CirculationTimer_Sunday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "Z1Timer_Monday_Slot3": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Z1Timer_Tuesday_Slot3": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Z1Timer_Wednesday_Slot3": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Z1Timer_Friday_Slot3": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Z1Timer_Saturday_Slot3": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Z1Timer_Sunday_Slot3": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Hc1ActualFlowTempDesired": {
+        "value": 0
+      },
+      "HwcStorageTemp": {
+        "value": 50.5
+      },
+      "Hc1FlowTemp": {
+        "value": 22.5
+      },
+      "Z1RoomTemp": {
+        "value": 22.725
+      },
+      "Z1Status": {
+        "value": "auto"
+      },
+      "Hc1HeatCurveAdaption": {
+        "value": 0
+      },
+      "DisplayedOutsideTemp": {
+        "value": 3.58594
+      },
+      "Hc1ExcessTemp": {
+        "value": 0
+      },
+      "Z1QuickVetoTemp": {
+        "value": 25.3
+      },
+      "Z1NightTemp": {
+        "value": 19
+      },
+      "MaxRoomHumidity": {
+        "value": 40
+      },
+      "Hc1AutoOffMode": {
+        "value": "eco"
+      },
+      "Z1SFMode": {
+        "value": "auto"
+      },
+      "Hc1MinFlowTempDesired": {
+        "value": 24
+      },
+      "Z1ValveStatus": {
+        "value": 0
+      },
+      "Hc1MaxFlowTempDesired": {
+        "value": 35
+      },
+      "CoolingFlowTempDesiredMin": {
+        "value": 17
+      },
+      "AdaptHeatCurve": {
+        "value": "yes"
+      },
+      "Hc1SummerTempLimit": {
+        "value": 23
+      },
+      "Hc1RoomTempSwitchOn": {
+        "value": "modulating"
+      },
+      "Hc1Status": {
+        "value": 0
+      },
+      "CoolingFlowTempDesiredMax": {
+        "value": 20
+      },
+      "HwcMaxFlowTempDesired": {
+        "value": 80
+      },
+      "PrEnergySumHcThisMonth": {
+        "value": 49
+      },
+      "PrEnergySumHcLastMonth": {
+        "value": 163
+      },
+      "PrEnergySumHwcThisMonth": {
+        "value": 9
+      },
+      "PrEnergySumHc": {
+        "value": 3735
+      },
+      "PrEnergySumHwcLastMonth": {
+        "value": 53
+      },
+      "PrEnergySumHwc": {
+        "value": 1362
+      },
+      "CylinderChargeHyst": {
+        "value": 7
+      },
+      "ErrorMemorySlot": {
+        "slot": 2,
+        "error": null,
+        "data": "ff ff ff ff ff ff ff ff"
+      },
+      "Currenterror": {
+        "error": null,
+        "error_1": null,
+        "error_2": null,
+        "error_3": null,
+        "error_4": null
+      },
+      "CylinderChargeOffset": {
+        "value": 7
+      },
+      "MaxCylinderChargeTime": {
+        "value": 120
+      },
+      "HwcLockTime": {
+        "value": 60
+      },
+      "HwcParallelLoading": {
+        "value": "off"
+      },
+      "BufferChargeOffset": {
+        "value": 0
+      },
+      "BivalencePointHc": {
+        "value": -15
+      },
+      "BivalencePointHwc": {
+        "value": -15
+      },
+      "AlternativePoint": {
+        "value": -21
+      },
+      "GlobalSystemOff": {
+        "value": "no"
+      },
+      "Z1OpMode": {
+        "value": "auto"
+      },
+      "Z1ActualRoomTempDesired": {
+        "value": 6.5
+      },
+      "Z1CoolingTempDesired": {
+        "value": 99
+      },
+      "Hc1PumpStatus": {
+        "value": 0
+      },
+      "Z1ManualTemp": {
+        "value": 11
+      },
+      "SystemOperatingState": {
+        "value": "standby"
+      }
+    },
+    "ctlv3": {
+      "HwcStatus": {
+        "value": "auto"
+      },
+      "HolidayTemp": {
+        "value": 13
+      },
+      "HolidayStartDate": {
+        "day": 1,
+        "month": 1,
+        "year": 15
+      },
+      "HolidayStartTime": {
+        "hours": 0,
+        "minutes": 0,
+        "seconds": 0
+      },
+      "HolidayEndDate": {
+        "day": 1,
+        "month": 1,
+        "year": 15
+      },
+      "HolidayEndTime": {
+        "hours": 0,
+        "minutes": 0,
+        "seconds": 0
+      },
+      "CoolingStartDate": {
+        "day": 1,
+        "month": 1,
+        "year": 19
+      },
+      "CoolingEndDate": {
+        "day": 1,
+        "month": 1,
+        "year": 19
+      },
+      "CoolingReleaseStatus": {
+        "value": "on"
+      },
+      "HwcSFMode": {
+        "value": "auto"
+      },
+      "HwcFlowTemp": {
+        "value": 0
+      },
+      "Hc1HeatCurve": {
+        "value": 0.2
+      },
+      "PrEnergySolarTotal": {
+        "energy": 0
+      },
+      "CirculationTimer_Slots": {
+        "mon": 3,
+        "tue": 3,
+        "wed": 3,
+        "thu": 3,
+        "fri": 3,
+        "sat": 3,
+        "sun": 3
+      },
+      "CoolingTimer_Slots": {
+        "mon": 1,
+        "tue": 1,
+        "wed": 1,
+        "thu": 1,
+        "fri": 1,
+        "sat": 1,
+        "sun": 1
+      },
+      "HwcTimer_Slots": {
+        "mon": 1,
+        "tue": 1,
+        "wed": 1,
+        "thu": 1,
+        "fri": 1,
+        "sat": 1,
+        "sun": 1
+      },
+      "Z1Timer_Slots": {
+        "mon": 3,
+        "tue": 3,
+        "wed": 3,
+        "thu": 2,
+        "fri": 3,
+        "sat": 3,
+        "sun": 3
+      },
+      "CirculationTimer_Monday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "CirculationTimer_Tuesday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "CirculationTimer_Wednesday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "CirculationTimer_Thursday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "CirculationTimer_Friday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "CirculationTimer_Saturday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "CirculationTimer_Sunday_Slot2": {
+        "from_hour": 9,
+        "from_min": 30,
+        "to_hour": 17,
+        "to_min": 0
+      },
+      "Z1Timer_Monday_Slot2": {
+        "from_hour": 19,
+        "from_min": 20,
+        "to_hour": 19,
+        "to_min": 30
+      },
+      "Z1Timer_Tuesday_Slot2": {
+        "from_hour": 19,
+        "from_min": 20,
+        "to_hour": 19,
+        "to_min": 30
+      },
+      "Z1Timer_Wednesday_Slot2": {
+        "from_hour": 19,
+        "from_min": 20,
+        "to_hour": 19,
+        "to_min": 30
+      },
+      "Z1Timer_Thursday_Slot2": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Z1Timer_Friday_Slot2": {
+        "from_hour": 19,
+        "from_min": 20,
+        "to_hour": 19,
+        "to_min": 30
+      },
+      "Z1Timer_Saturday_Slot2": {
+        "from_hour": 11,
+        "from_min": 30,
+        "to_hour": 11,
+        "to_min": 40
+      },
+      "Z1Timer_Sunday_Slot2": {
+        "from_hour": 11,
+        "from_min": 30,
+        "to_hour": 11,
+        "to_min": 40
+      },
+      "CirculationTimer_Monday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CirculationTimer_Tuesday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CirculationTimer_Wednesday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CirculationTimer_Thursday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CirculationTimer_Friday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CirculationTimer_Saturday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CirculationTimer_Sunday": {
+        "from_hour": 0,
+        "from_min": 0,
+        "to_hour": 1,
+        "to_min": 30
+      },
+      "CoolingTimer_Monday": {
+        "from_hour": 8,
+        "from_min": 30,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "CoolingTimer_Tuesday": {
+        "from_hour": 11,
+        "from_min": 0,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "CoolingTimer_Wednesday": {
+        "from_hour": 8,
+        "from_min": 30,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "CoolingTimer_Thursday": {
+        "from_hour": 8,
+        "from_min": 30,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "CoolingTimer_Friday": {
+        "from_hour": 8,
+        "from_min": 30,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "CoolingTimer_Saturday": {
+        "from_hour": 8,
+        "from_min": 30,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "CoolingTimer_Sunday": {
+        "from_hour": 8,
+        "from_min": 30,
+        "to_hour": 18,
+        "to_min": 0,
+        "cooling_temp": 19.5
+      },
+      "HwcTimer_Monday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "HwcTimer_Tuesday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "HwcTimer_Wednesday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "HwcTimer_Thursday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "HwcTimer_Friday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "HwcTimer_Saturday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "HwcTimer_Sunday": {
+        "from_hour": 12,
+        "from_min": 0,
+        "to_hour": 14,
+        "to_min": 0
+      },
+      "Z1Timer_Monday": {
+        "from_hour": 6,
+        "from_min": 0,
+        "to_hour": 6,
+        "to_min": 10
+      },
+      "Z1Timer_Tuesday": {
+        "from_hour": 6,
+        "from_min": 0,
+        "to_hour": 6,
+        "to_min": 10
+      },
+      "Z1Timer_Wednesday": {
+        "from_hour": 6,
+        "from_min": 0,
+        "to_hour": 6,
+        "to_min": 10
+      },
+      "Z1Timer_Thursday": {
+        "from_hour": 19,
+        "from_min": 0,
+        "to_hour": 19,
+        "to_min": 10
+      },
+      "Z1Timer_Friday": {
+        "from_hour": 6,
+        "from_min": 0,
+        "to_hour": 6,
+        "to_min": 10
+      },
+      "Z1Timer_Saturday": {
+        "from_hour": 7,
+        "from_min": 30,
+        "to_hour": 7,
+        "to_min": 40
+      },
+      "Z1Timer_Sunday": {
+        "from_hour": 7,
+        "from_min": 30,
+        "to_hour": 7,
+        "to_min": 40
+      },
+      "CirculationTimer_Monday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "CirculationTimer_Tuesday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "CirculationTimer_Wednesday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "CirculationTimer_Thursday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "CirculationTimer_Friday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "CirculationTimer_Saturday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "CirculationTimer_Sunday_Slot3": {
+        "from_hour": 17,
+        "from_min": 0,
+        "to_hour": 24,
+        "to_min": 0
+      },
+      "Z1Timer_Monday_Slot3": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Z1Timer_Tuesday_Slot3": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Z1Timer_Wednesday_Slot3": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Z1Timer_Friday_Slot3": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Z1Timer_Saturday_Slot3": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Z1Timer_Sunday_Slot3": {
+        "from_hour": 21,
+        "from_min": 50,
+        "to_hour": 22,
+        "to_min": 0
+      },
+      "Hc1ActualFlowTempDesired": {
+        "value": 0
+      },
+      "HwcStorageTemp": {
+        "value": 50.5
+      },
+      "Hc1FlowTemp": {
+        "value": 22.5
+      },
+      "Z1RoomTemp": {
+        "value": 22.725
+      },
+      "Z1Status": {
+        "value": "auto"
+      },
+      "Hc1HeatCurveAdaption": {
+        "value": 0
+      },
+      "DisplayedOutsideTemp": {
+        "value": 3.58594
+      },
+      "Hc1ExcessTemp": {
+        "value": 0
+      },
+      "Z1QuickVetoTemp": {
+        "value": 25.3
+      },
+      "Z1NightTemp": {
+        "value": 19
+      },
+      "MaxRoomHumidity": {
+        "value": 40
+      },
+      "Hc1AutoOffMode": {
+        "value": "eco"
+      },
+      "Z1SFMode": {
+        "value": "auto"
+      },
+      "Hc1MinFlowTempDesired": {
+        "value": 24
+      },
+      "Z1ValveStatus": {
+        "value": 0
+      },
+      "Hc1MaxFlowTempDesired": {
+        "value": 35
+      },
+      "CoolingFlowTempDesiredMin": {
+        "value": 17
+      },
+      "AdaptHeatCurve": {
+        "value": "yes"
+      },
+      "Hc1SummerTempLimit": {
+        "value": 23
+      },
+      "Hc1RoomTempSwitchOn": {
+        "value": "modulating"
+      },
+      "Hc1Status": {
+        "value": 0
+      },
+      "CoolingFlowTempDesiredMax": {
+        "value": 20
+      },
+      "HwcMaxFlowTempDesired": {
+        "value": 80
+      },
+      "PrEnergySumHcThisMonth": {
+        "value": 49
+      },
+      "PrEnergySumHcLastMonth": {
+        "value": 163
+      },
+      "PrEnergySumHwcThisMonth": {
+        "value": 9
+      },
+      "PrEnergySumHc": {
+        "value": 3735
+      },
+      "PrEnergySumHwcLastMonth": {
+        "value": 53
+      },
+      "PrEnergySumHwc": {
+        "value": 1362
+      },
+      "CylinderChargeHyst": {
+        "value": 7
+      },
+      "ErrorMemorySlot": {
+        "slot": 2,
+        "error": null,
+        "data": "ff ff ff ff ff ff ff ff"
+      },
+      "Currenterror": {
+        "error": null,
+        "error_1": null,
+        "error_2": null,
+        "error_3": null,
+        "error_4": null
+      },
+      "CylinderChargeOffset": {
+        "value": 7
+      },
+      "MaxCylinderChargeTime": {
+        "value": 120
+      },
+      "HwcLockTime": {
+        "value": 60
+      },
+      "HwcParallelLoading": {
+        "value": "off"
+      },
+      "BufferChargeOffset": {
+        "value": 0
+      },
+      "BivalencePointHc": {
+        "value": -15
+      },
+      "BivalencePointHwc": {
+        "value": -15
+      },
+      "AlternativePoint": {
+        "value": -21
+      },
+      "GlobalSystemOff": {
+        "value": "no"
+      },
+      "Z1OpMode": {
+        "value": "auto"
+      },
+      "Z1ActualRoomTempDesired": {
+        "value": 6.5
+      },
+      "Z1CoolingTempDesired": {
+        "value": 99
+      },
+      "Hc1PumpStatus": {
+        "value": 0
+      },
+      "Z1ManualTemp": {
+        "value": 11
+      },
+      "SystemOperatingState": {
+        "value": "standby"
+      }
+    },
+    "broadcast": {
+      "CoolingStatus": {
+        "status": "off"
+      },
+      "SystemStatus": {
+        "status": 0
+      },
+      "Vdatetime": {
+        "time": "19:48:22",
+        "date": "06.11.2026"
+      },
+      "Outsidetemp": {
+        "temp": 3.469
+      }
+    }
+  }
+}

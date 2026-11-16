@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from datetime import date
 from typing import Any
 
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
@@ -11,6 +12,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.util import dt as dt_util
 
 from .const import CIRCUIT_BASS3, DEVICE_CLIMATE_CONTROLLER, DOMAIN
 from .coordinator import SaunierGeniaCoordinator
@@ -75,6 +77,7 @@ async def async_setup_entry(
         SaunierGeniaDhwBoostSwitch(coordinator),
         SaunierGeniaCoolingSeasonSwitch(coordinator),
         SaunierGeniaHolidayModeSwitch(coordinator),
+        SaunierGeniaVentilationBoostSwitch(coordinator),
         *(
             SaunierGeniaStandardSwitch(coordinator, description)
             for description in STANDARD_SWITCH_DESCRIPTIONS
@@ -85,6 +88,8 @@ async def async_setup_entry(
 
 class SaunierGeniaDhwBoostSwitch(SaunierGeniaEntity, SwitchEntity):
     """Switch for One-Time DHW Boost (ACS Puntual) with Smart Forced Hysteresis Bypass."""
+
+    _gate_availability_on_ebus = True
 
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the DHW Boost switch."""
@@ -129,6 +134,8 @@ class SaunierGeniaDhwBoostSwitch(SaunierGeniaEntity, SwitchEntity):
 class SaunierGeniaCoolingSeasonSwitch(SaunierGeniaEntity, SwitchEntity):
     """Switch for Cooling Season Authorization (Lock 1: CoolingStartDate / CoolingEndDate)."""
 
+    _gate_availability_on_ebus = True
+
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the Cooling Season Authorization (Lock 1) switch."""
         super().__init__(
@@ -143,19 +150,55 @@ class SaunierGeniaCoolingSeasonSwitch(SaunierGeniaEntity, SwitchEntity):
             ],
             unique_id_suffix="switch_bass3_coolinglock1_season",
         )
+        self._cooling_lock = asyncio.Lock()
 
     @property
     def is_on(self) -> bool | None:
-        """Return True if CoolingReleaseStatus is 'on' or CoolingEndDate year is 99."""
+        """Return True if Lock 1 is open (CoolingReleaseStatus='on', year 99, or active window)."""
         release_status = self.coordinator.get_str(
             CIRCUIT_BASS3, "CoolingReleaseStatus", "value"
         )
         end_year = self.coordinator.get_int(CIRCUIT_BASS3, "CoolingEndDate", "year")
         if release_status is None and end_year is None:
             return None
-        return (
-            release_status is not None and release_status.lower() == "on"
-        ) or end_year == 99
+        if release_status is not None and release_status.lower() == "on":
+            return True
+        if end_year == 99:
+            return True
+        if end_year == 19:
+            return False
+        if end_year is not None:
+            end_msg = self.coordinator.get_message(CIRCUIT_BASS3, "CoolingEndDate")
+            if isinstance(end_msg, dict):
+                ed = end_msg.get("day")
+                em = end_msg.get("month")
+                if isinstance(ed, int) and isinstance(em, int):
+                    try:
+                        end_dt = date(2000 + end_year, em, ed)
+                    except ValueError:
+                        return False
+                    today = dt_util.now().date()
+                    if end_dt < today:
+                        return False
+                    start_msg = self.coordinator.get_message(
+                        CIRCUIT_BASS3, "CoolingStartDate"
+                    )
+                    if isinstance(start_msg, dict):
+                        sy = start_msg.get("year")
+                        sm = start_msg.get("month")
+                        sd = start_msg.get("day")
+                        if (
+                            isinstance(sy, int)
+                            and isinstance(sm, int)
+                            and isinstance(sd, int)
+                        ):
+                            try:
+                                if date(2000 + sy, sm, sd) > today:
+                                    return False
+                            except ValueError:
+                                return False
+                    return True
+        return False
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -187,33 +230,37 @@ class SaunierGeniaCoolingSeasonSwitch(SaunierGeniaEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Open Lock 1 (custom period if pre-set or indefinite 01;01;26 to 01;01;99)."""
-        start_date = self.coordinator.custom_cooling_start_date or "01;01;26"
-        end_date = self.coordinator.custom_cooling_end_date or "01;01;99"
-        await self.coordinator.async_write_parameter(
-            CIRCUIT_BASS3, "CoolingStartDate", start_date
-        )
-        await asyncio.sleep(0.5)
-        await self.coordinator.async_write_parameter(
-            CIRCUIT_BASS3, "CoolingEndDate", end_date
-        )
+        async with self._cooling_lock:
+            start_date = self.coordinator.custom_cooling_start_date or "01;01;26"
+            end_date = self.coordinator.custom_cooling_end_date or "01;01;99"
+            await self.coordinator.async_write_parameter(
+                CIRCUIT_BASS3, "CoolingStartDate", start_date
+            )
+            await asyncio.sleep(0.5)
+            await self.coordinator.async_write_parameter(
+                CIRCUIT_BASS3, "CoolingEndDate", end_date
+            )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Close Lock 1 to epoch 2019 (01;01;19) and set Z1OpModeCooling='off'."""
-        await self.coordinator.async_write_parameter(
-            CIRCUIT_BASS3, "CoolingStartDate", "01;01;19"
-        )
-        await asyncio.sleep(0.5)
-        await self.coordinator.async_write_parameter(
-            CIRCUIT_BASS3, "CoolingEndDate", "01;01;19"
-        )
-        await asyncio.sleep(0.5)
-        await self.coordinator.async_write_parameter(
-            CIRCUIT_BASS3, "Z1OpModeCooling", "off"
-        )
+        async with self._cooling_lock:
+            await self.coordinator.async_write_parameter(
+                CIRCUIT_BASS3, "CoolingStartDate", "01;01;19"
+            )
+            await asyncio.sleep(0.5)
+            await self.coordinator.async_write_parameter(
+                CIRCUIT_BASS3, "CoolingEndDate", "01;01;19"
+            )
+            await asyncio.sleep(0.5)
+            await self.coordinator.async_write_parameter(
+                CIRCUIT_BASS3, "Z1OpModeCooling", "off"
+            )
 
 
 class SaunierGeniaHolidayModeSwitch(SaunierGeniaEntity, SwitchEntity):
-    """Switch for Away / Holiday Mode (Modo Ausencia)."""
+    """Switch for Away / Holiday Mode."""
+
+    _gate_availability_on_ebus = True
 
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the Holiday Mode switch."""
@@ -226,7 +273,9 @@ class SaunierGeniaHolidayModeSwitch(SaunierGeniaEntity, SwitchEntity):
                 (CIRCUIT_BASS3, "HwcStatus"),
                 (CIRCUIT_BASS3, "HolidayTemp"),
                 (CIRCUIT_BASS3, "HolidayStartDate"),
+                (CIRCUIT_BASS3, "HolidayStartTime"),
                 (CIRCUIT_BASS3, "HolidayEndDate"),
+                (CIRCUIT_BASS3, "HolidayEndTime"),
             ],
             unique_id_suffix="switch_bass3_holiday_mode",
         )
@@ -240,43 +289,35 @@ class SaunierGeniaHolidayModeSwitch(SaunierGeniaEntity, SwitchEntity):
         start_year = self.coordinator.get_int(CIRCUIT_BASS3, "HolidayStartDate", "year")
         if z1_status is None and hwc_status is None and end_year is None:
             return None
+        if (z1_status is not None and z1_status.lower() == "holidayaway") or (
+            hwc_status is not None and hwc_status.lower() == "holidayaway"
+        ):
+            return True
         if start_year == 15 or end_year == 15:
             return False
-        if end_year is not None and end_year != 15:
-            return self.coordinator.get_holiday_remaining_days() != "Inactivo"
-        return (z1_status is not None and z1_status.lower() == "holidayaway") or (
-            hwc_status is not None and hwc_status.lower() == "holidayaway"
-        )
+        if end_year is not None:
+            return bool(
+                self.coordinator.get_holiday_remaining_attributes().get("is_active")
+            )
+        return False
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return holiday diagnostic attributes including start/end dates."""
-        start_msg = self.coordinator.get_message(CIRCUIT_BASS3, "HolidayStartDate")
-        end_msg = self.coordinator.get_message(CIRCUIT_BASS3, "HolidayEndDate")
+        """Return holiday diagnostic attributes including start/end dates, times, and remaining duration."""
+        rem_attrs = self.coordinator.get_holiday_remaining_attributes()
         return {
             "holiday_ongoing": bool(self.is_on),
             "holiday_temp": self.coordinator.get_float(
                 CIRCUIT_BASS3, "HolidayTemp", "value"
             ),
             "holiday_remaining_days": self.coordinator.get_holiday_remaining_days(),
-            "holiday_start_date": (
-                f"{start_msg.get('day'):02d}/{start_msg.get('month'):02d}/20{start_msg.get('year'):02d}"
-                if start_msg
-                and all(
-                    isinstance(start_msg.get(k), int) for k in ("day", "month", "year")
-                )
-                and start_msg.get("year") != 15
-                else None
-            ),
-            "holiday_end_date": (
-                f"{end_msg.get('day'):02d}/{end_msg.get('month'):02d}/20{end_msg.get('year'):02d}"
-                if end_msg
-                and all(
-                    isinstance(end_msg.get(k), int) for k in ("day", "month", "year")
-                )
-                and end_msg.get("year") != 15
-                else None
-            ),
+            "holiday_remaining_hours": rem_attrs.get("remaining_hours"),
+            "holiday_remaining_minutes": rem_attrs.get("remaining_minutes"),
+            "holiday_remaining_formatted": rem_attrs.get("remaining_formatted"),
+            "holiday_start_date": rem_attrs.get("start_date"),
+            "holiday_start_time": rem_attrs.get("start_time"),
+            "holiday_end_date": rem_attrs.get("end_date"),
+            "holiday_end_time": rem_attrs.get("end_time"),
         }
 
     async def async_turn_on(self, **kwargs: Any) -> None:
@@ -288,10 +329,51 @@ class SaunierGeniaHolidayModeSwitch(SaunierGeniaEntity, SwitchEntity):
         await self.coordinator.async_cancel_holiday_mode()
 
 
+class SaunierGeniaVentilationBoostSwitch(SaunierGeniaEntity, SwitchEntity):
+    """Switch for Intensive Ventilation Boost (30-minute heating pause)."""
+
+    _gate_availability_on_ebus = True
+
+    def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
+        """Initialize the Intensive Ventilation Boost switch."""
+        super().__init__(
+            coordinator=coordinator,
+            device_key=DEVICE_CLIMATE_CONTROLLER,
+            translation_key="ventilation_boost_switch",
+            subscriptions=[
+                (CIRCUIT_BASS3, "Z1Status"),
+                (CIRCUIT_BASS3, "VentilationBoost"),
+            ],
+            unique_id_suffix="switch_bass3_ventilation_boost",
+        )
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return True if intensive ventilation boost is currently active."""
+        z1_status = self.coordinator.get_str(CIRCUIT_BASS3, "Z1Status", "value")
+        if z1_status is not None:
+            return z1_status.lower() == "ventilation"
+        vent_boost = self.coordinator.get_str(
+            CIRCUIT_BASS3, "VentilationBoost", "value"
+        )
+        if vent_boost is None:
+            return None
+        return vent_boost.lower() in ("on", "1", "true", "yes")
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Activate Intensive Ventilation Boost."""
+        await self.coordinator.async_activate_ventilation_boost()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Cancel Intensive Ventilation Boost."""
+        await self.coordinator.async_cancel_ventilation_boost()
+
+
 class SaunierGeniaStandardSwitch(SaunierGeniaEntity, SwitchEntity):
     """Standard single-register switch entity for MiPro Sense parameters."""
 
     entity_description: SaunierGeniaSwitchEntityDescription
+    _gate_availability_on_ebus = True
 
     def __init__(
         self,

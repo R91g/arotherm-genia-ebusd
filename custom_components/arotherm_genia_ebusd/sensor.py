@@ -14,10 +14,15 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    CALC_CIRCUIT,
     CIRCUIT_BASS3,
+    CIRCUIT_HMU,
+    CIRCUIT_HMUX0,
+    CONTROLLER_CIRCUITS,
     DAY_SHORT_KEYS,
     DEVICE_CLIMATE_CONTROLLER,
     DOMAIN,
+    OUTDOOR_CIRCUITS,
     WEEKDAYS_LIST,
 )
 from .coordinator import SaunierGeniaCoordinator
@@ -73,17 +78,15 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
         if description.fallback_circuit and description.fallback_message:
             subs.append((description.fallback_circuit, description.fallback_message))
         if description.key == "z1_actual_room_temp_desired":
-            subs.extend(
-                [
-                    (CIRCUIT_BASS3, "Z1OpMode"),
-                    (CIRCUIT_BASS3, "Z1DayTemp"),
-                ]
-            )
+            subs.append((CIRCUIT_BASS3, "Z1OpMode"))
         elif description.key == "holiday_duration_remaining":
             subs.extend(
                 [
                     (CIRCUIT_BASS3, "HolidayStartDate"),
+                    (CIRCUIT_BASS3, "HolidayStartTime"),
+                    (CIRCUIT_BASS3, "HolidayEndTime"),
                     (CIRCUIT_BASS3, "Z1Status"),
+                    (CALC_CIRCUIT, "HolidayRemaining"),
                 ]
             )
         elif description.key == "cooling_duration_remaining":
@@ -94,20 +97,81 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
                     (CIRCUIT_BASS3, "Z1OpModeCooling"),
                 ]
             )
+        elif description.key == "vwzio_secondary_circuit_status":
+            subs.extend(
+                [
+                    (CIRCUIT_BASS3, "Hc1PumpStatus"),
+                    (CIRCUIT_BASS3, "CoolingReleaseStatus"),
+                ]
+            )
+        elif description.key == "quick_veto_remaining_time":
+            subs.extend(
+                [
+                    (CIRCUIT_BASS3, "Z1SFMode"),
+                    (CIRCUIT_BASS3, "Z1QuickVetoDuration"),
+                    (CIRCUIT_BASS3, "Z1QuickVetoTemp"),
+                    (CIRCUIT_BASS3, "Z1CoolingTempDesired"),
+                    (CIRCUIT_BASS3, "Z1CoolingManualTemp"),
+                    (CIRCUIT_BASS3, "Z1OpModeCooling"),
+                ]
+            )
+        elif description.key == "ventilation_remaining_time":
+            subs.extend(
+                [
+                    (CIRCUIT_BASS3, "Z1Status"),
+                    (CIRCUIT_BASS3, "Z1SFMode"),
+                ]
+            )
+        elif description.key == "electric_power_consumption":
+            subs.extend(
+                [
+                    (CIRCUIT_HMUX0, "PowerStatus"),
+                    (CIRCUIT_HMUX0, "RunDataElectricPowerConsumption"),
+                    (CIRCUIT_HMU, "PowerStatus"),
+                    (CIRCUIT_HMU, "RunDataElectricPowerConsumption"),
+                ]
+            )
+        elif description.key == "hmu_current_error":
+            subs.extend([(c, "Currenterror") for c in OUTDOOR_CIRCUITS])
+        elif description.key == "controller_current_error":
+            subs.extend([(c, "Currenterror") for c in CONTROLLER_CIRCUITS])
+        elif description.key == "energy_thermal_hc":
+            subs.append((CIRCUIT_BASS3, "PrEnergySumHc"))
+        elif description.key == "energy_thermal_hwc":
+            subs.append((CIRCUIT_BASS3, "PrEnergySumHwc"))
+        elif description.key == "subcooling":
+            subs.extend(
+                [
+                    (CIRCUIT_HMUX0, "RunDataCondensationTemp"),
+                    (CIRCUIT_HMUX0, "RunDataCondensateTemp"),
+                    (CIRCUIT_HMU, "RunDataCondensationTemp"),
+                    (CIRCUIT_HMU, "RunDataCondensateTemp"),
+                ]
+            )
 
         c = description.circuit.lower()
         m = description.message.lower()
         f = description.field.lower()
-        unique_id_suffix = f"{c}_{m}_{f}"
+        unique_id_suffix = description.unique_id_suffix or f"{c}_{m}_{f}"
 
         super().__init__(
             coordinator=coordinator,
             device_key=description.device_key,
             translation_key=description.translation_key or description.key,
-            subscriptions=subs,
+            subscriptions=list(dict.fromkeys(subs)),
             unique_id_suffix=unique_id_suffix,
         )
         self.entity_description = description
+        if description.key in {
+            "ebusd_symbol_rate",
+            "ebusd_reconnects",
+            "ebusd_masters",
+            "ebusd_arbitration_latency",
+            "ebusd_missing_csv_devices",
+        }:
+            self._attr_entity_registry_enabled_default = (
+                coordinator.is_ebusd_tcp_enabled
+            )
 
     @property
     def native_value(self) -> Any:
@@ -149,17 +213,23 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
 
     @property
     def native_unit_of_measurement(self) -> str | None:
-        """Return the unit of measurement, suppressing it for non-numeric states (e.g. Inactivo / Final abierto)."""
-        val = self.native_value
-        if isinstance(val, (int, float)):
-            return self.entity_description.native_unit_of_measurement
-        return None
+        """Return the unit of measurement defined on the entity description."""
+        return self.entity_description.native_unit_of_measurement
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
         """Return optional extra state attributes."""
         if self.entity_description.attr_fn is not None:
             return self.entity_description.attr_fn(self.coordinator)
+        msg_data = self.coordinator.get_message(
+            self.entity_description.circuit, self.entity_description.message
+        )
+        if isinstance(msg_data, dict):
+            extra = {
+                k: v for k, v in msg_data.items() if k != self.entity_description.field
+            }
+            if extra:
+                return extra
         return None
 
 
@@ -201,7 +271,7 @@ class SaunierGeniaWeeklyScheduleSensor(SaunierGeniaEntity, SensorEntity):
         fm = msg.get("from_min")
         th = msg.get("to_hour")
         tm = msg.get("to_min")
-        if None in (fh, fm, th, tm):
+        if fh is None or fm is None or th is None or tm is None:
             return None
 
         try:
@@ -223,17 +293,29 @@ class SaunierGeniaWeeklyScheduleSensor(SaunierGeniaEntity, SensorEntity):
                 pass
         return slot_str
 
+    def _parse_day_slot_count(
+        self, slots_msg: dict[str, Any], day: str, *, default: int = 1
+    ) -> int:
+        """Parse active slot count (0..3) for a day, ignoring bools and invalid values."""
+        short_key = DAY_SHORT_KEYS[day]
+        raw_count = slots_msg.get(short_key)
+        if raw_count is None or isinstance(raw_count, bool):
+            return default
+        try:
+            parsed = (
+                int(float(raw_count)) if isinstance(raw_count, str) else int(raw_count)
+            )
+        except (ValueError, TypeError):
+            return default
+        return parsed if 0 <= parsed <= 3 else default
+
     def _get_day_slots(self, day: str) -> list[str]:
         """Return list of formatted active slots for the given day."""
         slots_msg = (
             self.coordinator.get_message(CIRCUIT_BASS3, f"{self._timer_prefix}_Slots")
             or {}
         )
-        short_key = DAY_SHORT_KEYS[day]
-        active_count = slots_msg.get(short_key)
-        max_slots = 3
-        if isinstance(active_count, (int, float)) and 0 <= int(active_count) <= 3:
-            max_slots = int(active_count) if int(active_count) > 0 else 1
+        max_slots = self._parse_day_slot_count(slots_msg, day)
 
         formatted: list[str] = []
         for s_idx in range(1, max_slots + 1):
@@ -263,12 +345,12 @@ class SaunierGeniaWeeklyScheduleSensor(SaunierGeniaEntity, SensorEntity):
         )
         schedule_dict: dict[str, dict[str, Any]] = {}
         for day in WEEKDAYS_LIST:
-            short_key = DAY_SHORT_KEYS[day]
+            active_count = self._parse_day_slot_count(slots_msg, day)
             schedule_dict[day] = {
-                "active_slots": slots_msg.get(short_key, 1),
-                "Slot 1": self._format_slot(day, 1),
-                "Slot 2": self._format_slot(day, 2),
-                "Slot 3": self._format_slot(day, 3),
+                "active_slots": active_count,
+                "Slot 1": self._format_slot(day, 1) if active_count >= 1 else None,
+                "Slot 2": self._format_slot(day, 2) if active_count >= 2 else None,
+                "Slot 3": self._format_slot(day, 3) if active_count >= 3 else None,
             }
         return {
             "timer_prefix": self._timer_prefix,

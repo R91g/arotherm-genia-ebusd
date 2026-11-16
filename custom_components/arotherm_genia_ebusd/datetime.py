@@ -17,6 +17,13 @@ from .coordinator import SaunierGeniaCoordinator
 from .entity import SaunierGeniaEntity
 
 
+def _to_local_aware(value: datetime) -> datetime:
+    """Return a timezone-aware local datetime, attaching default TZ if naive."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=dt_util.get_default_time_zone())
+    return dt_util.as_local(value)
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -38,6 +45,7 @@ class SaunierGeniaHolidayStartDateTime(SaunierGeniaEntity, DateTimeEntity):
     """DateTime entity for Holiday / Away Mode Start Date and Time."""
 
     _attr_entity_category = EntityCategory.CONFIG
+    _gate_availability_on_ebus = True
 
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the Holiday Start DateTime entity."""
@@ -52,13 +60,14 @@ class SaunierGeniaHolidayStartDateTime(SaunierGeniaEntity, DateTimeEntity):
             ],
             unique_id_suffix="datetime_bass3_holiday_start",
         )
+        self._write_lock = asyncio.Lock()
 
     @property
     def native_value(self) -> datetime | None:
         """Return the current holiday start datetime or preselected buffer.
 
         Returns None when the bus holds the inactive sentinel (year == 15) and
-        no preselected buffer exists, so Home Assistant shows 'Desconocido'.
+        no preselected buffer exists, so Home Assistant shows 'Unknown'.
         Year == 99 (open-ended) is shown normally.
         """
         date_msg = self.coordinator.get_message(CIRCUIT_BASS3, "HolidayStartDate")
@@ -91,25 +100,27 @@ class SaunierGeniaHolidayStartDateTime(SaunierGeniaEntity, DateTimeEntity):
 
     async def async_set_value(self, value: datetime) -> None:
         """Set new holiday start date and time."""
-        loc_val = dt_util.as_local(value) if value.tzinfo else value
-        self.coordinator.preselected_holiday_start_datetime = loc_val
+        async with self._write_lock:
+            loc_val = _to_local_aware(value)
+            self.coordinator.preselected_holiday_start_datetime = loc_val
 
-        date_str = f"{loc_val.day:02d};{loc_val.month:02d};{loc_val.year % 100:02d}"
-        time_str = f"{loc_val.hour:02d};{loc_val.minute:02d};{loc_val.second:02d}"
+            date_str = f"{loc_val.day:02d};{loc_val.month:02d};{loc_val.year % 100:02d}"
+            time_str = f"{loc_val.hour:02d};{loc_val.minute:02d};{loc_val.second:02d}"
 
-        await self.coordinator.async_write_parameter(
-            CIRCUIT_BASS3, "HolidayStartDate", date_str
-        )
-        await asyncio.sleep(0.4)
-        await self.coordinator.async_write_parameter(
-            CIRCUIT_BASS3, "HolidayStartTime", time_str
-        )
+            await self.coordinator.async_write_parameter(
+                CIRCUIT_BASS3, "HolidayStartDate", date_str
+            )
+            await asyncio.sleep(0.4)
+            await self.coordinator.async_write_parameter(
+                CIRCUIT_BASS3, "HolidayStartTime", time_str
+            )
 
 
 class SaunierGeniaHolidayEndDateTime(SaunierGeniaEntity, DateTimeEntity):
     """DateTime entity for Holiday / Away Mode End Date and Time."""
 
     _attr_entity_category = EntityCategory.CONFIG
+    _gate_availability_on_ebus = True
 
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the Holiday End DateTime entity."""
@@ -124,13 +135,14 @@ class SaunierGeniaHolidayEndDateTime(SaunierGeniaEntity, DateTimeEntity):
             ],
             unique_id_suffix="datetime_bass3_holiday_end",
         )
+        self._write_lock = asyncio.Lock()
 
     @property
     def native_value(self) -> datetime | None:
         """Return the current holiday end datetime or preselected buffer.
 
         Returns None when the bus holds the inactive sentinel (year == 15) and
-        no preselected buffer exists, so Home Assistant shows 'Desconocido'.
+        no preselected buffer exists, so Home Assistant shows 'Unknown'.
         Year == 99 (open-ended) is shown normally.
         """
         date_msg = self.coordinator.get_message(CIRCUIT_BASS3, "HolidayEndDate")
@@ -163,25 +175,27 @@ class SaunierGeniaHolidayEndDateTime(SaunierGeniaEntity, DateTimeEntity):
 
     async def async_set_value(self, value: datetime) -> None:
         """Set new holiday end date and time."""
-        loc_val = dt_util.as_local(value) if value.tzinfo else value
-        self.coordinator.preselected_holiday_end_datetime = loc_val
+        async with self._write_lock:
+            loc_val = _to_local_aware(value)
+            self.coordinator.preselected_holiday_end_datetime = loc_val
 
-        date_str = f"{loc_val.day:02d};{loc_val.month:02d};{loc_val.year % 100:02d}"
-        time_str = f"{loc_val.hour:02d};{loc_val.minute:02d};{loc_val.second:02d}"
+            date_str = f"{loc_val.day:02d};{loc_val.month:02d};{loc_val.year % 100:02d}"
+            time_str = f"{loc_val.hour:02d};{loc_val.minute:02d};{loc_val.second:02d}"
 
-        await self.coordinator.async_write_parameter(
-            CIRCUIT_BASS3, "HolidayEndDate", date_str
-        )
-        await asyncio.sleep(0.4)
-        await self.coordinator.async_write_parameter(
-            CIRCUIT_BASS3, "HolidayEndTime", time_str
-        )
+            await self.coordinator.async_write_parameter(
+                CIRCUIT_BASS3, "HolidayEndDate", date_str
+            )
+            await asyncio.sleep(0.4)
+            await self.coordinator.async_write_parameter(
+                CIRCUIT_BASS3, "HolidayEndTime", time_str
+            )
 
 
 class SaunierGeniaCoolingStartDateTime(SaunierGeniaEntity, DateTimeEntity):
     """DateTime entity for Cooling Season Start Date (Lock 1)."""
 
     _attr_entity_category = EntityCategory.CONFIG
+    _gate_availability_on_ebus = True
 
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the Cooling Start DateTime entity."""
@@ -200,7 +214,7 @@ class SaunierGeniaCoolingStartDateTime(SaunierGeniaEntity, DateTimeEntity):
         """Return the cooling start date.
 
         Returns None when the bus holds the inactive sentinel (year == 19),
-        so Home Assistant shows 'Desconocido'. Year == 99 is shown normally.
+        so Home Assistant shows 'Unknown'. Year == 99 is shown normally.
         """
         date_msg = self.coordinator.get_message(CIRCUIT_BASS3, "CoolingStartDate")
         if date_msg:
@@ -224,7 +238,7 @@ class SaunierGeniaCoolingStartDateTime(SaunierGeniaEntity, DateTimeEntity):
 
     async def async_set_value(self, value: datetime) -> None:
         """Set new cooling season start date."""
-        loc_val = dt_util.as_local(value) if value.tzinfo else value
+        loc_val = _to_local_aware(value)
         date_str = f"{loc_val.day:02d};{loc_val.month:02d};{loc_val.year % 100:02d}"
         self.coordinator.set_custom_cooling_start_date(date_str)
         await self.coordinator.async_write_parameter(
@@ -236,6 +250,7 @@ class SaunierGeniaCoolingEndDateTime(SaunierGeniaEntity, DateTimeEntity):
     """DateTime entity for Cooling Season End Date (Lock 1)."""
 
     _attr_entity_category = EntityCategory.CONFIG
+    _gate_availability_on_ebus = True
 
     def __init__(self, coordinator: SaunierGeniaCoordinator) -> None:
         """Initialize the Cooling End DateTime entity."""
@@ -254,7 +269,7 @@ class SaunierGeniaCoolingEndDateTime(SaunierGeniaEntity, DateTimeEntity):
         """Return the cooling end date.
 
         Returns None when the bus holds the inactive sentinel (year == 19),
-        so Home Assistant shows 'Desconocido'. Year == 99 (indefinite) is
+        so Home Assistant shows 'Unknown'. Year == 99 (indefinite) is
         shown normally.
         """
         date_msg = self.coordinator.get_message(CIRCUIT_BASS3, "CoolingEndDate")
@@ -279,7 +294,7 @@ class SaunierGeniaCoolingEndDateTime(SaunierGeniaEntity, DateTimeEntity):
 
     async def async_set_value(self, value: datetime) -> None:
         """Set new cooling season end date."""
-        loc_val = dt_util.as_local(value) if value.tzinfo else value
+        loc_val = _to_local_aware(value)
         date_str = f"{loc_val.day:02d};{loc_val.month:02d};{loc_val.year % 100:02d}"
         self.coordinator.set_custom_cooling_end_date(date_str)
         await self.coordinator.async_write_parameter(

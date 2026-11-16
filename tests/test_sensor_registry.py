@@ -17,6 +17,7 @@ from custom_components.arotherm_genia_ebusd.const import (
     CIRCUIT_BASS3,
     CIRCUIT_BROADCAST,
     CIRCUIT_GLOBAL,
+    CIRCUIT_HMU,
     CIRCUIT_HMUX0,
     CIRCUIT_NETX3,
     CIRCUIT_NETX3_ALT,
@@ -26,12 +27,17 @@ from custom_components.arotherm_genia_ebusd.const import (
     DEVICE_HYDRAULIC_INTERFACE,
     DEVICE_OUTDOOR_UNIT,
     DEVICE_WIRELESS_THERMOSTAT,
+    HMUX0_ONLY_SENSOR_UNIQUE_ID_SUFFIXES,
 )
 from custom_components.arotherm_genia_ebusd.number import NUMBER_DESCRIPTIONS
 from custom_components.arotherm_genia_ebusd.select import SELECT_DESCRIPTIONS
 from custom_components.arotherm_genia_ebusd.sensor_descriptions import (
     SENSOR_DESCRIPTIONS,
     WEEKLY_SCHEDULE_SENSORS,
+    _get_electric_power,
+    _get_vwzio_secondary_hwc_status,
+    _get_z1_actual_desired_filtered,
+    _get_z1_room_humidity,
 )
 from custom_components.arotherm_genia_ebusd.switch import STANDARD_SWITCH_DESCRIPTIONS
 
@@ -72,7 +78,7 @@ class TestSensorRegistry(unittest.TestCase):
             c = desc.circuit.lower()
             m = desc.message.lower()
             f = desc.field.lower()
-            uid = f"{c}_{m}_{f}"
+            uid = desc.unique_id_suffix or f"{c}_{m}_{f}"
             uids.append(uid)
 
         # Check for duplicate unique_id suffixes among standard sensors
@@ -81,6 +87,54 @@ class TestSensorRegistry(unittest.TestCase):
         self.assertEqual(
             duplicates, {}, f"Duplicate sensor unique_ids found: {duplicates}"
         )
+
+    def test_wireless_room_target_is_stable_mirror_of_z1manualtemp(self) -> None:
+        """The thermostat target sensor mirrors Z1ManualTemp and keeps its legacy unique_id."""
+        desc = next(
+            d for d in SENSOR_DESCRIPTIONS if d.key == "wireless_room_target_temp"
+        )
+        self.assertEqual(desc.message, "Z1ManualTemp")
+        self.assertIsNone(desc.fallback_message)
+        self.assertEqual(desc.unique_id_suffix, "04_roomtargettemp_temp")
+
+    def test_primary_flow_rate_field_alignment_and_unique_id(self) -> None:
+        """Primary flow rate aligns with modern 08.hmux0.csv while preserving legacy unique_id."""
+        desc = next(d for d in SENSOR_DESCRIPTIONS if d.key == "primary_flow_rate")
+        self.assertEqual(desc.message, "RunDataFlowRate")
+        self.assertEqual(desc.field, "flow_rate")
+        self.assertEqual(desc.fallback_field, "value")
+        self.assertEqual(desc.unique_id_suffix, "hmux0_rundataflowrate_value")
+
+    def test_electric_power_consumption_alignment_and_unique_id(self) -> None:
+        """Electric power consumption prioritizes RunDataElectricPowerConsumption while preserving legacy unique_id."""
+        desc = next(
+            d for d in SENSOR_DESCRIPTIONS if d.key == "electric_power_consumption"
+        )
+        self.assertEqual(desc.message, "RunDataElectricPowerConsumption")
+        self.assertEqual(desc.field, "power")
+        self.assertEqual(desc.fallback_message, "PowerStatus")
+        self.assertEqual(desc.fallback_field, "power")
+        self.assertEqual(
+            desc.unique_id_suffix, "hmux0_rundataelectricpowerconsumption_power"
+        )
+        self.assertIsNotNone(desc.value_fn)
+
+        from unittest.mock import MagicMock
+
+        coord = MagicMock()
+        coord.active_outdoor_circuit = CIRCUIT_HMUX0
+
+        # Case 1: Neither exists -> returns None
+        coord.get_instantaneous_electric_power.return_value = None
+        self.assertIsNone(_get_electric_power(coord))
+
+        # Case 2: Only PowerStatus exists -> returns fallback
+        coord.get_instantaneous_electric_power.return_value = 456.7
+        self.assertEqual(_get_electric_power(coord), 456.7)
+
+        # Case 3: Both exist -> RunDataElectricPowerConsumption (active high-frequency r1) MUST take precedence
+        coord.get_instantaneous_electric_power.return_value = 123.4
+        self.assertEqual(_get_electric_power(coord), 123.4)
 
     def test_binary_sensors_validity(self) -> None:
         """Verify binary sensors have valid circuits and unique ID suffixes."""
@@ -125,6 +179,16 @@ class TestSensorRegistry(unittest.TestCase):
             self.assertTrue(bool(desc.options))
             uid = f"select_{desc.circuit.lower()}_{desc.message.lower()}_{desc.field.lower()}"
             uids.append(uid)
+
+        # Ensure z1_op_mode_cooling includes 'night' for ECO preset alignment
+        z1_cooling = next(
+            d for d in SELECT_DESCRIPTIONS if d.key == "z1_op_mode_cooling"
+        )
+        self.assertEqual(
+            z1_cooling.options,
+            ["off", "auto", "day", "night"],
+            "z1_op_mode_cooling must include 'night' option",
+        )
 
         counter = Counter(uids)
         duplicates = {k: v for k, v in counter.items() if v > 1}
@@ -198,7 +262,8 @@ class TestSensorRegistry(unittest.TestCase):
         self.assertEqual(expected_sensor_tkeys, sensor_keys_strings)
 
         active_uids = {
-            f"{d.circuit.lower()}_{d.message.lower()}_{d.field.lower()}"
+            d.unique_id_suffix
+            or f"{d.circuit.lower()}_{d.message.lower()}_{d.field.lower()}"
             for d in SENSOR_DESCRIPTIONS
         } | {
             f"binary_{d.circuit.lower()}_{d.message.lower()}_{d.field.lower()}"
@@ -208,6 +273,252 @@ class TestSensorRegistry(unittest.TestCase):
         self.assertEqual(
             overlap, set(), f"Active unique_id overlaps deprecated list: {overlap}"
         )
+
+    def test_hmux0_only_sensor_unique_id_suffixes_match_descriptions(self) -> None:
+        """Verify HMUX0_ONLY_SENSOR_UNIQUE_ID_SUFFIXES matches exactly the 3 hmux0_only descriptions."""
+        hmux0_only_descs = [d for d in SENSOR_DESCRIPTIONS if d.hmux0_only]
+        self.assertEqual(
+            {d.key for d in hmux0_only_descs},
+            {
+                "energy_electric_cool",
+                "energy_electric_hc_outdoor",
+                "energy_electric_hwc_outdoor",
+            },
+        )
+        computed_suffixes = {
+            d.unique_id_suffix
+            or f"{d.circuit.lower()}_{d.message.lower()}_{d.field.lower()}"
+            for d in hmux0_only_descs
+        }
+        self.assertEqual(computed_suffixes, set(HMUX0_ONLY_SENSOR_UNIQUE_ID_SUFFIXES))
+
+    def test_quick_veto_remaining_time_sensor_description(self) -> None:
+        """Verify unified quick_veto_remaining_time sensor definition and subscriptions."""
+        from unittest.mock import MagicMock
+
+        from homeassistant.components.sensor import (
+            SensorDeviceClass,
+            SensorStateClass,
+        )
+        from homeassistant.const import UnitOfTime
+
+        from custom_components.arotherm_genia_ebusd.const import (
+            CALC_CIRCUIT,
+            CIRCUIT_BASS3,
+            DEVICE_CLIMATE_CONTROLLER,
+        )
+        from custom_components.arotherm_genia_ebusd.sensor import SaunierGeniaSensor
+
+        descs = [d for d in SENSOR_DESCRIPTIONS if d.key == "quick_veto_remaining_time"]
+        self.assertEqual(len(descs), 1)
+        desc = descs[0]
+        self.assertEqual(desc.device_key, DEVICE_CLIMATE_CONTROLLER)
+        self.assertEqual(desc.circuit, CALC_CIRCUIT)
+        self.assertEqual(desc.device_class, SensorDeviceClass.DURATION)
+        self.assertEqual(desc.state_class, SensorStateClass.MEASUREMENT)
+        self.assertEqual(desc.native_unit_of_measurement, UnitOfTime.MINUTES)
+
+        mock_coord = MagicMock()
+        mock_coord.entry_id = "test_entry"
+        mock_coord.get_quick_veto_remaining_minutes.return_value = 45
+        mock_coord.get_quick_veto_remaining_attributes.return_value = {
+            "is_active": True,
+            "veto_type": "cooling",
+            "end_time": "2026-11-15T20:00:00",
+            "target_temperature": 19.0,
+            "remaining_minutes": 45,
+        }
+        sensor_ent = SaunierGeniaSensor(mock_coord, desc)
+        self.assertEqual(sensor_ent.native_value, 45)
+        self.assertEqual(sensor_ent.native_unit_of_measurement, UnitOfTime.MINUTES)
+        self.assertEqual(
+            sensor_ent.extra_state_attributes,
+            {
+                "is_active": True,
+                "veto_type": "cooling",
+                "end_time": "2026-11-15T20:00:00",
+                "target_temperature": 19.0,
+                "remaining_minutes": 45,
+            },
+        )
+        self.assertIn((CALC_CIRCUIT, "QuickVetoRemaining"), sensor_ent._subscriptions)
+        self.assertIn((CIRCUIT_BASS3, "Z1SFMode"), sensor_ent._subscriptions)
+        self.assertIn((CIRCUIT_BASS3, "Z1OpModeCooling"), sensor_ent._subscriptions)
+
+    def test_z1_room_humidity_sensor_and_bounds(self) -> None:
+        """Verify z1_room_humidity sensor description and physical bounds filter."""
+        from unittest.mock import MagicMock
+
+        desc = next(d for d in SENSOR_DESCRIPTIONS if d.key == "z1_room_humidity")
+        self.assertEqual(desc.device_key, DEVICE_CLIMATE_CONTROLLER)
+        self.assertEqual(desc.circuit, CIRCUIT_BASS3)
+        self.assertEqual(desc.message, "Z1RoomHumidity")
+        self.assertEqual(desc.field, "value")
+
+        coord = MagicMock()
+        coord.get_float.return_value = 66.24
+        self.assertEqual(_get_z1_room_humidity(coord), 66.2)
+
+        for invalid in (None, 0.0, -1.0, 100.5, 255.0):
+            coord.get_float.return_value = invalid
+            self.assertIsNone(_get_z1_room_humidity(coord))
+
+    def test_subcooling_sensor_subscriptions_and_value(self) -> None:
+        """Verify subcooling sensor subscribes to condensation and condensate temperatures."""
+        from unittest.mock import MagicMock
+
+        from custom_components.arotherm_genia_ebusd.sensor import SaunierGeniaSensor
+
+        desc = next(d for d in SENSOR_DESCRIPTIONS if d.key == "subcooling")
+        mock_coord = MagicMock()
+        mock_coord.entry.entry_id = "test_entry"
+        mock_coord.get_float.side_effect = lambda c, m, _f: {
+            (CIRCUIT_HMUX0, "RunDataCondensationTemp"): 42.5,
+            (CIRCUIT_HMUX0, "RunDataCondensateTemp"): 37.2,
+        }.get((c, m))
+
+        sensor_ent = SaunierGeniaSensor(mock_coord, desc)
+        for expected_sub in (
+            (CIRCUIT_HMUX0, "RunDataCondensationTemp"),
+            (CIRCUIT_HMUX0, "RunDataCondensateTemp"),
+            (CIRCUIT_HMU, "RunDataCondensationTemp"),
+            (CIRCUIT_HMU, "RunDataCondensateTemp"),
+        ):
+            self.assertIn(expected_sub, sensor_ent._subscriptions)
+        self.assertEqual(sensor_ent.native_value, 5.3)
+
+    def test_vwzio_secondary_hwc_and_z1_desired_sentinel_filters(self) -> None:
+        """Verify vwzio_secondary_circuit_hwc subscriptions/parsing and Z1 5°C sentinel filtering."""
+        from unittest.mock import MagicMock
+
+        from custom_components.arotherm_genia_ebusd.sensor import SaunierGeniaSensor
+
+        hwc_desc = next(
+            d for d in SENSOR_DESCRIPTIONS if d.key == "vwzio_secondary_circuit_hwc"
+        )
+        mock_coord = MagicMock()
+        mock_coord.entry.entry_id = "test_entry"
+        hwc_ent = SaunierGeniaSensor(mock_coord, hwc_desc)
+        self.assertIn((CIRCUIT_VWZIO, "Status01"), hwc_ent._subscriptions)
+
+        mock_coord.get_str.side_effect = lambda _c, m, _f: {
+            "Status01": None,
+            "SecondaryCircuitStatusHwc": "00 00",
+        }.get(m)
+        self.assertEqual(_get_vwzio_secondary_hwc_status(mock_coord), "standby")
+
+        mock_coord.get_str.side_effect = lambda _c, m, _f: {
+            "Status01": None,
+            "SecondaryCircuitStatusHwc": "standby",
+        }.get(m)
+        self.assertEqual(_get_vwzio_secondary_hwc_status(mock_coord), "standby")
+
+        mock_coord.get_str.side_effect = lambda _c, m, _f: {
+            "Status01": None,
+            "SecondaryCircuitStatusHwc": "ERR: element not found",
+        }.get(m)
+        self.assertIsNone(_get_vwzio_secondary_hwc_status(mock_coord))
+
+        mock_coord.get_str.side_effect = lambda _c, m, _f: {
+            "Status01": None,
+            "SecondaryCircuitStatusHwc": "20 00",
+        }.get(m)
+        self.assertEqual(_get_vwzio_secondary_hwc_status(mock_coord), "dhw")
+
+        # Z1ActualRoomTempDesired sentinel checks
+        coord_z1 = MagicMock()
+        coord_z1.get_float.side_effect = lambda _c, m, _f: (
+            5.0 if m == "Z1ActualRoomTempDesired" else 21.5
+        )
+        coord_z1.get_str.return_value = "auto"
+        self.assertIsNone(_get_z1_actual_desired_filtered(coord_z1))
+
+        coord_z1.get_str.return_value = "day"
+        self.assertEqual(_get_z1_actual_desired_filtered(coord_z1), 5.0)
+
+        coord_z1.get_str.return_value = "off"
+        self.assertIsNone(_get_z1_actual_desired_filtered(coord_z1))
+
+    def test_vwzio_secondary_status_unhydrated_and_subscriptions(self) -> None:
+        """vwzio_secondary_circuit_status returns None when unhydrated and subscribes Hc1PumpStatus."""
+        from unittest.mock import MagicMock
+
+        from custom_components.arotherm_genia_ebusd.sensor import SaunierGeniaSensor
+        from custom_components.arotherm_genia_ebusd.sensor_descriptions import (
+            _get_vwzio_secondary_status,
+        )
+
+        coord = MagicMock()
+        coord.entry.entry_id = "test_entry"
+        coord.get_str.return_value = None
+        coord.get_int.return_value = None
+        self.assertIsNone(_get_vwzio_secondary_status(coord))
+        self.assertIsNone(_get_vwzio_secondary_hwc_status(coord))
+
+        desc = next(
+            d for d in SENSOR_DESCRIPTIONS if d.key == "vwzio_secondary_circuit_status"
+        )
+        ent = SaunierGeniaSensor(coord, desc)
+        self.assertIn((CIRCUIT_BASS3, "Hc1PumpStatus"), ent._subscriptions)
+        self.assertIn((CIRCUIT_BASS3, "CoolingReleaseStatus"), ent._subscriptions)
+
+    def test_stats_hwc_starts_has_vwzio_fallback(self) -> None:
+        """stats_hwc_starts falls back to 76.vwzio RunStatsHwcStarts when hmux0 has no value."""
+        from unittest.mock import MagicMock
+
+        from custom_components.arotherm_genia_ebusd.sensor import SaunierGeniaSensor
+
+        desc = next(d for d in SENSOR_DESCRIPTIONS if d.key == "stats_hwc_starts")
+        self.assertEqual(desc.fallback_circuit, CIRCUIT_VWZIO)
+        self.assertEqual(desc.fallback_message, "RunStatsHwcStarts")
+        self.assertEqual(desc.fallback_field, "value")
+
+        mock_coord = MagicMock()
+        mock_coord.entry.entry_id = "test_entry"
+        mock_coord.get_int.side_effect = lambda c, m, _f: (
+            42 if (c == CIRCUIT_VWZIO and m == "RunStatsHwcStarts") else None
+        )
+        sensor_ent = SaunierGeniaSensor(mock_coord, desc)
+        self.assertIn((CIRCUIT_VWZIO, "RunStatsHwcStarts"), sensor_ent._subscriptions)
+        self.assertEqual(sensor_ent.native_value, 42)
+
+    def test_stats_sensors_are_diagnostic_and_hc1_pump_is_primary(self) -> None:
+        """Verify all stats_* counters use EntityCategory.DIAGNOSTIC while hc1_pump_status stays primary."""
+        from homeassistant.const import EntityCategory
+
+        stats_descs = [d for d in SENSOR_DESCRIPTIONS if d.key.startswith("stats_")]
+        self.assertEqual(len(stats_descs), 29)
+        for desc in stats_descs:
+            self.assertEqual(
+                desc.entity_category,
+                EntityCategory.DIAGNOSTIC,
+                f"Expected {desc.key} to have EntityCategory.DIAGNOSTIC",
+            )
+
+        hc1_pump = next(d for d in SENSOR_DESCRIPTIONS if d.key == "hc1_pump_status")
+        self.assertIsNone(hc1_pump.entity_category)
+
+    def test_delta_sensors_use_celsius_and_temperature_delta(self) -> None:
+        """Verify temperature-delta sensors use UnitOfTemperature.CELSIUS instead of legacy K."""
+        from homeassistant.components.sensor import SensorDeviceClass
+        from homeassistant.const import UnitOfTemperature
+
+        expected_delta_keys = {"calculated_delta_t", "superheat", "subcooling"}
+        expected_dc = getattr(SensorDeviceClass, "TEMPERATURE_DELTA", None)
+        found = set()
+        for desc in SENSOR_DESCRIPTIONS:
+            self.assertNotEqual(
+                desc.native_unit_of_measurement,
+                "K",
+                f"Unexpected legacy Kelvin unit on {desc.key}",
+            )
+            if desc.key in expected_delta_keys:
+                found.add(desc.key)
+                self.assertEqual(
+                    desc.native_unit_of_measurement, UnitOfTemperature.CELSIUS
+                )
+                self.assertEqual(desc.device_class, expected_dc)
+        self.assertEqual(found, expected_delta_keys)
 
 
 if __name__ == "__main__":

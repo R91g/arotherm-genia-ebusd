@@ -11,6 +11,7 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntityDescription,
 )
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -102,8 +103,6 @@ def _check_defrost_active(coord: SaunierGeniaCoordinator) -> bool | None:
 def _check_energy_integration(coord: SaunierGeniaCoordinator) -> bool | None:
     status = coord.get_str(CIRCUIT_HMUX0, "PowerStatus", "status")
     if status is None:
-        status = coord.get_str(CIRCUIT_HMUX0, "EnergyYieldPrecision", "status")
-    if status is None:
         return None
     return status.lower() in ("active", "heating", "hwc", "cooling", "1", "2", "3")
 
@@ -118,9 +117,9 @@ def _check_z1_heating_demand(coord: SaunierGeniaCoordinator) -> bool | None:
 def _check_cooling_release(coord: SaunierGeniaCoordinator) -> bool | None:
     """Check literal hardware cooling authorization from BASS3 CoolingReleaseStatus.
 
-    Returns True (Unlocked) ONLY when the heat pump firmware physically authorizes cooling
+    Returns True (Authorized) ONLY when the heat pump firmware physically authorizes cooling
     (which requires both active calendar dates AND outdoor temperature >= 15 °C).
-    Returns False (Locked) if blocked by calendar dates or cold outdoor temperature.
+    Returns False (Blocked) if blocked by calendar dates or cold outdoor temperature.
     """
     status = coord.get_str(CIRCUIT_BASS3, "CoolingReleaseStatus", "value")
     if status is None:
@@ -137,6 +136,13 @@ def _check_broadcast_cooling(coord: SaunierGeniaCoordinator) -> bool | None:
 
 def _check_ebusd_signal(coord: SaunierGeniaCoordinator) -> bool | None:
     val = coord.get_str(CIRCUIT_GLOBAL, "signal", "value")
+    if val is None:
+        return None
+    return val.lower() in ("true", "1", "on", "yes")
+
+
+def _check_ebusd_running(coord: SaunierGeniaCoordinator) -> bool | None:
+    val = coord.get_str(CIRCUIT_GLOBAL, "running", "value")
     if val is None:
         return None
     return val.lower() in ("true", "1", "on", "yes")
@@ -200,7 +206,6 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[SaunierGeniaBinarySensorEntityDescription, ...
         circuit=CIRCUIT_BASS3,
         message="CoolingReleaseStatus",
         field="value",
-        device_class=BinarySensorDeviceClass.LOCK,
         is_on_fn=_check_cooling_release,
     ),
     SaunierGeniaBinarySensorEntityDescription(
@@ -221,7 +226,19 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[SaunierGeniaBinarySensorEntityDescription, ...
         message="signal",
         field="value",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        entity_category=EntityCategory.DIAGNOSTIC,
         is_on_fn=_check_ebusd_signal,
+    ),
+    SaunierGeniaBinarySensorEntityDescription(
+        key="ebusd_running",
+        translation_key="ebusd_running",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_GLOBAL,
+        message="running",
+        field="value",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        is_on_fn=_check_ebusd_running,
     ),
 )
 
@@ -256,8 +273,6 @@ class SaunierGeniaBinarySensor(SaunierGeniaEntity, BinarySensorEntity):
         if description.key == "compressor_active":
             subs.append((CIRCUIT_HMUX0, "RunDataCompressorSpeed"))
             subs.append((CIRCUIT_HMUX0, "HMUStatusCode"))
-        elif description.key == "energy_integration_active":
-            subs.append((CIRCUIT_HMUX0, "EnergyYieldPrecision"))
 
         c = description.circuit.lower()
         m = description.message.lower()

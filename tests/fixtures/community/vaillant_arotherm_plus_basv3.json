@@ -1,0 +1,1423 @@
+{
+  "domain": "arotherm_genia_ebusd",
+  "entry_id": "fixture_vaillant_arotherm_plus_basv3",
+  "anonymized": true,
+  "mqtt_prefix": "ebusd",
+  "is_ebus_operational": true,
+  "outdoor_model": "aroTHERM plus VWL 55/6 A 230V (Legacy)",
+  "indoor_model": "VWZ AI 7/230V",
+  "active_outdoor_circuit": "hmu",
+  "active_controller_circuit": "basv3",
+  "cached_messages_count": 419,
+  "values": {
+    "global": {
+      "running": {
+        "value": true
+      },
+      "signal": {
+        "value": true
+      },
+      "scan": {
+        "value": "finished"
+      },
+      "updatecheck": {
+        "value": "version 26.1 available, broadcast.csv: different version available, vaillant/08.hmu.csv: different version available"
+      },
+      "uptime": {
+        "value": 896
+      }
+    },
+    "broadcast": {
+      "CoolingStatus": {
+        "status": "off"
+      },
+      "Vdatetime": {
+        "time": "20:32:47",
+        "date": "06.11.2026"
+      },
+      "Outsidetemp": {
+        "temp": 10.566
+      },
+      "SystemStatus": {
+        "status": 0
+      }
+    },
+    "hmu": {
+      "RunDataElectricPowerConsumption": {
+        "power": 25.182
+      },
+      "RunDataFlowTemp": {
+        "value": 26
+      },
+      "Status01": {
+        "flow_temp": 25.5,
+        "return_temp": 25.5,
+        "outside_temp": null,
+        "hwc_temp": null,
+        "storage_temp": null,
+        "pumpstate": "off"
+      },
+      "RunDataReturnTemp": {
+        "value": 25.5747
+      },
+      "RunDataFlowRate": {
+        "value": 537
+      },
+      "RunDataHighPressure": {
+        "value": 5.27228
+      },
+      "Currenterror": {
+        "error": null,
+        "error_1": null,
+        "error_2": null,
+        "error_3": null,
+        "error_4": null
+      },
+      "PowerStatus": {
+        "status": "heating",
+        "power": 24.8569,
+        "fuel_power": 0
+      },
+      "CompressorSilentOperationLevel": {
+        "value": 33
+      },
+      "RunDataAirInletTemp": {
+        "value": 10.251
+      },
+      "RunDataCompressorInletTemp": {
+        "value": 20.0448
+      },
+      "RunDataCompressorOutletTemp": {
+        "value": 30.4891
+      },
+      "RunDataEEVOutletTemp": {
+        "value": 13.9062
+      },
+      "FlowPressure": {
+        "value": 1.52
+      },
+      "YieldHwc": {
+        "value": 2659
+      },
+      "YieldCooling": {
+        "value": 0
+      },
+      "TotalEnergyUsage": {
+        "value": 4217
+      },
+      "EnergyIntegral": {
+        "value": -20
+      },
+      "StateCompressor": {
+        "flow_temp": 25.88,
+        "modulation": 0,
+        "mode_flags": 1,
+        "state_bytes": "08 00 00 00"
+      },
+      "StatusCirPump": {
+        "value": "off"
+      },
+      "HMUStatusCode": {
+        "status": "heat_prerun"
+      },
+      "RunDataCompressorSpeed": {
+        "value": 0
+      },
+      "RunDataBuildingCPumpPower": {
+        "value": 42.2434
+      },
+      "CompressorHc": {
+        "runtime": 302569,
+        "cycles": 2144
+      },
+      "CompressorHwc": {
+        "runtime": 50736,
+        "cycles": 294
+      },
+      "CompressorStarts": {
+        "value": 2444
+      },
+      "CompressorHours": {
+        "value": 5885
+      },
+      "CopHcMonth": {
+        "value": 5.4
+      },
+      "CopHc": {
+        "value": 4.5
+      },
+      "CopHwcMonth": {
+        "value": 4.2
+      },
+      "RunDataEEVPositionAbs": {
+        "value": 250
+      }
+    },
+    "hmux0": {
+      "RunDataElectricPowerConsumption": {
+        "power": 25.182
+      },
+      "RunDataFlowTemp": {
+        "value": 26
+      },
+      "Status01": {
+        "flow_temp": 25.5,
+        "return_temp": 25.5,
+        "outside_temp": null,
+        "hwc_temp": null,
+        "storage_temp": null,
+        "pumpstate": "off"
+      },
+      "RunDataReturnTemp": {
+        "value": 25.5747
+      },
+      "RunDataFlowRate": {
+        "value": 537
+      },
+      "RunDataHighPressure": {
+        "value": 5.27228
+      },
+      "Currenterror": {
+        "error": null,
+        "error_1": null,
+        "error_2": null,
+        "error_3": null,
+        "error_4": null
+      },
+      "PowerStatus": {
+        "status": "heating",
+        "power": 24.8569,
+        "fuel_power": 0
+      },
+      "CompressorSilentOperationLevel": {
+        "value": 33
+      },
+      "RunDataAirInletTemp": {
+        "value": 10.251
+      },
+      "RunDataCompressorInletTemp": {
+        "value": 20.0448
+      },
+      "RunDataCompressorOutletTemp": {
+        "value": 30.4891
+      },
+      "RunDataEEVOutletTemp": {
+        "value": 13.9062
+      },
+      "FlowPressure": {
+        "value": 1.52
+      },
+      "YieldHwc": {
+        "value": 2659
+      },
+      "YieldCooling": {
+        "value": 0
+      },
+      "TotalEnergyUsage": {
+        "value": 4217
+      },
+      "EnergyIntegral": {
+        "value": -20
+      },
+      "StateCompressor": {
+        "flow_temp": 25.88,
+        "modulation": 0,
+        "mode_flags": 1,
+        "state_bytes": "08 00 00 00"
+      },
+      "StatusCirPump": {
+        "value": "off"
+      },
+      "HMUStatusCode": {
+        "status": "heat_prerun"
+      },
+      "RunDataCompressorSpeed": {
+        "value": 0
+      },
+      "RunDataBuildingCPumpPower": {
+        "value": 42.2434
+      },
+      "CompressorHc": {
+        "runtime": 302569,
+        "cycles": 2144
+      },
+      "CompressorHwc": {
+        "runtime": 50736,
+        "cycles": 294
+      },
+      "CompressorStarts": {
+        "value": 2444
+      },
+      "CompressorHours": {
+        "value": 5885
+      },
+      "CopHcMonth": {
+        "value": 5.4
+      },
+      "CopHc": {
+        "value": 4.5
+      },
+      "CopHwcMonth": {
+        "value": 4.2
+      },
+      "RunDataEEVPositionAbs": {
+        "value": 250
+      }
+    },
+    "hmu00": {
+      "RunDataElectricPowerConsumption": {
+        "power": 25.182
+      },
+      "RunDataFlowTemp": {
+        "value": 26
+      },
+      "Status01": {
+        "flow_temp": 25.5,
+        "return_temp": 25.5,
+        "outside_temp": null,
+        "hwc_temp": null,
+        "storage_temp": null,
+        "pumpstate": "off"
+      },
+      "RunDataReturnTemp": {
+        "value": 25.5747
+      },
+      "RunDataFlowRate": {
+        "value": 537
+      },
+      "RunDataHighPressure": {
+        "value": 5.27228
+      },
+      "Currenterror": {
+        "error": null,
+        "error_1": null,
+        "error_2": null,
+        "error_3": null,
+        "error_4": null
+      },
+      "PowerStatus": {
+        "status": "heating",
+        "power": 24.8569,
+        "fuel_power": 0
+      },
+      "CompressorSilentOperationLevel": {
+        "value": 33
+      },
+      "RunDataAirInletTemp": {
+        "value": 10.251
+      },
+      "RunDataCompressorInletTemp": {
+        "value": 20.0448
+      },
+      "RunDataCompressorOutletTemp": {
+        "value": 30.4891
+      },
+      "RunDataEEVOutletTemp": {
+        "value": 13.9062
+      },
+      "FlowPressure": {
+        "value": 1.52
+      },
+      "YieldHwc": {
+        "value": 2659
+      },
+      "YieldCooling": {
+        "value": 0
+      },
+      "TotalEnergyUsage": {
+        "value": 4217
+      },
+      "EnergyIntegral": {
+        "value": -20
+      },
+      "StateCompressor": {
+        "flow_temp": 25.88,
+        "modulation": 0,
+        "mode_flags": 1,
+        "state_bytes": "08 00 00 00"
+      },
+      "StatusCirPump": {
+        "value": "off"
+      },
+      "HMUStatusCode": {
+        "status": "heat_prerun"
+      },
+      "RunDataCompressorSpeed": {
+        "value": 0
+      },
+      "RunDataBuildingCPumpPower": {
+        "value": 42.2434
+      },
+      "CompressorHc": {
+        "runtime": 302569,
+        "cycles": 2144
+      },
+      "CompressorHwc": {
+        "runtime": 50736,
+        "cycles": 294
+      },
+      "CompressorStarts": {
+        "value": 2444
+      },
+      "CompressorHours": {
+        "value": 5885
+      },
+      "CopHcMonth": {
+        "value": 5.4
+      },
+      "CopHc": {
+        "value": 4.5
+      },
+      "CopHwcMonth": {
+        "value": 4.2
+      },
+      "RunDataEEVPositionAbs": {
+        "value": 250
+      }
+    },
+    "calculated": {
+      "calculated_live_cop": {
+        "value": 0
+      },
+      "calculated_cool_eer": {
+        "value": 0
+      },
+      "calculated_delta_t": {
+        "value": 0.43
+      },
+      "calculated_thermal_power": {
+        "value": 268.5
+      },
+      "calculated_heating_total_energy": {
+        "value": 10000
+      },
+      "calculated_dhw_total_energy": {
+        "value": 0
+      },
+      "calculated_system_total_energy": {
+        "value": 10000
+      },
+      "calculated_hc_cop": {
+        "value": 0
+      },
+      "calculated_hwc_cop": {
+        "value": 0
+      },
+      "calculated_global_efficiency": {
+        "value": 0
+      }
+    },
+    "basv3": {
+      "Z1QuickVetoTemp": {
+        "value": 18
+      },
+      "HolidayTemp": {
+        "value": 15
+      },
+      "HolidayStartDate": {
+        "day": 3,
+        "month": 9,
+        "year": 26
+      },
+      "HolidayStartTime": {
+        "hours": 22,
+        "minutes": 39,
+        "seconds": 34
+      },
+      "HwcStatus": {
+        "value": "auto"
+      },
+      "Z1Status": {
+        "value": "auto"
+      },
+      "HolidayEndDate": {
+        "day": 19,
+        "month": 9,
+        "year": 26
+      },
+      "HolidayEndTime": {
+        "hours": 22,
+        "minutes": 39,
+        "seconds": 16
+      },
+      "CoolingStartDate": {
+        "day": 1,
+        "month": 1,
+        "year": 19
+      },
+      "CoolingEndDate": {
+        "day": 1,
+        "month": 1,
+        "year": 19
+      },
+      "CoolingReleaseStatus": {
+        "value": "off"
+      },
+      "HwcSFMode": {
+        "value": "auto"
+      },
+      "HwcFlowTemp": {
+        "value": 0
+      },
+      "Hc1HeatCurve": {
+        "value": 0.7
+      },
+      "Hc1ExcessTemp": {
+        "value": 0
+      },
+      "AppSessionStatus": {
+        "status": "connected"
+      },
+      "Hc1MinFlowTempDesired": {
+        "value": 15
+      },
+      "Hc1MaxFlowTempDesired": {
+        "value": 55
+      },
+      "Hc1SummerTempLimit": {
+        "value": 15
+      },
+      "CoolingFlowTempDesiredMin": {
+        "value": 20
+      },
+      "CoolingFlowTempDesiredMax": {
+        "value": 25
+      },
+      "Hc1AutoOffMode": {
+        "value": "night"
+      },
+      "Hc1RoomTempSwitchOn": {
+        "value": "modulating"
+      },
+      "HwcMaxFlowTempDesired": {
+        "value": 80
+      },
+      "CylinderChargeHyst": {
+        "value": 9
+      },
+      "CylinderChargeOffset": {
+        "value": 3
+      },
+      "MaxCylinderChargeTime": {
+        "value": 15
+      },
+      "HwcLockTime": {
+        "value": 0
+      },
+      "HwcParallelLoading": {
+        "value": "off"
+      },
+      "AdaptHeatCurve": {
+        "value": "no"
+      },
+      "BufferChargeOffset": {
+        "value": 10
+      },
+      "MaxRoomHumidity": {
+        "value": 40
+      },
+      "BivalencePointHc": {
+        "value": -20
+      },
+      "BivalencePointHwc": {
+        "value": -20
+      },
+      "AlternativePoint": {
+        "value": -21
+      },
+      "PrEnergySumHcThisMonth": {
+        "value": 38
+      },
+      "PrEnergySumHcLastMonth": {
+        "value": 128
+      },
+      "PrEnergySumHc": {
+        "value": 3363
+      },
+      "PrEnergySumHwcThisMonth": {
+        "value": 9
+      },
+      "PrEnergySumHwcLastMonth": {
+        "value": 43
+      },
+      "PrEnergySumHwc": {
+        "value": 862
+      },
+      "ErrorMemorySlot": {
+        "slot": 2,
+        "error": null,
+        "data": "ff ff ff ff ff ff ff ff"
+      },
+      "Currenterror": {
+        "error": null,
+        "error_1": null,
+        "error_2": null,
+        "error_3": null,
+        "error_4": null
+      },
+      "GlobalSystemOff": {
+        "value": "no"
+      },
+      "Z1OpMode": {
+        "value": "auto"
+      },
+      "Hc1ActualFlowTempDesired": {
+        "value": 29.9572
+      },
+      "Z1ActualRoomTempDesired": {
+        "value": 19.5
+      },
+      "Hc1PumpStatus": {
+        "value": 1
+      },
+      "Z1ManualTemp": {
+        "value": 18.5
+      },
+      "SystemOperatingState": {
+        "value": "heating"
+      },
+      "Z1RoomTemp": {
+        "value": 19.625
+      },
+      "Z1MaxFlowTempDesired": {
+        "value": 63
+      },
+      "Z1HeatingState": {
+        "value": "on"
+      },
+      "DisplayedOutsideTemp": {
+        "value": 10.5664
+      },
+      "HwcOpMode": {
+        "value": "auto"
+      },
+      "Unknown04": {
+        "data": "03 00 04 00"
+      },
+      "HwcTempDesired": {
+        "value": 48
+      },
+      "HwcStorageTemp": {
+        "value": 12.5
+      },
+      "Hc1FlowTemp": {
+        "value": 26
+      },
+      "Hc1MixerMovement": {
+        "value": 0
+      },
+      "Hc1HeatCurveAdaption": {
+        "value": 0
+      },
+      "WaterPressure": {
+        "press": 1.5
+      },
+      "SystemFlowTemp": {
+        "value": null
+      },
+      "SolarStorageTempBottom": {
+        "value": null
+      },
+      "SolarStorageTempTop": {
+        "value": null
+      },
+      "HwcStorageTempTop": {
+        "value": null
+      },
+      "HwcStorageTempBottom": {
+        "value": null
+      },
+      "HcStorageTempTop": {
+        "value": null
+      },
+      "HcStorageTempBottom": {
+        "value": null
+      },
+      "UnknownSettingB6": {
+        "data": "03 00 b6 00"
+      },
+      "PumpAdditionalTime": {
+        "value": 1
+      },
+      "Z1SFMode": {
+        "value": "auto"
+      },
+      "Z1NightTemp": {
+        "value": 17.5
+      },
+      "Hc1Status": {
+        "value": 1
+      },
+      "Z1ValveStatus": {
+        "value": 1
+      }
+    },
+    "bass3": {
+      "Z1QuickVetoTemp": {
+        "value": 18
+      },
+      "HolidayTemp": {
+        "value": 15
+      },
+      "HolidayStartDate": {
+        "day": 3,
+        "month": 9,
+        "year": 26
+      },
+      "HolidayStartTime": {
+        "hours": 22,
+        "minutes": 39,
+        "seconds": 34
+      },
+      "HwcStatus": {
+        "value": "auto"
+      },
+      "Z1Status": {
+        "value": "auto"
+      },
+      "HolidayEndDate": {
+        "day": 19,
+        "month": 9,
+        "year": 26
+      },
+      "HolidayEndTime": {
+        "hours": 22,
+        "minutes": 39,
+        "seconds": 16
+      },
+      "CoolingStartDate": {
+        "day": 1,
+        "month": 1,
+        "year": 19
+      },
+      "CoolingEndDate": {
+        "day": 1,
+        "month": 1,
+        "year": 19
+      },
+      "CoolingReleaseStatus": {
+        "value": "off"
+      },
+      "HwcSFMode": {
+        "value": "auto"
+      },
+      "HwcFlowTemp": {
+        "value": 0
+      },
+      "Hc1HeatCurve": {
+        "value": 0.7
+      },
+      "Hc1ExcessTemp": {
+        "value": 0
+      },
+      "AppSessionStatus": {
+        "status": "connected"
+      },
+      "Hc1MinFlowTempDesired": {
+        "value": 15
+      },
+      "Hc1MaxFlowTempDesired": {
+        "value": 55
+      },
+      "Hc1SummerTempLimit": {
+        "value": 15
+      },
+      "CoolingFlowTempDesiredMin": {
+        "value": 20
+      },
+      "CoolingFlowTempDesiredMax": {
+        "value": 25
+      },
+      "Hc1AutoOffMode": {
+        "value": "night"
+      },
+      "Hc1RoomTempSwitchOn": {
+        "value": "modulating"
+      },
+      "HwcMaxFlowTempDesired": {
+        "value": 80
+      },
+      "CylinderChargeHyst": {
+        "value": 9
+      },
+      "CylinderChargeOffset": {
+        "value": 3
+      },
+      "MaxCylinderChargeTime": {
+        "value": 15
+      },
+      "HwcLockTime": {
+        "value": 0
+      },
+      "HwcParallelLoading": {
+        "value": "off"
+      },
+      "AdaptHeatCurve": {
+        "value": "no"
+      },
+      "BufferChargeOffset": {
+        "value": 10
+      },
+      "MaxRoomHumidity": {
+        "value": 40
+      },
+      "BivalencePointHc": {
+        "value": -20
+      },
+      "BivalencePointHwc": {
+        "value": -20
+      },
+      "AlternativePoint": {
+        "value": -21
+      },
+      "PrEnergySumHcThisMonth": {
+        "value": 38
+      },
+      "PrEnergySumHcLastMonth": {
+        "value": 128
+      },
+      "PrEnergySumHc": {
+        "value": 3363
+      },
+      "PrEnergySumHwcThisMonth": {
+        "value": 9
+      },
+      "PrEnergySumHwcLastMonth": {
+        "value": 43
+      },
+      "PrEnergySumHwc": {
+        "value": 862
+      },
+      "ErrorMemorySlot": {
+        "slot": 2,
+        "error": null,
+        "data": "ff ff ff ff ff ff ff ff"
+      },
+      "Currenterror": {
+        "error": null,
+        "error_1": null,
+        "error_2": null,
+        "error_3": null,
+        "error_4": null
+      },
+      "GlobalSystemOff": {
+        "value": "no"
+      },
+      "Z1OpMode": {
+        "value": "auto"
+      },
+      "Hc1ActualFlowTempDesired": {
+        "value": 29.9572
+      },
+      "Z1ActualRoomTempDesired": {
+        "value": 19.5
+      },
+      "Hc1PumpStatus": {
+        "value": 1
+      },
+      "Z1ManualTemp": {
+        "value": 18.5
+      },
+      "SystemOperatingState": {
+        "value": "heating"
+      },
+      "Z1RoomTemp": {
+        "value": 19.625
+      },
+      "Z1MaxFlowTempDesired": {
+        "value": 63
+      },
+      "Z1HeatingState": {
+        "value": "on"
+      },
+      "DisplayedOutsideTemp": {
+        "value": 10.5664
+      },
+      "HwcOpMode": {
+        "value": "auto"
+      },
+      "Unknown04": {
+        "data": "03 00 04 00"
+      },
+      "HwcTempDesired": {
+        "value": 48
+      },
+      "HwcStorageTemp": {
+        "value": 12.5
+      },
+      "Hc1FlowTemp": {
+        "value": 26
+      },
+      "Hc1MixerMovement": {
+        "value": 0
+      },
+      "Hc1HeatCurveAdaption": {
+        "value": 0
+      },
+      "WaterPressure": {
+        "press": 1.5
+      },
+      "SystemFlowTemp": {
+        "value": null
+      },
+      "SolarStorageTempBottom": {
+        "value": null
+      },
+      "SolarStorageTempTop": {
+        "value": null
+      },
+      "HwcStorageTempTop": {
+        "value": null
+      },
+      "HwcStorageTempBottom": {
+        "value": null
+      },
+      "HcStorageTempTop": {
+        "value": null
+      },
+      "HcStorageTempBottom": {
+        "value": null
+      },
+      "UnknownSettingB6": {
+        "data": "03 00 b6 00"
+      },
+      "PumpAdditionalTime": {
+        "value": 1
+      },
+      "Z1SFMode": {
+        "value": "auto"
+      },
+      "Z1NightTemp": {
+        "value": 17.5
+      },
+      "Hc1Status": {
+        "value": 1
+      },
+      "Z1ValveStatus": {
+        "value": 1
+      }
+    },
+    "ctlv2": {
+      "Z1QuickVetoTemp": {
+        "value": 18
+      },
+      "HolidayTemp": {
+        "value": 15
+      },
+      "HolidayStartDate": {
+        "day": 3,
+        "month": 9,
+        "year": 26
+      },
+      "HolidayStartTime": {
+        "hours": 22,
+        "minutes": 39,
+        "seconds": 34
+      },
+      "HwcStatus": {
+        "value": "auto"
+      },
+      "Z1Status": {
+        "value": "auto"
+      },
+      "HolidayEndDate": {
+        "day": 19,
+        "month": 9,
+        "year": 26
+      },
+      "HolidayEndTime": {
+        "hours": 22,
+        "minutes": 39,
+        "seconds": 16
+      },
+      "CoolingStartDate": {
+        "day": 1,
+        "month": 1,
+        "year": 19
+      },
+      "CoolingEndDate": {
+        "day": 1,
+        "month": 1,
+        "year": 19
+      },
+      "CoolingReleaseStatus": {
+        "value": "off"
+      },
+      "HwcSFMode": {
+        "value": "auto"
+      },
+      "HwcFlowTemp": {
+        "value": 0
+      },
+      "Hc1HeatCurve": {
+        "value": 0.7
+      },
+      "Hc1ExcessTemp": {
+        "value": 0
+      },
+      "AppSessionStatus": {
+        "status": "connected"
+      },
+      "Hc1MinFlowTempDesired": {
+        "value": 15
+      },
+      "Hc1MaxFlowTempDesired": {
+        "value": 55
+      },
+      "Hc1SummerTempLimit": {
+        "value": 15
+      },
+      "CoolingFlowTempDesiredMin": {
+        "value": 20
+      },
+      "CoolingFlowTempDesiredMax": {
+        "value": 25
+      },
+      "Hc1AutoOffMode": {
+        "value": "night"
+      },
+      "Hc1RoomTempSwitchOn": {
+        "value": "modulating"
+      },
+      "HwcMaxFlowTempDesired": {
+        "value": 80
+      },
+      "CylinderChargeHyst": {
+        "value": 9
+      },
+      "CylinderChargeOffset": {
+        "value": 3
+      },
+      "MaxCylinderChargeTime": {
+        "value": 15
+      },
+      "HwcLockTime": {
+        "value": 0
+      },
+      "HwcParallelLoading": {
+        "value": "off"
+      },
+      "AdaptHeatCurve": {
+        "value": "no"
+      },
+      "BufferChargeOffset": {
+        "value": 10
+      },
+      "MaxRoomHumidity": {
+        "value": 40
+      },
+      "BivalencePointHc": {
+        "value": -20
+      },
+      "BivalencePointHwc": {
+        "value": -20
+      },
+      "AlternativePoint": {
+        "value": -21
+      },
+      "PrEnergySumHcThisMonth": {
+        "value": 38
+      },
+      "PrEnergySumHcLastMonth": {
+        "value": 128
+      },
+      "PrEnergySumHc": {
+        "value": 3363
+      },
+      "PrEnergySumHwcThisMonth": {
+        "value": 9
+      },
+      "PrEnergySumHwcLastMonth": {
+        "value": 43
+      },
+      "PrEnergySumHwc": {
+        "value": 862
+      },
+      "ErrorMemorySlot": {
+        "slot": 2,
+        "error": null,
+        "data": "ff ff ff ff ff ff ff ff"
+      },
+      "Currenterror": {
+        "error": null,
+        "error_1": null,
+        "error_2": null,
+        "error_3": null,
+        "error_4": null
+      },
+      "GlobalSystemOff": {
+        "value": "no"
+      },
+      "Z1OpMode": {
+        "value": "auto"
+      },
+      "Hc1ActualFlowTempDesired": {
+        "value": 29.9572
+      },
+      "Z1ActualRoomTempDesired": {
+        "value": 19.5
+      },
+      "Hc1PumpStatus": {
+        "value": 1
+      },
+      "Z1ManualTemp": {
+        "value": 18.5
+      },
+      "SystemOperatingState": {
+        "value": "heating"
+      },
+      "Z1RoomTemp": {
+        "value": 19.625
+      },
+      "Z1MaxFlowTempDesired": {
+        "value": 63
+      },
+      "Z1HeatingState": {
+        "value": "on"
+      },
+      "DisplayedOutsideTemp": {
+        "value": 10.5664
+      },
+      "HwcOpMode": {
+        "value": "auto"
+      },
+      "Unknown04": {
+        "data": "03 00 04 00"
+      },
+      "HwcTempDesired": {
+        "value": 48
+      },
+      "HwcStorageTemp": {
+        "value": 12.5
+      },
+      "Hc1FlowTemp": {
+        "value": 26
+      },
+      "Hc1MixerMovement": {
+        "value": 0
+      },
+      "Hc1HeatCurveAdaption": {
+        "value": 0
+      },
+      "WaterPressure": {
+        "press": 1.5
+      },
+      "SystemFlowTemp": {
+        "value": null
+      },
+      "SolarStorageTempBottom": {
+        "value": null
+      },
+      "SolarStorageTempTop": {
+        "value": null
+      },
+      "HwcStorageTempTop": {
+        "value": null
+      },
+      "HwcStorageTempBottom": {
+        "value": null
+      },
+      "HcStorageTempTop": {
+        "value": null
+      },
+      "HcStorageTempBottom": {
+        "value": null
+      },
+      "UnknownSettingB6": {
+        "data": "03 00 b6 00"
+      },
+      "PumpAdditionalTime": {
+        "value": 1
+      },
+      "Z1SFMode": {
+        "value": "auto"
+      },
+      "Z1NightTemp": {
+        "value": 17.5
+      },
+      "Hc1Status": {
+        "value": 1
+      },
+      "Z1ValveStatus": {
+        "value": 1
+      }
+    },
+    "ctlv3": {
+      "Z1QuickVetoTemp": {
+        "value": 18
+      },
+      "HolidayTemp": {
+        "value": 15
+      },
+      "HolidayStartDate": {
+        "day": 3,
+        "month": 9,
+        "year": 26
+      },
+      "HolidayStartTime": {
+        "hours": 22,
+        "minutes": 39,
+        "seconds": 34
+      },
+      "HwcStatus": {
+        "value": "auto"
+      },
+      "Z1Status": {
+        "value": "auto"
+      },
+      "HolidayEndDate": {
+        "day": 19,
+        "month": 9,
+        "year": 26
+      },
+      "HolidayEndTime": {
+        "hours": 22,
+        "minutes": 39,
+        "seconds": 16
+      },
+      "CoolingStartDate": {
+        "day": 1,
+        "month": 1,
+        "year": 19
+      },
+      "CoolingEndDate": {
+        "day": 1,
+        "month": 1,
+        "year": 19
+      },
+      "CoolingReleaseStatus": {
+        "value": "off"
+      },
+      "HwcSFMode": {
+        "value": "auto"
+      },
+      "HwcFlowTemp": {
+        "value": 0
+      },
+      "Hc1HeatCurve": {
+        "value": 0.7
+      },
+      "Hc1ExcessTemp": {
+        "value": 0
+      },
+      "AppSessionStatus": {
+        "status": "connected"
+      },
+      "Hc1MinFlowTempDesired": {
+        "value": 15
+      },
+      "Hc1MaxFlowTempDesired": {
+        "value": 55
+      },
+      "Hc1SummerTempLimit": {
+        "value": 15
+      },
+      "CoolingFlowTempDesiredMin": {
+        "value": 20
+      },
+      "CoolingFlowTempDesiredMax": {
+        "value": 25
+      },
+      "Hc1AutoOffMode": {
+        "value": "night"
+      },
+      "Hc1RoomTempSwitchOn": {
+        "value": "modulating"
+      },
+      "HwcMaxFlowTempDesired": {
+        "value": 80
+      },
+      "CylinderChargeHyst": {
+        "value": 9
+      },
+      "CylinderChargeOffset": {
+        "value": 3
+      },
+      "MaxCylinderChargeTime": {
+        "value": 15
+      },
+      "HwcLockTime": {
+        "value": 0
+      },
+      "HwcParallelLoading": {
+        "value": "off"
+      },
+      "AdaptHeatCurve": {
+        "value": "no"
+      },
+      "BufferChargeOffset": {
+        "value": 10
+      },
+      "MaxRoomHumidity": {
+        "value": 40
+      },
+      "BivalencePointHc": {
+        "value": -20
+      },
+      "BivalencePointHwc": {
+        "value": -20
+      },
+      "AlternativePoint": {
+        "value": -21
+      },
+      "PrEnergySumHcThisMonth": {
+        "value": 38
+      },
+      "PrEnergySumHcLastMonth": {
+        "value": 128
+      },
+      "PrEnergySumHc": {
+        "value": 3363
+      },
+      "PrEnergySumHwcThisMonth": {
+        "value": 9
+      },
+      "PrEnergySumHwcLastMonth": {
+        "value": 43
+      },
+      "PrEnergySumHwc": {
+        "value": 862
+      },
+      "ErrorMemorySlot": {
+        "slot": 2,
+        "error": null,
+        "data": "ff ff ff ff ff ff ff ff"
+      },
+      "Currenterror": {
+        "error": null,
+        "error_1": null,
+        "error_2": null,
+        "error_3": null,
+        "error_4": null
+      },
+      "GlobalSystemOff": {
+        "value": "no"
+      },
+      "Z1OpMode": {
+        "value": "auto"
+      },
+      "Hc1ActualFlowTempDesired": {
+        "value": 29.9572
+      },
+      "Z1ActualRoomTempDesired": {
+        "value": 19.5
+      },
+      "Hc1PumpStatus": {
+        "value": 1
+      },
+      "Z1ManualTemp": {
+        "value": 18.5
+      },
+      "SystemOperatingState": {
+        "value": "heating"
+      },
+      "Z1RoomTemp": {
+        "value": 19.625
+      },
+      "Z1MaxFlowTempDesired": {
+        "value": 63
+      },
+      "Z1HeatingState": {
+        "value": "on"
+      },
+      "DisplayedOutsideTemp": {
+        "value": 10.5664
+      },
+      "HwcOpMode": {
+        "value": "auto"
+      },
+      "Unknown04": {
+        "data": "03 00 04 00"
+      },
+      "HwcTempDesired": {
+        "value": 48
+      },
+      "HwcStorageTemp": {
+        "value": 12.5
+      },
+      "Hc1FlowTemp": {
+        "value": 26
+      },
+      "Hc1MixerMovement": {
+        "value": 0
+      },
+      "Hc1HeatCurveAdaption": {
+        "value": 0
+      },
+      "WaterPressure": {
+        "press": 1.5
+      },
+      "SystemFlowTemp": {
+        "value": null
+      },
+      "SolarStorageTempBottom": {
+        "value": null
+      },
+      "SolarStorageTempTop": {
+        "value": null
+      },
+      "HwcStorageTempTop": {
+        "value": null
+      },
+      "HwcStorageTempBottom": {
+        "value": null
+      },
+      "HcStorageTempTop": {
+        "value": null
+      },
+      "HcStorageTempBottom": {
+        "value": null
+      },
+      "UnknownSettingB6": {
+        "data": "03 00 b6 00"
+      },
+      "PumpAdditionalTime": {
+        "value": 1
+      },
+      "Z1SFMode": {
+        "value": "auto"
+      },
+      "Z1NightTemp": {
+        "value": 17.5
+      },
+      "Hc1Status": {
+        "value": 1
+      },
+      "Z1ValveStatus": {
+        "value": 1
+      }
+    },
+    "vwzio": {
+      "Status01": {
+        "flow_temp": null,
+        "return_temp": null,
+        "outside_temp": null,
+        "hwc_temp": null,
+        "storage_temp": 12.5,
+        "pumpstate": "off"
+      },
+      "SecondaryCircuitStatusStandby": {
+        "status": "cd 00 00 00 80 ff 00"
+      },
+      "Currenterror": {
+        "error": null,
+        "error_1": null,
+        "error_2": null,
+        "error_3": null,
+        "error_4": null
+      },
+      "PrEnergyElectricHc": {
+        "energy": 10000
+      },
+      "PrEnergyElectricHwc": {
+        "energy": 0
+      },
+      "PrEnergyThermalHc": {
+        "energy": 0
+      },
+      "PrEnergyThermalHwc": {
+        "energy": 0
+      }
+    }
+  }
+}
