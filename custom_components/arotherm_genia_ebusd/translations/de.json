@@ -246,6 +246,21 @@
       },
       "compressor_silent_operation_level": {
         "name": "Flüstermodus-Leistungsstufe"
+      },
+      "dew_point_offset": {
+        "name": "Taupunkt-Offset"
+      },
+      "cooling_outside_temp_threshold": {
+        "name": "Außentemperatur-Schwellwert Kühlen"
+      },
+      "offset_outside_temp": {
+        "name": "Kalibrierungsoffset Außentemperatur"
+      },
+      "continuous_heating_threshold": {
+        "name": "Durchheizen Außentemperatur-Grenze"
+      },
+      "frost_override_time": {
+        "name": "Frostschutz-Verzögerungszeit"
       }
     },
     "select": {
@@ -326,6 +341,9 @@
       },
       "global_system_off": {
         "name": "Gesamtes System Aus (Fachhandwerker)"
+      },
+      "dew_point_monitoring": {
+        "name": "Taupunktüberwachung"
       }
     },
     "datetime": {
@@ -374,6 +392,12 @@
       },
       "ebusd_running": {
         "name": "Status eBUSd-Daemon"
+      },
+      "maintenance_due": {
+        "name": "Wartung fällig"
+      },
+      "app_session_status": {
+        "name": "App-Verbindungsstatus"
       }
     },
     "sensor": {
@@ -858,6 +882,35 @@
       },
       "ebusd_missing_csv_devices": {
         "name": "eBUS-Geräte ohne geladene CSV"
+      },
+      "energy_env_yield_cool": {
+        "name": "Umweltertrag Kühlen"
+      },
+      "hc1_circuit_type": {
+        "name": "Heizkreis 1 Typ",
+        "state": {
+          "inactive": "Inaktiv",
+          "mixer": "Mischerkreis",
+          "fixed": "Festwert",
+          "hwc": "Warmwasser",
+          "returnincr": "Rücklaufanhebung",
+          "pool": "Schwimmbad"
+        }
+      },
+      "hc1_heat_curve_adaptation": {
+        "name": "Heizkurven-Adaption"
+      },
+      "hc1_mixer_movement": {
+        "name": "Mischerbewegung Heizkreis 1"
+      },
+      "multi_relay_setting": {
+        "name": "Funktion Multifunktionsrelais",
+        "state": {
+          "circulation": "Zirkulationspumpe",
+          "dryer": "Estrichtrocknung",
+          "zone": "Zonenpumpe",
+          "legiopump": "Legionellenpumpe"
+        }
       }
     },
     "button": {

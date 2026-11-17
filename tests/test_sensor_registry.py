@@ -520,6 +520,61 @@ class TestSensorRegistry(unittest.TestCase):
                 self.assertEqual(desc.device_class, expected_dc)
         self.assertEqual(found, expected_delta_keys)
 
+    def test_dew_point_and_additional_csv_entities_registered(self) -> None:
+        """Verify newly added documented CSV sensors, binary sensors, numbers, and switches."""
+        from custom_components.arotherm_genia_ebusd.const import (
+            ESSENTIAL_HYDRATION_MESSAGES,
+            HMUX0_EXCLUSIVE_MESSAGES,
+        )
+
+        sensor_keys = {d.key for d in SENSOR_DESCRIPTIONS}
+        self.assertTrue(
+            {
+                "energy_env_yield_cool",
+                "hc1_circuit_type",
+                "hc1_heat_curve_adaptation",
+                "hc1_mixer_movement",
+                "multi_relay_setting",
+            }.issubset(sensor_keys)
+        )
+        self.assertIn("PrEnergyEnvYieldCool", HMUX0_EXCLUSIVE_MESSAGES)
+
+        binary_keys = {d.key for d in BINARY_SENSOR_DESCRIPTIONS}
+        self.assertTrue({"maintenance_due", "app_session_status"}.issubset(binary_keys))
+
+        number_keys = {d.key for d in NUMBER_DESCRIPTIONS}
+        self.assertTrue(
+            {
+                "dew_point_offset",
+                "cooling_outside_temp_threshold",
+                "offset_outside_temp",
+                "continuous_heating_threshold",
+                "frost_override_time",
+            }.issubset(number_keys)
+        )
+
+        switch_keys = {d.key for d in STANDARD_SWITCH_DESCRIPTIONS}
+        self.assertIn("dew_point_monitoring", switch_keys)
+
+        hydrated_msgs = {m for _c, m in ESSENTIAL_HYDRATION_MESSAGES}
+        self.assertTrue(
+            {
+                "DewPointMonitoring",
+                "DewPointOffset",
+                "CoolingOutsideTempThreshold",
+                "OffsetOutsideTemp",
+                "ContinuosHeating",
+                "FrostOverRideTime",
+                "MultiRelaySetting",
+                "MaintenanceDue",
+                "Hc1CircuitType",
+                "Hc1MixerMovement",
+                "Hc1HeatCurveAdaption",
+                "AppSessionStatus",
+                "PrEnergyEnvYieldCool",
+            }.issubset(hydrated_msgs)
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

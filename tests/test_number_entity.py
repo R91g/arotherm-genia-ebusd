@@ -52,7 +52,7 @@ class TestNumberPlatform(unittest.IsolatedAsyncioTestCase):
 
     def test_number_descriptions_structure(self) -> None:
         """Verify that NUMBER_DESCRIPTIONS contains valid and expected definitions."""
-        self.assertEqual(len(NUMBER_DESCRIPTIONS), 26)
+        self.assertEqual(len(NUMBER_DESCRIPTIONS), 31)
 
         keys = [d.key for d in NUMBER_DESCRIPTIONS]
         self.assertEqual(
@@ -119,7 +119,7 @@ class TestNumberPlatform(unittest.IsolatedAsyncioTestCase):
             added_entities.extend(entities)
 
         await async_setup_entry(self.hass, self.entry, mock_add_entities)
-        self.assertEqual(len(added_entities), 28)
+        self.assertEqual(len(added_entities), 33)
 
         # Check boost delta entity setup (heating)
         boost_delta_entity = next(

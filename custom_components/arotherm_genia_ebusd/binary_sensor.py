@@ -148,6 +148,20 @@ def _check_ebusd_running(coord: SaunierGeniaCoordinator) -> bool | None:
     return val.lower() in ("true", "1", "on", "yes")
 
 
+def _check_maintenance_due(coord: SaunierGeniaCoordinator) -> bool | None:
+    val = coord.get_str(CIRCUIT_BASS3, "MaintenanceDue", "value")
+    if val is None:
+        return None
+    return val.lower() in ("yes", "1", "on", "true")
+
+
+def _check_app_session_status(coord: SaunierGeniaCoordinator) -> bool | None:
+    val = coord.get_str(CIRCUIT_BASS3, "AppSessionStatus", "status")
+    if val is None:
+        return None
+    return val.lower() in ("connected", "1", "on", "true")
+
+
 BINARY_SENSOR_DESCRIPTIONS: tuple[SaunierGeniaBinarySensorEntityDescription, ...] = (
     SaunierGeniaBinarySensorEntityDescription(
         key="compressor_active",
@@ -239,6 +253,28 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[SaunierGeniaBinarySensorEntityDescription, ...
         device_class=BinarySensorDeviceClass.RUNNING,
         entity_category=EntityCategory.DIAGNOSTIC,
         is_on_fn=_check_ebusd_running,
+    ),
+    SaunierGeniaBinarySensorEntityDescription(
+        key="maintenance_due",
+        translation_key="maintenance_due",
+        device_key=DEVICE_CLIMATE_CONTROLLER,
+        circuit=CIRCUIT_BASS3,
+        message="MaintenanceDue",
+        field="value",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        is_on_fn=_check_maintenance_due,
+    ),
+    SaunierGeniaBinarySensorEntityDescription(
+        key="app_session_status",
+        translation_key="app_session_status",
+        device_key=DEVICE_CLIMATE_CONTROLLER,
+        circuit=CIRCUIT_BASS3,
+        message="AppSessionStatus",
+        field="status",
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        is_on_fn=_check_app_session_status,
     ),
 )
 

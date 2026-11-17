@@ -246,6 +246,21 @@
       },
       "compressor_silent_operation_level": {
         "name": "Nivel de modo silencioso del compresor"
+      },
+      "dew_point_offset": {
+        "name": "Offset del punto de rocío"
+      },
+      "cooling_outside_temp_threshold": {
+        "name": "Umbral exterior de refrigeración"
+      },
+      "offset_outside_temp": {
+        "name": "Offset de calibración sonda exterior"
+      },
+      "continuous_heating_threshold": {
+        "name": "Umbral exterior de calefacción continua"
+      },
+      "frost_override_time": {
+        "name": "Retardo de protección antihielo"
       }
     },
     "select": {
@@ -326,6 +341,9 @@
       },
       "global_system_off": {
         "name": "Apagado global del sistema (Instalador)"
+      },
+      "dew_point_monitoring": {
+        "name": "Vigilancia del punto de rocío"
       }
     },
     "datetime": {
@@ -374,6 +392,12 @@
       },
       "ebusd_running": {
         "name": "Estado del servicio ebusd"
+      },
+      "maintenance_due": {
+        "name": "Mantenimiento pendiente"
+      },
+      "app_session_status": {
+        "name": "Sesión de la app"
       }
     },
     "sensor": {
@@ -858,6 +882,35 @@
       },
       "ebusd_missing_csv_devices": {
         "name": "Dispositivos eBUS con CSV pendiente"
+      },
+      "energy_env_yield_cool": {
+        "name": "Energía ambiental captada refrigeración"
+      },
+      "hc1_circuit_type": {
+        "name": "Tipo de circuito de calefacción 1",
+        "state": {
+          "inactive": "Inactivo",
+          "mixer": "Mezclador",
+          "fixed": "Consigna fija",
+          "hwc": "ACS",
+          "returnincr": "Elevación de retorno",
+          "pool": "Piscina"
+        }
+      },
+      "hc1_heat_curve_adaptation": {
+        "name": "Adaptación de curva de calefacción"
+      },
+      "hc1_mixer_movement": {
+        "name": "Movimiento mezcladora circuito 1"
+      },
+      "multi_relay_setting": {
+        "name": "Función del relé multifunción",
+        "state": {
+          "circulation": "Recirculación ACS",
+          "dryer": "Secado de solera",
+          "zone": "Bomba de zona",
+          "legiopump": "Bomba antilegionela"
+        }
       }
     },
     "button": {

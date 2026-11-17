@@ -36,15 +36,15 @@ r;u,,,PrEnergyThermalHwc,total hot water thermal energy delivered,,,b516,1000fff
 
 r;u,,,RunStatsHcStarts,,,,b509,540200c00b,ign,,IGN:4,,,,value,,UIN,,,total starts of heating mode
 r;u,,,RunStatsHwcStarts,,,,b509,540200c10b,ign,,IGN:4,,,,value,,UIN,,,total starts of Hwc mode
-r;u,,,RunDataDiagnostic,diagnostic code readout,,,b509,540200cc10,ign,,IGN:4,,,,value,,HEX:2,,,
+u,,,RunDataDiagnostic,diagnostic code readout,,,b509,540200cc10,ign,,IGN:4,,,,value,,HEX:2,,,
 r;u,,,RunStatsHeaterEnergy,electrical energy consumption of the immersion heater,,,b509,5402000c0b,ign,,IGN:4,,,,value,,ULG,,kWh,"electrical energy consumption of the immersion heater"
 r;u,,,RunDataHeaterFlowTemp,immersion heater flow temperature,,,b509,5402004c09,ign,,IGN:4,,,,value,,EXP,,°C,"immersion heater flow temperature"
-# Hourly diagnostic telemetry & hydraulic status (Section 4)
-r;u,,,RunDataDiagbf0d,minimum volumetric flow rate safety threshold,,,b509,540200bf0d,ign,,IGN:4,,,,value,,EXP,,l/min,"minimum volumetric flow rate safety threshold"
-r;u,,,RunDataDiagad0d,hydraulic actuator position status diagnostic,,,b509,540200ad0d,ign,,IGN:4,,,,status,,UCH,,,hydraulic actuator position status diagnostic
-r;u,,,RunDataDiagac0d,backup heater relay status diagnostic,,,b509,540200ac0d,ign,,IGN:4,,,,status,,UCH,,,backup heater relay status diagnostic
-r;u,,,RunDataDiag640b,hydraulic module runtime counter 640b,,,b509,540200640b,ign,,IGN:4,,,,hours,,UIN,,h,"hydraulic module runtime counter 640b"
-r;u,,,RunDataDiagbd0b,hydraulic module cycle counter bd0b,,,b509,540200bd0b,ign,,IGN:4,,,,switches,,ULG,,,hydraulic module cycle counter bd0b
+# Passive-only (u) diagnostic telemetry & hydraulic status (Section 4)
+u,,,RunDataDiagbf0d,minimum volumetric flow rate safety threshold,,,b509,540200bf0d,ign,,IGN:4,,,,value,,EXP,,l/min,"minimum volumetric flow rate safety threshold"
+u,,,RunDataDiagad0d,hydraulic actuator position status diagnostic,,,b509,540200ad0d,ign,,IGN:4,,,,status,,UCH,,,hydraulic actuator position status diagnostic
+u,,,RunDataDiagac0d,backup heater relay status diagnostic,,,b509,540200ac0d,ign,,IGN:4,,,,status,,UCH,,,backup heater relay status diagnostic
+u,,,RunDataDiag640b,hydraulic module runtime counter 640b,,,b509,540200640b,ign,,IGN:4,,,,hours,,UIN,,h,"hydraulic module runtime counter 640b"
+u,,,RunDataDiagbd0b,hydraulic module cycle counter bd0b,,,b509,540200bd0b,ign,,IGN:4,,,,switches,,ULG,,,hydraulic module cycle counter bd0b
 r;u,,,Currenterror,current errors,,,b503,0001,error,,UIN,,,error number,error_1,,UIN,,,error number,error_2,,UIN,,,error number,error_3,,UIN,,,error number,error_4,,UIN,,,error number
 r;u,,,Errorhistory,Error_History,,,b503,0101,index,m,UCH,,,,status,,UCH,,,Status,time,,VTM,,,time,date,,HDA:3,,,date,error,,UIN,,,error number
 r;u,,,ErrorMemorySlot,error memory slot,,,b503,00,slot,m,UCH,,,,error,,UIN,,,error number,data,,HEX:8,,,

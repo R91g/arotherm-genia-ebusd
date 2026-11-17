@@ -6247,6 +6247,146 @@ class TestCoordinatorLogic(unittest.TestCase):
 
         asyncio.run(_run())
 
+    def test_initial_hydration_expands_only_active_weekly_timer_slots(self) -> None:
+        """Initial hydration must queue <prefix>_Slots and expand only days/slots with active counts."""
+        hass = MagicMock()
+        entry = MagicMock()
+        entry.entry_id = "test_timer_hydration"
+        entry.data = {CONF_MANUFACTURER: MANUFACTURER_VAILLANT}
+        entry.options = {}
+
+        coord = SaunierGeniaCoordinator(hass, entry)
+        coord._active_outdoor_circuit = CIRCUIT_HMUX0
+        coord._state[(CIRCUIT_BASS3, "Z1Timer_Slots")] = {
+            "mon": 3,
+            "tue": 1,
+            "wed": 0,
+            "thu": 0,
+            "fri": 0,
+            "sat": 0,
+            "sun": 0,
+        }
+
+        requested: list[tuple[str, str]] = []
+
+        async def _capture_get(circuit: str, message: str) -> None:
+            requested.append((circuit, message))
+            if (circuit, message) == (CIRCUIT_BASS3, "HwcTimer_Slots"):
+                coord._state[(CIRCUIT_BASS3, "HwcTimer_Slots")] = {
+                    "mon": 2,
+                    "tue": 0,
+                    "wed": 0,
+                    "thu": 0,
+                    "fri": 0,
+                    "sat": 0,
+                    "sun": 0,
+                }
+
+        with (
+            patch.object(coord, "async_request_get", side_effect=_capture_get),
+            patch(
+                "custom_components.arotherm_genia_ebusd.coordinator.HYDRATION_STEP_DELAY_SECONDS",
+                0.0,
+            ),
+        ):
+            asyncio.run(
+                coord._async_run_hydration_queue(
+                    [
+                        (CIRCUIT_BASS3, "OutsideTempAvg"),
+                        (CIRCUIT_BASS3, "HydraulicScheme"),
+                        (CIRCUIT_BASS3, "Z1Timer_Slots"),
+                        (CIRCUIT_BASS3, "HwcTimer_Slots"),
+                    ]
+                )
+            )
+
+        self.assertIn((CIRCUIT_BASS3, "Z1Timer_Monday"), requested)
+        self.assertIn((CIRCUIT_BASS3, "Z1Timer_Monday_Slot2"), requested)
+        self.assertIn((CIRCUIT_BASS3, "Z1Timer_Monday_Slot3"), requested)
+        self.assertIn((CIRCUIT_BASS3, "Z1Timer_Tuesday"), requested)
+        self.assertNotIn((CIRCUIT_BASS3, "Z1Timer_Tuesday_Slot2"), requested)
+        self.assertNotIn((CIRCUIT_BASS3, "Z1Timer_Wednesday"), requested)
+        self.assertIn((CIRCUIT_BASS3, "HwcTimer_Monday"), requested)
+        self.assertIn((CIRCUIT_BASS3, "HwcTimer_Monday_Slot2"), requested)
+        self.assertNotIn((CIRCUIT_BASS3, "HwcTimer_Monday_Slot3"), requested)
+
+    def test_tiered_fast_and_hourly_slow_fallback_polling(self) -> None:
+        """Fast fallback polls live telemetry only; hourly slow fallback polls config, stats, and timers."""
+        hass = MagicMock()
+        hass.async_create_background_task.side_effect = lambda coro, name=None: (
+            coro.close()
+        )
+        entry = MagicMock()
+        entry.entry_id = "test_tiered_fallback"
+        entry.data = {CONF_HAS_MIGO_LINK: False}
+        entry.options = {}
+
+        coord = SaunierGeniaCoordinator(hass, entry)
+        coord._active_outdoor_circuit = CIRCUIT_HMUX0
+        coord._state[(CIRCUIT_BASS3, "CoolingTimer_Slots")] = {
+            "mon": 2,
+            "tue": 0,
+            "wed": 0,
+            "thu": 0,
+            "fri": 0,
+            "sat": 0,
+            "sun": 0,
+        }
+
+        # Fast cycle: operational & thermodynamic telemetry, no static config / legacy probes / RunStats
+        with patch.object(
+            coord, "_async_force_poll_queue", return_value=None
+        ) as mock_fast:
+            asyncio.run(coord._async_run_fallback_poll(datetime.now()))
+            fast_queue = mock_fast.call_args[0][0]
+            self.assertIn((CIRCUIT_BASS3, "OutsideTempAvg"), fast_queue)
+            self.assertIn((CIRCUIT_HMUX0, "RunDataSuperheat"), fast_queue)
+            self.assertIn((CIRCUIT_HMUX0, "PrEnergyEnvYieldCool"), fast_queue)
+            self.assertNotIn((CIRCUIT_BASS3, "Hc1HeatCurve"), fast_queue)
+            self.assertNotIn((CIRCUIT_BASS3, "Z1HolidayTemp"), fast_queue)
+            self.assertNotIn((CIRCUIT_BASS3, "Z1DayTemp"), fast_queue)
+            self.assertNotIn((CIRCUIT_BASS3, "PrEnergySumHcThisMonth"), fast_queue)
+            self.assertNotIn((CIRCUIT_HMUX0, "RunStatsHMUHours"), fast_queue)
+
+        # Hourly slow cycle (HMUX0): installation settings, monthly sums, RunStats, vwzio stats, active timers
+        with patch.object(
+            coord, "_async_force_poll_queue", return_value=None
+        ) as mock_slow:
+            asyncio.run(coord._async_run_fallback_slow_poll(datetime.now()))
+            slow_queue = mock_slow.call_args[0][0]
+            self.assertTrue(mock_slow.call_args[1].get("expand_timer_slots"))
+            self.assertIn((CIRCUIT_BASS3, "Hc1HeatCurve"), slow_queue)
+            self.assertIn((CIRCUIT_BASS3, "DewPointMonitoring"), slow_queue)
+            self.assertIn((CIRCUIT_BASS3, "HydraulicScheme"), slow_queue)
+            self.assertIn((CIRCUIT_BASS3, "Z1Timer_Slots"), slow_queue)
+            self.assertIn((CIRCUIT_BASS3, "CoolingTimer_Monday"), slow_queue)
+            self.assertIn((CIRCUIT_BASS3, "CoolingTimer_Monday_Slot2"), slow_queue)
+            self.assertNotIn((CIRCUIT_BASS3, "CoolingTimer_Monday_Slot3"), slow_queue)
+            self.assertIn((CIRCUIT_HMUX0, "RunStatsHMUHours"), slow_queue)
+            self.assertIn((CIRCUIT_HMUX0, "RunStatsCompressorCool"), slow_queue)
+            self.assertIn((CIRCUIT_VWZIO, "RunStatsHeaterEnergy"), slow_queue)
+            self.assertNotIn((CIRCUIT_BASS3, "Z1HolidayTemp"), slow_queue)
+
+        # HMU SW < 902 skips CompressorHc/Hwc/Cool in slow poll
+        coord._active_outdoor_circuit = CIRCUIT_HMU
+        coord._record_detected_outdoor_sw("0804")
+        with patch.object(
+            coord, "_async_force_poll_queue", return_value=None
+        ) as mock_slow_hmu:
+            asyncio.run(coord._async_run_fallback_slow_poll(datetime.now()))
+            slow_hmu_queue = mock_slow_hmu.call_args[0][0]
+            self.assertIn((CIRCUIT_HMU, "CompressorHours"), slow_hmu_queue)
+            self.assertNotIn((CIRCUIT_HMU, "CompressorHc"), slow_hmu_queue)
+            self.assertNotIn((CIRCUIT_HMUX0, "RunStatsCompressorCool"), slow_hmu_queue)
+
+        # Skips cleanly when MiGo Link is enabled
+        entry.data = {CONF_HAS_MIGO_LINK: True}
+        with patch.object(
+            coord, "_async_force_poll_queue", return_value=None
+        ) as mock_migo:
+            asyncio.run(coord._async_run_fallback_slow_poll(datetime.now()))
+            mock_migo.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -62,8 +62,10 @@ from .const import (
     DEVICE_HYDRAULIC_INTERFACE,
     DEVICE_OUTDOOR_UNIT,
     DEVICE_WIRELESS_THERMOSTAT,
+    HC1_CIRCUIT_TYPE_OPTIONS,
     HMU_STATUS_CODES,
     HWC_STATUS_OPTIONS,
+    MULTI_RELAY_SETTING_OPTIONS,
     OUTDOOR_CIRCUITS,
     SENTINEL_HEATING_THRESHOLD,
     SETMODE_HC_MODES,
@@ -434,6 +436,21 @@ def _get_env_yield_hwc_wh(coord: SaunierGeniaCoordinator) -> float | None:
     if wh is not None:
         return round(wh, 1)
     kwh = coord.get_float(CIRCUIT_HMU, "YieldHwc", "value")
+    return round(kwh * 1000.0, 1) if kwh is not None else None
+
+
+def _get_env_yield_cool_wh(coord: SaunierGeniaCoordinator) -> float | None:
+    """Return cumulative cooling environmental energy yield in Wh.
+
+    Reads PrEnergyEnvYieldCool (Wh) on HMUX0, or converts YieldCooling (kWh -> Wh) on HMU/HMU00.
+    """
+    if coord.active_outdoor_circuit in (CIRCUIT_HMU, CIRCUIT_HMU00):
+        kwh = coord.get_float(CIRCUIT_HMU, "YieldCooling", "value")
+        return round(kwh * 1000.0, 1) if kwh is not None else None
+    wh = coord.get_float(CIRCUIT_HMUX0, "PrEnergyEnvYieldCool", "energy")
+    if wh is not None:
+        return round(wh, 1)
+    kwh = coord.get_float(CIRCUIT_HMU, "YieldCooling", "value")
     return round(kwh * 1000.0, 1) if kwh is not None else None
 
 
@@ -1003,6 +1020,22 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         fallback_message="YieldHwc",
         fallback_field="value",
         value_fn=_get_env_yield_hwc_wh,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=1,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="energy_env_yield_cool",
+        translation_key="energy_env_yield_cool",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_HMUX0,
+        message="PrEnergyEnvYieldCool",
+        field="energy",
+        fallback_circuit=CIRCUIT_HMU,
+        fallback_message="YieldCooling",
+        fallback_field="value",
+        value_fn=_get_env_yield_cool_wh,
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -1586,6 +1619,50 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         message="HydraulicScheme",
         field="value",
         is_integer=True,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="hc1_circuit_type",
+        translation_key="hc1_circuit_type",
+        device_key=DEVICE_CLIMATE_CONTROLLER,
+        circuit=CIRCUIT_BASS3,
+        message="Hc1CircuitType",
+        field="mctype",
+        device_class=SensorDeviceClass.ENUM,
+        options=HC1_CIRCUIT_TYPE_OPTIONS,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="hc1_heat_curve_adaptation",
+        translation_key="hc1_heat_curve_adaptation",
+        device_key=DEVICE_CLIMATE_CONTROLLER,
+        circuit=CIRCUIT_BASS3,
+        message="Hc1HeatCurveAdaption",
+        field="value",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="hc1_mixer_movement",
+        translation_key="hc1_mixer_movement",
+        device_key=DEVICE_CLIMATE_CONTROLLER,
+        circuit=CIRCUIT_BASS3,
+        message="Hc1MixerMovement",
+        field="value",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="multi_relay_setting",
+        translation_key="multi_relay_setting",
+        device_key=DEVICE_CLIMATE_CONTROLLER,
+        circuit=CIRCUIT_BASS3,
+        message="MultiRelaySetting",
+        field="value",
+        device_class=SensorDeviceClass.ENUM,
+        options=MULTI_RELAY_SETTING_OPTIONS,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     SaunierGeniaSensorEntityDescription(
         key="holiday_duration_remaining",

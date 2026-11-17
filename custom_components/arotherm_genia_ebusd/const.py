@@ -451,7 +451,9 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_BASS3, "HwcLegionellaDay"),
     (CIRCUIT_BASS3, "HwcLegionellaTime"),
     (CIRCUIT_BASS3, "DisplayedOutsideTemp"),
+    (CIRCUIT_BASS3, "OutsideTempAvg"),
     (CIRCUIT_BASS3, "WaterPressure"),
+    (CIRCUIT_BASS3, "HydraulicScheme"),
     (CIRCUIT_BASS3, "Hc1FlowTemp"),
     (CIRCUIT_BASS3, "Hc1ActualFlowTempDesired"),
     (CIRCUIT_BASS3, "Currenterror"),
@@ -477,6 +479,10 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
         CIRCUIT_BASS3,
         "Z1DayTemp",
     ),  # Probes for legacy pre-v1.3.0 CSV compatibility check (replaced by Z1CoolingManualTemp)
+    (CIRCUIT_BASS3, "Z1Timer_Slots"),
+    (CIRCUIT_BASS3, "HwcTimer_Slots"),
+    (CIRCUIT_BASS3, "CoolingTimer_Slots"),
+    (CIRCUIT_BASS3, "CirculationTimer_Slots"),
     (
         CIRCUIT_BASS3,
         "SilentTimer_Slots",
@@ -510,6 +516,18 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_BASS3, "BivalencePointHc"),
     (CIRCUIT_BASS3, "BivalencePointHwc"),
     (CIRCUIT_BASS3, "AlternativePoint"),
+    (CIRCUIT_BASS3, "CoolingOutsideTempThreshold"),
+    (CIRCUIT_BASS3, "DewPointOffset"),
+    (CIRCUIT_BASS3, "DewPointMonitoring"),
+    (CIRCUIT_BASS3, "OffsetOutsideTemp"),
+    (CIRCUIT_BASS3, "ContinuosHeating"),
+    (CIRCUIT_BASS3, "FrostOverRideTime"),
+    (CIRCUIT_BASS3, "MultiRelaySetting"),
+    (CIRCUIT_BASS3, "MaintenanceDue"),
+    (CIRCUIT_BASS3, "Hc1CircuitType"),
+    (CIRCUIT_BASS3, "Hc1MixerMovement"),
+    (CIRCUIT_BASS3, "Hc1HeatCurveAdaption"),
+    (CIRCUIT_BASS3, "AppSessionStatus"),
     (CIRCUIT_BASS3, "PrEnergySumHcThisMonth"),
     (CIRCUIT_BASS3, "PrEnergySumHcLastMonth"),
     (CIRCUIT_BASS3, "PrEnergySumHc"),
@@ -518,20 +536,54 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_BASS3, "PrEnergySumHwc"),
     # Outdoor Unit (08.hmux0) - Active live telemetry & energy counters (r / r1..r9)
     (CIRCUIT_HMUX0, "HMUStatusCode"),
+    (CIRCUIT_HMUX0, "StateCompressor"),
+    (CIRCUIT_HMUX0, "Currenterror"),
     (CIRCUIT_HMUX0, "PowerStatus"),
+    (CIRCUIT_HMUX0, "RunDataElectricPowerConsumption"),
     (CIRCUIT_HMUX0, "CompressorSilentOperationLevel"),
     (CIRCUIT_HMUX0, "RunDataCompressorSpeed"),
     (CIRCUIT_HMUX0, "RunDataFan1Speed"),
+    (CIRCUIT_HMUX0, "RunDataFan2Speed"),
     (CIRCUIT_HMUX0, "RunDataFlowRate"),
     (CIRCUIT_HMUX0, "RunDataBuildingCPumpPower"),
     (CIRCUIT_HMUX0, "RunDataHighPressure"),
     (CIRCUIT_HMUX0, "RunDataFlowTemp"),
     (CIRCUIT_HMUX0, "RunDataReturnTemp"),
+    (CIRCUIT_HMUX0, "RunDataFlowTempDesired"),
+    (CIRCUIT_HMUX0, "RunDataHeatOutput"),
+    (CIRCUIT_HMUX0, "RunDataEnergyIntegral"),
     (CIRCUIT_HMUX0, "RunDataAirInletTemp"),
     (CIRCUIT_HMUX0, "RunDataCompressorInletTemp"),
     (CIRCUIT_HMUX0, "RunDataCompressorOutletTemp"),
     (CIRCUIT_HMUX0, "RunDataEEVOutletTemp"),
+    (CIRCUIT_HMUX0, "RunDataCondenserOutTemp"),
+    (CIRCUIT_HMUX0, "RunDataCondensationTemp"),
+    (CIRCUIT_HMUX0, "RunDataCondensateTemp"),
+    (CIRCUIT_HMUX0, "RunDataEvaporationTemp"),
+    (CIRCUIT_HMUX0, "RunDataSuperheat"),
+    (CIRCUIT_HMUX0, "RunDataEEVPositionAbs"),
+    (CIRCUIT_HMUX0, "RunStatsHMUHours"),
+    (CIRCUIT_HMUX0, "RunStatsHcHours"),
     (CIRCUIT_HMUX0, "RunStatsHcStarts"),
+    (CIRCUIT_HMUX0, "RunStatsHwcHours"),
+    (CIRCUIT_HMUX0, "RunStatsHwcStarts"),
+    (CIRCUIT_HMUX0, "RunStatsCompressorHours"),
+    (CIRCUIT_HMUX0, "RunStatsCompressorStarts"),
+    (CIRCUIT_HMUX0, "RunStatsBuildingPumpHours"),
+    (CIRCUIT_HMUX0, "RunStatsBuildingCPumpStarts"),
+    (CIRCUIT_HMUX0, "RunStats4PortValveHours"),
+    (CIRCUIT_HMUX0, "RunStats4PortValveSwitches"),
+    (CIRCUIT_HMUX0, "RunStatsFan1Hours"),
+    (CIRCUIT_HMUX0, "RunStatsFan1Starts"),
+    (CIRCUIT_HMUX0, "RunStatsFan2Hours"),
+    (CIRCUIT_HMUX0, "RunStatsFan2Starts"),
+    (CIRCUIT_HMUX0, "RunStatsDeiceHours"),
+    (CIRCUIT_HMUX0, "RunStatsDeiceStarts"),
+    (CIRCUIT_HMUX0, "RunStatsImmersionHeaterHours"),
+    (CIRCUIT_HMUX0, "RunStatsImmersionHeaterStarts"),
+    (CIRCUIT_HMUX0, "RunStatsCompressorHc"),
+    (CIRCUIT_HMUX0, "RunStatsCompressorHwc"),
+    (CIRCUIT_HMUX0, "RunStatsCompressorCool"),
     (CIRCUIT_HMUX0, "PrEnergyElectricHc"),
     (CIRCUIT_HMUX0, "PrEnergyElectricHwc"),
     (CIRCUIT_HMUX0, "PrEnergyElectricCool"),
@@ -540,12 +592,111 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_HMUX0, "PrEnergyThermalCool"),
     (CIRCUIT_HMUX0, "PrEnergyEnvYieldHc"),
     (CIRCUIT_HMUX0, "PrEnergyEnvYieldHwc"),
-    # Hydraulic Interface (76.vwzio) - Active power & energy counters (r)
+    (CIRCUIT_HMUX0, "PrEnergyEnvYieldCool"),
+    # Hydraulic Interface (76.vwzio) - Active power, stats & energy counters (r)
+    (CIRCUIT_VWZIO, "Currenterror"),
     (CIRCUIT_VWZIO, "PowerStatus"),
+    (CIRCUIT_VWZIO, "RunStatsHcStarts"),
+    (CIRCUIT_VWZIO, "RunStatsHwcStarts"),
+    (CIRCUIT_VWZIO, "RunDataHeaterFlowTemp"),
+    (CIRCUIT_VWZIO, "RunStatsHeaterEnergy"),
+    (CIRCUIT_VWZIO, "RunStatsHeaterHc"),
+    (CIRCUIT_VWZIO, "RunStatsHeaterHwc"),
     (CIRCUIT_VWZIO, "PrEnergyElectricHc"),
     (CIRCUIT_VWZIO, "PrEnergyElectricHwc"),
     (CIRCUIT_VWZIO, "PrEnergyThermalHc"),
     (CIRCUIT_VWZIO, "PrEnergyThermalHwc"),
+]
+
+# No-MiGo Fallback Polling Tiers (mimicking MiGo Link fast operational vs hourly slow sync)
+FALLBACK_SLOW_POLL_INTERVAL_SECONDS: int = 3600
+
+FALLBACK_FAST_BASS3_MESSAGES: list[tuple[str, str]] = [
+    (CIRCUIT_BASS3, "Z1SFMode"),
+    (CIRCUIT_BASS3, "Z1Status"),
+    (CIRCUIT_BASS3, "Z1OpMode"),
+    (CIRCUIT_BASS3, "Z1OpModeCooling"),
+    (CIRCUIT_BASS3, "Z1RoomTemp"),
+    (CIRCUIT_BASS3, "Z1RoomHumidity"),
+    (CIRCUIT_BASS3, "Z1ActualRoomTempDesired"),
+    (CIRCUIT_BASS3, "Z1ManualTemp"),
+    (CIRCUIT_BASS3, "Z1CoolingTempDesired"),
+    (CIRCUIT_BASS3, "Z1CoolingManualTemp"),
+    (CIRCUIT_BASS3, "Z1CoolingTemp"),
+    (CIRCUIT_BASS3, "Z1NightTemp"),
+    (CIRCUIT_BASS3, "Z1QuickVetoTemp"),
+    (CIRCUIT_BASS3, "Z1QuickVetoDuration"),
+    (CIRCUIT_BASS3, "Z1HeatingState"),
+    (CIRCUIT_BASS3, "SystemOperatingState"),
+    (CIRCUIT_BASS3, "HwcOpMode"),
+    (CIRCUIT_BASS3, "HwcSFMode"),
+    (CIRCUIT_BASS3, "HwcTempDesired"),
+    (CIRCUIT_BASS3, "HwcStatus"),
+    (CIRCUIT_BASS3, "HwcStorageTemp"),
+    (CIRCUIT_BASS3, "HwcFlowTemp"),
+    (CIRCUIT_BASS3, "HwcLegionellaDay"),
+    (CIRCUIT_BASS3, "HwcLegionellaTime"),
+    (CIRCUIT_BASS3, "DisplayedOutsideTemp"),
+    (CIRCUIT_BASS3, "OutsideTempAvg"),
+    (CIRCUIT_BASS3, "WaterPressure"),
+    (CIRCUIT_BASS3, "Hc1FlowTemp"),
+    (CIRCUIT_BASS3, "Hc1ActualFlowTempDesired"),
+    (CIRCUIT_BASS3, "CoolingReleaseStatus"),
+    (CIRCUIT_BASS3, "Currenterror"),
+    (CIRCUIT_BASS3, "Hc1PumpStatus"),
+]
+
+_FALLBACK_FAST_BASS3_SET: frozenset[str] = frozenset(
+    m for _c, m in FALLBACK_FAST_BASS3_MESSAGES
+)
+_STARTUP_ONLY_PROBE_MESSAGES: frozenset[str] = frozenset({"Z1HolidayTemp", "Z1DayTemp"})
+
+FALLBACK_SLOW_BASS3_MESSAGES: list[tuple[str, str]] = [
+    (CIRCUIT_BASS3, m)
+    for c, m in ESSENTIAL_HYDRATION_MESSAGES
+    if c == CIRCUIT_BASS3
+    and m not in _FALLBACK_FAST_BASS3_SET
+    and m not in _STARTUP_ONLY_PROBE_MESSAGES
+]
+
+FALLBACK_SLOW_OUTDOOR_COMMON_MESSAGES: tuple[str, ...] = (
+    "Currenterror",
+    "CompressorSilentOperationLevel",
+    "RunDataFan2Speed",
+    "RunDataEEVPositionAbs",
+    "RunDataCondenserOutTemp",
+    "RunStatsHMUHours",
+    "RunStatsHcHours",
+    "RunStatsHcStarts",
+    "RunStatsHwcHours",
+    "RunStatsHwcStarts",
+    "RunStatsCompressorHours",
+    "RunStatsCompressorStarts",
+    "RunStatsBuildingPumpHours",
+    "RunStatsBuildingCPumpStarts",
+    "RunStats4PortValveHours",
+    "RunStats4PortValveSwitches",
+    "RunStatsFan1Hours",
+    "RunStatsFan1Starts",
+    "RunStatsFan2Hours",
+    "RunStatsFan2Starts",
+    "RunStatsDeiceHours",
+    "RunStatsDeiceStarts",
+    "RunStatsImmersionHeaterHours",
+    "RunStatsImmersionHeaterStarts",
+    "RunStatsCompressorHc",
+    "RunStatsCompressorHwc",
+    "RunStatsCompressorCool",
+)
+
+FALLBACK_SLOW_VWZIO_MESSAGES: list[tuple[str, str]] = [
+    (CIRCUIT_VWZIO, "Currenterror"),
+    (CIRCUIT_VWZIO, "RunStatsHcStarts"),
+    (CIRCUIT_VWZIO, "RunStatsHwcStarts"),
+    (CIRCUIT_VWZIO, "RunDataHeaterFlowTemp"),
+    (CIRCUIT_VWZIO, "RunStatsHeaterEnergy"),
+    (CIRCUIT_VWZIO, "RunStatsHeaterHc"),
+    (CIRCUIT_VWZIO, "RunStatsHeaterHwc"),
 ]
 
 # Communication silence timeout before marking eBUS as non-operational (seconds)
@@ -554,7 +705,12 @@ EBUSD_TRAFFIC_TIMEOUT_SECONDS: int = 600
 # Messages exclusive to Monobloc units (08.hmux0.csv b516 EEPROM table) that do not exist on Split (08.hmu.HW5103.csv)
 HMUX0_EXCLUSIVE_MESSAGES: frozenset[str] = frozenset(
     {
+        "RunDataCondenserOutTemp",
         "RunStatsHcStarts",
+        "RunStatsHwcStarts",
+        "RunStatsCompressorHc",
+        "RunStatsCompressorHwc",
+        "RunStatsCompressorCool",
         "PrEnergyElectricHc",
         "PrEnergyElectricHwc",
         "PrEnergyElectricCool",
@@ -563,6 +719,7 @@ HMUX0_EXCLUSIVE_MESSAGES: frozenset[str] = frozenset(
         "PrEnergyThermalCool",
         "PrEnergyEnvYieldHc",
         "PrEnergyEnvYieldHwc",
+        "PrEnergyEnvYieldCool",
     }
 )
 
@@ -592,6 +749,9 @@ HMU_HW5103_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_HMU, "CompressorSilentOperationLevel"),
     (CIRCUIT_HMU, "CompressorHours"),
     (CIRCUIT_HMU, "CompressorStarts"),
+    (CIRCUIT_HMU, "CompressorHc"),
+    (CIRCUIT_HMU, "CompressorHwc"),
+    (CIRCUIT_HMU, "CompressorCool"),
 ]
 
 # All 52 HMUStatusCode values (plus normalized aliases)
@@ -697,6 +857,22 @@ VWZIO_SECONDARY_HWC_OPTIONS: list[str] = [
     "dhw",
 ]
 
+HC1_CIRCUIT_TYPE_OPTIONS: list[str] = [
+    "inactive",
+    "mixer",
+    "fixed",
+    "hwc",
+    "returnincr",
+    "pool",
+]
+
+MULTI_RELAY_SETTING_OPTIONS: list[str] = [
+    "circulation",
+    "dryer",
+    "zone",
+    "legiopump",
+]
+
 # Home Assistant Repairs (issue_registry) Identifiers
 ISSUE_OUTDATED_HMUX0_CSV = "outdated_hmux0_csv"
 ISSUE_OUTDATED_HMU_CSV = "outdated_hmu_csv"
@@ -728,7 +904,6 @@ EXTERNAL_SWEEP_CANARY_MESSAGES: frozenset[str] = frozenset(
         "yieldhwcmonth",
         "yieldcoolingmonth",
         "supplytempweighted",
-        "status02",
         "status16",
         "yieldtotal",
         "hc1status",

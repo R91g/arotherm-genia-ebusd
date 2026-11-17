@@ -134,6 +134,13 @@
           "on": "mdi:swap-horizontal",
           "off": "mdi:swap-horizontal-bold"
         }
+      },
+      "dew_point_monitoring": {
+        "default": "mdi:water-alert-outline",
+        "state": {
+          "on": "mdi:water-alert",
+          "off": "mdi:water-check-outline"
+        }
       }
     },
     "datetime": {
@@ -217,6 +224,20 @@
         "state": {
           "on": "mdi:server-network",
           "off": "mdi:server-network-off"
+        }
+      },
+      "maintenance_due": {
+        "default": "mdi:wrench-clock",
+        "state": {
+          "on": "mdi:wrench-clock",
+          "off": "mdi:wrench-check"
+        }
+      },
+      "app_session_status": {
+        "default": "mdi:cellphone-link",
+        "state": {
+          "on": "mdi:cellphone-link",
+          "off": "mdi:cellphone-link-off"
         }
       }
     },
@@ -702,6 +723,21 @@
       },
       "broadcast_datetime": {
         "default": "mdi:clock-outline"
+      },
+      "energy_env_yield_cool": {
+        "default": "mdi:snowflake-variant"
+      },
+      "hc1_circuit_type": {
+        "default": "mdi:pipe-valve"
+      },
+      "hc1_heat_curve_adaptation": {
+        "default": "mdi:chart-line-variant"
+      },
+      "hc1_mixer_movement": {
+        "default": "mdi:valve"
+      },
+      "multi_relay_setting": {
+        "default": "mdi:electric-switch"
       }
     },
     "number": {
@@ -788,6 +824,21 @@
       },
       "compressor_silent_operation_level": {
         "default": "mdi:volume-mute"
+      },
+      "dew_point_offset": {
+        "default": "mdi:water-thermometer"
+      },
+      "cooling_outside_temp_threshold": {
+        "default": "mdi:snowflake-thermometer"
+      },
+      "offset_outside_temp": {
+        "default": "mdi:thermometer-plus"
+      },
+      "continuous_heating_threshold": {
+        "default": "mdi:thermometer-low"
+      },
+      "frost_override_time": {
+        "default": "mdi:timer-sand"
       }
     },
     "button": {

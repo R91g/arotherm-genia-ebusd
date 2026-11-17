@@ -92,6 +92,11 @@ from .const import (
     EXTERNAL_SWEEP_MIN_REPEAT_INTERVAL_SECONDS,
     EXTERNAL_SWEEP_MIN_REPEATS_PER_CANARY,
     EXTERNAL_SWEEP_SELF_GET_GRACE_SECONDS,
+    FALLBACK_FAST_BASS3_MESSAGES,
+    FALLBACK_SLOW_BASS3_MESSAGES,
+    FALLBACK_SLOW_OUTDOOR_COMMON_MESSAGES,
+    FALLBACK_SLOW_POLL_INTERVAL_SECONDS,
+    FALLBACK_SLOW_VWZIO_MESSAGES,
     HEATING_VETO_SFMODE_FRESHNESS_SECONDS,
     HMU_FLOW_PRESSURE_MIN_SW,
     HMU_HW5103_HYDRATION_MESSAGES,
@@ -120,8 +125,10 @@ from .const import (
     SENTINEL_COOLING_THRESHOLD,
     SET_CONFIRMATION_DELAY_SECONDS,
     SLOW_POLLING_WARNING_THRESHOLD_SECONDS,
+    TIMER_CIRCUIT_PREFIXES,
     UPSTREAM_DEFAULT_CSV_MESSAGES,
     VENTILATION_BOOST_DURATION_MINUTES,
+    WEEKDAYS_LIST,
 )
 from .ebusd_tcp import (
     LOOPBACK_HOSTS,
@@ -142,6 +149,10 @@ from .thermodynamics import (
 
 _LOGGER = logging.getLogger(__name__)
 _DEFERRED_RESTORE_END_ISO = datetime.fromtimestamp(0.0, tz=UTC).isoformat()
+
+_HMU_SW902_MESSAGES: frozenset[str] = frozenset(
+    {"FlowPressure", "CompressorHc", "CompressorHwc", "CompressorCool"}
+)
 
 _OUTDOOR_THERMO_TRIGGER_NAMES: tuple[str, ...] = (
     "rundataflowtemp",
@@ -338,6 +349,7 @@ class SaunierGeniaCoordinator:
         self._mqtt_unsubs: list[CALLBACK_TYPE] = []
         self._hydration_timer_unsub: CALLBACK_TYPE | None = None
         self._fallback_poll_unsub: CALLBACK_TYPE | None = None
+        self._fallback_slow_poll_unsub: CALLBACK_TYPE | None = None
         self._ebusd_tcp_poll_unsub: CALLBACK_TYPE | None = None
         self._tcp_autodiscover_task: asyncio.Task[None] | None = None
         self._seed_check_task: asyncio.Task[None] | None = None
@@ -1142,16 +1154,26 @@ class SaunierGeniaCoordinator:
             self._fallback_poll_unsub()
             self._fallback_poll_unsub = None
 
+        if self._fallback_slow_poll_unsub is not None:
+            self._fallback_slow_poll_unsub()
+            self._fallback_slow_poll_unsub = None
+
         if not self.has_migo_link:
             interval = max(60, self.fallback_poll_interval)
             _LOGGER.info(
-                "MiGo Link (f1) disabled; enabling fallback MQTT /get polling every %ds",
+                "MiGo Link (f1) disabled; enabling fast fallback MQTT /get polling every %ds and hourly slow sync (%ds)",
                 interval,
+                FALLBACK_SLOW_POLL_INTERVAL_SECONDS,
             )
             self._fallback_poll_unsub = async_track_time_interval(
                 self.hass,
                 self._async_run_fallback_poll,
                 timedelta(seconds=interval),
+            )
+            self._fallback_slow_poll_unsub = async_track_time_interval(
+                self.hass,
+                self._async_run_fallback_slow_poll,
+                timedelta(seconds=FALLBACK_SLOW_POLL_INTERVAL_SECONDS),
             )
 
         self._resolved_tcp_host_reset_if_overridden()
@@ -1186,6 +1208,10 @@ class SaunierGeniaCoordinator:
         if self._fallback_poll_unsub is not None:
             self._fallback_poll_unsub()
             self._fallback_poll_unsub = None
+
+        if self._fallback_slow_poll_unsub is not None:
+            self._fallback_slow_poll_unsub()
+            self._fallback_slow_poll_unsub = None
 
         if self._ebusd_tcp_poll_unsub is not None:
             self._ebusd_tcp_poll_unsub()
@@ -2567,7 +2593,7 @@ class SaunierGeniaCoordinator:
         return int(sw_str) >= HMU_FLOW_PRESSURE_MIN_SW
 
     def _record_detected_outdoor_sw(self, sw_ver: str | None) -> None:
-        """Record confirmed outdoor SW version and drop FlowPressure if SW < 902."""
+        """Record confirmed outdoor SW version and drop SW>=902 registers if SW < 902."""
         if not sw_ver or not sw_ver.strip():
             return
         self._detected_outdoor_sw = sw_ver.strip()
@@ -2575,7 +2601,7 @@ class SaunierGeniaCoordinator:
             self._pending_hydration = [
                 (c, m)
                 for (c, m) in self._pending_hydration
-                if not (c in OUTDOOR_CIRCUITS and m == "FlowPressure")
+                if not (c in OUTDOOR_CIRCUITS and m in _HMU_SW902_MESSAGES)
             ]
 
     @callback
@@ -2591,7 +2617,7 @@ class SaunierGeniaCoordinator:
                 if not (c in OUTDOOR_CIRCUITS and m in HMUX0_EXCLUSIVE_MESSAGES)
                 and not (
                     c in OUTDOOR_CIRCUITS
-                    and m == "FlowPressure"
+                    and m in _HMU_SW902_MESSAGES
                     and not self._is_hmu_flow_pressure_supported()
                 )
             ]
@@ -2601,7 +2627,10 @@ class SaunierGeniaCoordinator:
                 for (c, m) in HMU_HW5103_HYDRATION_MESSAGES
                 if not self.has_message(c, m)
                 and (c, m) not in self._pending_hydration
-                and (m != "FlowPressure" or self._is_hmu_flow_pressure_supported())
+                and (
+                    m not in _HMU_SW902_MESSAGES
+                    or self._is_hmu_flow_pressure_supported()
+                )
             ]
             if missing_hmu:
                 if self._hydration_task is not None and not self._hydration_task.done():
@@ -2632,7 +2661,7 @@ class SaunierGeniaCoordinator:
             ]
             for circuit, message in HMU_HW5103_HYDRATION_MESSAGES:
                 if (
-                    message == "FlowPressure"
+                    message in _HMU_SW902_MESSAGES
                     and not self._is_hmu_flow_pressure_supported()
                 ):
                     continue
@@ -2648,6 +2677,10 @@ class SaunierGeniaCoordinator:
             CIRCUIT_NETX3, "RoomTempDial"
         ):
             missing.append((CIRCUIT_NETX3, "RoomTempDial"))
+
+        for item in self._collect_active_timer_slot_messages(only_if_missing=True):
+            if item not in missing:
+                missing.append(item)
 
         if not missing:
             _LOGGER.debug(
@@ -2666,11 +2699,48 @@ class SaunierGeniaCoordinator:
             name=f"{self.entry.domain}_initial_hydration",
         )
 
+    def _collect_active_timer_slot_messages(
+        self, *, only_if_missing: bool
+    ) -> list[tuple[str, str]]:
+        """Build daily weekly-timer slot /get targets from known <prefix>_Slots counts."""
+        slot_targets: list[tuple[str, str]] = []
+        for prefix in TIMER_CIRCUIT_PREFIXES.values():
+            slots_data = self.get_message(CIRCUIT_BASS3, f"{prefix}_Slots")
+            if not isinstance(slots_data, dict):
+                continue
+            for day in WEEKDAYS_LIST:
+                short_key = DAY_SHORT_KEYS[day]
+                raw_count = slots_data.get(short_key)
+                if raw_count is None:
+                    continue
+                try:
+                    slot_count = int(float(raw_count))
+                except (TypeError, ValueError):
+                    continue
+                for slot_idx, suffix in ((1, ""), (2, "_Slot2"), (3, "_Slot3")):
+                    if slot_count < slot_idx:
+                        continue
+                    msg_name = f"{prefix}_{day}{suffix}"
+                    if not only_if_missing or not self.has_message(
+                        CIRCUIT_BASS3, msg_name
+                    ):
+                        slot_targets.append((CIRCUIT_BASS3, msg_name))
+        return slot_targets
+
     async def _async_run_hydration_queue(self, messages: list[tuple[str, str]]) -> None:
         """Publish /get sequentially with 0.8s spacing to avoid eBUS collisions."""
         self._pending_hydration = list(messages)
+        timer_slots_expanded = False
         try:
-            while self._pending_hydration:
+            while self._pending_hydration or not timer_slots_expanded:
+                if not self._pending_hydration:
+                    timer_slots_expanded = True
+                    extra_timers = self._collect_active_timer_slot_messages(
+                        only_if_missing=True
+                    )
+                    if extra_timers:
+                        self._pending_hydration.extend(extra_timers)
+                    continue
                 circuit, message = self._pending_hydration.pop(0)
                 if self.has_message(circuit, message):
                     continue
@@ -2682,7 +2752,7 @@ class SaunierGeniaCoordinator:
                     continue
                 if (
                     circuit in OUTDOOR_CIRCUITS
-                    and message == "FlowPressure"
+                    and message in _HMU_SW902_MESSAGES
                     and not self._is_hmu_flow_pressure_supported()
                 ):
                     continue
@@ -2697,12 +2767,12 @@ class SaunierGeniaCoordinator:
         self._async_verify_custom_csv_after_hydration()
 
     async def _async_run_fallback_poll(self, _now: datetime) -> None:
-        """Periodic fallback poll executed only when has_migo_link is False."""
+        """Periodic fast fallback poll for dynamic telemetry when has_migo_link is False."""
         if self.has_migo_link:
             return
         if self._hydration_task is not None and not self._hydration_task.done():
             return
-        # Poll core operational messages + live telemetry & energy counters with gentle spacing
+        # Poll dynamic operational states, live thermodynamics & energy counters with gentle spacing
         if self._active_outdoor_circuit in (CIRCUIT_HMU, CIRCUIT_HMU00):
             fallback_energy_messages: list[tuple[str, str]] = [
                 (CIRCUIT_HMU, "HMUStatusCode"),
@@ -2713,6 +2783,12 @@ class SaunierGeniaCoordinator:
                 (CIRCUIT_HMU, "RunDataFlowRate"),
                 (CIRCUIT_HMU, "RunDataFlowTemp"),
                 (CIRCUIT_HMU, "RunDataReturnTemp"),
+                (CIRCUIT_HMU, "RunDataFlowTempDesired"),
+                (CIRCUIT_HMU, "RunDataHeatOutput"),
+                (CIRCUIT_HMU, "RunDataCondensationTemp"),
+                (CIRCUIT_HMU, "RunDataCondensateTemp"),
+                (CIRCUIT_HMU, "RunDataEvaporationTemp"),
+                (CIRCUIT_HMU, "RunDataSuperheat"),
                 (CIRCUIT_HMU, "YieldHc"),
                 (CIRCUIT_HMU, "YieldHwc"),
                 (CIRCUIT_HMU, "YieldCooling"),
@@ -2722,8 +2798,6 @@ class SaunierGeniaCoordinator:
                 (CIRCUIT_HMU, "TotalEnergyUsage"),
                 (CIRCUIT_HMU, "FlowPressure"),
                 (CIRCUIT_HMU, "EnergyIntegral"),
-                (CIRCUIT_HMU, "CompressorHours"),
-                (CIRCUIT_HMU, "CompressorStarts"),
                 (CIRCUIT_VWZIO, "PowerStatus"),
                 (CIRCUIT_VWZIO, "PrEnergyElectricHc"),
                 (CIRCUIT_VWZIO, "PrEnergyElectricHwc"),
@@ -2746,6 +2820,13 @@ class SaunierGeniaCoordinator:
                 (CIRCUIT_HMUX0, "RunDataFlowRate"),
                 (CIRCUIT_HMUX0, "RunDataFlowTemp"),
                 (CIRCUIT_HMUX0, "RunDataReturnTemp"),
+                (CIRCUIT_HMUX0, "RunDataFlowTempDesired"),
+                (CIRCUIT_HMUX0, "RunDataHeatOutput"),
+                (CIRCUIT_HMUX0, "RunDataEnergyIntegral"),
+                (CIRCUIT_HMUX0, "RunDataCondensationTemp"),
+                (CIRCUIT_HMUX0, "RunDataCondensateTemp"),
+                (CIRCUIT_HMUX0, "RunDataEvaporationTemp"),
+                (CIRCUIT_HMUX0, "RunDataSuperheat"),
                 (CIRCUIT_HMUX0, "PrEnergyElectricHc"),
                 (CIRCUIT_HMUX0, "PrEnergyElectricHwc"),
                 (CIRCUIT_HMUX0, "PrEnergyElectricCool"),
@@ -2754,28 +2835,95 @@ class SaunierGeniaCoordinator:
                 (CIRCUIT_HMUX0, "PrEnergyThermalCool"),
                 (CIRCUIT_HMUX0, "PrEnergyEnvYieldHc"),
                 (CIRCUIT_HMUX0, "PrEnergyEnvYieldHwc"),
+                (CIRCUIT_HMUX0, "PrEnergyEnvYieldCool"),
                 (CIRCUIT_VWZIO, "PowerStatus"),
                 (CIRCUIT_VWZIO, "PrEnergyElectricHc"),
                 (CIRCUIT_VWZIO, "PrEnergyElectricHwc"),
                 (CIRCUIT_VWZIO, "PrEnergyThermalHc"),
                 (CIRCUIT_VWZIO, "PrEnergyThermalHwc"),
             ]
-        controller_hydration_messages = [
-            item for item in ESSENTIAL_HYDRATION_MESSAGES if item[0] == CIRCUIT_BASS3
-        ]
         core_messages = list(
-            dict.fromkeys([*controller_hydration_messages, *fallback_energy_messages])
+            dict.fromkeys([*FALLBACK_FAST_BASS3_MESSAGES, *fallback_energy_messages])
         )
         self._hydration_task = self.hass.async_create_background_task(
             self._async_force_poll_queue(core_messages),
             name=f"{self.entry.domain}_fallback_poll",
         )
 
-    async def _async_force_poll_queue(self, messages: list[tuple[str, str]]) -> None:
-        """Sequentially request /get on messages with 0.8s spacing."""
-        for circuit, message in messages:
+    async def _async_run_fallback_slow_poll(self, _now: datetime) -> None:
+        """Hourly MiGo-style fallback poll for config, stats, and weekly timers when has_migo_link is False."""
+        if self.has_migo_link:
+            return
+        if self._hydration_task is not None and not self._hydration_task.done():
+            return
+        outdoor_circuit = (
+            CIRCUIT_HMU
+            if self._active_outdoor_circuit in (CIRCUIT_HMU, CIRCUIT_HMU00)
+            else CIRCUIT_HMUX0
+        )
+        slow_outdoor: list[tuple[str, str]] = [
+            (outdoor_circuit, msg)
+            for msg in FALLBACK_SLOW_OUTDOOR_COMMON_MESSAGES
+            if not (outdoor_circuit == CIRCUIT_HMU and msg in HMUX0_EXCLUSIVE_MESSAGES)
+        ]
+        if outdoor_circuit == CIRCUIT_HMU:
+            slow_outdoor.extend(
+                [
+                    (CIRCUIT_HMU, "CompressorHours"),
+                    (CIRCUIT_HMU, "CompressorStarts"),
+                ]
+            )
+            if self._is_hmu_flow_pressure_supported():
+                slow_outdoor.extend(
+                    [
+                        (CIRCUIT_HMU, "CompressorHc"),
+                        (CIRCUIT_HMU, "CompressorHwc"),
+                        (CIRCUIT_HMU, "CompressorCool"),
+                    ]
+                )
+        slow_messages = list(
+            dict.fromkeys(
+                [
+                    *FALLBACK_SLOW_BASS3_MESSAGES,
+                    *slow_outdoor,
+                    *FALLBACK_SLOW_VWZIO_MESSAGES,
+                    *self._collect_active_timer_slot_messages(only_if_missing=False),
+                ]
+            )
+        )
+        self._hydration_task = self.hass.async_create_background_task(
+            self._async_force_poll_queue(slow_messages, expand_timer_slots=True),
+            name=f"{self.entry.domain}_fallback_slow_poll",
+        )
+
+    async def _async_force_poll_queue(
+        self,
+        messages: list[tuple[str, str]],
+        *,
+        expand_timer_slots: bool = False,
+    ) -> None:
+        """Sequentially request /get on messages with gentle spacing."""
+        queue = list(messages)
+        step_delay = (
+            HYDRATION_STEP_DELAY_SECONDS * 1.25
+            if HYDRATION_STEP_DELAY_SECONDS > 0
+            else 0.0
+        )
+        seen = set(queue)
+        slots_checked = False
+        while queue or (expand_timer_slots and not slots_checked):
+            if not queue:
+                slots_checked = True
+                for item in self._collect_active_timer_slot_messages(
+                    only_if_missing=False
+                ):
+                    if item not in seen:
+                        seen.add(item)
+                        queue.append(item)
+                continue
+            circuit, message = queue.pop(0)
             await self.async_request_get(circuit, message)
-            await asyncio.sleep(HYDRATION_STEP_DELAY_SECONDS)
+            await asyncio.sleep(step_delay)
 
     # -------------------------------------------------------------------------
     # Advanced eBUSd TCP Daemon Polling (Diagnostics & Info)
