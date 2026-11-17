@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.1] - 2026-11-17
+
+> [!IMPORTANT]
+> **Recommended CSV update:** Please update `ebusd-configuration/vaillant/08.hmux0.csv`, `08.hmu.csv`, `08.hmu.HW5103.csv`, and `76.vwzio.csv` in your `ebusd` configuration folder and restart `ebusd`. Diagnostic (`*Diag*`), `Status02`, `SecondaryCircuitStatus`, and test registers are now marked passive (`u`) to avoid unintended active bus queries.
+
+### Added
+- **Mandatory Setup Prerequisites Screen (`config_flow.py`):** Added an initial confirmation step before MQTT/model setup explaining how to deploy repository CSV files (`ebusd-configuration/`), enable local `--configpath` / `--mqttjson` flags, and turn OFF **"Seed HA MQTT integration config"** (`seed_mqtt_cfg`) if using the Home Assistant eBUSd Add-on, with direct links to the documentation and a required confirmation toggle.
+- **Automatic eBUSd TCP Discovery & Serial/Metadata Extraction (`ebusd_tcp.py`, `coordinator.py`):**
+  - Automatically discovers reachable eBUSd TCP endpoints across Supervisor add-on metadata, known add-on hostnames (`b4d7ad18-ebusd`, `local-ebusd`), loopback, and the configured MQTT broker host during setup, options, and startup (respecting explicit opt-outs).
+  - Extracts device `ID`, `SW`, `HW`, active circuit bindings (`HMU00`/`HMUX0`, `CTLV2`/`CTLV3`/`BASV3`/`BASS3`), and 28-character serial numbers directly via eBUSd TCP (`info`, `scan result`, and one-shot `read -c scan.<addr> id` fallback) right after restart without waiting for a live `scan.*` MQTT broadcast, while keeping MQTT `scan.*` detection active whenever TCP is unavailable.
+- **External Polling Sweep Repair (`ebusd_external_sweep`):** Detects legacy add-on `seed_mqtt_cfg: true` configurations via Supervisor API or repeated unsolicited canary sweeps (`YieldHcDay`, `YieldHwcDay`, `YieldTotal`) and raises an actionable Repair notice.
+- **13 Documented Controller & Energy Entities:** Added `dew_point_monitoring`, `dew_point_offset`, `cooling_outside_temp_threshold`, `offset_outside_temp`, `continuous_heating_threshold`, `frost_override_time`, `energy_env_yield_cool`, `hc1_circuit_type`, `hc1_heat_curve_adaptation`, `hc1_mixer_movement`, `multi_relay_setting`, `maintenance_due`, and `app_session_status`.
+- **Complete Startup Hydration & Two-Tier Standalone Polling:** Expanded initial startup hydration to include `OutsideTempAvg`, `HydraulicScheme`, `StateCompressor`, `RunDataElectricPowerConsumption`, refrigeration telemetry, `RunStats*`, `vwzio` counters/status, and all 5 `*_Slots` weekly schedules with dynamic active-slot expansion; split standalone (`has_migo_link: false`) polling into a 5-minute fast telemetry cycle and an hourly configuration/statistics cycle (`3600s`).
+
+### Changed
+- **Passive `76.vwzio`, `Status02`, and `*Diag*` Definitions ([#3](https://github.com/R91g/arotherm-genia-ebusd/issues/3), [#9](https://github.com/R91g/arotherm-genia-ebusd/issues/9)):** Switched `SecondaryCircuitStatus` and test frames in `76.vwzio.csv`, plus `Status02`, `Status`, `RunDataUnsupported530d`, and all `*Diag*` registers across `08.hmux0.csv`, `08.hmu.csv`, `08.hmu.HW5103.csv`, and `76.vwzio.csv` to passive (`u`).
+
+### Fixed
+- **Home Assistant 2026.11 Event-Loop Thread Safety:** Added `@callback` to coordinator watchdog and boost timeout handlers (`_async_check_watchdog`, `_async_on_dhw_boost_timeout`) and `entity.py` update callbacks so `async_write_ha_state` always runs on the Home Assistant event loop, enforced by a new AST regression test.
+
+---
+
 ## [1.3.0] - 2026-11-16
 
 > [!IMPORTANT]
