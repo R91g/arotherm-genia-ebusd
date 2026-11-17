@@ -117,6 +117,10 @@
     "ebusd_slow_polling_seed": {
       "title": "Sehr langsame eBUSd-Telemetrie-Aktualisierung (mögliches Problem mit seed_mqtt_cfg)",
       "description": "Die hochpriorisierte Telemetrie des Stromverbrauchs (`RunDataElectricPowerConsumption`) wird sehr langsam aktualisiert ({interval} Minuten zwischen den Aktualisierungen statt ~10–20 Sekunden), während der eBUS aktiv ist. Wenn du das Home Assistant eBUSd-Add-on (LukasGrebe/ha-addons) nutzt, geschieht dies in der Regel, wenn die Option **\"Seed HA MQTT integration config (only needed once)\"** aktiviert ist (`seed_mqtt_cfg: true`), wodurch eine veraltete Konfiguration geladen wird, die über 160 Register alle 16 Minuten abfragt und den Bus überlastet. (Wenn eBUSd eigenständig oder im Docker ohne dieses Add-on betrieben wird, trifft diese Option nicht zu; überprüfe stattdessen deine Abfragezeiten). Bitte: (1) Gehe zu **Einstellungen → Add-ons → eBUSd → Konfiguration** und deaktiviere **Seed HA MQTT integration config**, (2) Überprüfe, ob `--mqttjson` in `commandline_options` vorhanden ist, und (3) Starte das Add-on neu. Dieser Hinweis wird automatisch gelöscht, sobald wieder regelmäßige Aktualisierungen eingehen."
+    },
+    "ebusd_external_sweep": {
+      "title": "Externer eBUSd-Abfrage-Sweep erkannt ({source})",
+      "description": "Es wurde ein externer Abfrage-Sweep (`{source}`) erkannt, der ungenutzte `r;u`-Register ({registers}) auf dem eBUS pollt. Beim Home Assistant eBUSd-Add-on (LukasGrebe/ha-addons) passiert dies, wenn **\"Seed HA MQTT integration config (only needed once)\"** (`seed_mqtt_cfg: true`) aktiviert ist (`mqtt-hassio.cfg` mit `filter-seen = 5`), oder durch ein externes MQTT-`/get`-Skript. Dies belastet den Bus und kann bei älteren CSVs unerwünschte Modulaktionen auslösen. Bitte: (1) Deaktiviere **Seed HA MQTT integration config** (`seed_mqtt_cfg: false`) unter **Einstellungen → Add-ons → eBUSd → Konfiguration**, (2) Stelle sicher, dass `--mqttjson` in `commandline_options` verbleibt und stoppe externe Poller, und (3) Starte eBUSd neu. Dieser Hinweis verschwindet automatisch, sobald die externen Sweeps aufhören."
     }
   },
   "entity": {

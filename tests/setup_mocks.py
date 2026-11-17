@@ -456,12 +456,25 @@ class MockOptionsFlow:
             "description_placeholders": description_placeholders,
         }
 
-    def async_create_entry(self, title: str = "", data: Any = None) -> dict[str, Any]:
-        return {
+    def async_create_entry(
+        self, title: str = "", data: Any = None, options: Any = None
+    ) -> dict[str, Any]:
+        res: dict[str, Any] = {
             "type": "create_entry",
             "title": title,
             "data": data or {},
         }
+        if options is not None:
+            res["options"] = options
+        return res
+
+
+class MockConfigFlow(MockOptionsFlow):
+    """Mock ConfigFlow base class supporting domain=... class keyword."""
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__()
 
 
 sys.modules["homeassistant.config_entries"].OptionsFlow = MockOptionsFlow
+sys.modules["homeassistant.config_entries"].ConfigFlow = MockConfigFlow

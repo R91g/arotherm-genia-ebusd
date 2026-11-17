@@ -86,6 +86,12 @@ from .const import (
     ELECTRIC_POWER_STALE_TIMEOUT_SECONDS,
     ELECTRIC_POWER_UNAVAILABLE_TIMEOUT_SECONDS,
     ESSENTIAL_HYDRATION_MESSAGES,
+    EXTERNAL_SWEEP_CANARY_MESSAGES,
+    EXTERNAL_SWEEP_CANARY_THRESHOLD,
+    EXTERNAL_SWEEP_CLEAR_SECONDS,
+    EXTERNAL_SWEEP_MIN_REPEAT_INTERVAL_SECONDS,
+    EXTERNAL_SWEEP_MIN_REPEATS_PER_CANARY,
+    EXTERNAL_SWEEP_SELF_GET_GRACE_SECONDS,
     HEATING_VETO_SFMODE_FRESHNESS_SECONDS,
     HMU_FLOW_PRESSURE_MIN_SW,
     HMU_HW5103_HYDRATION_MESSAGES,
@@ -98,6 +104,7 @@ from .const import (
     HOLIDAY_RESET_TIME,
     HYDRATION_STEP_DELAY_SECONDS,
     INITIAL_HYDRATION_WAIT_SECONDS,
+    ISSUE_EBUSD_EXTERNAL_SWEEP,
     ISSUE_EBUSD_SLOW_POLLING_SEED,
     ISSUE_MISSING_CUSTOM_CSV,
     ISSUE_MQTTJSON_NOT_ENABLED,
@@ -115,6 +122,12 @@ from .const import (
     SLOW_POLLING_WARNING_THRESHOLD_SECONDS,
     UPSTREAM_DEFAULT_CSV_MESSAGES,
     VENTILATION_BOOST_DURATION_MINUTES,
+)
+from .ebusd_tcp import (
+    LOOPBACK_HOSTS,
+    async_check_hassio_seed_mqtt_cfg,
+    async_open_ebusd_tcp_connection,
+    async_probe_ebusd_tcp,
 )
 from .thermodynamics import (
     MIN_CUMULATIVE_ELECTRICAL_ENERGY_WH,
@@ -326,6 +339,16 @@ class SaunierGeniaCoordinator:
         self._hydration_timer_unsub: CALLBACK_TYPE | None = None
         self._fallback_poll_unsub: CALLBACK_TYPE | None = None
         self._ebusd_tcp_poll_unsub: CALLBACK_TYPE | None = None
+        self._tcp_autodiscover_task: asyncio.Task[None] | None = None
+        self._seed_check_task: asyncio.Task[None] | None = None
+        self._resolved_tcp_host: str | None = None
+        self._resolved_tcp_port: int | None = None
+        self._tcp_autodiscover_attempted: bool = False
+        self._external_sweep_canaries: dict[tuple[str, str], list[float]] = {}
+        self._self_requested_canaries: dict[tuple[str, str], float] = {}
+        self._hassio_seed_mqtt_enabled: bool | None = None
+        self._last_seed_check_mono: float = 0.0
+        self._unloaded: bool = False
         self._hydration_task: asyncio.Task[None] | None = None
         self._pending_get_unsubs: dict[tuple[str, str], CALLBACK_TYPE] = {}
 
@@ -572,21 +595,42 @@ class SaunierGeniaCoordinator:
     @property
     def is_ebusd_tcp_enabled(self) -> bool:
         """Return True if advanced eBUSd TCP connection is enabled."""
+        if self._resolved_tcp_host is not None and not self._is_tcp_option_configured():
+            return True
         return bool(
             self.entry.options.get(CONF_ENABLE_EBUSD_TCP, DEFAULT_ENABLE_EBUSD_TCP)
         )
 
     @property
     def ebusd_tcp_host(self) -> str:
-        """Return configured eBUSd TCP host."""
-        return str(
+        """Return configured or auto-discovered eBUSd TCP host."""
+        configured = str(
             self.entry.options.get(CONF_EBUSD_TCP_HOST, DEFAULT_EBUSD_TCP_HOST)
         ).strip()
+        if self._resolved_tcp_host and configured in ("", *LOOPBACK_HOSTS):
+            return self._resolved_tcp_host
+        return configured
 
     @property
     def ebusd_tcp_port(self) -> int:
-        """Return configured eBUSd TCP port."""
-        return int(self.entry.options.get(CONF_EBUSD_TCP_PORT, DEFAULT_EBUSD_TCP_PORT))
+        """Return configured or auto-discovered eBUSd TCP port."""
+        configured = int(
+            self.entry.options.get(CONF_EBUSD_TCP_PORT, DEFAULT_EBUSD_TCP_PORT)
+        )
+        if (
+            self._resolved_tcp_port is not None
+            and self._resolved_tcp_host is not None
+            and str(
+                self.entry.options.get(CONF_EBUSD_TCP_HOST, DEFAULT_EBUSD_TCP_HOST)
+            ).strip()
+            in ("", *LOOPBACK_HOSTS)
+        ):
+            return self._resolved_tcp_port
+        return configured
+
+    def _is_tcp_option_configured(self) -> bool:
+        """Return True if CONF_ENABLE_EBUSD_TCP was explicitly saved in entry options."""
+        return CONF_ENABLE_EBUSD_TCP in self.entry.options
 
     def _get_device_registry_entry(self, dev_reg: Any, device_key: str) -> Any:
         """Look up a DeviceEntry for device_key scoped to this config entry."""
@@ -963,6 +1007,12 @@ class SaunierGeniaCoordinator:
             timedelta(seconds=60),
         )
 
+        # Optional Supervisor check for seed_mqtt_cfg: true on HA OS / Supervised
+        self._seed_check_task = self._schedule_background_task(
+            self._async_check_seed_mqtt_cfg(),
+            name=f"{DOMAIN}_seed_check_{self.entry.entry_id}",
+        )
+
     @callback
     def _async_sync_ebus_operational_listeners(self) -> None:
         """Notify availability-gated entities whenever is_ebus_operational transitions."""
@@ -972,6 +1022,7 @@ class SaunierGeniaCoordinator:
             self._async_notify_message_listeners(CIRCUIT_GLOBAL, "running")
             self._async_notify_message_listeners(CIRCUIT_GLOBAL, "signal")
 
+    @callback
     def _async_check_watchdog(self, _now: datetime) -> None:
         """Periodic watchdog checking for communication silence and stale electric power."""
         if self._last_telemetry_time is not None:
@@ -1065,6 +1116,25 @@ class SaunierGeniaCoordinator:
                         placeholders={"interval": minutes_str},
                     )
 
+        # Prune aged external-sweep canary observations and auto-clear if sweeps stopped
+        if (
+            ISSUE_EBUSD_EXTERNAL_SWEEP in self._active_repair_issues
+            or self._external_sweep_canaries
+        ):
+            now_mono = time.monotonic()
+            if (
+                self._hassio_seed_mqtt_enabled is True
+                and (now_mono - self._last_seed_check_mono) >= 300.0
+                and self.hass
+                and not self._unloaded
+                and (self._seed_check_task is None or self._seed_check_task.done())
+            ):
+                self._seed_check_task = self._schedule_background_task(
+                    self._async_check_seed_mqtt_cfg(),
+                    name=f"{DOMAIN}_seed_recheck_{self.entry.entry_id}",
+                )
+            self._async_evaluate_external_sweep_issue(now_mono)
+
     @callback
     def async_update_options(self) -> None:
         """Reconfigure runtime timers when OptionsFlow is updated."""
@@ -1084,10 +1154,27 @@ class SaunierGeniaCoordinator:
                 timedelta(seconds=interval),
             )
 
+        self._resolved_tcp_host_reset_if_overridden()
         self._async_setup_ebusd_tcp_polling()
+
+    def _resolved_tcp_host_reset_if_overridden(self) -> None:
+        """Clear runtime resolved host cache if user saved an explicit host or disabled TCP."""
+        configured = str(
+            self.entry.options.get(CONF_EBUSD_TCP_HOST, DEFAULT_EBUSD_TCP_HOST)
+        ).strip()
+        if (
+            self._is_tcp_option_configured()
+            and not bool(self.entry.options.get(CONF_ENABLE_EBUSD_TCP))
+        ) or (
+            configured not in ("", *LOOPBACK_HOSTS)
+            and configured != self._resolved_tcp_host
+        ):
+            self._resolved_tcp_host = None
+            self._resolved_tcp_port = None
 
     async def async_unload(self) -> None:
         """Unsubscribe from MQTT and cancel all background tasks and timers."""
+        self._unloaded = True
         for unsub in self._mqtt_unsubs:
             unsub()
         self._mqtt_unsubs.clear()
@@ -1143,6 +1230,17 @@ class SaunierGeniaCoordinator:
         if self._hydration_task is not None and not self._hydration_task.done():
             self._hydration_task.cancel()
             self._hydration_task = None
+
+        if (
+            self._tcp_autodiscover_task is not None
+            and not self._tcp_autodiscover_task.done()
+        ):
+            self._tcp_autodiscover_task.cancel()
+            self._tcp_autodiscover_task = None
+
+        if self._seed_check_task is not None and not self._seed_check_task.done():
+            self._seed_check_task.cancel()
+            self._seed_check_task = None
 
     # -------------------------------------------------------------------------
     # MQTT Reception & Normalization
@@ -1253,6 +1351,10 @@ class SaunierGeniaCoordinator:
 
         # Notify subscribers for this (circuit, message)
         self._async_notify_message_listeners(circuit_key, message_name)
+
+        # Track non-retained external sweep canary messages (never emitted passively or by us)
+        if getattr(msg, "retain", False) is not True:
+            self._async_record_external_sweep_canary(circuit_key, msg_lower)
 
         # Check if this message name has a canonical alias (e.g. flowtemp -> RunDataFlowTemp)
         canonical_alias = MESSAGE_ALIASES.get(msg_lower)
@@ -1593,6 +1695,113 @@ class SaunierGeniaCoordinator:
                 self._active_repair_issues.discard(issue_id)
                 self._cleared_repair_issues.add(issue_id)
                 ir.async_delete_issue(self.hass, DOMAIN, issue_id)
+
+    def _schedule_background_task(
+        self, coro: Coroutine[Any, Any, None], name: str
+    ) -> asyncio.Task[None] | None:
+        """Schedule a background task on hass and close unused coroutines in offline mocks."""
+        if not self.hass or self._unloaded:
+            coro.close()
+            return None
+        task = self.hass.async_create_background_task(coro, name=name)
+        if isinstance(task, asyncio.Task):
+            return task
+        coro.close()
+        return None
+
+    async def _async_check_seed_mqtt_cfg(self) -> None:
+        """Optionally check Supervisor add-on options for seed_mqtt_cfg: true."""
+        if self._unloaded:
+            return
+        self._last_seed_check_mono = time.monotonic()
+        self._hassio_seed_mqtt_enabled = await async_check_hassio_seed_mqtt_cfg(
+            self.hass
+        )
+        if not self._unloaded:
+            self._async_evaluate_external_sweep_issue(time.monotonic())
+
+    @callback
+    def _async_record_external_sweep_canary(
+        self, circuit_key: str, msg_lower: str
+    ) -> None:
+        """Record an incoming non-retained canary message if not requested by us."""
+        if msg_lower not in EXTERNAL_SWEEP_CANARY_MESSAGES:
+            return
+
+        now_mono = time.monotonic()
+        self_get_ts = self._self_requested_canaries.get((circuit_key, msg_lower))
+        if (
+            self_get_ts is not None
+            and (now_mono - self_get_ts) <= EXTERNAL_SWEEP_SELF_GET_GRACE_SECONDS
+        ):
+            return
+
+        key = (circuit_key, msg_lower)
+        timestamps = self._external_sweep_canaries.setdefault(key, [])
+        if (
+            not timestamps
+            or (now_mono - timestamps[-1]) >= EXTERNAL_SWEEP_MIN_REPEAT_INTERVAL_SECONDS
+        ):
+            timestamps.append(now_mono)
+        self._async_evaluate_external_sweep_issue(now_mono)
+
+    @callback
+    def _async_evaluate_external_sweep_issue(self, now_mono: float) -> None:
+        """Activate or clear the external sweep repair based on seed_mqtt_cfg and repeated canaries."""
+        for key in list(self._external_sweep_canaries):
+            fresh = [
+                ts
+                for ts in self._external_sweep_canaries[key]
+                if (now_mono - ts) <= EXTERNAL_SWEEP_CLEAR_SECONDS
+            ]
+            if fresh:
+                self._external_sweep_canaries[key] = fresh
+            else:
+                self._external_sweep_canaries.pop(key, None)
+
+        repeated_canaries = sorted(
+            key
+            for key, timestamps in self._external_sweep_canaries.items()
+            if len(timestamps) >= EXTERNAL_SWEEP_MIN_REPEATS_PER_CANARY
+        )
+        has_canary_sweep = len(repeated_canaries) >= EXTERNAL_SWEEP_CANARY_THRESHOLD
+        if self._hassio_seed_mqtt_enabled is True:
+            canary_list = ", ".join(
+                f"{circ}/{msg}" for circ, msg in sorted(self._external_sweep_canaries)
+            )
+            registers_desc = canary_list if canary_list else "seed_mqtt_cfg: true"
+            self._async_set_repair_issue(
+                ISSUE_EBUSD_EXTERNAL_SWEEP,
+                active=True,
+                placeholders={
+                    "source": "seed_mqtt_cfg (Home Assistant eBUSd Add-on)",
+                    "registers": registers_desc,
+                },
+            )
+            return
+
+        if has_canary_sweep:
+            sample = [f"{circ}/{msg}" for circ, msg in repeated_canaries[:5]]
+            suffix = (
+                f" (+{len(repeated_canaries) - 5})"
+                if len(repeated_canaries) > 5
+                else ""
+            )
+            self._async_set_repair_issue(
+                ISSUE_EBUSD_EXTERNAL_SWEEP,
+                active=True,
+                placeholders={
+                    "source": "MQTT /get / filter-seen sweep",
+                    "registers": ", ".join(sample) + suffix,
+                },
+            )
+            return
+
+        if (
+            ISSUE_EBUSD_EXTERNAL_SWEEP in self._active_repair_issues
+            and self._hassio_seed_mqtt_enabled is not True
+        ):
+            self._async_set_repair_issue(ISSUE_EBUSD_EXTERNAL_SWEEP, active=False)
 
     @staticmethod
     def _is_ebusd_err_msg(msg: dict[str, Any] | str | None) -> bool:
@@ -2163,6 +2372,13 @@ class SaunierGeniaCoordinator:
     async def async_request_get(self, circuit: str, message: str) -> None:
         """Publish an empty payload to <mqtt_prefix>/<circuit>/<message>/get."""
         target_circuit = self.resolve_circuit(circuit)
+        msg_lower = message.lower()
+        if msg_lower in EXTERNAL_SWEEP_CANARY_MESSAGES:
+            now_mono = time.monotonic()
+            self._self_requested_canaries[(circuit.lower(), msg_lower)] = now_mono
+            self._self_requested_canaries[(target_circuit.lower(), msg_lower)] = (
+                now_mono
+            )
         topic = f"{self.mqtt_prefix}/{target_circuit}/{message}/get"
         await mqtt.async_publish(self.hass, topic, "", qos=0, retain=False)
 
@@ -2566,6 +2782,57 @@ class SaunierGeniaCoordinator:
     # -------------------------------------------------------------------------
 
     @callback
+    def _persist_discovered_tcp_options(
+        self, host: str, port: int, *, enable_tcp: bool = False
+    ) -> None:
+        """Persist auto-discovered eBUSd TCP host/port into ConfigEntry options."""
+        if self._unloaded or not self.hass or not self.entry:
+            return
+        options = dict(self.entry.options)
+        changed = False
+        if enable_tcp and not options.get(CONF_ENABLE_EBUSD_TCP):
+            options[CONF_ENABLE_EBUSD_TCP] = True
+            changed = True
+        if str(options.get(CONF_EBUSD_TCP_HOST, "")).strip() != host:
+            options[CONF_EBUSD_TCP_HOST] = host
+            changed = True
+        if int(options.get(CONF_EBUSD_TCP_PORT, DEFAULT_EBUSD_TCP_PORT)) != int(port):
+            options[CONF_EBUSD_TCP_PORT] = int(port)
+            changed = True
+        if not changed:
+            return
+
+        cfg_entries = getattr(self.hass, "config_entries", None)
+        update_entry = getattr(cfg_entries, "async_update_entry", None)
+        if not callable(update_entry):
+            return
+        try:
+            res = update_entry(self.entry, options=options)
+            if asyncio.iscoroutine(res):
+                res.close()
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Failed persisting auto-discovered TCP options: %s", err)
+
+    async def _async_autodiscover_ebusd_tcp(self) -> None:
+        """Probe once at startup to auto-enable and autocomplete eBUSd TCP options."""
+        if self._unloaded or self._is_tcp_option_configured():
+            return
+
+        detected = await async_probe_ebusd_tcp(
+            self.hass,
+            configured_host=self.ebusd_tcp_host,
+            port=self.ebusd_tcp_port,
+        )
+        if detected is None or self._unloaded:
+            return
+
+        host, port = detected
+        self._resolved_tcp_host = host
+        self._resolved_tcp_port = port
+        self._persist_discovered_tcp_options(host, port, enable_tcp=True)
+        if self._ebusd_tcp_poll_unsub is None:
+            self._async_setup_ebusd_tcp_polling()
+
     def _async_setup_ebusd_tcp_polling(self) -> None:
         """Set up or cancel periodic eBUSd TCP info polling based on options."""
         if self._ebusd_tcp_poll_unsub is not None:
@@ -2573,6 +2840,17 @@ class SaunierGeniaCoordinator:
             self._ebusd_tcp_poll_unsub = None
 
         if not self.is_ebusd_tcp_enabled:
+            if (
+                not self._is_tcp_option_configured()
+                and not self._tcp_autodiscover_attempted
+                and self.hass
+                and not self._unloaded
+            ):
+                self._tcp_autodiscover_attempted = True
+                self._tcp_autodiscover_task = self._schedule_background_task(
+                    self._async_autodiscover_ebusd_tcp(),
+                    name=f"{DOMAIN}_tcp_autodiscover_{self.entry.entry_id}",
+                )
             return
 
         _LOGGER.info(
@@ -2582,7 +2860,7 @@ class SaunierGeniaCoordinator:
         )
 
         if self.hass:
-            self.hass.async_create_background_task(
+            self._schedule_background_task(
                 self._async_fetch_ebusd_tcp_info(),
                 name=f"{DOMAIN}_initial_tcp_info_{self.entry.entry_id}",
             )
@@ -2599,28 +2877,23 @@ class SaunierGeniaCoordinator:
     async def _async_open_tcp_connection(
         self, host: str, port: int, timeout: float = 3.0
     ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
-        """Open TCP connection to eBUSd socket, falling back to HA add-on hostnames if localhost fails."""
-        try:
-            connect_coro = asyncio.open_connection(host, port)
-            return await asyncio.wait_for(connect_coro, timeout=timeout)
-        except (TimeoutError, OSError):
-            if host in ("127.0.0.1", "localhost"):
-                fallback_hosts = ("b4d7ad18-ebusd", "local-ebusd", "ebusd")
-                for fb_host in fallback_hosts:
-                    try:
-                        connect_coro = asyncio.open_connection(fb_host, port)
-                        reader, writer = await asyncio.wait_for(
-                            connect_coro, timeout=timeout
-                        )
-                        _LOGGER.debug(
-                            "Connected to eBUSd TCP socket via fallback host '%s:%s'",
-                            fb_host,
-                            port,
-                        )
-                        return reader, writer
-                    except (TimeoutError, OSError):
-                        continue
-            raise
+        """Open TCP connection to eBUSd socket, prioritizing HA add-on over loopback."""
+        (
+            reader,
+            writer,
+            resolved_host,
+            resolved_port,
+        ) = await async_open_ebusd_tcp_connection(
+            self.hass, host, port, timeout=timeout
+        )
+        if (resolved_host != host or resolved_port != port) and host in (
+            "",
+            *LOOPBACK_HOSTS,
+        ):
+            self._resolved_tcp_host = resolved_host
+            self._resolved_tcp_port = resolved_port
+            self._persist_discovered_tcp_options(resolved_host, resolved_port)
+        return reader, writer
 
     async def _async_read_tcp_block(
         self, reader: asyncio.StreamReader, timeout: float = 3.0
@@ -3359,6 +3632,7 @@ class SaunierGeniaCoordinator:
                 )
             )
 
+    @callback
     def _async_on_dhw_boost_timeout(self, _now: datetime) -> None:
         """Handle 60-minute safety timeout for forced DHW boost."""
         self._dhw_boost_timeout_unsub = None

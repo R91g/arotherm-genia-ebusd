@@ -2672,7 +2672,7 @@ class TestCoordinatorLogic(unittest.TestCase):
         self.assertIsNone(coord.get_int(CIRCUIT_GLOBAL, "symbol_rate", "value"))
 
     def test_ebusd_tcp_polling_falls_back_to_addon_hostname(self) -> None:
-        """Verify TCP polling falls back to b4d7ad18-ebusd if 127.0.0.1 fails."""
+        """Verify TCP polling tries add-on hostnames before 127.0.0.1 and persists winner."""
         from custom_components.arotherm_genia_ebusd.const import (
             CONF_EBUSD_TCP_HOST,
             CONF_ENABLE_EBUSD_TCP,
@@ -2684,7 +2684,9 @@ class TestCoordinatorLogic(unittest.TestCase):
             CONF_ENABLE_EBUSD_TCP: True,
             CONF_EBUSD_TCP_HOST: "127.0.0.1",
         }
-        coord = SaunierGeniaCoordinator(MagicMock(), entry)
+        hass = MagicMock()
+        hass.config.components = ()
+        coord = SaunierGeniaCoordinator(hass, entry)
 
         mock_writer = MagicMock()
         mock_writer.drain = AsyncMock()
@@ -2700,15 +2702,66 @@ class TestCoordinatorLogic(unittest.TestCase):
 
         async def fake_open_connection(h: str, p: int):
             calls.append((h, p))
-            if h == "127.0.0.1":
-                raise OSError("Connection refused")
-            return mock_reader, mock_writer
+            if h == "b4d7ad18-ebusd":
+                return mock_reader, mock_writer
+            raise OSError("Connection refused")
 
         with patch("asyncio.open_connection", side_effect=fake_open_connection):
             asyncio.run(coord._async_fetch_ebusd_tcp_info())
 
-        self.assertEqual(calls, [("127.0.0.1", 8888), ("b4d7ad18-ebusd", 8888)])
+        self.assertEqual(calls, [("b4d7ad18-ebusd", 8888)])
         self.assertEqual(coord.get_int(CIRCUIT_GLOBAL, "symbol_rate", "value"), 22)
+        self.assertEqual(coord.ebusd_tcp_host, "b4d7ad18-ebusd")
+
+    def test_ebusd_tcp_polling_falls_back_to_loopback_after_addon_fails(self) -> None:
+        """Verify TCP polling falls back to 127.0.0.1 if HA add-on hostnames fail."""
+        from custom_components.arotherm_genia_ebusd.const import (
+            CONF_EBUSD_TCP_HOST,
+            CONF_ENABLE_EBUSD_TCP,
+        )
+
+        entry = MagicMock()
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {
+            CONF_ENABLE_EBUSD_TCP: True,
+            CONF_EBUSD_TCP_HOST: "127.0.0.1",
+        }
+        hass = MagicMock()
+        hass.config.components = ()
+        coord = SaunierGeniaCoordinator(hass, entry)
+
+        mock_writer = MagicMock()
+        mock_writer.drain = AsyncMock()
+        mock_writer.wait_closed = AsyncMock()
+        mock_reader = AsyncMock()
+        mock_reader.readline.side_effect = [
+            b"version: ebusd 26.1\n",
+            b"symbol rate: 25\n",
+            b"",
+        ]
+
+        calls = []
+
+        async def fake_open_connection(h: str, p: int):
+            calls.append((h, p))
+            if h == "127.0.0.1":
+                return mock_reader, mock_writer
+            raise OSError("DNS/connection error")
+
+        with patch("asyncio.open_connection", side_effect=fake_open_connection):
+            asyncio.run(coord._async_fetch_ebusd_tcp_info())
+
+        self.assertEqual(
+            calls,
+            [
+                ("b4d7ad18-ebusd", 8888),
+                ("local-ebusd", 8888),
+                ("ebusd", 8888),
+                ("ebusd.local", 8888),
+                ("127.0.0.1", 8888),
+            ],
+        )
+        self.assertEqual(coord.get_int(CIRCUIT_GLOBAL, "symbol_rate", "value"), 25)
 
     def test_ebusd_daemon_sensors_disabled_by_default(self) -> None:
         """Verify physical metrics without MQTT route are disabled by default in registry."""

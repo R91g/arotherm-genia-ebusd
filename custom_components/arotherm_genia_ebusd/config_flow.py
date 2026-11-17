@@ -62,6 +62,7 @@ from .const import (
     OUTDOOR_MODELS_SAUNIER,
     SECTION_ADVANCED_OPTIONS,
 )
+from .ebusd_tcp import LOOPBACK_HOSTS, async_probe_ebusd_tcp
 
 
 class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):  # pyright: ignore[reportCallIssue, reportGeneralTypeIssues]
@@ -137,14 +138,25 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):  # pyright: ignore[repo
                 CONF_HAS_MIGO_LINK: user_input[CONF_HAS_MIGO_LINK],
             }
             title = f"{self._manufacturer} {user_input[CONF_OUTDOOR_MODEL]} ({self._mqtt_prefix})"
+            options: dict[str, Any] = {
+                CONF_FORCE_DHW_BOOST: DEFAULT_FORCE_DHW_BOOST,
+                CONF_AUTO_COOLING_LOCK_BYPASS: DEFAULT_AUTO_COOLING_LOCK_BYPASS,
+                CONF_FALLBACK_POLL_INTERVAL: DEFAULT_FALLBACK_POLL_INTERVAL,
+            }
+            if getattr(self, "hass", None) is not None:
+                detected = await async_probe_ebusd_tcp(
+                    self.hass,
+                    port=DEFAULT_EBUSD_TCP_PORT,
+                )
+                if detected is not None:
+                    detected_host, detected_port = detected
+                    options[CONF_ENABLE_EBUSD_TCP] = True
+                    options[CONF_EBUSD_TCP_HOST] = detected_host
+                    options[CONF_EBUSD_TCP_PORT] = detected_port
             return self.async_create_entry(
                 title=title,
                 data=entry_data,
-                options={
-                    CONF_FORCE_DHW_BOOST: DEFAULT_FORCE_DHW_BOOST,
-                    CONF_AUTO_COOLING_LOCK_BYPASS: DEFAULT_AUTO_COOLING_LOCK_BYPASS,
-                    CONF_FALLBACK_POLL_INTERVAL: DEFAULT_FALLBACK_POLL_INTERVAL,
-                },
+                options=options,
             )
 
         is_vaillant = self._manufacturer == MANUFACTURER_VAILLANT
@@ -345,6 +357,9 @@ class SaunierGeniaOptionsFlowHandler(OptionsFlow):
         if not isinstance(adv_options, dict):
             adv_options = {}
 
+        tcp_explicitly_configured = (
+            CONF_ENABLE_EBUSD_TCP in options or CONF_ENABLE_EBUSD_TCP in adv_options
+        )
         enable_tcp_default = bool(
             options.get(
                 CONF_ENABLE_EBUSD_TCP,
@@ -363,6 +378,21 @@ class SaunierGeniaOptionsFlowHandler(OptionsFlow):
                 adv_options.get(CONF_EBUSD_TCP_PORT, DEFAULT_EBUSD_TCP_PORT),
             )
         )
+        if getattr(self, "hass", None) is not None and (
+            (not enable_tcp_default and not tcp_explicitly_configured)
+            or tcp_host_default in ("", *LOOPBACK_HOSTS)
+        ):
+            detected = await async_probe_ebusd_tcp(
+                self.hass,
+                configured_host=tcp_host_default,
+                port=tcp_port_default,
+            )
+            if detected is not None:
+                detected_host, detected_port = detected
+                tcp_host_default = detected_host
+                tcp_port_default = detected_port
+                if not tcp_explicitly_configured:
+                    enable_tcp_default = True
         send_hex_default = bool(
             options.get(
                 CONF_ENABLE_SEND_HEX,

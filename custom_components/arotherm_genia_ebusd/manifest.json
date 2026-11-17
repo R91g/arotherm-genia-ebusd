@@ -1,6 +1,7 @@
 {
   "domain": "arotherm_genia_ebusd",
   "name": "aroTHERM & GeniaAir (eBUS)",
+  "after_dependencies": ["hassio"],
   "categories": [
     "climate.heat_pumps_air_conditioning",
     "climate.thermostats_heating",

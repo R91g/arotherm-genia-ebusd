@@ -705,9 +705,35 @@ ISSUE_MISSING_CUSTOM_CSV = "missing_custom_csv"
 ISSUE_NO_EBUSD_MQTT_TRAFFIC = "no_ebusd_mqtt_traffic"
 ISSUE_MQTTJSON_NOT_ENABLED = "mqttjson_not_enabled"
 ISSUE_EBUSD_SLOW_POLLING_SEED = "ebusd_slow_polling_seed"
+ISSUE_EBUSD_EXTERNAL_SWEEP = "ebusd_external_sweep"
 
 SLOW_POLLING_WARNING_THRESHOLD_SECONDS: float = (
     300.0  # 5 minutes without r1 power updates
+)
+EXTERNAL_SWEEP_CANARY_THRESHOLD: int = 3
+EXTERNAL_SWEEP_MIN_REPEATS_PER_CANARY: int = 2
+EXTERNAL_SWEEP_MIN_REPEAT_INTERVAL_SECONDS: float = 60.0
+EXTERNAL_SWEEP_CLEAR_SECONDS: float = 2400.0
+EXTERNAL_SWEEP_SELF_GET_GRACE_SECONDS: float = 30.0
+
+# Registers defined as plain r;u (poll priority 0) that our integration never queries
+# and native bus masters (0x10 / 0xf1) never emit passively. Receiving several of them
+# via non-retained MQTT indicates an external sweeper (e.g. seed_mqtt_cfg filter-seen=5).
+EXTERNAL_SWEEP_CANARY_MESSAGES: frozenset[str] = frozenset(
+    {
+        "yieldhcday",
+        "yieldcoolday",
+        "yieldhwcday",
+        "yieldhcmonth",
+        "yieldhwcmonth",
+        "yieldcoolingmonth",
+        "supplytempweighted",
+        "status02",
+        "status16",
+        "yieldtotal",
+        "hc1status",
+        "z1valvestatus",
+    }
 )
 
 # Signature messages proving our custom 08.hmux0.csv is loaded in ebusd

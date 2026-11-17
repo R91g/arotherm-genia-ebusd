@@ -64,6 +64,7 @@ from .const import (
     WEEKDAYS_LIST,
 )
 from .coordinator import SaunierGeniaCoordinator
+from .ebusd_tcp import async_open_ebusd_tcp_connection
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -1547,34 +1548,9 @@ def _async_register_services(hass: HomeAssistant) -> None:
             reader: asyncio.StreamReader | None = None
             writer: asyncio.StreamWriter | None = None
             try:
-                try:
-                    connect_coro = asyncio.open_connection(host, port)
-                    reader, writer = await asyncio.wait_for(
-                        connect_coro, timeout=timeout
-                    )
-                except (TimeoutError, OSError):
-                    if host in ("127.0.0.1", "localhost"):
-                        fallback_hosts = ("b4d7ad18-ebusd", "local-ebusd", "ebusd")
-                        connected = False
-                        for fb_host in fallback_hosts:
-                            try:
-                                connect_coro = asyncio.open_connection(fb_host, port)
-                                reader, writer = await asyncio.wait_for(
-                                    connect_coro, timeout=timeout
-                                )
-                                host = fb_host
-                                connected = True
-                                break
-                            except (TimeoutError, OSError):
-                                continue
-                        if not connected:
-                            raise
-                    else:
-                        raise
-                if reader is None or writer is None:
-                    raise HomeAssistantError(
-                        f"Could not connect to eBUSd TCP daemon at {host}:{port}"
-                    )
+                reader, writer, host, port = await async_open_ebusd_tcp_connection(
+                    hass, host, port, timeout=timeout
+                )
                 writer.write(f"hex {command_raw}\n".encode("ascii"))
                 await writer.drain()
 
@@ -1677,6 +1653,7 @@ def _async_register_services(hass: HomeAssistant) -> None:
             # Set up notification event for the response
             event = asyncio.Event()
 
+            @callback
             def _on_update() -> None:
                 event.set()
 

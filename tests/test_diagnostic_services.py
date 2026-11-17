@@ -643,7 +643,7 @@ class TestDiagnosticServices(unittest.TestCase):
         self.assertIn("Could not connect to eBUSd TCP daemon", str(ctx.exception))
 
     def test_send_hex_command_falls_back_to_addon_hostname(self) -> None:
-        """Verify send_hex_command falls back to b4d7ad18-ebusd if 127.0.0.1 fails."""
+        """Verify send_hex_command tries HA add-on hostnames first and falls back to 127.0.0.1."""
         _async_register_services(self.hass)
         handler = self.registered_services[SERVICE_SEND_HEX_COMMAND]
 
@@ -660,17 +660,40 @@ class TestDiagnosticServices(unittest.TestCase):
 
         async def fake_open_connection(h: str, p: int):
             calls.append((h, p))
-            if h == "127.0.0.1":
-                raise OSError("Connection refused")
-            return mock_reader, mock_writer
+            if h == "b4d7ad18-ebusd":
+                return mock_reader, mock_writer
+            raise OSError("Connection refused")
 
         with patch("asyncio.open_connection", side_effect=fake_open_connection):
             result = asyncio.run(handler(call))
 
-        self.assertEqual(calls, [("127.0.0.1", 8888), ("b4d7ad18-ebusd", 8888)])
+        self.assertEqual(calls, [("b4d7ad18-ebusd", 8888)])
         self.assertTrue(result["success"])
         self.assertEqual(result["response"], "0aff021b")
         self.assertEqual(result["host"], "b4d7ad18-ebusd")
+
+        calls.clear()
+
+        async def fake_open_loopback_only(h: str, p: int):
+            calls.append((h, p))
+            if h == "127.0.0.1":
+                return mock_reader, mock_writer
+            raise OSError("Connection refused")
+
+        with patch("asyncio.open_connection", side_effect=fake_open_loopback_only):
+            result_loopback = asyncio.run(handler(call))
+
+        self.assertEqual(
+            calls,
+            [
+                ("b4d7ad18-ebusd", 8888),
+                ("local-ebusd", 8888),
+                ("ebusd", 8888),
+                ("ebusd.local", 8888),
+                ("127.0.0.1", 8888),
+            ],
+        )
+        self.assertEqual(result_loopback["host"], "127.0.0.1")
 
     def test_send_hex_command_timeout_raises(self) -> None:
         """Verify send_hex_command raises HomeAssistantError on TCP timeout."""

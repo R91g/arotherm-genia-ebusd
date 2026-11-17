@@ -117,6 +117,10 @@
     "ebusd_slow_polling_seed": {
       "title": "Slow eBUSd telemetry update rate (possible seed_mqtt_cfg issue)",
       "description": "High-priority electrical power telemetry (`RunDataElectricPowerConsumption`) is updating very slowly ({interval} minutes between updates instead of ~10–20 seconds) while the eBUS is active. If you are using the Home Assistant eBUSd Add-on (LukasGrebe/ha-addons), this typically happens when the option **\"Seed HA MQTT integration config (only needed once)\"** is enabled (`seed_mqtt_cfg: true`), which injects a legacy configuration that polls 160+ registers every 16 minutes and causes heavy bus traffic. (If you run ebusd standalone or in Docker without this add-on, this setting does not apply; check your polling timers instead). Please: (1) Go to **Settings → Add-ons → eBUSd → Configuration** and turn OFF **Seed HA MQTT integration config**, (2) Verify that `--mqttjson` is present in `commandline_options`, and (3) Restart the add-on. This repair notice will clear automatically once high-frequency telemetry updates resume."
+    },
+    "ebusd_external_sweep": {
+      "title": "External eBUSd polling sweep detected ({source})",
+      "description": "An external polling sweep (`{source}`) is querying unused `r;u` registers ({registers}) on the eBUS. In Home Assistant eBUSd Add-on (LukasGrebe/ha-addons), this happens when **\"Seed HA MQTT integration config (only needed once)\"** (`seed_mqtt_cfg: true`) is enabled, which loads `mqtt-hassio.cfg` with `filter-seen = 5` and sweeps the entire bus periodically; it can also be caused by an external MQTT `/get` poller. Besides saturating the bus and slowing live telemetry, sweeping non-passive definitions on older CSVs can trigger unintended module actions. Please: (1) Turn OFF **Seed HA MQTT integration config** (`seed_mqtt_cfg: false`) in **Settings → Add-ons → eBUSd → Configuration**, (2) Ensure `--mqttjson` stays in `commandline_options` and remove any external polling scripts, and (3) Restart eBUSd. This repair notice will clear automatically once external sweeps stop."
     }
   },
   "entity": {

@@ -1,5 +1,6 @@
 """Unit tests for schema integrity, manifest, translations, and services validation."""
 
+import ast
 import csv
 import glob
 import json
@@ -643,6 +644,65 @@ class TestSchemaIntegrity(unittest.TestCase):
                 "dev_4", name="MiPro Sense (Wireless Thermostat)"
             )
             self.assertEqual(mock_dev_reg.async_update_device.call_count, 4)
+
+    def test_event_and_listener_callbacks_run_on_event_loop(self) -> None:
+        """Ensure HA timer/MQTT/listener hooks never dispatch sync functions to the executor."""
+        hook_arg_index = {
+            "async_track_time_interval": 1,
+            "async_call_later": 2,
+            "async_subscribe": 2,
+            "async_add_listener": 2,
+        }
+        violations: list[str] = []
+
+        for py_path in sorted(glob.glob(os.path.join(self.component_dir, "*.py"))):
+            with open(py_path, encoding="utf-8") as fp:
+                tree = ast.parse(fp.read(), filename=py_path)
+
+            defs: dict[str, tuple[int, bool, bool]] = {}
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    has_callback_dec = any(
+                        (isinstance(dec, ast.Name) and dec.id == "callback")
+                        or (isinstance(dec, ast.Attribute) and dec.attr == "callback")
+                        for dec in node.decorator_list
+                    )
+                    defs[node.name] = (
+                        node.lineno,
+                        isinstance(node, ast.AsyncFunctionDef),
+                        has_callback_dec,
+                    )
+
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                fn_name = (
+                    node.func.attr
+                    if isinstance(node.func, ast.Attribute)
+                    else getattr(node.func, "id", None)
+                )
+                if fn_name not in hook_arg_index:
+                    continue
+                idx = hook_arg_index[fn_name]
+                if len(node.args) <= idx:
+                    continue
+                target_arg = node.args[idx]
+                target_name = (
+                    target_arg.attr
+                    if isinstance(target_arg, ast.Attribute)
+                    else getattr(target_arg, "id", None)
+                )
+                if not target_name or target_name not in defs:
+                    continue
+                lineno, is_async, has_callback_dec = defs[target_name]
+                if not is_async and not has_callback_dec:
+                    rel = os.path.relpath(py_path, self.root_dir)
+                    violations.append(
+                        f"{rel}:{node.lineno} passes sync '{target_name}' (defined line {lineno}) "
+                        f"to {fn_name} without @callback"
+                    )
+
+        self.assertEqual(violations, [], "\n".join(violations))
 
 
 if __name__ == "__main__":
