@@ -437,6 +437,8 @@ class SaunierGeniaCoordinator:
         }
         # Confirmed outdoor unit SW version from scan.08 or TCP info (excludes default placeholder)
         self._detected_outdoor_sw: str | None = None
+        # Addresses already queried with TCP `read -c scan.<addr> id` in this session
+        self._tcp_scan_id_attempted_addrs: set[str] = set()
 
         # Root outdoor device registry ID for child device topology (via_device_id)
         self._outdoor_device_id: str | None = None
@@ -3176,6 +3178,7 @@ class SaunierGeniaCoordinator:
         lines: list[str] = []
         loaded_csv_devices: list[dict[str, str]] = []
         missing_csv_devices: list[dict[str, str]] = []
+        scanned_addrs: list[str] = []
         total_scanned = 0
 
         try:
@@ -3235,6 +3238,7 @@ class SaunierGeniaCoordinator:
                 elif key.startswith("address ") and 'scanned "' in val:
                     total_scanned += 1
                     addr = key.replace("address", "").strip()
+                    addr_lower = addr.lower()
                     scanned_part = val.partition('scanned "')[2].partition('"')[0]
                     fields = dict(
                         item.split("=", 1)
@@ -3244,8 +3248,17 @@ class SaunierGeniaCoordinator:
                     dev_id = fields.get("ID", addr)
                     sw_ver = fields.get("SW", "")
                     hw_ver = fields.get("HW", "")
-                    if addr.lower() == "08" and sw_ver:
-                        self._record_detected_outdoor_sw(sw_ver)
+                    self._async_apply_scan_device_info(
+                        addr_lower,
+                        detected_id=dev_id,
+                        detected_sw=sw_ver or None,
+                        detected_hw=hw_ver or None,
+                    )
+                    if (
+                        addr_lower in SCAN_ADDRESS_TO_DEVICE_KEY
+                        and addr_lower not in scanned_addrs
+                    ):
+                        scanned_addrs.append(addr_lower)
                     if ', loaded "' in val:
                         csv_file = val.partition(', loaded "')[2].rstrip('"')
                         loaded_csv_devices.append(
@@ -3268,6 +3281,7 @@ class SaunierGeniaCoordinator:
                         )
 
             await self._async_verify_csvs_via_tcp(reader, writer, loaded_csv_devices)
+            await self._async_fetch_scan_serials_via_tcp(reader, writer, scanned_addrs)
 
             with contextlib.suppress(TimeoutError, OSError):
                 writer.write(b"quit\n")
@@ -3305,14 +3319,92 @@ class SaunierGeniaCoordinator:
         }
         self._async_notify_message_listeners(CIRCUIT_GLOBAL, "missing_csv_devices")
 
+    async def _async_fetch_scan_serials_via_tcp(
+        self,
+        reader: asyncio.StreamReader,
+        writer: asyncio.StreamWriter,
+        scanned_addrs: list[str],
+    ) -> None:
+        """Fetch device metadata and 28-char serial numbers via eBUSd TCP scan commands."""
+        if not scanned_addrs:
+            return
+
+        # Only hit TCP when at least one known scanned device still lacks a serial
+        missing_before = [
+            addr
+            for addr in scanned_addrs
+            if (device_key := SCAN_ADDRESS_TO_DEVICE_KEY.get(addr))
+            and not self.get_device_serial_number(device_key)
+        ]
+        if not missing_before:
+            return
+
+        # 1. `scan result` reads cached scan table from eBUSd RAM (zero bus traffic)
+        writer.write(b"scan result\n")
+        await writer.drain()
+        scan_lines = await self._async_read_tcp_block(reader, timeout=2.0)
+
+        for line in scan_lines:
+            if not line or line.upper().startswith("ERR:") or ";" not in line:
+                continue
+            tokens = [t.strip() for t in line.split(";")]
+            if len(tokens) < 5:
+                continue
+            line_addr = tokens[0].lower()
+            if line_addr not in SCAN_ADDRESS_TO_DEVICE_KEY:
+                continue
+            serial = self._extract_serial_from_semicolon_tokens(tokens, start_idx=5)
+            self._async_apply_scan_device_info(
+                line_addr,
+                detected_id=tokens[2],
+                detected_sw=tokens[3] or None,
+                detected_hw=tokens[4] or None,
+                detected_serial=serial,
+                payload_hint=line,
+            )
+
+        # 2. Fallback: query `read -c scan.<addr> id` once per address still missing serial
+        for addr in scanned_addrs:
+            device_key = SCAN_ADDRESS_TO_DEVICE_KEY.get(addr)
+            if (
+                not device_key
+                or self.get_device_serial_number(device_key)
+                or addr in self._tcp_scan_id_attempted_addrs
+            ):
+                continue
+            self._tcp_scan_id_attempted_addrs.add(addr)
+            writer.write(f"read -c scan.{addr} id\n".encode("ascii"))
+            await writer.drain()
+            id_lines = await self._async_read_tcp_block(reader, timeout=2.0)
+            for id_line in id_lines:
+                clean_line = id_line.strip()
+                if not clean_line or clean_line.upper().startswith("ERR:"):
+                    continue
+                val_part = (
+                    clean_line.partition("=")[2].strip()
+                    if "=" in clean_line
+                    else clean_line
+                )
+                tokens = [t.strip() for t in val_part.split(";")]
+                serial = self._extract_serial_from_semicolon_tokens(tokens)
+                if not serial:
+                    compact = val_part.replace(";", "").replace(" ", "").strip()
+                    if self._is_valid_serial_candidate(compact, exact_len=28):
+                        serial = compact
+                if serial:
+                    self._async_apply_scan_device_info(addr, detected_serial=serial)
+                    break
+
     async def async_ebusd_tcp_reload(self) -> str:
         """Send reload command to eBUSd via TCP socket to reload all CSV definition files."""
+        self._tcp_scan_id_attempted_addrs.clear()
         res = await self._async_send_ebusd_tcp_command("reload\n")
         await self._async_fetch_ebusd_tcp_info()
         return res
 
     async def async_ebusd_tcp_scan(self) -> str:
         """Send scan config command to eBUSd via TCP socket to restart device scanning."""
+        self._tcp_scan_id_attempted_addrs.clear()
         res = await self._async_send_ebusd_tcp_command("scan config\n")
         await self._async_fetch_ebusd_tcp_info()
         return res
@@ -5685,13 +5777,135 @@ class SaunierGeniaCoordinator:
             return len(candidate) == exact_len
         return len(candidate) >= min_len
 
+    @classmethod
+    def _extract_serial_from_semicolon_tokens(
+        cls, tokens: list[str], *, start_idx: int = 0
+    ) -> str | None:
+        """Extract a 28-character Vaillant/Saunier serial from 7 semicolon-delimited ID tokens."""
+        id_tokens = [t.strip() for t in tokens[start_idx:] if t.strip()]
+        if start_idx == 0:
+            if len(id_tokens) != 7:
+                return None
+        elif len(id_tokens) < 7:
+            return None
+        candidate = "".join(id_tokens[:7])
+        if cls._is_valid_serial_candidate(candidate, exact_len=28):
+            return candidate
+        return None
+
+    @callback
+    def _async_apply_scan_device_info(
+        self,
+        addr: str,
+        *,
+        detected_id: str = "",
+        detected_sw: str | None = None,
+        detected_hw: str | None = None,
+        detected_serial: str | None = None,
+        payload_hint: str = "",
+    ) -> None:
+        """Apply detected SW/HW/ID/serial metadata to circuit state and Device Registry."""
+        addr_lower = addr.lower().strip()
+        device_key = SCAN_ADDRESS_TO_DEVICE_KEY.get(addr_lower)
+        if not device_key:
+            return
+
+        # Record outdoor SW before _async_on_outdoor_circuit_changed runs hydration logic
+        if device_key == DEVICE_OUTDOOR_UNIT and detected_sw:
+            self._record_detected_outdoor_sw(detected_sw)
+
+        hint_upper = f"{detected_id} {payload_hint}".upper()
+
+        # Detect active controller circuit from address 15 scan
+        if addr_lower == "15":
+            if (
+                "CTLV3" in hint_upper
+                and self._active_controller_circuit != CIRCUIT_CTLV3
+            ):
+                _LOGGER.info(
+                    "Detected Vaillant sensoCOMFORT (CTLV3) on eBUS address 15; setting controller circuit to %s",
+                    CIRCUIT_CTLV3,
+                )
+                self._active_controller_circuit = CIRCUIT_CTLV3
+            elif (
+                "CTLV2" in hint_upper
+                and self._active_controller_circuit != CIRCUIT_CTLV2
+            ):
+                _LOGGER.info(
+                    "Detected Vaillant sensoCOMFORT (CTLV2) on eBUS address 15; setting controller circuit to %s",
+                    CIRCUIT_CTLV2,
+                )
+                self._active_controller_circuit = CIRCUIT_CTLV2
+            elif (
+                "BASV" in hint_upper
+                and self._active_controller_circuit != CIRCUIT_BASV3
+            ):
+                _LOGGER.info(
+                    "Detected Vaillant sensoCOMFORT (BASV3) on eBUS address 15; setting controller circuit to %s",
+                    CIRCUIT_BASV3,
+                )
+                self._active_controller_circuit = CIRCUIT_BASV3
+            elif (
+                "BASS" in hint_upper
+                and self._active_controller_circuit != CIRCUIT_BASS3
+            ):
+                _LOGGER.info(
+                    "Detected Saunier Duval MiPro Sense (BASS3) on eBUS address 15; setting controller circuit to %s",
+                    CIRCUIT_BASS3,
+                )
+                self._active_controller_circuit = CIRCUIT_BASS3
+
+        # Detect active outdoor unit circuit from address 08 scan
+        if addr_lower == "08":
+            if (
+                ("HMU00" in hint_upper or "HMU" in hint_upper)
+                and "HMUX" not in hint_upper
+                and self._active_outdoor_circuit != CIRCUIT_HMU
+            ):
+                _LOGGER.info(
+                    "Detected Vaillant aroTHERM HMU00 on eBUS address 08; setting outdoor circuit to %s",
+                    CIRCUIT_HMU,
+                )
+                self._active_outdoor_circuit = CIRCUIT_HMU
+                self._async_on_outdoor_circuit_changed(CIRCUIT_HMU)
+            elif "HMUX" in hint_upper and self._active_outdoor_circuit != CIRCUIT_HMUX0:
+                _LOGGER.info(
+                    "Detected Saunier Duval / Vaillant HMUX0 on eBUS address 08; setting outdoor circuit to %s",
+                    CIRCUIT_HMUX0,
+                )
+                self._active_outdoor_circuit = CIRCUIT_HMUX0
+                self._async_on_outdoor_circuit_changed(CIRCUIT_HMUX0)
+
+        # Update cache and notify Device Registry if any property changed
+        target_dict = self._device_versions.setdefault(device_key, {})
+        updated = False
+        if detected_sw and target_dict.get("sw") != detected_sw:
+            target_dict["sw"] = detected_sw
+            updated = True
+        if detected_hw and target_dict.get("hw") != detected_hw:
+            target_dict["hw"] = detected_hw
+            updated = True
+        if detected_serial and target_dict.get("serial_number") != detected_serial:
+            target_dict["serial_number"] = detected_serial
+            updated = True
+
+        if updated:
+            _LOGGER.info(
+                "Passively detected hardware info for %s (%s): SW=%s, HW=%s, Serial=%s",
+                device_key,
+                addr_lower,
+                target_dict.get("sw"),
+                target_dict.get("hw"),
+                target_dict.get("serial_number"),
+            )
+            self._async_update_device_registry(device_key)
+
     @callback
     def _async_handle_scan_message(self, parts: list[str], raw_payload: Any) -> None:
         """Passively extract SW, HW, and serial numbers from ebusd scan.* MQTT messages."""
         circuit_name = parts[0]
         addr = circuit_name.lower().replace("scan.", "").strip()
-        device_key = SCAN_ADDRESS_TO_DEVICE_KEY.get(addr)
-        if not device_key:
+        if addr not in SCAN_ADDRESS_TO_DEVICE_KEY:
             return
 
         payload_str = (
@@ -5736,16 +5950,10 @@ class SaunierGeniaCoordinator:
                 detected_sw = clean[1]
                 detected_hw = clean[2]
 
-        # 3. Check for serial number:
-        # a) 7-part semicolon token string (e.g. "21;24;10;0020123456;1234;567890;N1")
-        if ";" in val_str:
-            id_tokens = [t.strip() for t in val_str.split(";") if t.strip()]
-            if len(id_tokens) == 7:
-                joined = "".join(id_tokens)
-                if len(joined) == 28:
-                    detected_serial = joined
+            # 3a. 7-part semicolon token string (e.g. "21;24;10;0020123456;1234;567890;N1")
+            detected_serial = self._extract_serial_from_semicolon_tokens(tokens)
 
-        # b) JSON fields from Scan.<zz>/Id
+        # 3b. JSON fields from Scan.<zz>/Id
         if not detected_serial:
             p_product = str(parsed.get("product") or "").strip()
             p_counter = str(parsed.get("counter") or "").strip()
@@ -5759,7 +5967,7 @@ class SaunierGeniaCoordinator:
                 if len(candidate) == 28:
                     detected_serial = candidate
 
-        # c) Explicit serial / id fields
+        # 3c. Explicit serial / id fields
         if not detected_serial:
             for field in ("serial", "serial_number", "serialnumber"):
                 if field in parsed:
@@ -5772,7 +5980,7 @@ class SaunierGeniaCoordinator:
                 if self._is_valid_serial_candidate(candidate, exact_len=28):
                     detected_serial = candidate
 
-        # d) Raw 28-char string under an Id topic (e.g. Scan.08/Id)
+        # 3d. Raw 28-char string under an Id topic (e.g. Scan.08/Id)
         if (
             not detected_serial
             and len(parts) >= 2
@@ -5783,102 +5991,14 @@ class SaunierGeniaCoordinator:
             if self._is_valid_serial_candidate(clean_val, exact_len=28):
                 detected_serial = clean_val
 
-        # Record outdoor SW before _async_on_outdoor_circuit_changed runs hydration logic
-        if device_key == DEVICE_OUTDOOR_UNIT and detected_sw:
-            self._record_detected_outdoor_sw(detected_sw)
-
-        # Passive detection of active controller circuit from address 15 scan
-        if addr == "15":
-            payload_upper = (
-                f"{val_str} {parsed.get('id', '')} {parsed.get('ID', '')}"
-            ).upper()
-            if (
-                "CTLV3" in payload_upper
-                and self._active_controller_circuit != CIRCUIT_CTLV3
-            ):
-                _LOGGER.info(
-                    "Detected Vaillant sensoCOMFORT (CTLV3) on eBUS address 15; setting controller circuit to %s",
-                    CIRCUIT_CTLV3,
-                )
-                self._active_controller_circuit = CIRCUIT_CTLV3
-            elif (
-                "CTLV2" in payload_upper
-                and self._active_controller_circuit != CIRCUIT_CTLV2
-            ):
-                _LOGGER.info(
-                    "Detected Vaillant sensoCOMFORT (CTLV2) on eBUS address 15; setting controller circuit to %s",
-                    CIRCUIT_CTLV2,
-                )
-                self._active_controller_circuit = CIRCUIT_CTLV2
-            elif (
-                "BASV" in payload_upper
-                and self._active_controller_circuit != CIRCUIT_BASV3
-            ):
-                _LOGGER.info(
-                    "Detected Vaillant sensoCOMFORT (BASV3) on eBUS address 15; setting controller circuit to %s",
-                    CIRCUIT_BASV3,
-                )
-                self._active_controller_circuit = CIRCUIT_BASV3
-            elif (
-                "BASS" in payload_upper
-                and self._active_controller_circuit != CIRCUIT_BASS3
-            ):
-                _LOGGER.info(
-                    "Detected Saunier Duval MiPro Sense (BASS3) on eBUS address 15; setting controller circuit to %s",
-                    CIRCUIT_BASS3,
-                )
-                self._active_controller_circuit = CIRCUIT_BASS3
-
-        # Passive detection of active outdoor unit circuit from address 08 scan
-        if addr == "08":
-            payload_upper = (
-                f"{val_str} {parsed.get('id', '')} {parsed.get('ID', '')}"
-            ).upper()
-            if (
-                ("HMU00" in payload_upper or "HMU" in payload_upper)
-                and "HMUX" not in payload_upper
-                and self._active_outdoor_circuit != CIRCUIT_HMU
-            ):
-                _LOGGER.info(
-                    "Detected Vaillant aroTHERM HMU00 on eBUS address 08; setting outdoor circuit to %s",
-                    CIRCUIT_HMU,
-                )
-                self._active_outdoor_circuit = CIRCUIT_HMU
-                self._async_on_outdoor_circuit_changed(CIRCUIT_HMU)
-            elif (
-                "HMUX" in payload_upper
-                and self._active_outdoor_circuit != CIRCUIT_HMUX0
-            ):
-                _LOGGER.info(
-                    "Detected Saunier Duval / Vaillant HMUX0 on eBUS address 08; setting outdoor circuit to %s",
-                    CIRCUIT_HMUX0,
-                )
-                self._active_outdoor_circuit = CIRCUIT_HMUX0
-                self._async_on_outdoor_circuit_changed(CIRCUIT_HMUX0)
-
-        # Update cache and notify Device Registry if any property changed
-        target_dict = self._device_versions.setdefault(device_key, {})
-        updated = False
-        if detected_sw and target_dict.get("sw") != detected_sw:
-            target_dict["sw"] = detected_sw
-            updated = True
-        if detected_hw and target_dict.get("hw") != detected_hw:
-            target_dict["hw"] = detected_hw
-            updated = True
-        if detected_serial and target_dict.get("serial_number") != detected_serial:
-            target_dict["serial_number"] = detected_serial
-            updated = True
-
-        if updated:
-            _LOGGER.info(
-                "Passively detected hardware info for %s (%s): SW=%s, HW=%s, Serial=%s",
-                device_key,
-                addr,
-                target_dict.get("sw"),
-                target_dict.get("hw"),
-                target_dict.get("serial_number"),
-            )
-            self._async_update_device_registry(device_key)
+        self._async_apply_scan_device_info(
+            addr,
+            detected_id=str(parsed.get("id") or parsed.get("ID") or "").strip(),
+            detected_sw=detected_sw,
+            detected_hw=detected_hw,
+            detected_serial=detected_serial,
+            payload_hint=val_str,
+        )
 
     @callback
     def _async_update_device_registry(self, device_key: str) -> None:

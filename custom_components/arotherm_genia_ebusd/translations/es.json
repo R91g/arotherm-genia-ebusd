@@ -2,6 +2,13 @@
   "config": {
     "step": {
       "user": {
+        "title": "Requisitos Previos Importantes (eBUSd)",
+        "description": "Antes de continuar, comprueba que tu demonio eBUSd está bien configurado. La mayoría de incidencias se deben a usar los CSV por defecto o el sondeo heredado del add-on:\n\n1. **Copia nuestros archivos CSV** desde la [carpeta ebusd-configuration en GitHub](https://github.com/R91g/arotherm-genia-ebusd/tree/main/ebusd-configuration) (`broadcast.csv` y `vaillant/*.csv`) en tu carpeta local de configuración de eBUSd.\n2. **Habilita los archivos locales y JSON en eBUSd**: configura `--configpath` apuntando a esa carpeta local junto con `--mqttjson`, `--scanconfig`, `--accesslevel=*`, `--mqtttopic=ebusd/%circuit/%name` y `--mqttvar=filter-direction=r|u|^w`.\n3. **Si usas el Add-on eBUSd de Home Assistant (`LukasGrebe/ha-addons`)**: es **obligatorio desactivar** en sus opciones **\"Seed HA MQTT integration config (only needed once)\"** (`seed_mqtt_cfg`) y habilitar la configuración de archivos locales; si se deja activo, el add-on sondea más de 160 registros antiguos y satura el bus.\n\nInstrucciones paso a paso: [Guía de Instalación de eBUSd](https://github.com/R91g/arotherm-genia-ebusd/blob/main/docs/installation_es.md#2-desplegar-los-archivos-csv-de-ebusd).",
+        "data": {
+          "confirm_prerequisites": "Confirmo que he copiado los CSV del repositorio, configurado eBUSd en local y desactivado 'Seed HA MQTT integration config' (si uso el add-on)"
+        }
+      },
+      "mqtt": {
         "title": "Configurar Bomba de Calor (eBUSd)",
         "description": "Configura la conexión MQTT local con el demonio eBUSd (`--mqttjson` activado) y selecciona el fabricante de tu instalación.",
         "data": {
@@ -38,6 +45,7 @@
       }
     },
     "error": {
+      "prerequisites_not_confirmed": "Debes confirmar que eBUSd y los archivos CSV del repositorio están configurados para poder continuar.",
       "invalid_mqtt_prefix": "El prefijo MQTT no puede estar vacío.",
       "mqtt_not_configured": "La integración MQTT de Home Assistant no está configurada o activa."
     },

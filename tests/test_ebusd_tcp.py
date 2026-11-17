@@ -17,6 +17,8 @@ from custom_components.arotherm_genia_ebusd.config_flow import (
     SaunierGeniaOptionsFlowHandler,
 )
 from custom_components.arotherm_genia_ebusd.const import (
+    CIRCUIT_CTLV3,
+    CIRCUIT_HMU,
     CONF_EBUSD_TCP_HOST,
     CONF_EBUSD_TCP_PORT,
     CONF_ENABLE_EBUSD_TCP,
@@ -25,6 +27,9 @@ from custom_components.arotherm_genia_ebusd.const import (
     CONF_INDOOR_MODEL,
     CONF_OUTDOOR_MODEL,
     DEFAULT_EBUSD_TCP_HOST,
+    DEVICE_CLIMATE_CONTROLLER,
+    DEVICE_HYDRAULIC_INTERFACE,
+    DEVICE_OUTDOOR_UNIT,
     ISSUE_EBUSD_EXTERNAL_SWEEP,
     SECTION_ADVANCED_OPTIONS,
 )
@@ -407,6 +412,156 @@ class TestExternalSweepDetection(unittest.TestCase):
         ):
             asyncio.run(coord._async_check_seed_mqtt_cfg())
         self.assertNotIn(ISSUE_EBUSD_EXTERNAL_SWEEP, coord._active_repair_issues)
+
+
+class TestEbusdTcpScanMetadata(unittest.TestCase):
+    """Test device ID, SW/HW, circuit detection, and serial extraction via eBUSd TCP."""
+
+    @staticmethod
+    def _make_coord() -> SaunierGeniaCoordinator:
+        entry = MagicMock()
+        entry.entry_id = "entry_tcp_scan"
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {
+            CONF_ENABLE_EBUSD_TCP: True,
+            CONF_EBUSD_TCP_HOST: "192.168.1.50",
+            CONF_EBUSD_TCP_PORT: 8888,
+        }
+        return SaunierGeniaCoordinator(MagicMock(), entry)
+
+    def test_tcp_scan_result_extracts_serials_circuits_and_versions(self) -> None:
+        """TCP info + scan result populates SW/HW, circuits, and 28-char serials without MQTT scan.*."""
+        coord = self._make_coord()
+        fake_dev_reg = MagicMock()
+        fake_dev_reg.async_get_device.side_effect = lambda identifiers: MagicMock(
+            id=f"dev_{next(iter(identifiers))[1]}"
+        )
+
+        # No loaded CSVs on info lines so _async_verify_csvs_via_tcp sends no `find` queries
+        tcp_lines = [
+            b"version: ebusd 26.1\n",
+            b'address 08: slave #3, scanned "MF=Vaillant;ID=HMU00;SW=0902;HW=5103"\n',
+            b'address 15: slave #4, scanned "MF=Vaillant;ID=CTLV3;SW=0614;HW=4304"\n',
+            b'address 76: slave #5, scanned "MF=Vaillant;ID=VWZIO;SW=0904;HW=5103"\n',
+            b"\n",
+            # scan result response (12 semicolon fields: addr;MF;ID;SW;HW + 7 serial tokens)
+            b"08;Vaillant;HMU00;0902;5103;21;21;24;0010022010;0001;007815;N8\n",
+            b"15;Vaillant;CTLV3;0614;4304;21;22;11;0020260921;0002;011223;N1\n",
+            b"76;Vaillant;VWZIO;0904;5103;21;21;24;0010022011;0001;009988;N8\n",
+            b"\n",
+        ]
+        mock_reader = AsyncMock()
+        mock_reader.readline = AsyncMock(side_effect=tcp_lines)
+        mock_writer = MagicMock()
+        mock_writer.drain = AsyncMock()
+        mock_writer.wait_closed = AsyncMock()
+
+        with (
+            patch("asyncio.open_connection", return_value=(mock_reader, mock_writer)),
+            patch(
+                "homeassistant.helpers.device_registry.async_get",
+                return_value=fake_dev_reg,
+            ),
+        ):
+            asyncio.run(coord._async_fetch_ebusd_tcp_info())
+
+        self.assertEqual(coord._active_outdoor_circuit, CIRCUIT_HMU)
+        self.assertEqual(coord._active_controller_circuit, CIRCUIT_CTLV3)
+        self.assertEqual(coord.get_device_sw_version(DEVICE_OUTDOOR_UNIT), "0902")
+        self.assertEqual(coord.get_device_hw_version(DEVICE_OUTDOOR_UNIT), "5103")
+        self.assertEqual(
+            coord.get_device_serial_number(DEVICE_OUTDOOR_UNIT),
+            "21212400100220100001007815N8",
+        )
+        self.assertEqual(
+            coord.get_device_serial_number(DEVICE_CLIMATE_CONTROLLER),
+            "21221100202609210002011223N1",
+        )
+        self.assertEqual(
+            coord.get_device_serial_number(DEVICE_HYDRAULIC_INTERFACE),
+            "21212400100220110001009988N8",
+        )
+        # All serials resolved via `scan result`; no `read -c scan.<addr> id` needed
+        written_cmds = [c.args[0] for c in mock_writer.write.call_args_list]
+        self.assertIn(b"scan result\n", written_cmds)
+        self.assertFalse(
+            any(cmd.startswith(b"read -c scan.") for cmd in written_cmds),
+            f"Unexpected per-address scan reads: {written_cmds}",
+        )
+        self.assertTrue(fake_dev_reg.async_update_device.called)
+
+    def test_tcp_scan_falls_back_to_read_id_and_caches_subsequent_polls(self) -> None:
+        """When scan result lacks serial tokens, fallback reads `read -c scan.<addr> id` once."""
+        coord = self._make_coord()
+
+        # First cycle: scan result only has 5 fields -> falls back to `read -c scan.<addr> id`
+        tcp_lines_first = [
+            b"version: ebusd 26.1\n",
+            b'address 08: slave #3, scanned "MF=Vaillant;ID=HMU00;SW=0902;HW=5103"\n',
+            b'address 76: slave #5, scanned "MF=Vaillant;ID=VWZIO;SW=0904;HW=5103"\n',
+            b"\n",
+            b"08;Vaillant;HMU00;0902;5103\n",
+            b"76;Vaillant;VWZIO;0904;5103\n",
+            b"\n",
+            # read -c scan.08 id -> valid 7-part Vaillant serial
+            b"21;21;24;0010022010;0001;007815;N8\n",
+            b"\n",
+            # read -c scan.76 id -> ERR (accessory without extended ID)
+            b"ERR: element not found\n",
+            b"\n",
+        ]
+        reader1 = AsyncMock()
+        reader1.readline = AsyncMock(side_effect=tcp_lines_first)
+        writer1 = MagicMock()
+        writer1.drain = AsyncMock()
+        writer1.wait_closed = AsyncMock()
+
+        with (
+            patch("asyncio.open_connection", return_value=(reader1, writer1)),
+            patch(
+                "homeassistant.helpers.device_registry.async_get",
+                return_value=MagicMock(),
+            ),
+        ):
+            asyncio.run(coord._async_fetch_ebusd_tcp_info())
+
+        self.assertEqual(
+            coord.get_device_serial_number(DEVICE_OUTDOOR_UNIT),
+            "21212400100220100001007815N8",
+        )
+        self.assertIsNone(coord.get_device_serial_number(DEVICE_HYDRAULIC_INTERFACE))
+        cmds1 = [c.args[0] for c in writer1.write.call_args_list]
+        self.assertIn(b"read -c scan.08 id\n", cmds1)
+        self.assertIn(b"read -c scan.76 id\n", cmds1)
+
+        # Second cycle: 08 already has serial and 76 already attempted -> no repeat `read -c scan.* id`
+        tcp_lines_second = [
+            b"version: ebusd 26.1\n",
+            b'address 08: slave #3, scanned "MF=Vaillant;ID=HMU00;SW=0902;HW=5103"\n',
+            b'address 76: slave #5, scanned "MF=Vaillant;ID=VWZIO;SW=0904;HW=5103"\n',
+            b"\n",
+            b"08;Vaillant;HMU00;0902;5103\n",
+            b"76;Vaillant;VWZIO;0904;5103\n",
+            b"\n",
+        ]
+        reader2 = AsyncMock()
+        reader2.readline = AsyncMock(side_effect=tcp_lines_second)
+        writer2 = MagicMock()
+        writer2.drain = AsyncMock()
+        writer2.wait_closed = AsyncMock()
+
+        with (
+            patch("asyncio.open_connection", return_value=(reader2, writer2)),
+            patch(
+                "homeassistant.helpers.device_registry.async_get",
+                return_value=MagicMock(),
+            ),
+        ):
+            asyncio.run(coord._async_fetch_ebusd_tcp_info())
+
+        cmds2 = [c.args[0] for c in writer2.write.call_args_list]
+        self.assertIn(b"scan result\n", cmds2)
+        self.assertFalse(any(cmd.startswith(b"read -c scan.") for cmd in cmds2))
 
 
 if __name__ == "__main__":

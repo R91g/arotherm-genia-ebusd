@@ -25,6 +25,7 @@ PLATFORMS: list[Platform] = [
 ]
 
 # Configuration keys and defaults (ConfigFlow)
+CONF_PREREQUISITES_CONFIRMED = "confirm_prerequisites"
 CONF_MQTT_PREFIX = "mqtt_prefix"
 DEFAULT_MQTT_PREFIX = "ebusd"
 

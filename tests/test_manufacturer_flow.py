@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 import setup_mocks  # noqa: F401
 
 from custom_components.arotherm_genia_ebusd.config_flow import (
+    SaunierGeniaConfigFlow,
     SaunierGeniaOptionsFlowHandler,
 )
 from custom_components.arotherm_genia_ebusd.const import (
@@ -20,6 +21,9 @@ from custom_components.arotherm_genia_ebusd.const import (
     CONF_ENABLE_SEND_HEX,
     CONF_FALLBACK_POLL_INTERVAL,
     CONF_FORCE_DHW_BOOST,
+    CONF_MANUFACTURER,
+    CONF_MQTT_PREFIX,
+    CONF_PREREQUISITES_CONFIRMED,
     DEFAULT_MANUFACTURER,
     DEFAULT_OUTDOOR_MODEL_SAUNIER,
     DEFAULT_OUTDOOR_MODEL_VAILLANT,
@@ -144,6 +148,53 @@ class TestOptionsFlow(unittest.TestCase):
         }
         result_empty = asyncio.run(handler.async_step_init(user_input_empty_host))
         self.assertEqual(result_empty["data"][CONF_EBUSD_TCP_HOST], "127.0.0.1")
+
+
+class TestConfigFlowPrerequisites(unittest.TestCase):
+    """Test mandatory initial eBUSd CSV and add-on prerequisites step."""
+
+    def test_user_step_requires_confirmation_before_mqtt_and_models(self) -> None:
+        """Initial user step blocks progression until prerequisites are accepted."""
+        from unittest.mock import AsyncMock
+
+        flow = SaunierGeniaConfigFlow()
+        flow.hass = MagicMock()
+        flow.hass.config.components = {"mqtt"}
+        flow.async_set_unique_id = AsyncMock()
+        flow._abort_if_unique_id_configured = MagicMock()
+
+        res_init = asyncio.run(flow.async_step_user())
+        self.assertEqual(res_init["type"], "form")
+        self.assertEqual(res_init["step_id"], "user")
+        schema_keys = [k.schema for k in res_init["data_schema"].schema]
+        self.assertIn(CONF_PREREQUISITES_CONFIRMED, schema_keys)
+
+        res_rejected = asyncio.run(
+            flow.async_step_user({CONF_PREREQUISITES_CONFIRMED: False})
+        )
+        self.assertEqual(res_rejected["type"], "form")
+        self.assertEqual(res_rejected["step_id"], "user")
+        self.assertEqual(
+            res_rejected["errors"],
+            {CONF_PREREQUISITES_CONFIRMED: "prerequisites_not_confirmed"},
+        )
+
+        res_accepted = asyncio.run(
+            flow.async_step_user({CONF_PREREQUISITES_CONFIRMED: True})
+        )
+        self.assertEqual(res_accepted["type"], "form")
+        self.assertEqual(res_accepted["step_id"], "mqtt")
+
+        res_mqtt = asyncio.run(
+            flow.async_step_mqtt(
+                {
+                    CONF_MQTT_PREFIX: "ebusd",
+                    CONF_MANUFACTURER: MANUFACTURER_VAILLANT,
+                }
+            )
+        )
+        self.assertEqual(res_mqtt["type"], "form")
+        self.assertEqual(res_mqtt["step_id"], "models")
 
 
 if __name__ == "__main__":

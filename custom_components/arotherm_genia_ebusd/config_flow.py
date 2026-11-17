@@ -38,6 +38,7 @@ from .const import (
     CONF_MANUFACTURER,
     CONF_MQTT_PREFIX,
     CONF_OUTDOOR_MODEL,
+    CONF_PREREQUISITES_CONFIRMED,
     DEFAULT_AUTO_COOLING_LOCK_BYPASS,
     DEFAULT_EBUSD_TCP_HOST,
     DEFAULT_EBUSD_TCP_PORT,
@@ -78,7 +79,32 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):  # pyright: ignore[repo
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Step 1: Configure MQTT prefix and select equipment manufacturer."""
+        """Step 1: Require confirmation of eBUSd CSV and add-on prerequisites."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            if user_input.get(CONF_PREREQUISITES_CONFIRMED):
+                return await self.async_step_mqtt()
+            errors[CONF_PREREQUISITES_CONFIRMED] = "prerequisites_not_confirmed"
+
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_PREREQUISITES_CONFIRMED, default=False
+                ): BooleanSelector(),
+            }
+        )
+
+        return self.async_show_form(
+            step_id="user",
+            data_schema=schema,
+            errors=errors,
+        )
+
+    async def async_step_mqtt(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Step 2: Configure MQTT prefix and select equipment manufacturer."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -119,7 +145,7 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):  # pyright: ignore[repo
         )
 
         return self.async_show_form(
-            step_id="user",
+            step_id="mqtt",
             data_schema=schema,
             errors=errors,
         )
@@ -127,7 +153,7 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):  # pyright: ignore[repo
     async def async_step_models(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Step 2: Select specific hardware models based on chosen manufacturer."""
+        """Step 3: Select specific hardware models based on chosen manufacturer."""
         if user_input is not None:
             entry_data = {
                 CONF_MQTT_PREFIX: self._mqtt_prefix,
