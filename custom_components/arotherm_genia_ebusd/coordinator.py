@@ -117,6 +117,7 @@ from .const import (
     ISSUE_OUTDATED_CONTROLLER_CSV,
     ISSUE_OUTDATED_HMU_CSV,
     ISSUE_OUTDATED_HMUX0_CSV,
+    ISSUE_OUTDATED_VWZIO_CSV,
     MANUFACTURER_VAILLANT,
     MESSAGE_ALIASES,
     OUTDOOR_CIRCUITS,
@@ -464,6 +465,7 @@ class SaunierGeniaCoordinator:
         self._cleared_repair_issues: set[str] = set()
         self._missing_controller_registers: set[str] = set()
         self._missing_outdoor_silent_circuits: set[str] = set()
+        self._active_poll_legacy_outdoor_circuits: set[str] = set()
         self._last_err_responses: dict[
             tuple[str, str], tuple[float, dict[str, Any]]
         ] = {}
@@ -1863,7 +1865,12 @@ class SaunierGeniaCoordinator:
                 self.get_message(CIRCUIT_HMUX0, "CompressorSilentOperationLevel")
             )
         )
-        return has_legacy_sc or has_legacy_flow or is_silent_err
+        has_active_diag_legacy = (
+            CIRCUIT_HMUX0 in self._active_poll_legacy_outdoor_circuits
+        )
+        return (
+            has_legacy_sc or has_legacy_flow or is_silent_err or has_active_diag_legacy
+        )
 
     def _has_hmu_csv_incompatibility(self, circuit_key: str) -> bool:
         """Return True if any cached 08.hmu/hmu00 register indicates an outdated CSV."""
@@ -1879,7 +1886,10 @@ class SaunierGeniaCoordinator:
                 self.get_message(circuit_key, "CompressorSilentOperationLevel")
             )
         )
-        return has_legacy_status or is_silent_err
+        has_active_diag_legacy = (
+            circuit_key in self._active_poll_legacy_outdoor_circuits
+        )
+        return has_legacy_status or is_silent_err or has_active_diag_legacy
 
     @callback
     def _async_check_csv_compatibility_on_message(
@@ -3074,7 +3084,8 @@ class SaunierGeniaCoordinator:
         """Verify loaded CSV definitions using eBUSd TCP `find` (zero bus traffic)."""
         has_ctrl_csv = any("15." in d["csv"] for d in loaded_csv_devices)
         has_outdoor_csv = any("08." in d["csv"] for d in loaded_csv_devices)
-        if not has_ctrl_csv and not has_outdoor_csv:
+        has_vwzio_csv = any("76." in d["csv"] for d in loaded_csv_devices)
+        if not has_ctrl_csv and not has_outdoor_csv and not has_vwzio_csv:
             return
 
         async def _tcp_find(msg_name: str) -> str | None:
@@ -3084,6 +3095,19 @@ class SaunierGeniaCoordinator:
             if not resp:
                 return None
             return resp[0]
+
+        async def _tcp_find_types(msg_name: str) -> list[tuple[str, str, str]]:
+            writer.write(f"find -F type,circuit,name {msg_name}\n".encode("ascii"))
+            await writer.drain()
+            resp = await self._async_read_tcp_block(reader, timeout=2.0)
+            rows: list[tuple[str, str, str]] = []
+            for line in resp:
+                if not line or line.upper().startswith("ERR:") or "," not in line:
+                    continue
+                parts = [p.strip().lower() for p in line.split(",", 2)]
+                if len(parts) == 3 and parts[0]:
+                    rows.append((parts[0], parts[1], parts[2]))
+            return rows
 
         if has_ctrl_csv:
             ctrl_probe_names = (
@@ -3137,34 +3161,47 @@ class SaunierGeniaCoordinator:
             elif silent_resp is not None:
                 for c_out in active_out_circuits:
                     self._missing_outdoor_silent_circuits.discard(c_out)
-            if any(r is not None and r.startswith("ERR:") for r in out_probes):
+
+            # Verify passive-only (u) v1.3.1+ definitions on diagnostic/status frames
+            outdoor_diag_msg = "Status02" if is_hmux0_csv else "RunDataDiag000b"
+            diag_rows = [
+                row
+                for row in await _tcp_find_types(outdoor_diag_msg)
+                if row[1] in active_out_circuits and row[2] == outdoor_diag_msg.lower()
+            ]
+            has_active_diag_poll = any(row[0].startswith("r") for row in diag_rows)
+            if has_active_diag_poll:
+                self._active_poll_legacy_outdoor_circuits.update(active_out_circuits)
+            elif diag_rows:
+                for c_out in active_out_circuits:
+                    self._active_poll_legacy_outdoor_circuits.discard(c_out)
+
+            if any(r is not None and r.startswith("ERR:") for r in out_probes) or (
+                has_active_diag_poll
+            ):
                 self._async_set_repair_issue(outdoor_issue, active=True)
             elif all(r is not None and not r.startswith("ERR:") for r in out_probes):
                 if is_hmux0_csv:
-                    sc_msg = self.get_message(CIRCUIT_HMUX0, "StateCompressor") or {}
-                    flow_msg = self.get_message(CIRCUIT_HMUX0, "RunDataFlowRate") or {}
-                    has_legacy = (
-                        isinstance(sc_msg, dict)
-                        and "comp_speed" in sc_msg
-                        and "flow_temp" not in sc_msg
-                    ) or (
-                        isinstance(flow_msg, dict)
-                        and "value" in flow_msg
-                        and "flow_rate" not in flow_msg
-                    )
+                    has_legacy = self._has_hmux0_csv_incompatibility()
                 else:
-                    status_msg = (
-                        self.get_message(CIRCUIT_HMU, "Status01")
-                        or self.get_message(CIRCUIT_HMU00, "Status01")
-                        or {}
-                    )
-                    has_legacy = (
-                        isinstance(status_msg, dict)
-                        and "temp_1" in status_msg
-                        and "flow_temp" not in status_msg
+                    has_legacy = any(
+                        self._has_hmu_csv_incompatibility(c_out)
+                        for c_out in (CIRCUIT_HMU, CIRCUIT_HMU00)
                     )
                 if not has_legacy:
                     self._async_set_repair_issue(outdoor_issue, active=False)
+
+        if has_vwzio_csv:
+            vwzio_rows = [
+                row
+                for row in await _tcp_find_types("SecondaryCircuitStatus")
+                if row[1] == CIRCUIT_VWZIO and row[2] == "secondarycircuitstatus"
+            ]
+            if vwzio_rows:
+                self._async_set_repair_issue(
+                    ISSUE_OUTDATED_VWZIO_CSV,
+                    active=any(row[0].startswith("r") for row in vwzio_rows),
+                )
 
     async def _async_fetch_ebusd_tcp_info(self) -> None:
         """Fetch daemon health, metrics, and loaded CSV status directly from eBUSd TCP socket."""

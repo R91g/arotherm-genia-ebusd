@@ -31,6 +31,9 @@ from custom_components.arotherm_genia_ebusd.const import (
     DEVICE_HYDRAULIC_INTERFACE,
     DEVICE_OUTDOOR_UNIT,
     ISSUE_EBUSD_EXTERNAL_SWEEP,
+    ISSUE_OUTDATED_HMU_CSV,
+    ISSUE_OUTDATED_HMUX0_CSV,
+    ISSUE_OUTDATED_VWZIO_CSV,
     SECTION_ADVANCED_OPTIONS,
 )
 from custom_components.arotherm_genia_ebusd.coordinator import SaunierGeniaCoordinator
@@ -562,6 +565,107 @@ class TestEbusdTcpScanMetadata(unittest.TestCase):
         cmds2 = [c.args[0] for c in writer2.write.call_args_list]
         self.assertIn(b"scan result\n", cmds2)
         self.assertFalse(any(cmd.startswith(b"read -c scan.") for cmd in cmds2))
+
+    def test_tcp_verifies_passive_v131_csv_definitions_and_vwzio(self) -> None:
+        """TCP find -F flags active r* legacy rows on Status02, RunDataDiag000b, and SecondaryCircuitStatus."""
+        coord = self._make_coord()
+        tcp_legacy = [
+            b"version: ebusd 26.1\n",
+            b'address 08: slave #11, scanned "MF=Vaillant;ID=HMUX0;SW=0407;HW=0504", loaded "vaillant/08.hmux0.csv"\n',
+            b'address 76: slave #9, scanned "MF=Vaillant;ID=VWZIO;SW=0904;HW=5103", loaded "vaillant/76.vwzio.csv"\n',
+            b"\n",
+            # Existing outdoor checks pass, but Status02 still has active `r`
+            b"hmux0 CompressorSilentOperationLevel = 0\n",
+            b"\n",
+            b"hmux0 RunDataElectricPowerConsumption = 300\n",
+            b"\n",
+            b"r,hmux0,Status02\n",
+            b"u,hmux0,Status02\n",
+            b"\n",
+            # SecondaryCircuitStatus still has active `r` (pre-v1.3.1)
+            b"r,vwzio,SecondaryCircuitStatus\n",
+            b"\n",
+        ]
+        r1 = AsyncMock()
+        r1.readline = AsyncMock(side_effect=tcp_legacy)
+        w1 = MagicMock()
+        w1.drain = AsyncMock()
+        w1.wait_closed = AsyncMock()
+
+        with (
+            patch("asyncio.open_connection", return_value=(r1, w1)),
+            patch(
+                "homeassistant.helpers.device_registry.async_get",
+                return_value=MagicMock(),
+            ),
+        ):
+            asyncio.run(coord._async_fetch_ebusd_tcp_info())
+
+        self.assertIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
+        self.assertIn(ISSUE_OUTDATED_VWZIO_CSV, coord._active_repair_issues)
+
+        # Updating CSVs to passive `u` clears both repairs cleanly
+        tcp_updated = [
+            b"version: ebusd 26.1\n",
+            b'address 08: slave #11, scanned "MF=Vaillant;ID=HMUX0;SW=0407;HW=0504", loaded "vaillant/08.hmux0.csv"\n',
+            b'address 76: slave #9, scanned "MF=Vaillant;ID=VWZIO;SW=0904;HW=5103", loaded "vaillant/76.vwzio.csv"\n',
+            b"\n",
+            b"hmux0 CompressorSilentOperationLevel = 0\n",
+            b"\n",
+            b"hmux0 RunDataElectricPowerConsumption = 300\n",
+            b"\n",
+            b"u,hmux0,Status02\n",
+            b"\n",
+            b"u,vwzio,SecondaryCircuitStatus\n",
+            b"\n",
+        ]
+        r2 = AsyncMock()
+        r2.readline = AsyncMock(side_effect=tcp_updated)
+        w2 = MagicMock()
+        w2.drain = AsyncMock()
+        w2.wait_closed = AsyncMock()
+
+        with (
+            patch("asyncio.open_connection", return_value=(r2, w2)),
+            patch(
+                "homeassistant.helpers.device_registry.async_get",
+                return_value=MagicMock(),
+            ),
+        ):
+            asyncio.run(coord._async_fetch_ebusd_tcp_info())
+
+        self.assertNotIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
+        self.assertNotIn(ISSUE_OUTDATED_VWZIO_CSV, coord._active_repair_issues)
+
+        # Verify HMU00 RunDataDiag000b active `r` triggers ISSUE_OUTDATED_HMU_CSV
+        coord_hmu = self._make_coord()
+        tcp_hmu_legacy = [
+            b"version: ebusd 26.1\n",
+            b'address 08: slave #3, scanned "MF=Vaillant;ID=HMU00;SW=0902;HW=5103", loaded "vaillant/08.hmu.HW5103.csv"\n',
+            b"\n",
+            b"hmu CompressorSilentOperationLevel = 0\n",
+            b"\n",
+            b"hmu RunDataElectricPowerConsumption = 300\n",
+            b"\n",
+            b"r,hmu,RunDataDiag000b\n",
+            b"\n",
+        ]
+        r3 = AsyncMock()
+        r3.readline = AsyncMock(side_effect=tcp_hmu_legacy)
+        w3 = MagicMock()
+        w3.drain = AsyncMock()
+        w3.wait_closed = AsyncMock()
+
+        with (
+            patch("asyncio.open_connection", return_value=(r3, w3)),
+            patch(
+                "homeassistant.helpers.device_registry.async_get",
+                return_value=MagicMock(),
+            ),
+        ):
+            asyncio.run(coord_hmu._async_fetch_ebusd_tcp_info())
+
+        self.assertIn(ISSUE_OUTDATED_HMU_CSV, coord_hmu._active_repair_issues)
 
 
 if __name__ == "__main__":

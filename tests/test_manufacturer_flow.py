@@ -160,12 +160,17 @@ class TestConfigFlowPrerequisites(unittest.TestCase):
         flow = SaunierGeniaConfigFlow()
         flow.hass = MagicMock()
         flow.hass.config.components = {"mqtt"}
+        flow.hass.config.language = "es"
         flow.async_set_unique_id = AsyncMock()
         flow._abort_if_unique_id_configured = MagicMock()
 
         res_init = asyncio.run(flow.async_step_user())
         self.assertEqual(res_init["type"], "form")
         self.assertEqual(res_init["step_id"], "user")
+        self.assertIn("csv_url", res_init["description_placeholders"])
+        self.assertIn(
+            "installation_es.md", res_init["description_placeholders"]["guide_url"]
+        )
         schema_keys = [k.schema for k in res_init["data_schema"].schema]
         self.assertIn(CONF_PREREQUISITES_CONFIRMED, schema_keys)
 

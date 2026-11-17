@@ -878,6 +878,7 @@ MULTI_RELAY_SETTING_OPTIONS: list[str] = [
 ISSUE_OUTDATED_HMUX0_CSV = "outdated_hmux0_csv"
 ISSUE_OUTDATED_HMU_CSV = "outdated_hmu_csv"
 ISSUE_OUTDATED_CONTROLLER_CSV = "outdated_controller_csv"
+ISSUE_OUTDATED_VWZIO_CSV = "outdated_vwzio_csv"
 ISSUE_MISSING_CUSTOM_CSV = "missing_custom_csv"
 ISSUE_NO_EBUSD_MQTT_TRAFFIC = "no_ebusd_mqtt_traffic"
 ISSUE_MQTTJSON_NOT_ENABLED = "mqttjson_not_enabled"

@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Important Prerequisites (eBUSd Setup)",
-        "description": "Before continuing, verify that your eBUSd daemon is properly configured. Most issues are caused by using eBUSd's default CSVs or legacy add-on polling:\n\n1. **Copy our CSV files** from the [ebusd-configuration repository folder](https://github.com/R91g/arotherm-genia-ebusd/tree/main/ebusd-configuration) (`broadcast.csv` and `vaillant/*.csv`) into your local eBUSd config directory.\n2. **Configure eBUSd for local files & JSON**: point `--configpath` to that local folder together with `--mqttjson`, `--scanconfig`, `--accesslevel=*`, `--mqtttopic=ebusd/%circuit/%name`, and `--mqttvar=filter-direction=r|u|^w`.\n3. **If using the Home Assistant eBUSd Add-on (`LukasGrebe/ha-addons`)**: you **must turn OFF** **\"Seed HA MQTT integration config (only needed once)\"** (`seed_mqtt_cfg`) in the add-on options and enable your local configuration folder — otherwise the add-on polls 160+ legacy registers and saturates the bus.\n\nStep-by-step instructions: [eBUSd Installation Guide](https://github.com/R91g/arotherm-genia-ebusd/blob/main/docs/installation.md#2-deploy-the-ebusd-csv-configuration).",
+        "description": "Before continuing, verify that your eBUSd daemon is properly configured. Most issues are caused by using eBUSd's default CSVs or legacy add-on polling:\n\n1. **Copy our CSV files** from the [ebusd-configuration repository folder]({csv_url}) (`broadcast.csv` and `vaillant/*.csv`) into your local eBUSd config directory.\n2. **Configure eBUSd for local files & JSON**: point `--configpath` to that local folder together with `--mqttjson`, `--scanconfig`, `--accesslevel=*`, `--mqtttopic=ebusd/%circuit/%name`, and `--mqttvar=filter-direction=r|u|^w`.\n3. **If using the Home Assistant eBUSd Add-on (`LukasGrebe/ha-addons`)**: you **must turn OFF** **\"Seed HA MQTT integration config (only needed once)\"** (`seed_mqtt_cfg`) in the add-on options and enable your local configuration folder — otherwise the add-on polls 160+ legacy registers and saturates the bus.\n\nStep-by-step instructions: [eBUSd Installation Guide]({guide_url}).",
         "data": {
           "confirm_prerequisites": "I have copied the repository CSV files, configured eBUSd local config/flags, and disabled 'Seed HA MQTT integration config' (if using the HA add-on)"
         }
@@ -109,6 +109,10 @@
     "outdated_controller_csv": {
       "title": "Outdated controller CSV file in eBUSd",
       "description": "Your `ebusd` instance is using an older version of `vaillant/15.bass3.csv`, `15.basv3.csv`, `15.ctlv2.csv`, or `15.ctlv3.csv` (reporting legacy `Z1HolidayTemp` or `Z1DayTemp`, or missing `SilentTimer` weekly schedules or `VentilationBoost`). Please copy the updated `ebusd-configuration/vaillant/*.csv` into your `ebusd` configuration folder and restart `ebusd` to enable real-time Holiday Mode synchronization, active cooling manual setpoint (`Z1CoolingManualTemp`), silent mode weekly schedules, and intensive ventilation boost (`VentilationBoost`). This repair notice will clear automatically once `ebusd` reloads the updated CSV."
+    },
+    "outdated_vwzio_csv": {
+      "title": "Outdated 76.vwzio.csv file in eBUSd",
+      "description": "Your `ebusd` instance is using an older version of `vaillant/76.vwzio.csv` where `SecondaryCircuitStatus` (or test registers) is still configured for active polling (`r`) instead of passive capture (`u`). Please copy the updated `ebusd-configuration/vaillant/76.vwzio.csv` (v1.3.1+) into your `ebusd` configuration folder and restart `ebusd` to avoid unintended active reads on hydraulic modules. This repair notice will clear automatically once `ebusd` reloads the updated CSV."
     },
     "missing_custom_csv": {
       "title": "Custom eBUSd CSV files not loaded or incomplete scan",

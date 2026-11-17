@@ -95,10 +95,27 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):  # pyright: ignore[repo
             }
         )
 
+        lang = (
+            getattr(
+                getattr(getattr(self, "hass", None), "config", None), "language", ""
+            )
+            if getattr(self, "hass", None) is not None
+            else ""
+        )
+        guide_url = (
+            "https://github.com/R91g/arotherm-genia-ebusd/blob/main/docs/installation_es.md#2-desplegar-los-archivos-csv-de-ebusd"
+            if isinstance(lang, str) and lang.lower().startswith("es")
+            else "https://github.com/R91g/arotherm-genia-ebusd/blob/main/docs/installation.md#2-deploy-the-ebusd-csv-configuration"
+        )
+
         return self.async_show_form(
             step_id="user",
             data_schema=schema,
             errors=errors,
+            description_placeholders={
+                "csv_url": "https://github.com/R91g/arotherm-genia-ebusd/tree/main/ebusd-configuration",
+                "guide_url": guide_url,
+            },
         )
 
     async def async_step_mqtt(

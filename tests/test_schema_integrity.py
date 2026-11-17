@@ -181,6 +181,10 @@ class TestSchemaIntegrity(unittest.TestCase):
                     re.search(r"<[^>]+>", obj),
                     f"HTML-like tag disallowed by Hassfest at {path}: {obj}",
                 )
+                self.assertIsNone(
+                    re.search(r"https?://", obj),
+                    f"Raw URL disallowed by Hassfest in translations (use placeholders) at {path}: {obj}",
+                )
 
         check_translation_strings(strings, "strings.json")
         check_translation_strings(en, "en.json")
