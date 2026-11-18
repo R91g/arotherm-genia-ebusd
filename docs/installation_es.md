@@ -93,10 +93,36 @@ Copia los archivos CSV en el directorio de configuración de `ebusd` respetando 
      > - `--configpath`: carga los CSV de este repositorio en lugar de los por defecto en línea.
      > - `--scanconfig`: sondea el bus al arrancar y vincula los circuitos (`08`, `15`, `76`, `04`) con sus CSV.
      > - `--accesslevel=*`: permite leer y escribir parámetros de nivel instalador (curvas de calefacción, puntos de bivalencia, límites).
-     > - `--mqtttopic=ebusd/%circuit/%name`: estructura los topics por circuito y mensaje.
+     > - `--mqtttopic=ebusd/%circuit/%name`: estructura los topics por circuito y mensaje (coincide con el formato por defecto de `ebusd`).
      > - `--mqttvar=filter-direction=r|u|^w`: habilita las escrituras (`^w`) para consignas, modos y curvas.
      >
      > `--pollinterval` se omite a propósito para que `ebusd` mantenga su ciclo por defecto de 5 segundos, que coincide con las prioridades de lectura de los CSV (`r1`/`r2`/`r9`). `--enablehex` solo es necesario si piensas usar la acción de diagnóstico opcional `send_hex_command`.
+
+   <p align="center">
+     <img src="images/ebusd_addon_config.png" alt="Configuración del add-on eBUSd en Home Assistant con seed_mqtt_cfg desactivado y commandline_options" width="750">
+     <br>
+     <em>Configuración de referencia en la interfaz del Add-on eBUSd: <b>Seed HA MQTT integration config</b> desactivado (en rojo) y flags necesarios en <b>Additional ebusd options</b> (más opciones opcionales de broker MQTT externo y registro SQLite de telegramas).</em>
+   </p>
+
+   - **Configuración equivalente en YAML** (**⋮ → Editar en YAML**):
+     ```yaml
+     network_device: ens:<IP_ADAPTADOR>:9999
+     seed_mqtt_cfg: false
+     commandline_options:
+       - --mqttjson
+       - --mqtthost=<IP_BROKER>        # Opcional: solo si usas un broker MQTT externo (sin espacios tras '=')
+       - --mqttport=1883               # Opcional: puerto del broker MQTT externo
+       - --mqttuser=<USUARIO_MQTT>     # Opcional: usuario del broker MQTT externo
+       - --mqttpass=<CLAVE_MQTT>       # Opcional: contraseña del broker MQTT externo
+       - --mqttvar=filter-direction=r|u|^w
+       - --accesslevel=*
+       - --configpath=/config/ebusd-configuration/en
+       - --scanconfig
+       - --enablehex                   # Opcional: solo necesario para send_hex_command
+     sqlite_db: /config/telegrams.db   # Opcional: guarda los telegramas eBUS para diagnóstico
+     sqlite_retention_days: 10
+     ```
+     > Si usas el add-on local de Mosquitto de Home Assistant, `--mqtthost`, `--mqttport`, `--mqttuser` y `--mqttpass` se obtienen automáticamente del servicio MQTT del Supervisor y pueden omitirse. Si los indicas manualmente (por ejemplo para un broker externo), **no pongas espacios después del signo `=`**.
 4. Reinicia el add-on `eBUSd` y comprueba en su registro que los circuitos `08.hmux0` (o `08.hmu`), `15.bass3` (o `15.basv3` / `15.ctlv2` / `15.ctlv3`) y `76.vwzio` se cargan tras el escaneo del bus.
 
 ### Opción B: ebusd independiente en Linux / Docker
