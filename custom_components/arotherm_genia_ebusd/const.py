@@ -246,6 +246,8 @@ MESSAGE_ALIASES: dict[str, str] = {
     "z1maxflowtempdesired": "Z1RoomHumidity",
     "rundataenergyintegral": "EnergyIntegral",
     "energyintegral": "EnergyIntegral",
+    "runstatshcstarts": "RunStatsAuxHeaterSwitches",
+    "rundatanominalflowrate": "RunDataMaxResidualHead",
 }
 
 # Weekly timer passive update aliases for eavesdropping MiGo Link / gateway writes
@@ -565,7 +567,7 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_HMUX0, "RunDataEEVPositionAbs"),
     (CIRCUIT_HMUX0, "RunStatsHMUHours"),
     (CIRCUIT_HMUX0, "RunStatsHcHours"),
-    (CIRCUIT_HMUX0, "RunStatsHcStarts"),
+    (CIRCUIT_HMUX0, "RunStatsAuxHeaterSwitches"),
     (CIRCUIT_HMUX0, "RunStatsHwcHours"),
     (CIRCUIT_HMUX0, "RunStatsHwcStarts"),
     (CIRCUIT_HMUX0, "RunStatsCompressorHours"),
@@ -597,7 +599,7 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     # Hydraulic Interface (76.vwzio) - Active power, stats & energy counters (r)
     (CIRCUIT_VWZIO, "Currenterror"),
     (CIRCUIT_VWZIO, "PowerStatus"),
-    (CIRCUIT_VWZIO, "RunStatsHcStarts"),
+    (CIRCUIT_VWZIO, "RunStatsAuxHeaterSwitches"),
     (CIRCUIT_VWZIO, "RunStatsHwcStarts"),
     (CIRCUIT_VWZIO, "RunDataHeaterFlowTemp"),
     (CIRCUIT_VWZIO, "RunStatsHeaterEnergy"),
@@ -668,7 +670,7 @@ FALLBACK_SLOW_OUTDOOR_COMMON_MESSAGES: tuple[str, ...] = (
     "RunDataCondenserOutTemp",
     "RunStatsHMUHours",
     "RunStatsHcHours",
-    "RunStatsHcStarts",
+    "RunStatsAuxHeaterSwitches",
     "RunStatsHwcHours",
     "RunStatsHwcStarts",
     "RunStatsCompressorHours",
@@ -692,7 +694,7 @@ FALLBACK_SLOW_OUTDOOR_COMMON_MESSAGES: tuple[str, ...] = (
 
 FALLBACK_SLOW_VWZIO_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_VWZIO, "Currenterror"),
-    (CIRCUIT_VWZIO, "RunStatsHcStarts"),
+    (CIRCUIT_VWZIO, "RunStatsAuxHeaterSwitches"),
     (CIRCUIT_VWZIO, "RunStatsHwcStarts"),
     (CIRCUIT_VWZIO, "RunDataHeaterFlowTemp"),
     (CIRCUIT_VWZIO, "RunStatsHeaterEnergy"),
@@ -707,7 +709,7 @@ EBUSD_TRAFFIC_TIMEOUT_SECONDS: int = 600
 HMUX0_EXCLUSIVE_MESSAGES: frozenset[str] = frozenset(
     {
         "RunDataCondenserOutTemp",
-        "RunStatsHcStarts",
+        "RunStatsAuxHeaterSwitches",
         "RunStatsHwcStarts",
         "RunStatsCompressorHc",
         "RunStatsCompressorHwc",

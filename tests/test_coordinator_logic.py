@@ -1489,7 +1489,7 @@ class TestCoordinatorLogic(unittest.TestCase):
         coord._pending_hydration = [
             (CIRCUIT_HMUX0, "RunDataFlowTemp"),
             (CIRCUIT_HMUX0, "PrEnergyElectricHc"),
-            (CIRCUIT_HMUX0, "RunStatsHcStarts"),
+            (CIRCUIT_HMUX0, "RunStatsAuxHeaterSwitches"),
             (CIRCUIT_VWZIO, "PrEnergyElectricHc"),
         ]
         mock_task = MagicMock()
@@ -1509,8 +1509,12 @@ class TestCoordinatorLogic(unittest.TestCase):
             (CIRCUIT_HMUX0, "PrEnergyElectricHc"), coord._pending_hydration
         )
         self.assertNotIn((CIRCUIT_HMU, "PrEnergyElectricHc"), coord._pending_hydration)
-        self.assertNotIn((CIRCUIT_HMUX0, "RunStatsHcStarts"), coord._pending_hydration)
-        self.assertNotIn((CIRCUIT_HMU, "RunStatsHcStarts"), coord._pending_hydration)
+        self.assertNotIn(
+            (CIRCUIT_HMUX0, "RunStatsAuxHeaterSwitches"), coord._pending_hydration
+        )
+        self.assertNotIn(
+            (CIRCUIT_HMU, "RunStatsAuxHeaterSwitches"), coord._pending_hydration
+        )
 
         # Common RunDataFlowTemp and vwzio PrEnergyElectricHc must be preserved
         self.assertIn((CIRCUIT_HMUX0, "RunDataFlowTemp"), coord._pending_hydration)
@@ -1914,21 +1918,25 @@ class TestCoordinatorLogic(unittest.TestCase):
         push_mqtt("ebusd/hmux0/Status01", '{"temp1": {"value": 37.0}}')
         self.assertNotIn(ISSUE_MQTTJSON_NOT_ENABLED, coord._active_repair_issues)
 
-        # 5. Legacy RunDataFlowRate ('value' JSON key from pre-v1.2.4 CSV, regardless of number)
-        #    raises outdated_hmux0_csv, and v1.2.4+ ('flow_rate' key or RunDataNominalFlowRate) clears it
+        # 5. Modern RunDataFlowRate supports both upstream 'value' and legacy 'flow_rate'
+        #    without falsely raising outdated_hmux0_csv, and RunDataMaxResidualHead clears it
         push_mqtt("ebusd/hmux0/RunDataFlowRate", '{"value": {"value": 540}}')
-        self.assertIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
+        self.assertNotIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
         self.assertEqual(coord.get_int("hmux0", "RunDataFlowRate", "value"), 540)
 
         push_mqtt("ebusd/hmux0/RunDataFlowRate", '{"flow_rate": {"value": 1450}}')
         self.assertNotIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
         self.assertEqual(coord.get_int("hmux0", "RunDataFlowRate", "value"), 1450)
 
-        push_mqtt("ebusd/hmux0/RunDataFlowRate", '{"value": {"value": 900}}')
-        self.assertIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
-        push_mqtt("ebusd/hmux0/RunDataNominalFlowRate", '{"value": {"value": 900}}')
-        push_mqtt("ebusd/hmux0/RunDataFlowRate", '{"flow_rate": {"value": 1450}}')
+        push_mqtt("ebusd/hmux0/RunDataMaxResidualHead", '{"value": {"value": 900}}')
         self.assertNotIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
+        self.assertEqual(coord.get_int("hmux0", "RunDataMaxResidualHead", "value"), 900)
+
+        # Legacy RunStatsHcStarts alias maps to RunStatsAuxHeaterSwitches
+        push_mqtt("ebusd/hmux0/RunStatsHcStarts", '{"value": {"value": 42}}')
+        self.assertEqual(
+            coord.get_int("hmux0", "RunStatsAuxHeaterSwitches", "value"), 42
+        )
 
         # 6. Legacy controller Z1DayTemp vs Z1CoolingManualTemp and SilentTimer_Slots
         push_mqtt("ebusd/bass3/Z1DayTemp", '{"temp": {"value": 22.0}}')

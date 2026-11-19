@@ -98,12 +98,19 @@ class TestSensorRegistry(unittest.TestCase):
         self.assertEqual(desc.unique_id_suffix, "04_roomtargettemp_temp")
 
     def test_primary_flow_rate_field_alignment_and_unique_id(self) -> None:
-        """Primary flow rate aligns with modern 08.hmux0.csv while preserving legacy unique_id."""
+        """Primary flow rate aligns with upstream 08.hmux0.csv ('value') while preserving legacy fallback and unique_id."""
         desc = next(d for d in SENSOR_DESCRIPTIONS if d.key == "primary_flow_rate")
         self.assertEqual(desc.message, "RunDataFlowRate")
-        self.assertEqual(desc.field, "flow_rate")
-        self.assertEqual(desc.fallback_field, "value")
+        self.assertEqual(desc.field, "value")
+        self.assertEqual(desc.fallback_field, "flow_rate")
         self.assertEqual(desc.unique_id_suffix, "hmux0_rundataflowrate_value")
+
+    def test_aux_heater_switches_alignment_and_unique_id(self) -> None:
+        """Auxiliary heater switches aligns with upstream RunStatsAuxHeaterSwitches while preserving legacy unique_id."""
+        desc = next(d for d in SENSOR_DESCRIPTIONS if d.key == "stats_hc_starts")
+        self.assertEqual(desc.message, "RunStatsAuxHeaterSwitches")
+        self.assertEqual(desc.fallback_message, "RunStatsAuxHeaterSwitches")
+        self.assertEqual(desc.unique_id_suffix, "hmux0_runstatshcstarts_value")
 
     def test_electric_power_consumption_alignment_and_unique_id(self) -> None:
         """Electric power consumption prioritizes RunDataElectricPowerConsumption while preserving legacy unique_id."""

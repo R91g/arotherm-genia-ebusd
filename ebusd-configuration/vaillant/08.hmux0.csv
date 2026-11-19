@@ -53,13 +53,13 @@ r9;u,,,RunDataEEVOutletTemp,,,,b509,540200ac08,ign,,IGN:4,,,,value,,EXP,,°C,tem
 r;u,,,RunDataCondenserOutTemp,,,,b509,540200b608,ign,,IGN:4,,,,value,,EXP,,°C,condenser outlet temperature
 r2;u,,,RunDataFlowTemp,,,,b509,540200fc08,ign,,IGN:4,,,,value,,EXP,,°C,"current flow temp, accurate to 2 decimal places"
 r2;u,,,RunDataReturnTemp,,,,b509,5402000609,ign,,IGN:4,,,,value,,EXP,,°C,"current return temp, accurate to 2 decimal places"
-r2;u,,,RunDataFlowRate,building circuit water flow rate,,,b509,540200090b,ign,,IGN:4,,,,flow_rate,,UIN,,l/h,"building circuit volumetric water flow rate"
-r;u,,,RunDataNominalFlowRate,nominal building circuit water flow rate,,,b509,540200680b,ign,,IGN:4,,,,value,,UIN,,l/h,"nominal building circuit volumetric water flow rate"
+r2;u,,,RunDataFlowRate,building circuit water flow rate (display D.060),,,b509,540200090b,ign,,IGN:4,,,,value,,UIN,,l/h,"building circuit volumetric water flow rate"
+r;u,,,RunDataMaxResidualHead,"maximum residual pump head (display D.231, constant setting)",,,b509,540200680b,ign,,IGN:4,,,,value,,UIN,,mbar,
 r;u,,,RunStatsHMUHours,,,,b509,540200b80b,ign,,IGN:4,,,,value,,UIN,,h,hours
 r;u,,,RunStatsHcHours,,,,b509,540200b90b,ign,,IGN:4,,,,value,,UIN,,h,hours
 u,,,RunStatsDiagbb0b,,,,b509,540200bb0b,ign,,IGN:4,,,,value,,UIN,,h,hours
 r;u,,,RunStatsHwcHours,,,,b509,540200bc0b,ign,,IGN:4,,,,value,,UIN,,h,total runtime of Hwc mode
-r9;u,,,RunStatsHcStarts,,,,b509,540200c00b,ign,,IGN:4,,,,value,,UIN,,,total starts of heating mode
+r9;u,,,RunStatsAuxHeaterSwitches,switching operations of the auxiliary heater (display D.074),,,b509,540200c00b,ign,,IGN:4,,,,value,,UIN,,,
 r;u,,,RunStatsHwcStarts,,,,b509,540200c10b,ign,,IGN:4,,,,value,,UIN,,,total starts of Hwc mode
 r;u,,,RunStatsCompressorHours,,,,b509,540200c20b,ign,,IGN:4,,,,value,,UIN,,h,hours
 r;u,,,RunStatsCompressorStarts,,,,b509,540200c30b,ign,,IGN:4,,,,value,,UIN,,,start count

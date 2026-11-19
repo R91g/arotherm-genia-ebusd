@@ -1853,12 +1853,6 @@ class SaunierGeniaCoordinator:
             and "comp_speed" in sc_msg
             and "flow_temp" not in sc_msg
         )
-        flow_msg = self.get_message(CIRCUIT_HMUX0, "RunDataFlowRate") or {}
-        has_legacy_flow = (
-            isinstance(flow_msg, dict)
-            and "value" in flow_msg
-            and "flow_rate" not in flow_msg
-        )
         is_silent_err = (
             CIRCUIT_HMUX0 in self._missing_outdoor_silent_circuits
             or self._is_ebusd_err_msg(
@@ -1868,9 +1862,7 @@ class SaunierGeniaCoordinator:
         has_active_diag_legacy = (
             CIRCUIT_HMUX0 in self._active_poll_legacy_outdoor_circuits
         )
-        return (
-            has_legacy_sc or has_legacy_flow or is_silent_err or has_active_diag_legacy
-        )
+        return has_legacy_sc or is_silent_err or has_active_diag_legacy
 
     def _has_hmu_csv_incompatibility(self, circuit_key: str) -> bool:
         """Return True if any cached 08.hmu/hmu00 register indicates an outdated CSV."""
@@ -1930,22 +1922,11 @@ class SaunierGeniaCoordinator:
                 ):
                     self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=False)
 
-            elif msg_lower == "rundataflowrate":
-                if (
-                    isinstance(parsed, dict)
-                    and "flow_rate" in parsed
-                    and not self._has_hmux0_csv_incompatibility()
-                ):
-                    self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=False)
-                elif (
-                    isinstance(parsed, dict)
-                    and "value" in parsed
-                    and "flow_rate" not in parsed
-                    and raw_payload.strip().startswith("{")
-                ):
-                    self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=True)
-
-            elif msg_lower == "rundatanominalflowrate":
+            elif msg_lower in (
+                "rundataflowrate",
+                "rundatamaxresidualhead",
+                "rundatanominalflowrate",
+            ):
                 if not self._has_hmux0_csv_incompatibility():
                     self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=False)
 
@@ -3532,7 +3513,7 @@ class SaunierGeniaCoordinator:
 
         # 2. Instantaneous Thermal Power (W)
         hmu_status = self.get_str(CIRCUIT_HMUX0, "HMUStatusCode", "status") or ""
-        flow_rate = self.get_float(CIRCUIT_HMUX0, "RunDataFlowRate", "flow_rate")
+        flow_rate = self.get_float(CIRCUIT_HMUX0, "RunDataFlowRate", "value")
         thermal_power = calculate_thermal_power(flow_rate, delta_t, hmu_status)
         if thermal_power is not None:
             self._set_calculated(CALC_THERMAL_POWER, thermal_power)

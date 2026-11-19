@@ -34,7 +34,7 @@ r;u,,,PrEnergyElectricHwc,total hot water electrical energy consumed,,,b516,1000
 r;u,,,PrEnergyThermalHc,total heating thermal energy delivered,,,b516,1000ffff49030000,ign,,IGN:7,,,,energy,,EXP,,Wh,"cumulative heating delivered thermal energy"
 r;u,,,PrEnergyThermalHwc,total hot water thermal energy delivered,,,b516,1000ffff49040000,ign,,IGN:7,,,,energy,,EXP,,Wh,"cumulative hot water delivered thermal energy"
 
-r;u,,,RunStatsHcStarts,,,,b509,540200c00b,ign,,IGN:4,,,,value,,UIN,,,total starts of heating mode
+r;u,,,RunStatsAuxHeaterSwitches,switching operations of the auxiliary heater (display D.074),,,b509,540200c00b,ign,,IGN:4,,,,value,,UIN,,,
 r;u,,,RunStatsHwcStarts,,,,b509,540200c10b,ign,,IGN:4,,,,value,,UIN,,,total starts of Hwc mode
 u,,,RunDataDiagnostic,diagnostic code readout,,,b509,540200cc10,ign,,IGN:4,,,,value,,HEX:2,,,
 r;u,,,RunStatsHeaterEnergy,electrical energy consumption of the immersion heater,,,b509,5402000c0b,ign,,IGN:4,,,,value,,ULG,,kWh,"electrical energy consumption of the immersion heater"
