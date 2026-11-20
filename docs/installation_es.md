@@ -97,6 +97,8 @@ Copia los archivos CSV en el directorio de configuración de `ebusd` respetando 
      > - `--mqttvar=filter-direction=r|u|^w`: habilita las escrituras (`^w`) para consignas, modos y curvas.
      >
      > `--pollinterval` se omite a propósito para que `ebusd` mantenga su ciclo por defecto de 5 segundos, que coincide con las prioridades de lectura de los CSV (`r1`/`r2`/`r9`). `--enablehex` solo es necesario si piensas usar la acción de diagnóstico opcional `send_hex_command`.
+     >
+     > **¿Usas un adaptador eBUS por Wi-Fi (`ens:`)?** `ebusd` aplica `--latency=10` ms por defecto en dispositivos de red, un margen demasiado justo ante el *jitter* de Wi-Fi en 2,4 GHz que puede provocar `ERR: read timeout`, `ERR: SYN received` o comandos descartados. Añade `--latency=50` en `commandline_options` (hasta `80`–`100` en redes Wi-Fi saturadas; mantén `--pollinterval` en su valor por defecto de 5 s). En adaptadores por Ethernet o USB no hace falta.
 
    <p align="center">
      <img src="images/ebusd_addon_config.png" alt="Configuración del add-on eBUSd en Home Assistant con seed_mqtt_cfg desactivado y commandline_options" width="750">
@@ -118,6 +120,7 @@ Copia los archivos CSV en el directorio de configuración de `ebusd` respetando 
        - --accesslevel=*
        - --configpath=/config/ebusd-configuration/en
        - --scanconfig
+       - --latency=50                  # Recomendado para adaptadores por Wi-Fi (ens:); omitir en Ethernet/USB
        - --enablehex                   # Opcional: solo necesario para send_hex_command
      sqlite_db: /config/telegrams.db   # Opcional: guarda los telegramas eBUS para diagnóstico
      sqlite_retention_days: 10

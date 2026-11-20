@@ -61,6 +61,16 @@ Dos causas habituales:
 El coordinador aplica un watchdog de comunicaciones y frescura de potencia de `600 s` (`10 minutos`, o `2 × fallback_poll_interval`). Si dejan de llegar actualizaciones MQTT desde `ebusd` (p. ej. caída del demonio, desconexión MQTT o fallo del adaptador eBUS), los controles y la potencia/COP en vivo pasan a `no disponible` (*unavailable*) hasta que vuelve la telemetría del bus, manteniendo intactos los acumuladores históricos.
 </details>
 
+<details>
+<summary><b>7. Los comandos vuelven a su estado anterior a los pocos segundos o <code>ebusd</code> registra muchos <code>ERR: read timeout</code> / <code>ERR: SYN received</code> / <code>ERR: wrong symbol received</code> por Wi-Fi.</b></summary>
+
+Es el síntoma típico de *jitter* de latencia en Wi-Fi de 2,4 GHz con adaptadores en modo `ens:` (*enhanced network stream*):
+
+1. **Añade `--latency=50` en `ebusd`** (hasta `80`–`100` en redes Wi-Fi saturadas). `ebusd` usa `10 ms` por defecto en dispositivos de red, un margen demasiado estrecho para micro-picos inalámbricos. En instalaciones reales, este único parámetro suele bajar la tasa de errores activos de ~30 % a menos del 2 %. Mantén `--pollinterval` en su valor por defecto de 5 s para que los sensores `r1` (como la potencia instantánea) no se ralenticen.
+2. **Mantén activado el [diagnóstico TCP de eBUSd](configuration_es.md#opciones-en-tiempo-de-ejecución-configurar)** (activo por defecto). Cuando el puerto TCP `8888` de `ebusd` es accesible, la integración envía escrituras confirmadas (`write`) con hasta 3 reintentos automáticos ante errores transitorios del bus en lugar de depender solo de MQTT `/set` sin acuse de recibo.
+3. **Actualiza el firmware del adaptador** y crea una reserva DHCP para su IP. Si quieres eliminar el *jitter* por completo, pasa el adaptador a Ethernet por cable (por ejemplo, con el módulo USR-ES1 / W5500 en el eBUS Adapter Shield/Stick C6).
+</details>
+
 ## Cómo Reportar un Issue
 
 Al abrir un [issue en GitHub](https://github.com/R91g/arotherm-genia-ebusd/issues), incluye:

@@ -61,6 +61,16 @@ Two common causes:
 The coordinator enforces a `600 s` (`10-minute`, or `2 × fallback_poll_interval`) communication watchdog and power-freshness timeout. If MQTT updates from `ebusd` stop arriving (e.g. `ebusd` stopped, MQTT disconnected, or the adapter dropped off the bus), controls and live power/COP switch to `unavailable` until bus telemetry resumes, while historical energy counters keep their state.
 </details>
 
+<details>
+<summary><b>7. Commands revert after a few seconds, or <code>ebusd</code> logs frequent <code>ERR: read timeout</code> / <code>ERR: SYN received</code> / <code>ERR: wrong symbol received</code> over Wi-Fi.</b></summary>
+
+This is a classic symptom of 2.4 GHz Wi-Fi latency jitter with `ens:` (enhanced network stream) adapters:
+
+1. **Add `--latency=50` to `ebusd`** (up to `80`–`100` on noisy Wi-Fi). `ebusd` defaults to `10 ms` for network devices, which is often too tight for wireless micro-spikes. In real installations this single flag typically drops active bus error rates from ~30 % down to <2 %. Keep `--pollinterval` at its default 5 s so `r1` sensors (like instantaneous power) stay responsive.
+2. **Keep [eBUSd TCP Diagnostics](configuration.md#runtime-options-configure) enabled** (default). When `ebusd` TCP port `8888` is reachable, the integration sends acknowledged `write` commands with up to 3 automatic retries on transient bus errors instead of fire-and-forget MQTT `/set`.
+3. **Update the adapter firmware** and set a DHCP reservation for its IP. For near-zero jitter, switch the adapter to wired Ethernet (for example, the USR-ES1 / W5500 Ethernet module on eBUS Adapter Shield/Stick C6).
+</details>
+
 ## Reporting an Issue
 
 When opening a [GitHub issue](https://github.com/R91g/arotherm-genia-ebusd/issues), include:
