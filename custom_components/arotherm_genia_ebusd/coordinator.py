@@ -126,7 +126,11 @@ from .const import (
     SENTINEL_COOLING_THRESHOLD,
     SET_CONFIRMATION_DELAY_SECONDS,
     SLOW_POLLING_WARNING_THRESHOLD_SECONDS,
+    TCP_WRITE_MAX_ATTEMPTS,
+    TCP_WRITE_RETRY_DELAYS,
+    TCP_WRITE_TIMEOUT_SECONDS,
     TIMER_CIRCUIT_PREFIXES,
+    TRANSIENT_EBUS_WRITE_ERRORS,
     UPSTREAM_DEFAULT_CSV_MESSAGES,
     VENTILATION_BOOST_DURATION_MINUTES,
     WEEKDAYS_LIST,
@@ -480,6 +484,9 @@ class SaunierGeniaCoordinator:
 
         # Lock to serialize multi-slot weekly timer operations and prevent bus collisions
         self.timer_write_lock: asyncio.Lock = asyncio.Lock()
+
+        # Confirmed eBUSd TCP socket availability for acknowledged write-with-retry
+        self._tcp_write_available: bool = False
 
     # -------------------------------------------------------------------------
     # Configuration & Options Properties
@@ -2401,22 +2408,170 @@ class SaunierGeniaCoordinator:
         topic = f"{self.mqtt_prefix}/{target_circuit}/{message}/get"
         await mqtt.async_publish(self.hass, topic, "", qos=0, retain=False)
 
+    @staticmethod
+    def _is_transient_ebus_write_error(response: str) -> bool:
+        """Return True if an eBUSd TCP write error is a transient bus error worth retrying."""
+        lower = response.lower()
+        return any(token in lower for token in TRANSIENT_EBUS_WRITE_ERRORS)
+
+    async def _async_write_via_tcp(
+        self,
+        target_circuit: str,
+        message: str,
+        payload: str,
+    ) -> bool | None:
+        """Execute a synchronous eBUSd TCP write with automatic retries on transient bus errors.
+
+        Returns:
+            True  - Write acknowledged by the bus (e.g. 'done' or non-ERR response).
+            False - All retry attempts failed due to transient eBUS errors (do not fall back to blind MQTT).
+            None  - TCP unavailable, socket error, unsafe payload, or non-transient error (fall back to MQTT).
+        """
+        if not self.is_ebusd_tcp_enabled or not self._tcp_write_available:
+            return None
+
+        # Guard against control characters, empty payloads, or whitespace requiring quoting in eBUSd CLI
+        if (
+            not payload
+            or any(c in payload for c in ("\r", "\n", " ", "\t", '"', "'"))
+            or any(c in target_circuit for c in ("\r", "\n", " ", "\t"))
+            or any(c in message for c in ("\r", "\n", " ", "\t"))
+        ):
+            return None
+
+        host = self.ebusd_tcp_host
+        port = self.ebusd_tcp_port
+        cmd = f"write -c {target_circuit} {message} {payload}\n"
+        last_err = ""
+
+        for attempt in range(1, TCP_WRITE_MAX_ATTEMPTS + 1):
+            writer: asyncio.StreamWriter | None = None
+            try:
+                reader, writer = await self._async_open_tcp_connection(
+                    host, port, timeout=3.0
+                )
+                writer.write(cmd.encode("ascii"))
+                await asyncio.wait_for(writer.drain(), timeout=3.0)
+                lines = await self._async_read_tcp_block(
+                    reader, timeout=TCP_WRITE_TIMEOUT_SECONDS
+                )
+                with contextlib.suppress(TimeoutError, OSError):
+                    writer.write(b"quit\n")
+                    await writer.drain()
+            except (TimeoutError, OSError) as err:
+                _LOGGER.debug(
+                    "eBUSd TCP write socket unavailable at %s:%s for %s/%s (%s); falling back to MQTT",
+                    host,
+                    port,
+                    target_circuit,
+                    message,
+                    err,
+                )
+                self._tcp_write_available = False
+                return None
+            finally:
+                if writer is not None:
+                    writer.close()
+                    with contextlib.suppress(OSError):
+                        await writer.wait_closed()
+
+            resp = lines[0] if lines else ""
+            if resp and not resp.upper().startswith("ERR:"):
+                if attempt > 1:
+                    _LOGGER.info(
+                        "eBUSd TCP write succeeded on attempt %d/%d: %s/%s -> '%s' (%s)",
+                        attempt,
+                        TCP_WRITE_MAX_ATTEMPTS,
+                        target_circuit,
+                        message,
+                        payload,
+                        resp,
+                    )
+                else:
+                    _LOGGER.debug(
+                        "eBUSd TCP write confirmed: %s/%s -> '%s' (%s)",
+                        target_circuit,
+                        message,
+                        payload,
+                        resp,
+                    )
+                return True
+
+            last_err = resp or "ERR: empty response"
+            if resp and not self._is_transient_ebus_write_error(resp):
+                _LOGGER.debug(
+                    "Non-transient eBUSd TCP write response for %s/%s -> '%s' (%s); falling back to MQTT",
+                    target_circuit,
+                    message,
+                    payload,
+                    resp,
+                )
+                return None
+
+            if attempt < TCP_WRITE_MAX_ATTEMPTS:
+                delay = TCP_WRITE_RETRY_DELAYS[
+                    min(attempt - 1, len(TCP_WRITE_RETRY_DELAYS) - 1)
+                ]
+                _LOGGER.debug(
+                    "Transient eBUSd TCP write failure (attempt %d/%d) for %s/%s -> '%s': %s; retrying in %.1fs",
+                    attempt,
+                    TCP_WRITE_MAX_ATTEMPTS,
+                    target_circuit,
+                    message,
+                    payload,
+                    last_err,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+
+        _LOGGER.warning(
+            "eBUSd write failed after %d attempts for %s/%s -> '%s': %s (check eBUS adapter signal/latency)",
+            TCP_WRITE_MAX_ATTEMPTS,
+            target_circuit,
+            message,
+            payload,
+            last_err,
+        )
+        return False
+
     async def async_write_parameter(
         self,
         circuit: str,
         message: str,
         value: Any,
     ) -> None:
-        """Publish a write command to <mqtt_prefix>/<circuit>/<message>/set and schedule confirmation /get."""
+        """Write a parameter via acknowledged eBUSd TCP (with retries) or MQTT /set fallback."""
         circuit_lower = circuit.lower()
         is_controller = circuit_lower in CONTROLLER_CIRCUITS
         is_outdoor = circuit_lower in OUTDOOR_CIRCUITS
         target_circuit = self.resolve_circuit(circuit)
-        topic = f"{self.mqtt_prefix}/{target_circuit}/{message}/set"
         payload = str(value)
-        _LOGGER.debug("Publishing eBUSd write: %s -> '%s'", topic, payload)
 
-        await mqtt.async_publish(self.hass, topic, payload, qos=0, retain=False)
+        tcp_result = await self._async_write_via_tcp(target_circuit, message, payload)
+        if tcp_result is False:
+            # All bus retries failed: do NOT apply a misleading optimistic state; notify
+            # listeners so UI reverts immediately to the real cached bus state, and trigger
+            # a confirmation read if safe.
+            self._async_notify_message_listeners(circuit, message)
+            if is_controller:
+                for alt_circuit in CONTROLLER_CIRCUITS:
+                    if alt_circuit != circuit_lower:
+                        self._async_notify_message_listeners(alt_circuit, message)
+            elif is_outdoor:
+                for alt_circuit in OUTDOOR_CIRCUITS:
+                    if alt_circuit != circuit_lower:
+                        self._async_notify_message_listeners(alt_circuit, message)
+            check_circuit = CIRCUIT_BASS3.lower() if is_controller else circuit.lower()
+            if (check_circuit, message) in ACTIVE_READ_CONFIRMATION_MESSAGES:
+                self._schedule_confirmation_get(
+                    circuit, message, key_circuit=check_circuit
+                )
+            return
+
+        if tcp_result is None:
+            topic = f"{self.mqtt_prefix}/{target_circuit}/{message}/set"
+            _LOGGER.debug("Publishing eBUSd write: %s -> '%s'", topic, payload)
+            await mqtt.async_publish(self.hass, topic, payload, qos=0, retain=False)
 
         # Optimistic local update so Home Assistant UI reflects the user's action immediately.
         # For passive 'u' messages this is the ONLY state refresh until MiGo Link (f1) or the
@@ -2434,13 +2589,15 @@ class SaunierGeniaCoordinator:
                     self._apply_optimistic_update(alt_circuit, message, value)
                     self._async_notify_message_listeners(alt_circuit, message)
 
-        # Schedule confirmation /get ONLY for active read commands (r / r9 whitelist).
-        # For all passive 'u' commands (setpoints, modes, timers, dates), NEVER send /get,
-        # perfectly preserving the optimistic UI update without stale cache rebounds.
-        check_circuit = CIRCUIT_BASS3.lower() if is_controller else circuit.lower()
-        key = (check_circuit, message)
-        if key in ACTIVE_READ_CONFIRMATION_MESSAGES:
-            self._schedule_confirmation_get(circuit, message, key_circuit=check_circuit)
+        # Schedule confirmation /get ONLY when falling back to unacknowledged MQTT for active
+        # read commands (r / r9 whitelist). When TCP confirmed 'done', no extra /get is needed.
+        if tcp_result is None:
+            check_circuit = CIRCUIT_BASS3.lower() if is_controller else circuit.lower()
+            key = (check_circuit, message)
+            if key in ACTIVE_READ_CONFIRMATION_MESSAGES:
+                self._schedule_confirmation_get(
+                    circuit, message, key_circuit=check_circuit
+                )
 
     @callback
     def _schedule_confirmation_get(
@@ -3210,6 +3367,8 @@ class SaunierGeniaCoordinator:
             if not lines:
                 return
 
+            self._tcp_write_available = True
+
             for line in lines:
                 if ":" not in line:
                     continue
@@ -3305,6 +3464,7 @@ class SaunierGeniaCoordinator:
                 writer.write(b"quit\n")
                 await writer.drain()
         except (TimeoutError, OSError) as err:
+            self._tcp_write_available = False
             _LOGGER.debug(
                 "Unable to connect to eBUSd TCP socket at %s:%s for info: %s",
                 host,

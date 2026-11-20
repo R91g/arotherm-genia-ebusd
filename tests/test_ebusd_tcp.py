@@ -667,6 +667,186 @@ class TestEbusdTcpScanMetadata(unittest.TestCase):
 
         self.assertIn(ISSUE_OUTDATED_HMU_CSV, coord_hmu._active_repair_issues)
 
+    def test_tcp_write_confirmed_and_retries_on_transient_errors(self) -> None:
+        """TCP write succeeds on retry after transient bus errors without MQTT /set fallback."""
+        hass = MagicMock()
+        entry = MagicMock()
+        entry.entry_id = "tcp_write_test"
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {
+            "enable_ebusd_tcp": True,
+            "ebusd_host": "192.168.1.50",
+            "ebusd_port": 8888,
+        }
+        coord = SaunierGeniaCoordinator(hass, entry)
+        coord._tcp_write_available = True
+        coord._state[("bass3", "Z1OpMode")] = {"value": "auto"}
+
+        def _make_conn(resp_bytes: bytes):
+            r = AsyncMock()
+            r.readline = AsyncMock(side_effect=[resp_bytes, b"\n"])
+            w = MagicMock()
+            w.drain = AsyncMock()
+            w.wait_closed = AsyncMock()
+            return r, w
+
+        conns = [
+            _make_conn(b"ERR: read timeout\n"),
+            _make_conn(b"ERR: SYN received\n"),
+            _make_conn(b"done\n"),
+        ]
+        written_cmds: list[bytes] = []
+
+        async def _fake_open(_host, _port, timeout=3.0):
+            r, w = conns.pop(0)
+            orig_write = w.write
+
+            def _capture(data: bytes):
+                written_cmds.append(data)
+                return orig_write(data)
+
+            w.write = _capture
+            return r, w
+
+        with (
+            patch.object(coord, "_async_open_tcp_connection", side_effect=_fake_open),
+            patch(
+                "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                new_callable=AsyncMock,
+            ) as mock_pub,
+            patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+        ):
+            asyncio.run(coord.async_write_parameter("bass3", "Z1OpMode", "off"))
+
+        self.assertEqual(mock_pub.await_count, 0)
+        self.assertEqual(mock_sleep.await_count, 2)
+        self.assertEqual(coord.get_str("bass3", "Z1OpMode", "value"), "off")
+        self.assertEqual(
+            [c for c in written_cmds if c.startswith(b"write ")],
+            [b"write -c bass3 Z1OpMode off\n"] * 3,
+        )
+
+    def test_tcp_write_exhausted_retries_does_not_fake_optimistic_state(self) -> None:
+        """When all 3 TCP write attempts fail with transient bus errors, state stays unchanged."""
+        hass = MagicMock()
+        entry = MagicMock()
+        entry.entry_id = "tcp_write_fail"
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {
+            "enable_ebusd_tcp": True,
+            "ebusd_host": "192.168.1.50",
+            "ebusd_port": 8888,
+        }
+        coord = SaunierGeniaCoordinator(hass, entry)
+        coord._tcp_write_available = True
+        coord._state[("bass3", "Z1OpMode")] = {"value": "auto"}
+        notified: list[bool] = []
+        coord.async_add_listener("bass3", "Z1OpMode", lambda: notified.append(True))
+
+        async def _fake_open(_host, _port, timeout=3.0):
+            r = AsyncMock()
+            r.readline = AsyncMock(side_effect=[b"ERR: read timeout\n", b"\n"])
+            w = MagicMock()
+            w.drain = AsyncMock()
+            w.wait_closed = AsyncMock()
+            return r, w
+
+        with (
+            patch.object(coord, "_async_open_tcp_connection", side_effect=_fake_open),
+            patch(
+                "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                new_callable=AsyncMock,
+            ) as mock_pub,
+            patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+        ):
+            asyncio.run(coord.async_write_parameter("bass3", "Z1OpMode", "off"))
+
+        self.assertEqual(mock_pub.await_count, 0)
+        self.assertEqual(mock_sleep.await_count, 2)
+        self.assertEqual(coord.get_str("bass3", "Z1OpMode", "value"), "auto")
+        self.assertTrue(notified)
+
+    def test_tcp_write_socket_error_and_non_transient_fallback_to_mqtt(self) -> None:
+        """Socket errors or non-transient TCP errors fall back cleanly to MQTT /set."""
+        hass = MagicMock()
+        entry = MagicMock()
+        entry.entry_id = "tcp_write_fallback"
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {
+            "enable_ebusd_tcp": True,
+            "ebusd_host": "192.168.1.50",
+            "ebusd_port": 8888,
+        }
+        coord = SaunierGeniaCoordinator(hass, entry)
+        coord._tcp_write_available = True
+        coord._state[("bass3", "Z1OpMode")] = {"value": "auto"}
+
+        # 1. Socket error disables _tcp_write_available and falls back to MQTT /set
+        with (
+            patch.object(
+                coord,
+                "_async_open_tcp_connection",
+                side_effect=OSError("Connection refused"),
+            ),
+            patch(
+                "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                new_callable=AsyncMock,
+            ) as mock_pub,
+        ):
+            asyncio.run(coord.async_write_parameter("bass3", "Z1OpMode", "off"))
+
+        self.assertFalse(coord._tcp_write_available)
+        mock_pub.assert_awaited_once_with(
+            hass, "ebusd/bass3/Z1OpMode/set", "off", qos=0, retain=False
+        )
+        self.assertEqual(coord.get_str("bass3", "Z1OpMode", "value"), "off")
+
+        # 2. Non-transient ERR (e.g. element not found) falls back to MQTT without retrying
+        coord._tcp_write_available = True
+
+        async def _fake_open_err(_host, _port, timeout=3.0):
+            r = AsyncMock()
+            r.readline = AsyncMock(side_effect=[b"ERR: element not found\n", b"\n"])
+            w = MagicMock()
+            w.drain = AsyncMock()
+            w.wait_closed = AsyncMock()
+            return r, w
+
+        with (
+            patch.object(
+                coord, "_async_open_tcp_connection", side_effect=_fake_open_err
+            ),
+            patch(
+                "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                new_callable=AsyncMock,
+            ) as mock_pub2,
+            patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep2,
+        ):
+            asyncio.run(coord.async_write_parameter("bass3", "Z1OpMode", "auto"))
+
+        self.assertEqual(mock_sleep2.await_count, 0)
+        mock_pub2.assert_awaited_once_with(
+            hass, "ebusd/bass3/Z1OpMode/set", "auto", qos=0, retain=False
+        )
+        self.assertEqual(coord.get_str("bass3", "Z1OpMode", "value"), "auto")
+
+        # 3. Payload with spaces bypasses TCP CLI and goes straight to MQTT /set
+        with (
+            patch.object(
+                coord, "_async_open_tcp_connection", new_callable=AsyncMock
+            ) as mock_open3,
+            patch(
+                "custom_components.arotherm_genia_ebusd.coordinator.mqtt.async_publish",
+                new_callable=AsyncMock,
+            ) as mock_pub3,
+        ):
+            asyncio.run(coord.async_write_parameter("bass3", "Z1Name1", "Zone 1"))
+
+        mock_open3.assert_not_awaited()
+        mock_pub3.assert_awaited_once_with(
+            hass, "ebusd/bass3/Z1Name1/set", "Zone 1", qos=0, retain=False
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

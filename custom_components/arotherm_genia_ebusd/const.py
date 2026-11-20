@@ -349,6 +349,21 @@ DEPRECATED_UNIQUE_ID_SUFFIXES: tuple[str, ...] = (
 INITIAL_HYDRATION_WAIT_SECONDS = 5.0
 HYDRATION_STEP_DELAY_SECONDS = 0.8
 SET_CONFIRMATION_DELAY_SECONDS = 1.5
+TCP_WRITE_MAX_ATTEMPTS: int = 3
+TCP_WRITE_RETRY_DELAYS: tuple[float, ...] = (0.6, 1.2)
+TCP_WRITE_TIMEOUT_SECONDS: float = 5.0
+TRANSIENT_EBUS_WRITE_ERRORS: tuple[str, ...] = (
+    "read timeout",
+    "syn received",
+    "wrong symbol",
+    "arbitration lost",
+    "no signal",
+    "crc error",
+    "ack error",
+    "collision",
+    "bus error",
+    "not ready",
+)
 HEATING_VETO_SFMODE_FRESHNESS_SECONDS = 15.0
 DHW_BOOST_MAX_TIMEOUT_SECONDS = 3600  # 60 minutes safety timeout
 ELECTRIC_POWER_STALE_TIMEOUT_SECONDS: float = (
