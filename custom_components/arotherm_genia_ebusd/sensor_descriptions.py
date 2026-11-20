@@ -291,16 +291,18 @@ def _get_compressor_modulation(coord: SaunierGeniaCoordinator) -> float | None:
     """Return true compressor modulation (%) from StateCompressor.
 
     In b511 00 (StateCompressor), byte 3 and byte 8 (the 4th byte of state_bytes)
-    carry the real compressor modulation percentage (0% in standby/prerun/overrun,
-    25..102% when active), whereas byte 4 in older CSVs was a mode bitmask (e.g. 4 in heating).
-    Reading state_bytes[3] first guarantees accurate modulation on both old and new CSVs.
+    carry the compressor modulation in 0.5 % steps (0..200 raw -> 0.0..100.0 %,
+    verified against display D.037 on both aroTHERM plus and Genia Air Max ES),
+    whereas byte 4 in older CSVs was a mode bitmask (e.g. 4 in heating).
+    Reading state_bytes[3] / 2.0 first guarantees accurate modulation on both
+    old and new CSVs.
     """
     state_bytes = coord.get_str(CIRCUIT_HMUX0, "StateCompressor", "state_bytes")
     if state_bytes:
         parts = state_bytes.strip().split()
         if len(parts) >= 4:
             try:
-                return float(int(parts[3], 16))
+                return int(parts[3], 16) / 2.0
             except ValueError:
                 pass
     return coord.get_float(CIRCUIT_HMUX0, "StateCompressor", "modulation")

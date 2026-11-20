@@ -12,7 +12,7 @@ uw,,,SetMode,target power and mode from regulator,,,b510,00,hcmode,,UCH,0=auto;1
 # ==============================================================================
 # 2. TEMPERATURES AND PUMP STATES (CONTROLLER 10 -> 76)
 # ==============================================================================
-r;u,,,Status01,circuit temperatures and pump state,,,b511,01,flow_temp,,D1C,,°C,flow temperature,return_temp,,D1C,,°C,return temperature,outside_temp,,D2B,,°C,outside temperature,hwc_temp,,D1C,,°C,hot water temperature,storage_temp,,D1C,,°C,storage temperature,pumpstate,,UCH,0=off;1=on;2=overrun;4=hwc,,pump status
+r;u,,,Status01,circuit temperatures and pump state,,,b511,01,flow_temp,,D1C,,°C,flow temperature,return_temp,,D1C,,°C,return temperature,outside_temp,,D2B,,°C,outside temperature,hwc_temp,,D1C,,°C,hot water temperature,storage_temp,,D1C,,°C,storage temperature,pumpstate,,UCH,0=off;1=on;2=overrun;4=hwc;8=venting,,pump status
 
 # Immersion heater runtime and start count by mode (Heating, DHW)
 r;u,,,RunStatsHeaterHc,immersion heater runtime and start count in heating mode,,,b511,1801,ign,,IGN:1,,,,runtime,,ULG,,min,"immersion heater runtime",cycles,,ULG,,,"start count"
@@ -46,8 +46,14 @@ u,,,RunDataDiagac0d,backup heater relay status diagnostic,,,b509,540200ac0d,ign,
 u,,,RunDataDiag640b,hydraulic module runtime counter 640b,,,b509,540200640b,ign,,IGN:4,,,,hours,,UIN,,h,"hydraulic module runtime counter 640b"
 u,,,RunDataDiagbd0b,hydraulic module cycle counter bd0b,,,b509,540200bd0b,ign,,IGN:4,,,,switches,,ULG,,,hydraulic module cycle counter bd0b
 r;u,,,Currenterror,current errors,,,b503,0001,error,,UIN,,,error number,error_1,,UIN,,,error number,error_2,,UIN,,,error number,error_3,,UIN,,,error number,error_4,,UIN,,,error number
-r;u,,,Errorhistory,Error_History,,,b503,0101,index,m,UCH,,,,status,,UCH,,,Status,time,,VTM,,,time,date,,HDA:3,,,date,error,,UIN,,,error number
+r;u,,,Errorhistory,Error History,,,b503,0101,index,m,UCH,,,,status,,UCH,,,Status,time,,BTM,,,"BCD minutes, hours",date,,BDA:3,,,"BCD day, month, year",error,,UIN,,,"followed by 1 (HMU) or 2 (VWZIO) bytes of unknown data that change between reads of the same entry"
 r;u,,,ErrorMemorySlot,error memory slot,,,b503,00,slot,m,UCH,,,,error,,UIN,,,error number,data,,HEX:8,,,
+u,,,RunDataWaterPressure,"building circuit water pressure (1/64 bar, follows the controller water pressure)",,,b509,5402003b0b,ign,,IGN:4,,,,value,,UIN,64,bar,
+# Installer settings and counters via b51a 05ff HH LL (display-verified D-codes)
+r;u,,,ImmersionHeaterSwitches,D.074 immersion heater switching operations (display 8 = RunStatsAuxHeaterSwitches 0BC0),,,b51a,05ff324a,ign,,IGN:3,,,,value,,ULG,,,,ign_2,,IGN:3,,,
+r;u,,,ImmersionHeaterPower,D.076 immersion heater current power (0.0 kW while off),,,b51a,05ff324c,ign,,IGN:3,,,,value,,UIN,10,kW,,ign_2,,IGN:5,,,
+r;u,,,ImmersionHeaterPowerLimit,"D.126 immersion heater power limit (display 2.0 kW; setting, range 0..9.0 step 0.5)",,,b51a,05ff331a,ign,,IGN:3,,,,value,,UIN,10,kW,,ign_2,,IGN:5,,,
+r;u,,,ImmersionHeaterBlockTime,D.362 immersion heater block time (display 0 min),,,b51a,05ff353e,ign,,IGN:3,,,,value,,UIN,,min,,ign_2,,IGN:5,,,
 
 # ==============================================================================
 # 4. SERVICE MODE / RELAY TEST (ORIGINAL)

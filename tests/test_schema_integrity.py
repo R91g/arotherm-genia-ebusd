@@ -407,6 +407,7 @@ class TestSchemaIntegrity(unittest.TestCase):
             "HTM",
             "BDA",
             "BTI",
+            "BTM",
             "VTI",
             "VTM",
             "DAY",

@@ -920,14 +920,14 @@ class TestCoordinatorLogic(unittest.TestCase):
         self.assertFalse(_check_compressor_active(coord))
         self.assertEqual(_get_compressor_modulation(coord), 0.0)
 
-        # 3. Active heating run where state_bytes is 09 00 00 66 (0x66 = 102% modulation)
-        # Even if legacy CSV 'modulation' byte 4 is stuck at 4, _get_compressor_modulation reads 102.0%
+        # 3. Active heating run where state_bytes is 09 00 00 66 (0x66 = 102 raw -> 51.0% modulation in 0.5% steps)
+        # Even if legacy CSV 'modulation' byte 4 is stuck at 4, _get_compressor_modulation reads 51.0%
         push_mqtt(
             "ebusd/hmux0/StateCompressor",
             '{"comp_speed": {"value": 614}, "fan_speed": {"value": 26128}, "modulation": {"value": 4}, "state_bytes": {"value": "09 00 00 66"}}',
         )
         self.assertTrue(_check_compressor_active(coord))
-        self.assertEqual(_get_compressor_modulation(coord), 102.0)
+        self.assertEqual(_get_compressor_modulation(coord), 51.0)
 
         # 4. Fallback to HMUStatusCode when state_bytes is absent
         coord._state.clear()
