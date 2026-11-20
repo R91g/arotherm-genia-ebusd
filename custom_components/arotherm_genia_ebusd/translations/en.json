@@ -262,6 +262,9 @@
       "dew_point_offset": {
         "name": "Dew Point Offset"
       },
+      "hc1_dew_point_offset": {
+        "name": "Circuit 1 Dew Point Offset"
+      },
       "cooling_outside_temp_threshold": {
         "name": "Cooling Outside Temperature Threshold"
       },
@@ -356,6 +359,9 @@
       },
       "dew_point_monitoring": {
         "name": "Dew Point Monitoring"
+      },
+      "hc1_cooling_enabled": {
+        "name": "Circuit 1 Cooling Enabled"
       }
     },
     "datetime": {
@@ -410,6 +416,12 @@
       },
       "app_session_status": {
         "name": "App Session Status"
+      },
+      "z1_time_slot_active": {
+        "name": "Zone 1 Heating Time Slot Active"
+      },
+      "z1_cooling_time_slot_active": {
+        "name": "Zone 1 Cooling Time Slot Active"
       }
     },
     "sensor": {
@@ -604,7 +616,7 @@
         "name": "Heating Mode Operating Hours"
       },
       "stats_hc_starts": {
-        "name": "Heating Mode Total Starts"
+        "name": "Auxiliary Heater Switches (D.074)"
       },
       "stats_hwc_hours": {
         "name": "DHW Mode Operating Hours"
@@ -756,7 +768,8 @@
           "heating": "Heating Active",
           "cooling": "Cooling Active",
           "dhw": "Domestic Hot Water (DHW)",
-          "overrun": "Overrun"
+          "overrun": "Overrun",
+          "venting": "Air Purging / Venting"
         }
       },
       "vwzio_secondary_circuit_hwc": {

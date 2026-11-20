@@ -262,6 +262,9 @@
       "dew_point_offset": {
         "name": "Offset del punto de rocío"
       },
+      "hc1_dew_point_offset": {
+        "name": "Offset del punto de rocío (Circuito 1)"
+      },
       "cooling_outside_temp_threshold": {
         "name": "Umbral exterior de refrigeración"
       },
@@ -356,6 +359,9 @@
       },
       "dew_point_monitoring": {
         "name": "Vigilancia del punto de rocío"
+      },
+      "hc1_cooling_enabled": {
+        "name": "Refrigeración habilitada (Circuito 1)"
       }
     },
     "datetime": {
@@ -410,6 +416,12 @@
       },
       "app_session_status": {
         "name": "Sesión de la app"
+      },
+      "z1_time_slot_active": {
+        "name": "Franja horaria de calefacción Zona 1 activa"
+      },
+      "z1_cooling_time_slot_active": {
+        "name": "Franja horaria de refrigeración Zona 1 activa"
       }
     },
     "sensor": {
@@ -604,7 +616,7 @@
         "name": "Horas de funcionamiento en calefacción"
       },
       "stats_hc_starts": {
-        "name": "Arranques acumulados en calefacción"
+        "name": "Conmutaciones resistencia auxiliar (D.074)"
       },
       "stats_hwc_hours": {
         "name": "Horas de funcionamiento en ACS"
@@ -756,7 +768,8 @@
           "heating": "Calefacción activa",
           "cooling": "Refrigeración activa",
           "dhw": "Agua Caliente Sanitaria (ACS)",
-          "overrun": "Postcirculación"
+          "overrun": "Postcirculación",
+          "venting": "Purga de aire"
         }
       },
       "vwzio_secondary_circuit_hwc": {

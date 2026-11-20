@@ -482,6 +482,10 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_BASS3, "Z1NightTemp"),
     (CIRCUIT_BASS3, "Z1QuickVetoTemp"),
     (CIRCUIT_BASS3, "Z1QuickVetoDuration"),
+    (CIRCUIT_BASS3, "Z1QuickVetoEndTime"),
+    (CIRCUIT_BASS3, "Z1QuickVetoEndDate"),
+    (CIRCUIT_BASS3, "Z1TimeSlotActive"),
+    (CIRCUIT_BASS3, "Z1CoolingTimeSlotActive"),
     (CIRCUIT_BASS3, "HolidayTemp"),
     (CIRCUIT_BASS3, "HolidayStartDate"),
     (CIRCUIT_BASS3, "HolidayStartTime"),
@@ -537,6 +541,8 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_BASS3, "CoolingOutsideTempThreshold"),
     (CIRCUIT_BASS3, "DewPointOffset"),
     (CIRCUIT_BASS3, "DewPointMonitoring"),
+    (CIRCUIT_BASS3, "Hc1CoolingEnabled"),
+    (CIRCUIT_BASS3, "Hc1DewPointOffset"),
     (CIRCUIT_BASS3, "OffsetOutsideTemp"),
     (CIRCUIT_BASS3, "ContinuosHeating"),
     (CIRCUIT_BASS3, "FrostOverRideTime"),
@@ -645,6 +651,8 @@ FALLBACK_FAST_BASS3_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_BASS3, "Z1QuickVetoTemp"),
     (CIRCUIT_BASS3, "Z1QuickVetoDuration"),
     (CIRCUIT_BASS3, "Z1HeatingState"),
+    (CIRCUIT_BASS3, "Z1TimeSlotActive"),
+    (CIRCUIT_BASS3, "Z1CoolingTimeSlotActive"),
     (CIRCUIT_BASS3, "SystemOperatingState"),
     (CIRCUIT_BASS3, "HwcOpMode"),
     (CIRCUIT_BASS3, "HwcSFMode"),
@@ -868,6 +876,7 @@ VWZIO_SECONDARY_STATUS_OPTIONS: list[str] = [
     "cooling",
     "dhw",
     "overrun",
+    "venting",
 ]
 
 VWZIO_SECONDARY_HWC_OPTIONS: list[str] = [

@@ -141,6 +141,13 @@
           "on": "mdi:water-alert",
           "off": "mdi:water-check-outline"
         }
+      },
+      "hc1_cooling_enabled": {
+        "default": "mdi:snowflake",
+        "state": {
+          "on": "mdi:snowflake",
+          "off": "mdi:snowflake-off"
+        }
       }
     },
     "datetime": {
@@ -238,6 +245,20 @@
         "state": {
           "on": "mdi:cellphone-link",
           "off": "mdi:cellphone-link-off"
+        }
+      },
+      "z1_time_slot_active": {
+        "default": "mdi:calendar-clock",
+        "state": {
+          "on": "mdi:calendar-check",
+          "off": "mdi:calendar-remove-outline"
+        }
+      },
+      "z1_cooling_time_slot_active": {
+        "default": "mdi:calendar-clock",
+        "state": {
+          "on": "mdi:snowflake-check",
+          "off": "mdi:snowflake-off"
         }
       }
     },
@@ -339,7 +360,8 @@
           "heating": "mdi:radiator",
           "cooling": "mdi:snowflake",
           "dhw": "mdi:water-boiler",
-          "overrun": "mdi:pump"
+          "overrun": "mdi:pump",
+          "venting": "mdi:air-filter"
         }
       },
       "vwzio_secondary_circuit_hwc": {
@@ -826,6 +848,9 @@
         "default": "mdi:volume-mute"
       },
       "dew_point_offset": {
+        "default": "mdi:water-thermometer"
+      },
+      "hc1_dew_point_offset": {
         "default": "mdi:water-thermometer"
       },
       "cooling_outside_temp_threshold": {

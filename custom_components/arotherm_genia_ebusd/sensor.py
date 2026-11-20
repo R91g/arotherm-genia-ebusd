@@ -110,6 +110,8 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
                     (CIRCUIT_BASS3, "Z1SFMode"),
                     (CIRCUIT_BASS3, "Z1QuickVetoDuration"),
                     (CIRCUIT_BASS3, "Z1QuickVetoTemp"),
+                    (CIRCUIT_BASS3, "Z1QuickVetoEndTime"),
+                    (CIRCUIT_BASS3, "Z1QuickVetoEndDate"),
                     (CIRCUIT_BASS3, "Z1CoolingTempDesired"),
                     (CIRCUIT_BASS3, "Z1CoolingManualTemp"),
                     (CIRCUIT_BASS3, "Z1OpModeCooling"),
@@ -142,6 +144,8 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
         elif description.key == "subcooling":
             subs.extend(
                 [
+                    (CIRCUIT_HMUX0, "SubcoolingTemp"),
+                    (CIRCUIT_HMU, "SubcoolingTemp"),
                     (CIRCUIT_HMUX0, "RunDataCondensationTemp"),
                     (CIRCUIT_HMUX0, "RunDataCondensateTemp"),
                     (CIRCUIT_HMU, "RunDataCondensationTemp"),

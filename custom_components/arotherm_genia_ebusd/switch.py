@@ -59,6 +59,15 @@ STANDARD_SWITCH_DESCRIPTIONS: tuple[SaunierGeniaSwitchEntityDescription, ...] = 
         entity_category=EntityCategory.CONFIG,
     ),
     SaunierGeniaSwitchEntityDescription(
+        key="hc1_cooling_enabled",
+        translation_key="hc1_cooling_enabled",
+        message="Hc1CoolingEnabled",
+        field="value",
+        payload_on="on",
+        payload_off="off",
+        entity_category=EntityCategory.CONFIG,
+    ),
+    SaunierGeniaSwitchEntityDescription(
         key="global_system_off",
         translation_key="global_system_off",
         message="GlobalSystemOff",

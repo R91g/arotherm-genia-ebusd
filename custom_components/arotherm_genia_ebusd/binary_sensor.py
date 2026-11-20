@@ -162,6 +162,20 @@ def _check_app_session_status(coord: SaunierGeniaCoordinator) -> bool | None:
     return val.lower() in ("connected", "1", "on", "true")
 
 
+def _check_z1_time_slot_active(coord: SaunierGeniaCoordinator) -> bool | None:
+    val = coord.get_str(CIRCUIT_BASS3, "Z1TimeSlotActive", "value")
+    if val is None:
+        return None
+    return val.lower() in ("yes", "1", "on", "true")
+
+
+def _check_z1_cooling_time_slot_active(coord: SaunierGeniaCoordinator) -> bool | None:
+    val = coord.get_str(CIRCUIT_BASS3, "Z1CoolingTimeSlotActive", "value")
+    if val is None:
+        return None
+    return val.lower() in ("yes", "1", "on", "true")
+
+
 BINARY_SENSOR_DESCRIPTIONS: tuple[SaunierGeniaBinarySensorEntityDescription, ...] = (
     SaunierGeniaBinarySensorEntityDescription(
         key="compressor_active",
@@ -275,6 +289,27 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[SaunierGeniaBinarySensorEntityDescription, ...
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         entity_category=EntityCategory.DIAGNOSTIC,
         is_on_fn=_check_app_session_status,
+    ),
+    SaunierGeniaBinarySensorEntityDescription(
+        key="z1_time_slot_active",
+        translation_key="z1_time_slot_active",
+        device_key=DEVICE_CLIMATE_CONTROLLER,
+        circuit=CIRCUIT_BASS3,
+        message="Z1TimeSlotActive",
+        field="value",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        is_on_fn=_check_z1_time_slot_active,
+    ),
+    SaunierGeniaBinarySensorEntityDescription(
+        key="z1_cooling_time_slot_active",
+        translation_key="z1_cooling_time_slot_active",
+        device_key=DEVICE_CLIMATE_CONTROLLER,
+        circuit=CIRCUIT_BASS3,
+        message="Z1CoolingTimeSlotActive",
+        field="value",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        is_on_fn=_check_z1_cooling_time_slot_active,
     ),
 )
 

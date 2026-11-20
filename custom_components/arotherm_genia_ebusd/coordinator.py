@@ -840,6 +840,43 @@ class SaunierGeniaCoordinator:
             parts.append(f"{mins}min")
         return " ".join(parts)
 
+    def _get_hardware_quick_veto_end_datetime(self) -> datetime | None:
+        """Build local end datetime from BASS3 Z1QuickVetoEndDate (HDA:3) and Z1QuickVetoEndTime (HTI)."""
+        date_str = self.get_str(CIRCUIT_BASS3, "Z1QuickVetoEndDate", "value")
+        time_str = self.get_str(CIRCUIT_BASS3, "Z1QuickVetoEndTime", "value")
+        if not date_str or not time_str:
+            return None
+        date_clean = date_str.strip()
+        time_clean = time_str.strip()
+        if date_clean in ("-", "null", "none") or time_clean in ("-", "null", "none"):
+            return None
+        date_parts = date_clean.split(".")
+        time_parts = time_clean.split(":")
+        if len(date_parts) != 3 or len(time_parts) not in (2, 3):
+            return None
+        try:
+            day = int(date_parts[0])
+            month = int(date_parts[1])
+            year = int(date_parts[2])
+            if year < 100:
+                year += 2000
+            if year <= 2015 or year >= 2099:
+                return None
+            hour = int(time_parts[0])
+            minute = int(time_parts[1])
+            second = int(time_parts[2]) if len(time_parts) == 3 else 0
+            return datetime(
+                year,
+                month,
+                day,
+                hour,
+                minute,
+                second,
+                tzinfo=dt_util.get_default_time_zone(),
+            )
+        except (ValueError, TypeError, OverflowError):
+            return None
+
     def _get_quick_veto_status(
         self,
     ) -> tuple[int | None, dict[str, Any]]:
@@ -875,14 +912,22 @@ class SaunierGeniaCoordinator:
                 }
 
         if sf_mode == "veto":
-            if self._heating_veto_end_time is not None:
-                return 0, {
+            effective_end = (
+                self._heating_veto_end_time
+                or self._get_hardware_quick_veto_end_datetime()
+            )
+            if effective_end is not None:
+                diff = self._seconds_until(effective_end)
+                rem = max(1, math.ceil(diff / 60.0)) if diff > 0 else 0
+                return rem, {
                     "is_active": True,
                     "veto_type": "heating",
-                    "end_time": self._heating_veto_end_time.isoformat(),
+                    "end_time": effective_end.isoformat(),
                     "target_temperature": target_temp,
-                    "remaining_minutes": 0,
-                    "remaining_formatted": "0 min",
+                    "remaining_minutes": rem,
+                    "remaining_formatted": (
+                        self._format_remaining_duration(rem) if rem > 0 else "0 min"
+                    ),
                 }
             return None, {
                 "is_active": True,

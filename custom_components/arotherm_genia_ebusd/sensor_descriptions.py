@@ -147,6 +147,8 @@ def _get_vwzio_secondary_status(coord: SaunierGeniaCoordinator) -> str | None:
             return "overrun"
         if p_lower in ("hwc", "4"):
             return "dhw"
+        if p_lower in ("venting", "8"):
+            return "venting"
         if p_lower in ("on", "1"):
             cooling_rel = coord.get_str(CIRCUIT_BASS3, "CoolingReleaseStatus", "value")
             if cooling_rel and cooling_rel.lower().strip() == "on":
@@ -215,7 +217,7 @@ def _get_vwzio_secondary_hwc_status(coord: SaunierGeniaCoordinator) -> str | Non
         p_lower = pumpstate.lower().strip()
         if p_lower in ("hwc", "4"):
             return "dhw"
-        if p_lower in ("off", "0", "on", "1", "overrun", "2"):
+        if p_lower in ("off", "0", "on", "1", "overrun", "2", "venting", "8"):
             return "standby"
 
     msg = coord.get_str(CIRCUIT_VWZIO, "SecondaryCircuitStatusHwc", "status")
@@ -309,7 +311,12 @@ def _get_compressor_modulation(coord: SaunierGeniaCoordinator) -> float | None:
 
 
 def _get_subcooling(coord: SaunierGeniaCoordinator) -> float | None:
-    """Return condenser subcooling (K) = CondensationTemp - CondensateTemp."""
+    """Return condenser subcooling (K), preferring direct D.375 SubcoolingTemp over derived diff."""
+    direct = coord.get_float(CIRCUIT_HMUX0, "SubcoolingTemp", "value")
+    if direct is None:
+        direct = coord.get_float(CIRCUIT_HMU, "SubcoolingTemp", "value")
+    if direct is not None:
+        return round(direct, 2)
     t_cond = coord.get_float(CIRCUIT_HMUX0, "RunDataCondensationTemp", "value")
     if t_cond is None:
         t_cond = coord.get_float(CIRCUIT_HMU, "RunDataCondensationTemp", "value")

@@ -262,6 +262,9 @@
       "dew_point_offset": {
         "name": "Taupunkt-Offset"
       },
+      "hc1_dew_point_offset": {
+        "name": "Heizkreis 1 Taupunkt-Offset"
+      },
       "cooling_outside_temp_threshold": {
         "name": "Außentemperatur-Schwellwert Kühlen"
       },
@@ -356,6 +359,9 @@
       },
       "dew_point_monitoring": {
         "name": "Taupunktüberwachung"
+      },
+      "hc1_cooling_enabled": {
+        "name": "Heizkreis 1 Kühlung aktiviert"
       }
     },
     "datetime": {
@@ -410,6 +416,12 @@
       },
       "app_session_status": {
         "name": "App-Verbindungsstatus"
+      },
+      "z1_time_slot_active": {
+        "name": "Zone 1 Heizzeitfenster aktiv"
+      },
+      "z1_cooling_time_slot_active": {
+        "name": "Zone 1 Kühlzeitfenster aktiv"
       }
     },
     "sensor": {
@@ -604,7 +616,7 @@
         "name": "Betriebsstunden Heizmodus"
       },
       "stats_hc_starts": {
-        "name": "Gesamte Starts Heizmodus"
+        "name": "Schaltspiele Zusatzheizung (D.074)"
       },
       "stats_hwc_hours": {
         "name": "Betriebsstunden Warmwassermodus"
@@ -756,7 +768,8 @@
           "heating": "Heizen aktiv",
           "cooling": "Kühlen aktiv",
           "dhw": "Warmwasser",
-          "overrun": "Pumpennachlauf"
+          "overrun": "Pumpennachlauf",
+          "venting": "Entlüften"
         }
       },
       "vwzio_secondary_circuit_hwc": {

@@ -568,6 +568,12 @@ class TestSensorRegistry(unittest.TestCase):
             {
                 "DewPointMonitoring",
                 "DewPointOffset",
+                "Hc1CoolingEnabled",
+                "Hc1DewPointOffset",
+                "Z1TimeSlotActive",
+                "Z1CoolingTimeSlotActive",
+                "Z1QuickVetoEndTime",
+                "Z1QuickVetoEndDate",
                 "CoolingOutsideTempThreshold",
                 "OffsetOutsideTemp",
                 "ContinuosHeating",
@@ -581,6 +587,106 @@ class TestSensorRegistry(unittest.TestCase):
                 "PrEnergyEnvYieldCool",
             }.issubset(hydrated_msgs)
         )
+
+    def test_venting_pumpstate_subcooling_and_bass3_entities(self) -> None:
+        """Verify venting pumpstate mapping, direct SubcoolingTemp priority, and new BASS3 entities."""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        from homeassistant.util import dt as dt_util
+
+        from custom_components.arotherm_genia_ebusd.const import (
+            VWZIO_SECONDARY_STATUS_OPTIONS,
+        )
+        from custom_components.arotherm_genia_ebusd.coordinator import (
+            SaunierGeniaCoordinator,
+        )
+        from custom_components.arotherm_genia_ebusd.sensor import SaunierGeniaSensor
+        from custom_components.arotherm_genia_ebusd.sensor_descriptions import (
+            _get_subcooling,
+            _get_vwzio_secondary_status,
+        )
+
+        # 1. pumpstate 8 / venting mapped in both secondary status helpers and options
+        self.assertIn("venting", VWZIO_SECONDARY_STATUS_OPTIONS)
+        mock_coord = MagicMock()
+        mock_coord.get_str.side_effect = lambda _c, m, _f: (
+            "venting" if m == "Status01" else None
+        )
+        self.assertEqual(_get_vwzio_secondary_status(mock_coord), "venting")
+        self.assertEqual(_get_vwzio_secondary_hwc_status(mock_coord), "standby")
+
+        mock_coord.get_str.side_effect = lambda _c, m, _f: (
+            "8" if m == "Status01" else None
+        )
+        self.assertEqual(_get_vwzio_secondary_status(mock_coord), "venting")
+        self.assertEqual(_get_vwzio_secondary_hwc_status(mock_coord), "standby")
+
+        # 2. Subcooling prefers direct D.375 SubcoolingTemp when present
+        sub_coord = MagicMock()
+        sub_coord.entry.entry_id = "test_entry"
+        sub_coord.get_float.side_effect = lambda c, m, _f: {
+            (CIRCUIT_HMUX0, "SubcoolingTemp"): 6.25,
+            (CIRCUIT_HMUX0, "RunDataCondensationTemp"): 42.5,
+            (CIRCUIT_HMUX0, "RunDataCondensateTemp"): 37.2,
+        }.get((c, m))
+        self.assertEqual(_get_subcooling(sub_coord), 6.25)
+
+        sub_desc = next(d for d in SENSOR_DESCRIPTIONS if d.key == "subcooling")
+        sub_ent = SaunierGeniaSensor(sub_coord, sub_desc)
+        self.assertIn((CIRCUIT_HMUX0, "SubcoolingTemp"), sub_ent._subscriptions)
+        self.assertIn((CIRCUIT_HMU, "SubcoolingTemp"), sub_ent._subscriptions)
+
+        # 3. New BASS3 binary sensors, switch, and number registered
+        binary_by_key = {d.key: d for d in BINARY_SENSOR_DESCRIPTIONS}
+        self.assertIn("z1_time_slot_active", binary_by_key)
+        self.assertIn("z1_cooling_time_slot_active", binary_by_key)
+        self.assertFalse(
+            binary_by_key["z1_cooling_time_slot_active"].entity_registry_enabled_default
+        )
+
+        slot_coord = MagicMock()
+        slot_coord.get_str.return_value = "yes"
+        self.assertTrue(binary_by_key["z1_time_slot_active"].is_on_fn(slot_coord))
+        slot_coord.get_str.return_value = "no"
+        self.assertFalse(
+            binary_by_key["z1_cooling_time_slot_active"].is_on_fn(slot_coord)
+        )
+
+        switch_keys = {d.key for d in STANDARD_SWITCH_DESCRIPTIONS}
+        self.assertIn("hc1_cooling_enabled", switch_keys)
+        number_keys = {d.key for d in NUMBER_DESCRIPTIONS}
+        self.assertIn("hc1_dew_point_offset", number_keys)
+
+        # 4. Hardware Z1QuickVetoEndDate + Z1QuickVetoEndTime parsed when veto active
+        hass = MagicMock()
+        entry = MagicMock()
+        entry.entry_id = "test_veto_hw"
+        entry.data = {}
+        coord = SaunierGeniaCoordinator(hass, entry)
+        future_dt = datetime.now(tz=dt_util.get_default_time_zone()) + timedelta(
+            minutes=45
+        )
+        coord._state[(CIRCUIT_BASS3, "Z1SFMode")] = {"value": "veto"}
+        coord._state[(CIRCUIT_BASS3, "Z1QuickVetoTemp")] = {"value": 23.0}
+        coord._state[(CIRCUIT_BASS3, "Z1QuickVetoEndDate")] = {
+            "value": future_dt.strftime("%d.%m.%Y")
+        }
+        coord._state[(CIRCUIT_BASS3, "Z1QuickVetoEndTime")] = {
+            "value": future_dt.strftime("%H:%M:%S")
+        }
+        rem = coord.get_quick_veto_remaining_minutes()
+        attrs = coord.get_quick_veto_remaining_attributes()
+        self.assertIsNotNone(rem)
+        assert rem is not None
+        self.assertGreaterEqual(rem, 44)
+        self.assertLessEqual(rem, 46)
+        self.assertTrue(attrs["is_active"])
+        self.assertIsNotNone(attrs["end_time"])
+
+        # Placeholder date (year 2015) is ignored cleanly
+        coord._state[(CIRCUIT_BASS3, "Z1QuickVetoEndDate")] = {"value": "01.01.2015"}
+        self.assertIsNone(coord.get_quick_veto_remaining_minutes())
 
 
 if __name__ == "__main__":

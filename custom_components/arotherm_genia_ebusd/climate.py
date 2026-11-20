@@ -107,6 +107,8 @@ class SaunierGeniaZone1Climate(SaunierGeniaEntity, ClimateEntity, RestoreEntity)
             (CIRCUIT_BASS3, "Z1ManualTemp"),
             (CIRCUIT_BASS3, "Z1QuickVetoTemp"),
             (CIRCUIT_BASS3, "Z1QuickVetoDuration"),
+            (CIRCUIT_BASS3, "Z1QuickVetoEndTime"),
+            (CIRCUIT_BASS3, "Z1QuickVetoEndDate"),
             (CIRCUIT_BASS3, "Z1OpMode"),
             (CIRCUIT_BASS3, "Z1OpModeCooling"),
             (CIRCUIT_BASS3, "Z1SFMode"),
