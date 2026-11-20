@@ -620,29 +620,38 @@ class TestCoordinatorLogic(unittest.TestCase):
         coord._message_timestamps[(CIRCUIT_HMUX0, "powerstatus")] = t0
         self.assertEqual(coord.get_instantaneous_electric_power(now=t0), 1200.0)
 
-        # Both available and RunData is fresh (age 30s <= 180s)
+        # Both available: fresher reading wins regardless of 180s threshold
         coord._state[(CIRCUIT_HMUX0, "RunDataElectricPowerConsumption")] = {
             "power": 1350.0
         }
         coord._message_timestamps[
             (CIRCUIT_HMUX0, "rundataelectricpowerconsumption")
         ] = t0 + 50.0
-        # PowerStatus updated at t0 + 60, RunData at t0 + 50, now is t0 + 80
+        # PowerStatus updated at t0 + 60 is fresher than RunData at t0 + 50 -> PowerStatus wins
         coord._message_timestamps[(CIRCUIT_HMUX0, "powerstatus")] = t0 + 60.0
+        self.assertEqual(coord.get_instantaneous_electric_power(now=t0 + 80.0), 1200.0)
+
+        # Tie (both at t0 + 60) prefers RunDataElectricPowerConsumption
+        coord._message_timestamps[
+            (CIRCUIT_HMUX0, "rundataelectricpowerconsumption")
+        ] = t0 + 60.0
         self.assertEqual(coord.get_instantaneous_electric_power(now=t0 + 80.0), 1350.0)
 
-        # RunData becomes stale (age 200s > 180s) and PowerStatus is fresher
-        # RunData at t0 + 50 (age = 250 - 50 = 200s > 180s)
-        # PowerStatus at t0 + 220 (age = 250 - 220 = 30s <= 180s, and 220 > 50)
+        # Newer RunData at t0 + 70 beats PowerStatus at t0 + 60
+        coord._message_timestamps[
+            (CIRCUIT_HMUX0, "rundataelectricpowerconsumption")
+        ] = t0 + 70.0
+        self.assertEqual(coord.get_instantaneous_electric_power(now=t0 + 80.0), 1350.0)
+
+        # Newer PowerStatus at t0 + 220 beats older RunData at t0 + 70
         coord._message_timestamps[(CIRCUIT_HMUX0, "powerstatus")] = t0 + 220.0
         self.assertEqual(coord.get_instantaneous_electric_power(now=t0 + 250.0), 1200.0)
 
-        # Both stale (> 180s, <= 600s): RunData at t0 + 50, PowerStatus at t0 + 40, now is t0 + 500
-        # When both are between 180s and 600s, the more recent reading (RunData at 50 vs PS at 40) is kept
+        # Older PowerStatus at t0 + 40 vs RunData at t0 + 70 -> RunData wins (within 600s)
         coord._message_timestamps[(CIRCUIT_HMUX0, "powerstatus")] = t0 + 40.0
         self.assertEqual(coord.get_instantaneous_electric_power(now=t0 + 500.0), 1350.0)
 
-        # Both exceed 10 minutes (> 600s): RunData age 650s, PowerStatus age 660s -> None (unavailable)
+        # Both exceed 10 minutes (> 600s): RunData age 630s, PowerStatus age 660s -> None (unavailable)
         self.assertIsNone(coord.get_instantaneous_electric_power(now=t0 + 700.0))
 
     def test_split_hmu_cumulative_energy_and_efficiency(self) -> None:

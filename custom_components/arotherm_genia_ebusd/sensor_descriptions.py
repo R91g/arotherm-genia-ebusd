@@ -367,8 +367,8 @@ def _get_hydraulic_heater_hwc_hours(coord: SaunierGeniaCoordinator) -> float | N
 def _get_electric_power(coord: SaunierGeniaCoordinator) -> float | None:
     """Return instantaneous electrical power consumption (W).
 
-    Prioritizes RunDataElectricPowerConsumption (active high-frequency r1 poll),
-    falling back dynamically to PowerStatus when stale (> 180s) or missing.
+    Uses whichever of RunDataElectricPowerConsumption (active r1 poll) or
+    PowerStatus (passive 60s poll) has the newer timestamp.
     """
     return coord.get_instantaneous_electric_power()
 

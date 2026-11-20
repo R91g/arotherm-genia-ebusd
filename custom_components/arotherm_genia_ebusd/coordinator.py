@@ -83,7 +83,6 @@ from .const import (
     DHW_BOOST_MAX_TIMEOUT_SECONDS,
     DOMAIN,
     EBUSD_TRAFFIC_TIMEOUT_SECONDS,
-    ELECTRIC_POWER_STALE_TIMEOUT_SECONDS,
     ELECTRIC_POWER_UNAVAILABLE_TIMEOUT_SECONDS,
     ESSENTIAL_HYDRATION_MESSAGES,
     EXTERNAL_SWEEP_CANARY_MESSAGES,
@@ -2346,12 +2345,14 @@ class SaunierGeniaCoordinator:
     def get_instantaneous_electric_power(
         self, now: float | None = None
     ) -> float | None:
-        """Return instantaneous electrical power consumption (W) with dynamic staleness fallback.
+        """Return instantaneous electrical power consumption (W) from the freshest source.
 
-        Prioritizes RunDataElectricPowerConsumption (active high-frequency r1 poll) when fresh.
-        If RunDataElectricPowerConsumption is stale (> 180s) and PowerStatus is fresher,
-        dynamically falls back to PowerStatus. If all available sources exceed 600s (or 2x fallback
-        poll interval) without updates, returns None so power and Live COP show unavailable.
+        Both RunDataElectricPowerConsumption (active r1 poll) and PowerStatus (passive 60s
+        MiGo Link poll) report the same inverter electrical power in Watts. Always selects
+        whichever reading has the newer timestamp (preferring RunDataElectricPowerConsumption
+        on ties or missing timestamps), so passive PowerStatus frames bridge eBUSd r9 poll
+        bursts immediately. If all available sources exceed 600s (or 2x fallback poll
+        interval) without updates, returns None so power and Live COP show unavailable.
         """
         circuits = tuple(
             dict.fromkeys([self._active_outdoor_circuit, CIRCUIT_HMUX0, CIRCUIT_HMU])
@@ -2402,17 +2403,15 @@ class SaunierGeniaCoordinator:
                 return None
             return run_val
 
-        # Both are present: check staleness
-        is_run_stale = (
-            run_age is not None and run_age > ELECTRIC_POWER_STALE_TIMEOUT_SECONDS
-        )
-        if not is_run_stale:
-            return run_val
-
-        # RunData is stale (> 180s). Prefer PowerStatus if fresher; invalidate if all stale > unavailable_timeout.
-        ps_is_newer = (ps_ts is not None and run_ts is not None and ps_ts > run_ts) or (
-            ps_age is not None and ps_age <= ELECTRIC_POWER_STALE_TIMEOUT_SECONDS
-        )
+        # Both are present: always prefer whichever reading is fresher (preferring
+        # RunDataElectricPowerConsumption on ties or missing timestamps) so passive
+        # 60s PowerStatus frames seamlessly fill gaps during eBUSd r9 poll bursts.
+        if ps_ts is not None and run_ts is not None:
+            ps_is_newer = ps_ts > run_ts
+        elif ps_age is not None and run_age is not None:
+            ps_is_newer = ps_age < run_age
+        else:
+            ps_is_newer = False
         candidate_val = ps_val if ps_is_newer else run_val
         candidate_age = ps_age if ps_is_newer else run_age
         if candidate_age is not None and candidate_age > unavailable_timeout:
