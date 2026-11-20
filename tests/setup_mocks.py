@@ -14,6 +14,7 @@ MOCKED_MODULES = [
     "homeassistant.components",
     "homeassistant.components.binary_sensor",
     "homeassistant.components.button",
+    "homeassistant.components.calendar",
     "homeassistant.components.climate",
     "homeassistant.components.datetime",
     "homeassistant.components.diagnostics",
@@ -364,7 +365,20 @@ class MockButtonEntity(MockEntity):
         """Press the button asynchronously."""
 
 
+@dataclass
+class MockCalendarEvent:
+    """Mock Home Assistant CalendarEvent."""
+
+    start: Any
+    end: Any
+    summary: str
+    description: str | None = None
+    location: str | None = None
+
+
 sys.modules["homeassistant.components.button"].ButtonEntity = MockButtonEntity
+sys.modules["homeassistant.components.calendar"].CalendarEntity = MockEntity
+sys.modules["homeassistant.components.calendar"].CalendarEvent = MockCalendarEvent
 
 
 class MockRegistryEntryDisabler:
@@ -431,7 +445,9 @@ sys.modules["homeassistant.const"].Platform = MagicMock(
     SELECT="select",
     SWITCH="switch",
     DATETIME="datetime",
+    TIME="time",
     BUTTON="button",
+    CALENDAR="calendar",
 )
 
 

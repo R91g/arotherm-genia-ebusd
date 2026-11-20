@@ -79,6 +79,7 @@
         "data": {
           "force_dhw_boost": "Intelligenten Warmwasser-Boost aktivieren",
           "auto_cooling_lock_bypass": "Kühlsperre 1 (01;01;99) beim Aktivieren des Kühlmodus automatisch aufheben",
+          "enable_schedule_calendars": "Wöchentliche Zeitprogramm-Kalender in Home Assistant aktivieren",
           "fallback_poll_interval": "Ausweich-Polling-Intervall (/get), falls kein offizielles Gateway vorhanden ist (Sekunden)",
           "enable_ebusd_tcp": "eBUSd physikalische Diagnose und Befehle über TCP aktivieren",
           "ebusd_tcp_host": "eBUSd TCP-Host (IP oder Hostname)",
@@ -88,6 +89,7 @@
         "data_description": {
           "force_dhw_boost": "Setzt automatisch Ist-Temp + Hysterese + 1,5 °C, wenn die Differenz zwischen Soll- und Speichertemperatur unter der Hysterese liegt.",
           "auto_cooling_lock_bypass": "Hebt die Kühlsperre im Regler beim Umschalten auf Kühlbetrieb automatisch auf.",
+          "enable_schedule_calendars": "Zeigt schreibgeschützte Wochenzeitprogramm-Kalender (Heizen, Warmwasser, Kühlen; Zirkulation & Flüstermodus standardmäßig ausgeblendet) in der Kalenderansicht von Home Assistant ohne zusätzlichen eBUS-Datenverkehr an.",
           "fallback_poll_interval": "Abfrageintervall, falls die Anlage über kein offizielles Cloud-Gateway verfügt.",
           "enable_ebusd_tcp": "Fragt den eBUSd-TCP-Socket regelmäßig ab, um die physische Symbolrate, Arbitrierungslatenz, Adapter-Wiederverbindungen zu überwachen und nicht geladene CSV-Dateien zu überprüfen. Aktiviert Diagnoseentitäten und Steuerungsschaltflächen automatisch.",
           "ebusd_tcp_host": "eBUSd-Daemon-Adresse. In Home Assistant OS mit dem Community-Add-on (LukasGrebe) wird sie automatisch erkannt oder verwenden Sie 'b4d7ad18-ebusd'. Bei lokalen Host-Installationen mit freigegebenem Port verwenden Sie '127.0.0.1'.",
@@ -383,6 +385,23 @@
         "name": "Legionellenschutz Uhrzeit"
       }
     },
+    "calendar": {
+      "z1_schedule_calendar": {
+        "name": "Heizzeitprogramm Zone 1"
+      },
+      "hwc_schedule_calendar": {
+        "name": "Warmwasser-Zeitprogramm"
+      },
+      "cooling_schedule_calendar": {
+        "name": "Kühlzeitprogramm Zone 1"
+      },
+      "circulation_schedule_calendar": {
+        "name": "Zirkulations-Zeitprogramm"
+      },
+      "silent_mode_schedule_calendar": {
+        "name": "Flüstermodus-Zeitprogramm"
+      }
+    },
     "binary_sensor": {
       "compressor_active": {
         "name": "Verdichter läuft"
@@ -422,6 +441,9 @@
       },
       "z1_cooling_time_slot_active": {
         "name": "Zone 1 Kühlzeitfenster aktiv"
+      },
+      "active_fault": {
+        "name": "Aktive Systemstörung"
       }
     },
     "sensor": {

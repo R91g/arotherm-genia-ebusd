@@ -684,9 +684,45 @@ class TestSensorRegistry(unittest.TestCase):
         self.assertTrue(attrs["is_active"])
         self.assertIsNotNone(attrs["end_time"])
 
-        # Placeholder date (year 2015) is ignored cleanly
-        coord._state[(CIRCUIT_BASS3, "Z1QuickVetoEndDate")] = {"value": "01.01.2015"}
+        # Placeholder date (year 2019, observed on BASS3 when idle) is ignored cleanly
+        coord._state[(CIRCUIT_BASS3, "Z1QuickVetoEndDate")] = {"value": "01.01.2019"}
         self.assertIsNone(coord.get_quick_veto_remaining_minutes())
+
+        # 5. Unified active_fault binary sensor aggregates Currenterror across boards
+        from custom_components.arotherm_genia_ebusd.binary_sensor import (
+            SaunierGeniaBinarySensor,
+        )
+
+        fault_desc = binary_by_key["active_fault"]
+        fault_ent = SaunierGeniaBinarySensor(coord, fault_desc)
+        self.assertIn((CIRCUIT_HMUX0, "Currenterror"), fault_ent._subscriptions)
+        self.assertIn((CIRCUIT_BASS3, "Currenterror"), fault_ent._subscriptions)
+        self.assertIn((CIRCUIT_VWZIO, "Currenterror"), fault_ent._subscriptions)
+        self.assertIsNone(fault_ent.is_on)
+
+        coord._state[(CIRCUIT_HMUX0, "Currenterror")] = {"error": "-"}
+        coord._state[(CIRCUIT_BASS3, "Currenterror")] = {"error": "0"}
+        coord._state[(CIRCUIT_VWZIO, "Currenterror")] = {"error": "-"}
+        self.assertFalse(fault_ent.is_on)
+        self.assertEqual(
+            fault_ent.extra_state_attributes,
+            {
+                "outdoor_unit": "OK",
+                "climate_controller": "OK",
+                "hydraulic_interface": "OK",
+            },
+        )
+
+        coord._state[(CIRCUIT_HMUX0, "Currenterror")] = {"error": "733"}
+        self.assertTrue(fault_ent.is_on)
+        self.assertEqual(
+            fault_ent.extra_state_attributes,
+            {
+                "outdoor_unit": "733",
+                "climate_controller": "OK",
+                "hydraulic_interface": "OK",
+            },
+        )
 
 
 if __name__ == "__main__":

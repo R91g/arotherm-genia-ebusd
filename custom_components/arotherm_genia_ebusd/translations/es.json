@@ -79,6 +79,7 @@
         "data": {
           "force_dhw_boost": "Activar ACS Boost Forzado Inteligente",
           "auto_cooling_lock_bypass": "Abrir automáticamente el Cerrojo 1 de refrigeración (01;01;99) al activar modo Frío",
+          "enable_schedule_calendars": "Activar calendarios de programación horaria semanal en Home Assistant",
           "fallback_poll_interval": "Intervalo de sondeo /get de respaldo si no hay pasarela oficial (segundos)",
           "enable_ebusd_tcp": "Habilitar diagnóstico físico y comandos de eBUSd por TCP",
           "ebusd_tcp_host": "Host TCP de eBUSd (IP o nombre de host)",
@@ -88,6 +89,7 @@
         "data_description": {
           "force_dhw_boost": "Aplica automáticamente T_actual + histéresis + 1.5 °C cuando la diferencia entre la consigna y la temperatura del depósito sea inferior a la histéresis.",
           "auto_cooling_lock_bypass": "Desbloquea el cerrojo de refrigeración en el regulador al conmutar a frío.",
+          "enable_schedule_calendars": "Muestra calendarios semanales de solo lectura (Calefacción, ACS y Refrigeración; Circulación y Modo Silencioso ocultos por defecto) en la vista Calendario de Home Assistant sin añadir tráfico extra al bus eBUS.",
           "fallback_poll_interval": "Frecuencia de sondeo cuando la instalación no cuenta con pasarela oficial en nube.",
           "enable_ebusd_tcp": "Conecta periódicamente al socket TCP de eBUSd para obtener la tasa de símbolos, latencia de arbitraje, reconexiones del adaptador y verificar qué archivos CSV faltan por cargar. Habilita automáticamente las entidades de diagnóstico y los botones de recarga.",
           "ebusd_tcp_host": "Dirección del demonio eBUSd. En Home Assistant OS con el add-on comunitario (LukasGrebe) se autodetecta o usa 'b4d7ad18-ebusd'. Si eBUSd corre con el puerto expuesto en local, usa '127.0.0.1'.",
@@ -383,6 +385,23 @@
         "name": "Hora de protección antilegionela"
       }
     },
+    "calendar": {
+      "z1_schedule_calendar": {
+        "name": "Calendario Calefacción Zona 1"
+      },
+      "hwc_schedule_calendar": {
+        "name": "Calendario ACS"
+      },
+      "cooling_schedule_calendar": {
+        "name": "Calendario Refrigeración Zona 1"
+      },
+      "circulation_schedule_calendar": {
+        "name": "Calendario Circulación ACS"
+      },
+      "silent_mode_schedule_calendar": {
+        "name": "Calendario Modo Silencioso"
+      }
+    },
     "binary_sensor": {
       "compressor_active": {
         "name": "Compresor en marcha"
@@ -422,6 +441,9 @@
       },
       "z1_cooling_time_slot_active": {
         "name": "Franja horaria de refrigeración Zona 1 activa"
+      },
+      "active_fault": {
+        "name": "Fallo activo del sistema"
       }
     },
     "sensor": {

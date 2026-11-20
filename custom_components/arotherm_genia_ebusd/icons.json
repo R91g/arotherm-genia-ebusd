@@ -260,6 +260,13 @@
           "on": "mdi:snowflake-check",
           "off": "mdi:snowflake-off"
         }
+      },
+      "active_fault": {
+        "default": "mdi:check-circle-outline",
+        "state": {
+          "on": "mdi:alert-circle",
+          "off": "mdi:check-circle-outline"
+        }
       }
     },
     "sensor": {
@@ -872,6 +879,23 @@
       },
       "ebusd_restart_scan": {
         "default": "mdi:radar"
+      }
+    },
+    "calendar": {
+      "z1_schedule_calendar": {
+        "default": "mdi:calendar-clock"
+      },
+      "hwc_schedule_calendar": {
+        "default": "mdi:calendar-clock"
+      },
+      "cooling_schedule_calendar": {
+        "default": "mdi:calendar-clock"
+      },
+      "circulation_schedule_calendar": {
+        "default": "mdi:calendar-clock"
+      },
+      "silent_mode_schedule_calendar": {
+        "default": "mdi:calendar-clock"
       }
     }
   },

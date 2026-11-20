@@ -29,6 +29,7 @@ from .const import (
     CONF_EBUSD_TCP_HOST,
     CONF_EBUSD_TCP_PORT,
     CONF_ENABLE_EBUSD_TCP,
+    CONF_ENABLE_SCHEDULE_CALENDARS,
     CONF_ENABLE_SEND_HEX,
     CONF_FALLBACK_POLL_INTERVAL,
     CONF_FORCE_DHW_BOOST,
@@ -43,6 +44,7 @@ from .const import (
     DEFAULT_EBUSD_TCP_HOST,
     DEFAULT_EBUSD_TCP_PORT,
     DEFAULT_ENABLE_EBUSD_TCP,
+    DEFAULT_ENABLE_SCHEDULE_CALENDARS,
     DEFAULT_ENABLE_SEND_HEX,
     DEFAULT_FALLBACK_POLL_INTERVAL,
     DEFAULT_FORCE_DHW_BOOST,
@@ -482,6 +484,13 @@ class SaunierGeniaOptionsFlowHandler(OptionsFlow):
                 default=options.get(
                     CONF_AUTO_COOLING_LOCK_BYPASS,
                     DEFAULT_AUTO_COOLING_LOCK_BYPASS,
+                ),
+            ): BooleanSelector(),
+            vol.Required(
+                CONF_ENABLE_SCHEDULE_CALENDARS,
+                default=options.get(
+                    CONF_ENABLE_SCHEDULE_CALENDARS,
+                    DEFAULT_ENABLE_SCHEDULE_CALENDARS,
                 ),
             ): BooleanSelector(),
             vol.Required(

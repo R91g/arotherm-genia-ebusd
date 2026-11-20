@@ -27,17 +27,20 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
+from .calendar import ALL_CALENDAR_SUFFIXES, DEFAULT_ENABLED_CALENDAR_SUFFIXES
 from .const import (
     CIRCUIT_BASS3,
     CIRCUIT_GLOBAL,
     CONF_EBUSD_TCP_HOST,
     CONF_EBUSD_TCP_PORT,
     CONF_ENABLE_EBUSD_TCP,
+    CONF_ENABLE_SCHEDULE_CALENDARS,
     CONF_ENABLE_SEND_HEX,
     DAY_SHORT_KEYS,
     DEFAULT_EBUSD_TCP_HOST,
     DEFAULT_EBUSD_TCP_PORT,
     DEFAULT_ENABLE_EBUSD_TCP,
+    DEFAULT_ENABLE_SCHEDULE_CALENDARS,
     DEFAULT_ENABLE_SEND_HEX,
     DEFAULT_HOLIDAY_TEMP,
     DEPRECATED_UNIQUE_ID_SUFFIXES,
@@ -342,6 +345,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _async_cleanup_deprecated_entities(hass, entry)
     _async_migrate_legacy_device_names(hass, entry)
     _async_sync_tcp_diagnostic_entities(hass, entry, reload_on_change=False)
+    _async_sync_schedule_calendar_entities(hass, entry, reload_on_change=False)
 
     # 3. Pre-register parent outdoor device in device registry so child devices can use via_device_id
     dev_reg = dr.async_get(hass)
@@ -372,7 +376,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 def _async_sync_tcp_diagnostic_entities(
     hass: HomeAssistant, entry: ConfigEntry, reload_on_change: bool = True
-) -> None:
+) -> bool:
     """Enable or disable TCP diagnostic entities based on enable_ebusd_tcp option."""
     is_tcp_enabled = bool(
         entry.options.get(CONF_ENABLE_EBUSD_TCP, DEFAULT_ENABLE_EBUSD_TCP)
@@ -412,6 +416,42 @@ def _async_sync_tcp_diagnostic_entities(
             ent_reg.async_update_entity(reg_entry.entity_id, disabled_by=disabled_by)
         if reload_on_change:
             hass.async_create_task(hass.config_entries.async_reload(entry.entry_id))
+        return True
+    return False
+
+
+def _async_sync_schedule_calendar_entities(
+    hass: HomeAssistant, entry: ConfigEntry, reload_on_change: bool = True
+) -> bool:
+    """Enable or disable weekly schedule calendar entities based on enable_schedule_calendars."""
+    is_calendars_enabled = bool(
+        entry.options.get(
+            CONF_ENABLE_SCHEDULE_CALENDARS, DEFAULT_ENABLE_SCHEDULE_CALENDARS
+        )
+    )
+    ent_reg = er.async_get(hass)
+    entities_to_update: list[
+        tuple[er.RegistryEntry, er.RegistryEntryDisabler | None]
+    ] = []
+    for reg_entry in er.async_entries_for_config_entry(ent_reg, entry.entry_id):
+        if not any(reg_entry.unique_id.endswith(sfx) for sfx in ALL_CALENDAR_SUFFIXES):
+            continue
+        if is_calendars_enabled:
+            if reg_entry.disabled_by == er.RegistryEntryDisabler.INTEGRATION and any(
+                reg_entry.unique_id.endswith(sfx)
+                for sfx in DEFAULT_ENABLED_CALENDAR_SUFFIXES
+            ):
+                entities_to_update.append((reg_entry, None))
+        elif not reg_entry.disabled:
+            entities_to_update.append((reg_entry, er.RegistryEntryDisabler.INTEGRATION))
+
+    if entities_to_update:
+        for reg_entry, disabled_by in entities_to_update:
+            ent_reg.async_update_entity(reg_entry.entity_id, disabled_by=disabled_by)
+        if reload_on_change:
+            hass.async_create_task(hass.config_entries.async_reload(entry.entry_id))
+        return True
+    return False
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -422,7 +462,14 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
     if coordinator is not None:
         coordinator.async_update_options()
 
-    _async_sync_tcp_diagnostic_entities(hass, entry, reload_on_change=True)
+    tcp_changed = _async_sync_tcp_diagnostic_entities(
+        hass, entry, reload_on_change=False
+    )
+    cal_changed = _async_sync_schedule_calendar_entities(
+        hass, entry, reload_on_change=False
+    )
+    if tcp_changed or cal_changed:
+        hass.async_create_task(hass.config_entries.async_reload(entry.entry_id))
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

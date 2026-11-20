@@ -859,7 +859,7 @@ class SaunierGeniaCoordinator:
             year = int(date_parts[2])
             if year < 100:
                 year += 2000
-            if year <= 2015 or year >= 2099:
+            if year <= 2019 or year >= 2099:
                 return None
             hour = int(time_parts[0])
             minute = int(time_parts[1])

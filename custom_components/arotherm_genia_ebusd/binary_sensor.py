@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
@@ -20,12 +21,20 @@ from .const import (
     CIRCUIT_BROADCAST,
     CIRCUIT_GLOBAL,
     CIRCUIT_HMUX0,
+    CIRCUIT_VWZIO,
+    CONTROLLER_CIRCUITS,
     DEVICE_CLIMATE_CONTROLLER,
     DEVICE_OUTDOOR_UNIT,
     DOMAIN,
+    OUTDOOR_CIRCUITS,
 )
 from .coordinator import SaunierGeniaCoordinator
 from .entity import SaunierGeniaEntity
+from .sensor_descriptions import (
+    _get_controller_error,
+    _get_outdoor_error,
+    _get_vwzio_error,
+)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -37,6 +46,7 @@ class SaunierGeniaBinarySensorEntityDescription(BinarySensorEntityDescription):
     message: str
     field: str
     is_on_fn: Callable[[SaunierGeniaCoordinator], bool | None]
+    attr_fn: Callable[[SaunierGeniaCoordinator], dict[str, Any]] | None = None
 
 
 def _check_compressor_active(coord: SaunierGeniaCoordinator) -> bool | None:
@@ -176,6 +186,29 @@ def _check_z1_cooling_time_slot_active(coord: SaunierGeniaCoordinator) -> bool |
     return val.lower() in ("yes", "1", "on", "true")
 
 
+def _check_active_fault(coord: SaunierGeniaCoordinator) -> bool | None:
+    """Return True if any board reports an active Currenterror, False if OK, None if unhydrated."""
+    statuses = (
+        _get_outdoor_error(coord),
+        _get_controller_error(coord),
+        _get_vwzio_error(coord),
+    )
+    reported = [s for s in statuses if s is not None]
+    if not reported:
+        return None
+    return any(s != "OK" for s in reported)
+
+
+def _get_active_fault_attrs(coord: SaunierGeniaCoordinator) -> dict[str, Any]:
+    """Return per-board Currenterror diagnostics for the unified active_fault binary sensor."""
+    attrs: dict[str, Any] = {
+        "outdoor_unit": _get_outdoor_error(coord),
+        "climate_controller": _get_controller_error(coord),
+        "hydraulic_interface": _get_vwzio_error(coord),
+    }
+    return {k: v for k, v in attrs.items() if v is not None}
+
+
 BINARY_SENSOR_DESCRIPTIONS: tuple[SaunierGeniaBinarySensorEntityDescription, ...] = (
     SaunierGeniaBinarySensorEntityDescription(
         key="compressor_active",
@@ -311,6 +344,18 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[SaunierGeniaBinarySensorEntityDescription, ...
         entity_registry_enabled_default=False,
         is_on_fn=_check_z1_cooling_time_slot_active,
     ),
+    SaunierGeniaBinarySensorEntityDescription(
+        key="active_fault",
+        translation_key="active_fault",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CIRCUIT_HMUX0,
+        message="Currenterror",
+        field="error",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        is_on_fn=_check_active_fault,
+        attr_fn=_get_active_fault_attrs,
+    ),
 )
 
 
@@ -344,6 +389,10 @@ class SaunierGeniaBinarySensor(SaunierGeniaEntity, BinarySensorEntity):
         if description.key == "compressor_active":
             subs.append((CIRCUIT_HMUX0, "RunDataCompressorSpeed"))
             subs.append((CIRCUIT_HMUX0, "HMUStatusCode"))
+        elif description.key == "active_fault":
+            subs.extend([(c, "Currenterror") for c in OUTDOOR_CIRCUITS])
+            subs.extend([(c, "Currenterror") for c in CONTROLLER_CIRCUITS])
+            subs.append((CIRCUIT_VWZIO, "Currenterror"))
 
         c = description.circuit.lower()
         m = description.message.lower()
@@ -354,7 +403,7 @@ class SaunierGeniaBinarySensor(SaunierGeniaEntity, BinarySensorEntity):
             coordinator=coordinator,
             device_key=description.device_key,
             translation_key=description.translation_key or description.key,
-            subscriptions=subs,
+            subscriptions=list(dict.fromkeys(subs)),
             unique_id_suffix=unique_id_suffix,
         )
         self.entity_description = description
@@ -363,3 +412,10 @@ class SaunierGeniaBinarySensor(SaunierGeniaEntity, BinarySensorEntity):
     def is_on(self) -> bool | None:
         """Return True if the binary sensor is active."""
         return self.entity_description.is_on_fn(self.coordinator)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return optional extra state attributes for the binary sensor."""
+        if self.entity_description.attr_fn is not None:
+            return self.entity_description.attr_fn(self.coordinator)
+        return None

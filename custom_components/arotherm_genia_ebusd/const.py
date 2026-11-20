@@ -22,6 +22,7 @@ PLATFORMS: list[Platform] = [
     Platform.DATETIME,
     Platform.TIME,
     Platform.BUTTON,
+    Platform.CALENDAR,
 ]
 
 # Configuration keys and defaults (ConfigFlow)
@@ -208,6 +209,8 @@ DEFAULT_EBUSD_TCP_PORT = 8888
 
 CONF_ENABLE_SEND_HEX = "enable_send_hex"
 DEFAULT_ENABLE_SEND_HEX = False
+CONF_ENABLE_SCHEDULE_CALENDARS = "enable_schedule_calendars"
+DEFAULT_ENABLE_SCHEDULE_CALENDARS = True
 
 # Logical Device Identifiers
 DEVICE_OUTDOOR_UNIT = "outdoor_unit"
