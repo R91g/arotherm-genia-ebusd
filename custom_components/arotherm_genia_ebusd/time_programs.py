@@ -50,6 +50,7 @@ class TimeProgramSpec:
     program: str
     circuit_type: str
     has_temperature: bool
+    write_noop_temp: bool = False
     temp_field: str | None = None
     min_temp: float | None = None
     max_temp: float | None = None
@@ -71,11 +72,11 @@ TIME_PROGRAM_SPECS: tuple[TimeProgramSpec, ...] = (
     TimeProgramSpec(
         program="HwcTimer",
         circuit_type="dhw",
-        has_temperature=True,
-        temp_field="temp",
-        min_temp=35.0,
-        max_temp=70.0,
-        default_temp=50.0,
+        # HwcTimer uses a single shared DHW setpoint (HwcTempDesired) rather than
+        # per-slot temperatures; writing '-' (0xFFFF) updates time slots without
+        # mutating HwcTempDesired (matching VR940 / MiGo Link behavior).
+        has_temperature=False,
+        write_noop_temp=True,
         aliases=("hwc", "dhw"),
     ),
     TimeProgramSpec(
@@ -622,9 +623,12 @@ async def async_handle_write_time_program(
     write_plans: list[tuple[str, list[tuple[str, str]]]] = []
     for day_canonical in target_days:
         if total_slots == 0:
-            clear_payload = (
-                f"0;0;0;0;0;{default_temp:.1f}" if spec.has_temperature else "0;0;0;0;0"
-            )
+            if spec.has_temperature:
+                clear_payload = f"0;0;0;0;0;{default_temp:.1f}"
+            elif spec.write_noop_temp:
+                clear_payload = "0;0;0;0;0;-"
+            else:
+                clear_payload = "0;0;0;0;0"
             write_plans.append(
                 (day_canonical, [(f"{spec.program}_{day_canonical}", clear_payload)])
             )
@@ -642,6 +646,11 @@ async def async_handle_write_time_program(
                 payload = (
                     f"{total_slots};{slot.from_hour};{slot.from_min};"
                     f"{wire_to_h};{wire_to_m};{temp_val:.1f}"
+                )
+            elif spec.write_noop_temp:
+                payload = (
+                    f"{total_slots};{slot.from_hour};{slot.from_min};"
+                    f"{wire_to_h};{wire_to_m};-"
                 )
             else:
                 payload = (

@@ -554,11 +554,83 @@ class TestTimeProgramServices(unittest.IsolatedAsyncioTestCase):
         call.data = {
             "program": "HwcTimer",
             "days": ["monday"],
-            "slots": [{"start": "13:00", "end": "15:00", "temperature": 50.0}],
+            "slots": [{"start": "13:00", "end": "15:00"}],
         }
         with self.assertRaises(HomeAssistantError) as ctx:
             await registered[SERVICE_WRITE_TIME_PROGRAM]["handler"](call)
         self.assertIn("mismatch", str(ctx.exception).lower())
+
+    async def test_hwc_timer_reports_no_per_slot_temp_and_writes_noop_sentinel(
+        self,
+    ) -> None:
+        """HwcTimer reports temperature=False and writes '-' (0xFFFF) to preserve HwcTempDesired."""
+        hass, coord, registered = _make_hass_and_coordinator()
+        _async_register_services(hass)
+
+        written: list[tuple[str, str, str]] = []
+
+        async def _fake_write(circuit: str, msg_name: str, payload: str) -> None:
+            written.append((circuit, msg_name, payload))
+
+        async def _fake_get(_circuit: str, msg_name: str) -> None:
+            if msg_name == "HwcTimer_Slots":
+                coord._async_on_mqtt_message(
+                    _make_mqtt_msg(
+                        "ebusd/bass3/HwcTimer_Slots",
+                        {
+                            "mon": {"value": 1},
+                            "tue": {"value": 0},
+                            "wed": {"value": 0},
+                            "thu": {"value": 0},
+                            "fri": {"value": 0},
+                            "sat": {"value": 0},
+                            "sun": {"value": 0},
+                        },
+                    )
+                )
+            elif msg_name == "HwcTimer_Monday":
+                coord._async_on_mqtt_message(
+                    _make_mqtt_msg(
+                        "ebusd/bass3/HwcTimer_Monday",
+                        {
+                            "from_hour": {"value": 13},
+                            "from_min": {"value": 10},
+                            "to_hour": {"value": 14},
+                            "to_min": {"value": 50},
+                            "temp": {"value": 50.0},
+                        },
+                    )
+                )
+
+        coord.async_write_parameter = AsyncMock(side_effect=_fake_write)
+        coord.async_request_get = AsyncMock(side_effect=_fake_get)
+
+        write_call = MagicMock()
+        write_call.data = {
+            "program": "HwcTimer",
+            "days": ["monday"],
+            "slots": [{"start": "13:10", "end": "14:50"}],
+        }
+        w_res = await registered[SERVICE_WRITE_TIME_PROGRAM]["handler"](write_call)
+
+        self.assertEqual(
+            written,
+            [(CIRCUIT_BASS3, "HwcTimer_Monday", "1;13;10;14;50;-")],
+        )
+        self.assertEqual(
+            w_res["days"]["monday"],
+            [{"start": "13:10", "end": "14:50"}],
+        )
+        self.assertNotIn("temperature", w_res["days"]["monday"][0])
+
+        read_call = MagicMock()
+        read_call.data = {"program": "HwcTimer"}
+        r_res = await registered[SERVICE_READ_TIME_PROGRAM]["handler"](read_call)
+        self.assertIs(r_res["temperature"], False)
+        self.assertEqual(
+            r_res["days"]["monday"],
+            [{"start": "13:10", "end": "14:50"}],
+        )
 
     async def test_write_validation_rejects_bad_grid_overlaps_count_and_temp(
         self,

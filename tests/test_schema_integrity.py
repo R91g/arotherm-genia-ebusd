@@ -543,6 +543,16 @@ class TestSchemaIntegrity(unittest.TestCase):
                 f"{fname} must be byte-for-byte identical to 15.bass3.csv",
             )
 
+        # 1b. Verify CirculationTimer and SilentTimer write rows send 0xFFFF sentinel
+        # (IGN:2 pads with 0x0000 which BASS3/BASV3/CTLV3 rejects on b5 55 a6 writes)
+        for line in bass3_bytes.decode("utf-8").splitlines():
+            if line.startswith(("w,,,CirculationTimer_", "w,,,SilentTimer_")):
+                self.assertIn(
+                    ",ign_end,,HEX:2,=ffff,,",
+                    line,
+                    f"Timer write must pad with constant 0xFFFF: {line}",
+                )
+
         # 2. Verify Unix LF line endings and valid message type tokens across all CSVs
         valid_type_tokens = {f"r{i}" for i in range(1, 10)} | {"r", "w", "u", "uw"}
         csv_files = glob.glob(
