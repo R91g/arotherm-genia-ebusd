@@ -2331,12 +2331,12 @@ class TestCoordinatorLogic(unittest.TestCase):
         self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoDuration", 2.0), writes)
         self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "veto"), writes)
 
-        # 2. Cancel quick veto: should restore off
+        # 2. Cancel quick veto: writes ONLY Z1SFMode=auto (never Z1QuickVetoDuration=0.0) and restores off
         writes.clear()
         call.data = {}
         asyncio.run(registered_services[SERVICE_CANCEL_QUICK_VETO](call))
         self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "auto"), writes)
-        self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoDuration", 0.0), writes)
+        self.assertNotIn((CIRCUIT_BASS3, "Z1QuickVetoDuration", 0.0), writes)
         self.assertIn((CIRCUIT_BASS3, "Z1OpMode", "off"), writes)
         self.assertIsNone(coord.pre_veto_opmode)
 
@@ -6403,6 +6403,55 @@ class TestCoordinatorLogic(unittest.TestCase):
         ) as mock_migo:
             asyncio.run(coord._async_run_fallback_slow_poll(datetime.now()))
             mock_migo.assert_not_called()
+
+    def test_external_heating_veto_prefers_hardware_end_time(self) -> None:
+        """External veto tracking and passive Z1QuickVetoEndTime updates prefer hardware end time over 3h guess."""
+        from homeassistant.util import dt as dt_util
+
+        hass = MagicMock()
+        hass.async_create_task = lambda coro: coro.close()
+        entry = MagicMock()
+        entry.entry_id = "test_hw_veto_sync"
+        entry.data = {}
+        entry.options = {}
+        coord = SaunierGeniaCoordinator(hass, entry)
+
+        tz = dt_util.get_default_time_zone()
+        hw_30m = datetime.now(tz=tz) + timedelta(minutes=30)
+        coord._state[(CIRCUIT_BASS3, "Z1QuickVetoDuration")] = {"value": 3.0}
+        coord._state[(CIRCUIT_BASS3, "Z1QuickVetoEndDate")] = {
+            "value": hw_30m.strftime("%d.%m.%Y")
+        }
+        coord._state[(CIRCUIT_BASS3, "Z1QuickVetoEndTime")] = {
+            "value": hw_30m.strftime("%H:%M:%S")
+        }
+        coord._state[(CIRCUIT_BASS3, "Z1SFMode")] = {"value": "veto"}
+
+        # 1. External tracking starts using hardware 30m end time instead of 3.0h (180m) default
+        coord._async_start_external_heating_veto_tracking()
+        rem = coord.get_quick_veto_remaining_minutes()
+        self.assertIsNotNone(rem)
+        assert rem is not None
+        self.assertGreaterEqual(rem, 29)
+        self.assertLessEqual(rem, 31)
+
+        # 2. Passive Z1QuickVetoEndTime update (e.g. app changed veto to 90 min) re-syncs countdown
+        hw_90m = datetime.now(tz=tz) + timedelta(minutes=90)
+        msg_date = MagicMock()
+        msg_date.topic = "ebusd/bass3/Z1QuickVetoEndDate"
+        msg_date.payload = hw_90m.strftime("%d.%m.%Y")
+        coord._async_on_mqtt_message(msg_date)
+
+        msg_time = MagicMock()
+        msg_time.topic = "ebusd/bass3/Z1QuickVetoEndTime"
+        msg_time.payload = hw_90m.strftime("%H:%M:%S")
+        coord._async_on_mqtt_message(msg_time)
+
+        rem2 = coord.get_quick_veto_remaining_minutes()
+        self.assertIsNotNone(rem2)
+        assert rem2 is not None
+        self.assertGreaterEqual(rem2, 89)
+        self.assertLessEqual(rem2, 91)
 
 
 if __name__ == "__main__":

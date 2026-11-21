@@ -151,7 +151,6 @@ class MockCoordinatorForClimate:
 
     async def async_cancel_quick_veto(self, *, restore_opmode: bool = True) -> None:
         await self.async_write_parameter(CIRCUIT_BASS3, "Z1SFMode", "auto")
-        await self.async_write_parameter(CIRCUIT_BASS3, "Z1QuickVetoDuration", 0.0)
         restored_off = (
             restore_opmode and getattr(self, "_pre_veto_opmode", None) == "off"
         )
@@ -657,10 +656,11 @@ class TestClimateEntity(unittest.TestCase):
         self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "veto"), written)
 
         # 2. Direct cancellation (service/timeout equivalent) restores Z1OpMode to off
+        # and must NOT write Z1QuickVetoDuration=0.0 (which re-triggers a 30-min veto on BASS3)
         written.clear()
         asyncio.run(self.coordinator.async_cancel_quick_veto())
         self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "auto"), written)
-        self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoDuration", 0.0), written)
+        self.assertNotIn((CIRCUIT_BASS3, "Z1QuickVetoDuration", 0.0), written)
         self.assertIn((CIRCUIT_BASS3, "Z1OpMode", "off"), written)
         self.assertEqual(self.climate.hvac_mode, HVACMode.OFF)
 
@@ -671,7 +671,7 @@ class TestClimateEntity(unittest.TestCase):
         asyncio.run(self.climate.async_set_preset_mode(PRESET_COMFORT))
 
         self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "auto"), written)
-        self.assertIn((CIRCUIT_BASS3, "Z1QuickVetoDuration", 0.0), written)
+        self.assertNotIn((CIRCUIT_BASS3, "Z1QuickVetoDuration", 0.0), written)
         self.assertIn((CIRCUIT_BASS3, "Z1OpMode", "auto"), written)
         self.assertNotIn((CIRCUIT_BASS3, "Z1OpMode", "off"), written)
         self.assertEqual(self.climate.hvac_mode, HVACMode.HEAT)
@@ -1131,7 +1131,7 @@ class TestClimateEntity(unittest.TestCase):
         asyncio.run(self.climate.async_set_preset_mode(PRESET_MANUAL))
 
         self.assertIn((CIRCUIT_BASS3, "Z1SFMode", "auto"), self.coordinator.writes)
-        self.assertIn(
+        self.assertNotIn(
             (CIRCUIT_BASS3, "Z1QuickVetoDuration", 0.0), self.coordinator.writes
         )
         self.assertIn((CIRCUIT_BASS3, "Z1OpMode", "day"), self.coordinator.writes)

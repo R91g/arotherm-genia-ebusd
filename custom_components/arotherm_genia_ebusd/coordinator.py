@@ -1571,13 +1571,42 @@ class SaunierGeniaCoordinator:
         ):
             self._async_check_dhw_boost_restoration()
 
-        # Check Quick Veto restoration conditions when controller Z1SFMode, Z1Status, or Z1QuickVetoDuration updates
+        # Check Quick Veto restoration conditions when controller Z1SFMode, Z1Status, or Z1QuickVeto* updates
         if circuit_key in CONTROLLER_CIRCUITS and msg_lower in (
             "z1sfmode",
             "z1status",
             "z1quickvetoduration",
+            "z1quickvetoendtime",
+            "z1quickvetoenddate",
         ):
-            self._async_check_quick_veto_restoration(trigger_msg=msg_lower)
+            if msg_lower in ("z1quickvetoendtime", "z1quickvetoenddate"):
+                sf_now = (
+                    self.get_str(CIRCUIT_BASS3, "Z1SFMode", "value") or ""
+                ).lower()
+                st_now = (
+                    self.get_str(CIRCUIT_BASS3, "Z1Status", "value") or ""
+                ).lower()
+                if sf_now == "veto" or st_now == "veto":
+                    hw_end = self._get_hardware_quick_veto_end_datetime()
+                    if hw_end is not None:
+                        rem_secs = self._seconds_until(hw_end)
+                        if 0 < rem_secs <= 24 * 3600 and (
+                            self._heating_veto_end_time is None
+                            or abs(
+                                (hw_end - self._heating_veto_end_time).total_seconds()
+                            )
+                            >= 90.0
+                        ):
+                            self._heating_veto_end_time = hw_end
+                            self._arm_heating_veto_timer(rem_secs)
+                            self.hass.async_create_task(
+                                self._async_save_heating_veto_state()
+                            )
+                            self._async_notify_message_listeners(
+                                CALC_CIRCUIT, "QuickVetoRemaining"
+                            )
+            else:
+                self._async_check_quick_veto_restoration(trigger_msg=msg_lower)
             if (
                 msg_lower == "z1sfmode"
                 and not self._heating_veto_activating
@@ -4940,10 +4969,20 @@ class SaunierGeniaCoordinator:
             self._pre_veto_opmode = (
                 current_opmode if current_opmode != "off" else "auto"
             )
-        self._heating_veto_end_time = self._utc_deadline(timedelta(hours=dur_val))
-        self._heating_veto_started_mono = time.monotonic()
-        self._last_heating_veto_duration = dur_val
-        self._arm_heating_veto_timer(dur_val * 3600.0)
+        hw_end = self._get_hardware_quick_veto_end_datetime()
+        if (
+            hw_end is not None
+            and 0 < (rem_secs := self._seconds_until(hw_end)) <= 24 * 3600
+        ):
+            self._heating_veto_end_time = hw_end
+            self._heating_veto_started_mono = time.monotonic()
+            self._last_heating_veto_duration = dur_val
+            self._arm_heating_veto_timer(rem_secs)
+        else:
+            self._heating_veto_end_time = self._utc_deadline(timedelta(hours=dur_val))
+            self._heating_veto_started_mono = time.monotonic()
+            self._last_heating_veto_duration = dur_val
+            self._arm_heating_veto_timer(dur_val * 3600.0)
         self.hass.async_create_task(self._async_save_heating_veto_state())
         self._async_notify_message_listeners(CALC_CIRCUIT, "QuickVetoRemaining")
 
@@ -5127,9 +5166,10 @@ class SaunierGeniaCoordinator:
 
         _LOGGER.info("Cancelling Quick Veto and restoring auto operation")
         try:
+            # Official MiGo Link / BASS3 cancel writes ONLY Z1SFMode=auto (0).
+            # Writing Z1QuickVetoDuration=0.0 re-triggers a brand new 0.5h (30 min)
+            # veto on BASS3 firmware because any write to 0300 2600 starts a veto.
             await self.async_write_parameter(CIRCUIT_BASS3, "Z1SFMode", "auto")
-            await asyncio.sleep(0.3)
-            await self.async_write_parameter(CIRCUIT_BASS3, "Z1QuickVetoDuration", 0.0)
             if restored_off:
                 await asyncio.sleep(0.3)
                 await self.async_write_parameter(CIRCUIT_BASS3, "Z1OpMode", "off")
