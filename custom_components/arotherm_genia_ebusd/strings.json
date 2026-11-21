@@ -1181,6 +1181,42 @@
           "description": "Value or string payload to send to eBUSd."
         }
       }
+    },
+    "read_time_program": {
+      "name": "Read Weekly Time Program",
+      "description": "Reads the full 7-day weekly schedule for a controller time program (Z1Timer, HwcTimer, CoolingTimer, CirculationTimer, or SilentTimer), hydrating missing slots from the eBUS when needed and returning structured JSON compatible with schedule UI cards.",
+      "fields": {
+        "program": {
+          "name": "Time Program",
+          "description": "Controller time program prefix: 'Z1Timer', 'HwcTimer', 'CoolingTimer', 'CirculationTimer', or 'SilentTimer'."
+        },
+        "entry_id": {
+          "name": "Config Entry ID (Optional)",
+          "description": "Optional config entry ID when multiple integration instances are configured."
+        }
+      }
+    },
+    "write_time_program": {
+      "name": "Write Weekly Time Program",
+      "description": "Replaces all daily time slots (0 to 3 slots on the 10-minute grid) for one or more weekdays of a controller time program, then reads back from the eBUS to verify what the controller actually stored.",
+      "fields": {
+        "program": {
+          "name": "Time Program",
+          "description": "Controller time program prefix: 'Z1Timer', 'HwcTimer', 'CoolingTimer', 'CirculationTimer', or 'SilentTimer'."
+        },
+        "days": {
+          "name": "Days of the Week",
+          "description": "List of lowercase English weekday names to update (e.g. monday, tuesday)."
+        },
+        "slots": {
+          "name": "Time Slots",
+          "description": "List of 0 to 3 time slots (start, end, optional temperature) on the 10-minute grid. Pass an empty list to clear the day."
+        },
+        "entry_id": {
+          "name": "Config Entry ID (Optional)",
+          "description": "Optional config entry ID when multiple integration instances are configured."
+        }
+      }
     }
   }
 }

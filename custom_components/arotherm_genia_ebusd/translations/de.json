@@ -1181,6 +1181,42 @@
           "description": "Wert oder Nutzdaten-Zeichenfolge, die an eBUSd gesendet wird."
         }
       }
+    },
+    "read_time_program": {
+      "name": "Wochenzeitprogramm lesen",
+      "description": "Liest den vollständigen 7-Tage-Wochenzeitplan eines Regler-Zeitprogramms (Z1Timer, HwcTimer, CoolingTimer, CirculationTimer oder SilentTimer), liest fehlende Zeitfenster bei Bedarf vom eBUS nach und gibt strukturiertes JSON für Zeitplan-Karten zurück.",
+      "fields": {
+        "program": {
+          "name": "Zeitprogramm",
+          "description": "Präfix des Regler-Zeitprogramms: 'Z1Timer', 'HwcTimer', 'CoolingTimer', 'CirculationTimer' oder 'SilentTimer'."
+        },
+        "entry_id": {
+          "name": "Konfigurationseintrags-ID (Optional)",
+          "description": "Optionale Konfigurationseintrags-ID bei mehreren konfigurierten Instanzen."
+        }
+      }
+    },
+    "write_time_program": {
+      "name": "Wochenzeitprogramm schreiben",
+      "description": "Ersetzt alle täglichen Zeitfenster (0 bis 3 Fenster im 10-Minuten-Raster) für einen oder mehrere Wochentage eines Zeitprogramms und liest anschließend vom eBUS zurück, um die gespeicherten Werte zu prüfen.",
+      "fields": {
+        "program": {
+          "name": "Zeitprogramm",
+          "description": "Präfix des Regler-Zeitprogramms: 'Z1Timer', 'HwcTimer', 'CoolingTimer', 'CirculationTimer' oder 'SilentTimer'."
+        },
+        "days": {
+          "name": "Wochentage",
+          "description": "Liste englischer Wochentagsnamen in Kleinbuchstaben (z. B. monday, tuesday)."
+        },
+        "slots": {
+          "name": "Zeitfenster",
+          "description": "Liste von 0 bis 3 Zeitfenstern (start, end, optional temperature) im 10-Minuten-Raster. Eine leere Liste löscht den Tag."
+        },
+        "entry_id": {
+          "name": "Konfigurationseintrags-ID (Optional)",
+          "description": "Optionale Konfigurationseintrags-ID bei mehreren konfigurierten Instanzen."
+        }
+      }
     }
   }
 }

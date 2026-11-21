@@ -23,6 +23,7 @@ from custom_components.arotherm_genia_ebusd.const import (
     SERVICE_FORCE_DHW_BOOST,
     SERVICE_QUICK_VETO,
     SERVICE_READ_PARAMETER,
+    SERVICE_READ_TIME_PROGRAM,
     SERVICE_RECORD_TOPIC_CHANGES,
     SERVICE_SEND_HEX_COMMAND,
     SERVICE_SET_HOLIDAY_MODE,
@@ -30,6 +31,7 @@ from custom_components.arotherm_genia_ebusd.const import (
     SERVICE_SET_WEEKLY_TIMER,
     SERVICE_START_VENTILATION_BOOST,
     SERVICE_WRITE_PARAMETER,
+    SERVICE_WRITE_TIME_PROGRAM,
 )
 
 
@@ -252,6 +254,8 @@ class TestSchemaIntegrity(unittest.TestCase):
         self.assertIn(f"{SERVICE_SEND_HEX_COMMAND}:", content)
         self.assertIn(f"{SERVICE_READ_PARAMETER}:", content)
         self.assertIn(f"{SERVICE_WRITE_PARAMETER}:", content)
+        self.assertIn(f"{SERVICE_READ_TIME_PROGRAM}:", content)
+        self.assertIn(f"{SERVICE_WRITE_TIME_PROGRAM}:", content)
 
         # Check basic schema presence: name, description, fields
         self.assertIn("name:", content)

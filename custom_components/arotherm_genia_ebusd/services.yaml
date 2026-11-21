@@ -466,3 +466,103 @@ write_parameter:
       example: "50"
       selector:
         text:
+
+read_time_program:
+  name: Read Weekly Time Program
+  description: >
+    Reads the full 7-day weekly schedule for a controller time program
+    (Z1Timer, HwcTimer, CoolingTimer, CirculationTimer, or SilentTimer),
+    hydrating missing slots from the eBUS when needed and returning structured JSON
+    compatible with schedule UI cards (e.g. ebusd-time-program).
+  fields:
+    program:
+      name: Time Program
+      description: "Controller time program prefix: 'Z1Timer', 'HwcTimer', 'CoolingTimer', 'CirculationTimer', or 'SilentTimer'."
+      required: true
+      example: "Z1Timer"
+      selector:
+        select:
+          custom_value: true
+          options:
+            - label: "Zone 1 Heating (Z1Timer)"
+              value: "Z1Timer"
+            - label: "Domestic Hot Water / DHW (HwcTimer)"
+              value: "HwcTimer"
+            - label: "Zone 1 Cooling (CoolingTimer)"
+              value: "CoolingTimer"
+            - label: "DHW Circulation (CirculationTimer)"
+              value: "CirculationTimer"
+            - label: "Silent Mode (SilentTimer)"
+              value: "SilentTimer"
+    entry_id:
+      name: Config Entry ID (Optional)
+      description: Optional config entry ID when multiple integration instances are configured.
+      required: false
+      selector:
+        text:
+
+write_time_program:
+  name: Write Weekly Time Program
+  description: >
+    Replaces all daily time slots (0 to 3 slots on the 10-minute grid) for one or more
+    weekdays of a controller time program, then reads back from the eBUS to verify what
+    the controller actually stored.
+  fields:
+    program:
+      name: Time Program
+      description: "Controller time program prefix: 'Z1Timer', 'HwcTimer', 'CoolingTimer', 'CirculationTimer', or 'SilentTimer'."
+      required: true
+      example: "Z1Timer"
+      selector:
+        select:
+          custom_value: true
+          options:
+            - label: "Zone 1 Heating (Z1Timer)"
+              value: "Z1Timer"
+            - label: "Domestic Hot Water / DHW (HwcTimer)"
+              value: "HwcTimer"
+            - label: "Zone 1 Cooling (CoolingTimer)"
+              value: "CoolingTimer"
+            - label: "DHW Circulation (CirculationTimer)"
+              value: "CirculationTimer"
+            - label: "Silent Mode (SilentTimer)"
+              value: "SilentTimer"
+    days:
+      name: Days of the Week
+      description: List of lowercase English weekday names to update (e.g. ["monday", "tuesday"]).
+      required: true
+      example: ["monday"]
+      selector:
+        select:
+          multiple: true
+          options:
+            - label: "Monday"
+              value: "monday"
+            - label: "Tuesday"
+              value: "tuesday"
+            - label: "Wednesday"
+              value: "wednesday"
+            - label: "Thursday"
+              value: "thursday"
+            - label: "Friday"
+              value: "friday"
+            - label: "Saturday"
+              value: "saturday"
+            - label: "Sunday"
+              value: "sunday"
+    slots:
+      name: Time Slots
+      description: "List of 0 to 3 time slots ({start, end, temperature?}) on the 10-minute grid. Pass an empty list [] to clear the day."
+      required: true
+      example:
+        - start: "14:00"
+          end: "22:00"
+          temperature: 21.0
+      selector:
+        object:
+    entry_id:
+      name: Config Entry ID (Optional)
+      description: Optional config entry ID when multiple integration instances are configured.
+      required: false
+      selector:
+        text:

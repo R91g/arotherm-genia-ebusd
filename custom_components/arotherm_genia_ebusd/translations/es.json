@@ -1181,6 +1181,42 @@
           "description": "Valor o cadena de texto que se enviará en el payload de escritura a eBUSd."
         }
       }
+    },
+    "read_time_program": {
+      "name": "Leer programación horaria semanal",
+      "description": "Lee la programación semanal completa de 7 días de un programa horario del regulador (Z1Timer, HwcTimer, CoolingTimer, CirculationTimer o SilentTimer), completando desde el bus eBUS cualquier franja que falte y devolviendo JSON estructurado compatible con tarjetas de horarios.",
+      "fields": {
+        "program": {
+          "name": "Programa horario",
+          "description": "Prefijo del programa horario del regulador: 'Z1Timer', 'HwcTimer', 'CoolingTimer', 'CirculationTimer' o 'SilentTimer'."
+        },
+        "entry_id": {
+          "name": "ID de entrada de configuración (Opcional)",
+          "description": "ID opcional de la entrada de configuración si hay varias instancias configuradas."
+        }
+      }
+    },
+    "write_time_program": {
+      "name": "Escribir programación horaria semanal",
+      "description": "Reemplaza todas las franjas diarias (de 0 a 3 franjas en rejilla de 10 minutos) para uno o varios días de un programa horario y relee desde el bus eBUS para verificar lo que almacenó realmente el regulador.",
+      "fields": {
+        "program": {
+          "name": "Programa horario",
+          "description": "Prefijo del programa horario del regulador: 'Z1Timer', 'HwcTimer', 'CoolingTimer', 'CirculationTimer' o 'SilentTimer'."
+        },
+        "days": {
+          "name": "Días de la semana",
+          "description": "Lista de días de la semana en inglés y minúsculas a actualizar (ej. monday, tuesday)."
+        },
+        "slots": {
+          "name": "Franjas horarias",
+          "description": "Lista de 0 a 3 franjas (start, end y temperature opcional) en rejilla de 10 minutos. Envía una lista vacía para limpiar el día."
+        },
+        "entry_id": {
+          "name": "ID de entrada de configuración (Opcional)",
+          "description": "ID opcional de la entrada de configuración si hay varias instancias configuradas."
+        }
+      }
     }
   }
 }

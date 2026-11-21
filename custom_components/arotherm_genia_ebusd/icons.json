@@ -13,7 +13,9 @@
     "record_topic_changes": "mdi:record-rec",
     "send_hex_command": "mdi:hexadecimal",
     "read_parameter": "mdi:database-search",
-    "write_parameter": "mdi:database-edit"
+    "write_parameter": "mdi:database-edit",
+    "read_time_program": "mdi:calendar-search",
+    "write_time_program": "mdi:calendar-edit"
   },
   "entity": {
     "climate": {

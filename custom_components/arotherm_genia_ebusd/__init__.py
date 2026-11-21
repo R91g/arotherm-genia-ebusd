@@ -55,6 +55,7 @@ from .const import (
     SERVICE_FORCE_DHW_BOOST,
     SERVICE_QUICK_VETO,
     SERVICE_READ_PARAMETER,
+    SERVICE_READ_TIME_PROGRAM,
     SERVICE_RECORD_TOPIC_CHANGES,
     SERVICE_SEND_HEX_COMMAND,
     SERVICE_SET_HOLIDAY_MODE,
@@ -62,12 +63,19 @@ from .const import (
     SERVICE_SET_WEEKLY_TIMER,
     SERVICE_START_VENTILATION_BOOST,
     SERVICE_WRITE_PARAMETER,
+    SERVICE_WRITE_TIME_PROGRAM,
     SET_CONFIRMATION_DELAY_SECONDS,
     TIMER_CIRCUIT_PREFIXES,
     WEEKDAYS_LIST,
 )
 from .coordinator import SaunierGeniaCoordinator
 from .ebusd_tcp import async_open_ebusd_tcp_connection
+from .time_programs import (
+    READ_TIME_PROGRAM_SCHEMA,
+    WRITE_TIME_PROGRAM_SCHEMA,
+    async_handle_read_time_program,
+    async_handle_write_time_program,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -497,6 +505,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             hass.services.async_remove(DOMAIN, SERVICE_SEND_HEX_COMMAND)
             hass.services.async_remove(DOMAIN, SERVICE_READ_PARAMETER)
             hass.services.async_remove(DOMAIN, SERVICE_WRITE_PARAMETER)
+            hass.services.async_remove(DOMAIN, SERVICE_READ_TIME_PROGRAM)
+            hass.services.async_remove(DOMAIN, SERVICE_WRITE_TIME_PROGRAM)
 
     return unload_ok
 
@@ -1803,4 +1813,46 @@ def _async_register_services(hass: HomeAssistant) -> None:
             _async_handle_write_parameter,
             schema=WRITE_PARAMETER_SCHEMA,
             supports_response=SupportsResponse.OPTIONAL,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_READ_TIME_PROGRAM):
+
+        async def _async_handle_read_time_program(
+            call: ServiceCall,
+        ) -> ServiceResponse:
+            """Handle arotherm_genia_ebusd.read_time_program service call."""
+            return await async_handle_read_time_program(
+                hass,
+                str(call.data["program"]),
+                entry_id=call.data.get("entry_id"),
+            )
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_READ_TIME_PROGRAM,
+            _async_handle_read_time_program,
+            schema=READ_TIME_PROGRAM_SCHEMA,
+            supports_response=SupportsResponse.ONLY,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_WRITE_TIME_PROGRAM):
+
+        async def _async_handle_write_time_program(
+            call: ServiceCall,
+        ) -> ServiceResponse:
+            """Handle arotherm_genia_ebusd.write_time_program service call."""
+            return await async_handle_write_time_program(
+                hass,
+                str(call.data["program"]),
+                list(call.data["days"]),
+                list(call.data["slots"]),
+                entry_id=call.data.get("entry_id"),
+            )
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_WRITE_TIME_PROGRAM,
+            _async_handle_write_time_program,
+            schema=WRITE_TIME_PROGRAM_SCHEMA,
+            supports_response=SupportsResponse.ONLY,
         )
