@@ -619,17 +619,36 @@ class TestTimeProgramServices(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             w_res["days"]["monday"],
-            [{"start": "13:10", "end": "14:50"}],
+            [{"start": "13:10", "end": "14:50", "temperature": 50.0}],
         )
-        self.assertNotIn("temperature", w_res["days"]["monday"][0])
 
         read_call = MagicMock()
         read_call.data = {"program": "HwcTimer"}
         r_res = await registered[SERVICE_READ_TIME_PROGRAM]["handler"](read_call)
-        self.assertIs(r_res["temperature"], False)
+        self.assertIs(r_res["temperature"], True)
         self.assertEqual(
             r_res["days"]["monday"],
-            [{"start": "13:10", "end": "14:50"}],
+            [{"start": "13:10", "end": "14:50", "temperature": 50.0}],
+        )
+
+        # Explicit temperature on HwcTimer is written and verified
+        written.clear()
+        write_temp_call = MagicMock()
+        write_temp_call.data = {
+            "program": "HwcTimer",
+            "days": ["monday"],
+            "slots": [{"start": "13:10", "end": "14:50", "temperature": 50.0}],
+        }
+        w_temp_res = await registered[SERVICE_WRITE_TIME_PROGRAM]["handler"](
+            write_temp_call
+        )
+        self.assertEqual(
+            written,
+            [(CIRCUIT_BASS3, "HwcTimer_Monday", "1;13;10;14;50;50.0")],
+        )
+        self.assertEqual(
+            w_temp_res["days"]["monday"],
+            [{"start": "13:10", "end": "14:50", "temperature": 50.0}],
         )
 
     async def test_write_validation_rejects_bad_grid_overlaps_count_and_temp(

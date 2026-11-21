@@ -50,7 +50,7 @@ class TimeProgramSpec:
     program: str
     circuit_type: str
     has_temperature: bool
-    write_noop_temp: bool = False
+    optional_temperature: bool = False
     temp_field: str | None = None
     min_temp: float | None = None
     max_temp: float | None = None
@@ -72,11 +72,15 @@ TIME_PROGRAM_SPECS: tuple[TimeProgramSpec, ...] = (
     TimeProgramSpec(
         program="HwcTimer",
         circuit_type="dhw",
-        # HwcTimer uses a single shared DHW setpoint (HwcTempDesired) rather than
-        # per-slot temperatures; writing '-' (0xFFFF) updates time slots without
-        # mutating HwcTempDesired (matching VR940 / MiGo Link behavior).
-        has_temperature=False,
-        write_noop_temp=True,
+        # HwcTimer reports the active DHW setpoint on each slot (matching ebusd-time-program's
+        # 35-70 °C range). When a write omits `temperature`, we send '-' (0xFFFF) so the
+        # controller updates the time windows without mutating HwcTempDesired.
+        has_temperature=True,
+        optional_temperature=True,
+        temp_field="temp",
+        min_temp=35.0,
+        max_temp=70.0,
+        default_temp=50.0,
         aliases=("hwc", "dhw"),
     ),
     TimeProgramSpec(
@@ -93,7 +97,7 @@ TIME_PROGRAM_SPECS: tuple[TimeProgramSpec, ...] = (
         program="CirculationTimer",
         circuit_type="circulation",
         has_temperature=False,
-        aliases=("cc", "circulation"),
+        aliases=("cc", "circulation", "cctimer"),
     ),
     TimeProgramSpec(
         program="SilentTimer",
@@ -468,15 +472,20 @@ def validate_slots(
         slot_temp: float | None = None
         if spec.has_temperature:
             raw_temp = item.get("temperature")
-            temp_val = default_temp if raw_temp is None else round(float(raw_temp), 1)
-            if (spec.min_temp is not None and temp_val < spec.min_temp) or (
-                spec.max_temp is not None and temp_val > spec.max_temp
-            ):
-                raise HomeAssistantError(
-                    f"Slot {idx} temperature {temp_val} °C is out of range for {spec.program} "
-                    f"({spec.min_temp:.1f} to {spec.max_temp:.1f} °C)."
+            if raw_temp is None and spec.optional_temperature:
+                slot_temp = None
+            else:
+                temp_val = (
+                    default_temp if raw_temp is None else round(float(raw_temp), 1)
                 )
-            slot_temp = temp_val
+                if (spec.min_temp is not None and temp_val < spec.min_temp) or (
+                    spec.max_temp is not None and temp_val > spec.max_temp
+                ):
+                    raise HomeAssistantError(
+                        f"Slot {idx} temperature {temp_val} °C is out of range for {spec.program} "
+                        f"({spec.min_temp:.1f} to {spec.max_temp:.1f} °C)."
+                    )
+                slot_temp = temp_val
 
         parsed.append(
             ParsedTimeSlot(
@@ -509,8 +518,8 @@ def _slots_match(
         return False
     if actual.end_minutes != expected.end_minutes:
         return False
-    if spec.has_temperature:
-        if actual.temperature is None or expected.temperature is None:
+    if spec.has_temperature and expected.temperature is not None:
+        if actual.temperature is None:
             return False
         if abs(actual.temperature - expected.temperature) > TEMP_MATCH_TOLERANCE_C:
             return False
@@ -623,10 +632,10 @@ async def async_handle_write_time_program(
     write_plans: list[tuple[str, list[tuple[str, str]]]] = []
     for day_canonical in target_days:
         if total_slots == 0:
-            if spec.has_temperature:
-                clear_payload = f"0;0;0;0;0;{default_temp:.1f}"
-            elif spec.write_noop_temp:
+            if spec.has_temperature and spec.optional_temperature:
                 clear_payload = "0;0;0;0;0;-"
+            elif spec.has_temperature:
+                clear_payload = f"0;0;0;0;0;{default_temp:.1f}"
             else:
                 clear_payload = "0;0;0;0;0"
             write_plans.append(
@@ -640,18 +649,21 @@ async def async_handle_write_time_program(
             wire_to_h = 24 if slot.end_minutes == 1440 else slot.to_hour
             wire_to_m = 0 if slot.end_minutes == 1440 else slot.to_min
             if spec.has_temperature:
-                temp_val = (
-                    slot.temperature if slot.temperature is not None else default_temp
-                )
-                payload = (
-                    f"{total_slots};{slot.from_hour};{slot.from_min};"
-                    f"{wire_to_h};{wire_to_m};{temp_val:.1f}"
-                )
-            elif spec.write_noop_temp:
-                payload = (
-                    f"{total_slots};{slot.from_hour};{slot.from_min};"
-                    f"{wire_to_h};{wire_to_m};-"
-                )
+                if slot.temperature is None and spec.optional_temperature:
+                    payload = (
+                        f"{total_slots};{slot.from_hour};{slot.from_min};"
+                        f"{wire_to_h};{wire_to_m};-"
+                    )
+                else:
+                    temp_val = (
+                        slot.temperature
+                        if slot.temperature is not None
+                        else default_temp
+                    )
+                    payload = (
+                        f"{total_slots};{slot.from_hour};{slot.from_min};"
+                        f"{wire_to_h};{wire_to_m};{temp_val:.1f}"
+                    )
             else:
                 payload = (
                     f"{total_slots};{slot.from_hour};{slot.from_min};"
