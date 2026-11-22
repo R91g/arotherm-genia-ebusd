@@ -953,8 +953,9 @@ class TestEbusdTcpScanMetadata(unittest.TestCase):
             ) as mock_pub,
             patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
         ):
-            asyncio.run(coord.async_write_parameter("bass3", "Z1OpMode", "off"))
+            ok = asyncio.run(coord.async_write_parameter("bass3", "Z1OpMode", "off"))
 
+        self.assertTrue(ok)
         self.assertEqual(mock_pub.await_count, 0)
         self.assertEqual(mock_sleep.await_count, 2)
         self.assertEqual(coord.get_str("bass3", "Z1OpMode", "value"), "off")
@@ -964,7 +965,7 @@ class TestEbusdTcpScanMetadata(unittest.TestCase):
         )
 
     def test_tcp_write_exhausted_retries_does_not_fake_optimistic_state(self) -> None:
-        """When all 3 TCP write attempts fail with transient bus errors, state stays unchanged."""
+        """When all 3 TCP write attempts fail with transient bus errors, state stays unchanged and False is returned."""
         hass = MagicMock()
         entry = MagicMock()
         entry.entry_id = "tcp_write_fail"
@@ -996,8 +997,9 @@ class TestEbusdTcpScanMetadata(unittest.TestCase):
             ) as mock_pub,
             patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
         ):
-            asyncio.run(coord.async_write_parameter("bass3", "Z1OpMode", "off"))
+            ok = asyncio.run(coord.async_write_parameter("bass3", "Z1OpMode", "off"))
 
+        self.assertFalse(ok)
         self.assertEqual(mock_pub.await_count, 0)
         self.assertEqual(mock_sleep.await_count, 2)
         self.assertEqual(coord.get_str("bass3", "Z1OpMode", "value"), "auto")
@@ -1030,15 +1032,16 @@ class TestEbusdTcpScanMetadata(unittest.TestCase):
                 new_callable=AsyncMock,
             ) as mock_pub,
         ):
-            asyncio.run(coord.async_write_parameter("bass3", "Z1OpMode", "off"))
+            ok1 = asyncio.run(coord.async_write_parameter("bass3", "Z1OpMode", "off"))
 
+        self.assertTrue(ok1)
         self.assertFalse(coord._tcp_write_available)
         mock_pub.assert_awaited_once_with(
             hass, "ebusd/bass3/Z1OpMode/set", "off", qos=0, retain=False
         )
         self.assertEqual(coord.get_str("bass3", "Z1OpMode", "value"), "off")
 
-        # 2. Non-transient ERR (e.g. element not found) falls back to MQTT without retrying
+        # 2. Non-transient ERR (e.g. element not found) logs warning and falls back to MQTT without retrying
         coord._tcp_write_available = True
 
         async def _fake_open_err(_host, _port, timeout=3.0):
@@ -1058,9 +1061,14 @@ class TestEbusdTcpScanMetadata(unittest.TestCase):
                 new_callable=AsyncMock,
             ) as mock_pub2,
             patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep2,
+            self.assertLogs(
+                "custom_components.arotherm_genia_ebusd.coordinator", level="WARNING"
+            ) as cm,
         ):
-            asyncio.run(coord.async_write_parameter("bass3", "Z1OpMode", "auto"))
+            ok2 = asyncio.run(coord.async_write_parameter("bass3", "Z1OpMode", "auto"))
 
+        self.assertTrue(ok2)
+        self.assertTrue(any("ERR: element not found" in msg for msg in cm.output))
         self.assertEqual(mock_sleep2.await_count, 0)
         mock_pub2.assert_awaited_once_with(
             hass, "ebusd/bass3/Z1OpMode/set", "auto", qos=0, retain=False

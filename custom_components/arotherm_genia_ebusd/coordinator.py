@@ -2572,7 +2572,7 @@ class SaunierGeniaCoordinator:
 
             last_err = resp or "ERR: empty response"
             if resp and not self._is_transient_ebus_write_error(resp):
-                _LOGGER.debug(
+                _LOGGER.warning(
                     "Non-transient eBUSd TCP write response for %s/%s -> '%s' (%s); falling back to MQTT",
                     target_circuit,
                     message,
@@ -2612,8 +2612,12 @@ class SaunierGeniaCoordinator:
         circuit: str,
         message: str,
         value: Any,
-    ) -> None:
-        """Write a parameter via acknowledged eBUSd TCP (with retries) or MQTT /set fallback."""
+    ) -> bool:
+        """Write a parameter via acknowledged eBUSd TCP (with retries) or MQTT /set fallback.
+
+        Returns True when the write was acknowledged over TCP or published over MQTT,
+        and False when TCP exhausted all bus retries without delivering the write.
+        """
         circuit_lower = circuit.lower()
         is_controller = circuit_lower in CONTROLLER_CIRCUITS
         is_outdoor = circuit_lower in OUTDOOR_CIRCUITS
@@ -2639,7 +2643,7 @@ class SaunierGeniaCoordinator:
                 self._schedule_confirmation_get(
                     circuit, message, key_circuit=check_circuit
                 )
-            return
+            return False
 
         if tcp_result is None:
             topic = f"{self.mqtt_prefix}/{target_circuit}/{message}/set"
@@ -2671,6 +2675,7 @@ class SaunierGeniaCoordinator:
                 self._schedule_confirmation_get(
                     circuit, message, key_circuit=check_circuit
                 )
+        return True
 
     @callback
     def _schedule_confirmation_get(

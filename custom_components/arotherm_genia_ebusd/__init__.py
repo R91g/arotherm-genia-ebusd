@@ -1128,9 +1128,14 @@ def _async_register_services(hass: HomeAssistant) -> None:
                                 if not first_write:
                                     await asyncio.sleep(0.6)
                                 first_write = False
-                                await coordinator.async_write_parameter(
+                                write_ok = await coordinator.async_write_parameter(
                                     CIRCUIT_BASS3, message, msg_payload
                                 )
+                                if write_ok is False:
+                                    raise HomeAssistantError(
+                                        f"eBUSd failed to write {message} after retries "
+                                        "(bus communication error)."
+                                    )
                             # Update optimistic counter only after the full day's cascade finishes cleanly
                             coordinator.async_set_optimistic_active_slots(
                                 prefix, day_name, new_total
@@ -1239,14 +1244,28 @@ def _async_register_services(hass: HomeAssistant) -> None:
                     raise HomeAssistantError(
                         "Cannot execute service: eBUS communication is not operational."
                     )
-                await coordinator.async_write_parameter(
-                    CIRCUIT_BASS3, "HwcLegionellaDay", day_code
-                )
+                if (
+                    await coordinator.async_write_parameter(
+                        CIRCUIT_BASS3, "HwcLegionellaDay", day_code
+                    )
+                    is False
+                ):
+                    raise HomeAssistantError(
+                        "eBUSd failed to write HwcLegionellaDay after retries "
+                        "(bus communication error)."
+                    )
                 if time_str is not None:
                     await asyncio.sleep(SET_CONFIRMATION_DELAY_SECONDS)
-                    await coordinator.async_write_parameter(
-                        CIRCUIT_BASS3, "HwcLegionellaTime", time_str
-                    )
+                    if (
+                        await coordinator.async_write_parameter(
+                            CIRCUIT_BASS3, "HwcLegionellaTime", time_str
+                        )
+                        is False
+                    ):
+                        raise HomeAssistantError(
+                            "eBUSd failed to write HwcLegionellaTime after retries "
+                            "(bus communication error)."
+                        )
 
         hass.services.async_register(
             DOMAIN,
@@ -1792,7 +1811,14 @@ def _async_register_services(hass: HomeAssistant) -> None:
             topic = f"{coordinator.mqtt_prefix}/{target_circuit}/{name}/set"
 
             try:
-                await coordinator.async_write_parameter(circuit, name, value)
+                write_ok = await coordinator.async_write_parameter(circuit, name, value)
+                if write_ok is False:
+                    raise HomeAssistantError(
+                        f"eBUSd failed to write '{target_circuit}/{name}' after retries "
+                        "(bus communication error)."
+                    )
+            except HomeAssistantError:
+                raise
             except Exception as err:
                 raise HomeAssistantError(
                     f"Failed to publish write parameter to '{topic}': {err}"

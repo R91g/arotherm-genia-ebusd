@@ -687,9 +687,14 @@ async def async_handle_write_time_program(
                     if not first_write:
                         await asyncio.sleep(WRITE_PACING_SECONDS)
                     first_write = False
-                    await coordinator.async_write_parameter(
+                    write_ok = await coordinator.async_write_parameter(
                         CIRCUIT_BASS3, msg_name, payload
                     )
+                    if write_ok is False:
+                        raise HomeAssistantError(
+                            f"eBUSd failed to write {msg_name} after retries "
+                            "(bus communication error)."
+                        )
                 coordinator.async_set_optimistic_active_slots(
                     spec.program, day_canonical, total_slots
                 )

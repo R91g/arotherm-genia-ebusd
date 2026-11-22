@@ -560,10 +560,10 @@ class TestTimeProgramServices(unittest.IsolatedAsyncioTestCase):
             await registered[SERVICE_WRITE_TIME_PROGRAM]["handler"](call)
         self.assertIn("mismatch", str(ctx.exception).lower())
 
-    async def test_hwc_timer_reports_no_per_slot_temp_and_writes_noop_sentinel(
+    async def test_hwc_timer_reports_temp_and_writes_noop_sentinel_when_omitted(
         self,
     ) -> None:
-        """HwcTimer reports temperature=False and writes '-' (0xFFFF) to preserve HwcTempDesired."""
+        """HwcTimer reports temperature=True and writes '-' (0xFFFF) when temperature is omitted."""
         hass, coord, registered = _make_hass_and_coordinator()
         _async_register_services(hass)
 
@@ -806,6 +806,53 @@ class TestTimeProgramServices(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(HomeAssistantError):
             await registered[SERVICE_WRITE_TIME_PROGRAM]["handler"](call)
         coord.async_write_parameter.assert_not_called()
+
+    async def test_write_time_program_propagates_false_from_exhausted_tcp_retries(
+        self,
+    ) -> None:
+        """Even on an idempotent rewrite, async_write_parameter returning False must raise."""
+        hass, coord, registered = _make_hass_and_coordinator()
+        _async_register_services(hass)
+        coord._async_on_mqtt_message(
+            _make_mqtt_msg(
+                "ebusd/bass3/Z1Timer_Slots",
+                {
+                    "mon": {"value": 1},
+                    "tue": {"value": 0},
+                    "wed": {"value": 0},
+                    "thu": {"value": 0},
+                    "fri": {"value": 0},
+                    "sat": {"value": 0},
+                    "sun": {"value": 0},
+                },
+            )
+        )
+        coord._async_on_mqtt_message(
+            _make_mqtt_msg(
+                "ebusd/bass3/Z1Timer_Monday",
+                {
+                    "from_hour": {"value": 6},
+                    "from_min": {"value": 0},
+                    "to_hour": {"value": 9},
+                    "to_min": {"value": 0},
+                    "temp": {"value": 21.0},
+                },
+            )
+        )
+        coord.async_write_parameter = AsyncMock(return_value=False)
+
+        call = MagicMock()
+        call.data = {
+            "program": "Z1Timer",
+            "days": ["monday"],
+            "slots": [{"start": "06:00", "end": "09:00", "temperature": 21.0}],
+        }
+        with self.assertRaises(HomeAssistantError) as ctx:
+            await registered[SERVICE_WRITE_TIME_PROGRAM]["handler"](call)
+        self.assertIn("failed to write", str(ctx.exception).lower())
+        coord.async_write_parameter.assert_awaited_once()
+        # Slot cache for Monday was invalidated for safety
+        self.assertNotIn("mon", coord.get_message("bass3", "Z1Timer_Slots") or {})
 
 
 if __name__ == "__main__":
