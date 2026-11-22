@@ -28,7 +28,7 @@
       },
       "ebusd_tcp": {
         "title": "Conexión TCP con eBUSd (Opcional)",
-        "description": "**Paso opcional.** Configura la conexión directa por TCP con tu demonio eBUSd para activar diagnósticos físicos del bus en tiempo real, verificación automática de los CSV, escrituras confirmadas y las acciones de programación horaria semanal (`read_time_program` / `write_time_program`).\n\n- Si se ha detectado automáticamente el add-on de eBUSd en Home Assistant o un demonio local, el interruptor, el host y el puerto ya aparecerán **autocompletados abajo**.\n- Si no se ha detectado (por ejemplo, si eBUSd corre en otro equipo/IP), puedes escribir el host y el puerto manualmente o simplemente **dejarlo desactivado sin rellenar nada y continuar**. La integración funciona con normalidad por MQTT y **siempre podrás configurarlo o cambiarlo más adelante en las opciones de la integración**.",
+        "description": "**Paso opcional.** Configura la conexión directa por TCP con tu demonio eBUSd para activar diagnósticos físicos del bus en tiempo real, verificación automática de los CSV, botones de control del demonio y escrituras confirmadas con reintentos.\n\n- Si se ha detectado automáticamente el add-on de eBUSd en Home Assistant o un demonio local, el interruptor, el host y el puerto ya aparecerán **autocompletados abajo**.\n- Si no se ha detectado (por ejemplo, si eBUSd corre en otro equipo/IP), puedes escribir el host y el puerto manualmente o simplemente **dejarlo desactivado sin rellenar nada y continuar**. Todas las funciones principales (incluidos controles y programaciones horarias) funcionan con normalidad por MQTT y **siempre podrás configurarlo o cambiarlo más adelante en las opciones de la integración**.",
         "data": {
           "enable_ebusd_tcp": "Habilitar diagnóstico físico y comandos de eBUSd por TCP (opcional)",
           "ebusd_tcp_host": "Host TCP de eBUSd (IP o nombre de host)",
@@ -59,7 +59,7 @@
       },
       "reconfigure_ebusd_tcp": {
         "title": "Reconfigurar Conexión TCP con eBUSd (Opcional)",
-        "description": "**Paso opcional.** Revisa o actualiza la conexión directa por TCP con tu demonio eBUSd (diagnósticos físicos del bus, verificación de CSV, escrituras confirmadas y acciones de programación horaria semanal).\n\n- Si se ha detectado automáticamente el add-on de eBUSd o un demonio local, su host y puerto aparecen autocompletados abajo.\n- Puedes dejarlo desactivado sin afectar al funcionamiento por MQTT y **siempre podrás cambiarlo más adelante desde las opciones de la integración**.",
+        "description": "**Paso opcional.** Revisa o actualiza la conexión directa por TCP con tu demonio eBUSd (diagnósticos físicos del bus, verificación de CSV, botones de control del demonio y escrituras confirmadas con reintentos).\n\n- Si se ha detectado automáticamente el add-on de eBUSd o un demonio local, su host y puerto aparecen autocompletados abajo.\n- Puedes dejarlo desactivado sin afectar al funcionamiento por MQTT (controles y programaciones siguen funcionando por MQTT) y **siempre podrás cambiarlo más adelante desde las opciones de la integración**.",
         "data": {
           "enable_ebusd_tcp": "Habilitar diagnóstico físico y comandos de eBUSd por TCP (opcional)",
           "ebusd_tcp_host": "Host TCP de eBUSd (IP o nombre de host)",

@@ -28,7 +28,7 @@
       },
       "ebusd_tcp": {
         "title": "eBUSd-TCP-Verbindung (Optional)",
-        "description": "**Optionaler Schritt.** Konfiguriere eine direkte TCP-Verbindung zum eBUSd-Daemon für physische Echtzeit-Busdiagnose, automatische CSV-Prüfung, bestätigte Schreibbefehle und Wochenzeitprogramm-Aktionen (`read_time_program` / `write_time_program`).\n\n- Wenn das Home Assistant eBUSd-Add-on oder ein lokaler eBUSd-Daemon automatisch erkannt wurde, sind Schalter, Host und Port **unten bereits vorausgefüllt**.\n- Wenn nichts erkannt wurde (z. B. eBUSd läuft auf einem anderen Host/IP), kannst du Host und Port manuell eingeben — oder es einfach **deaktiviert lassen und ohne Eingabe fortfahren**. Die Integration funktioniert regulär über MQTT und **du kannst dies jederzeit später in den Optionen der Integration ändern**.",
+        "description": "**Optionaler Schritt.** Konfiguriere eine direkte TCP-Verbindung zum eBUSd-Daemon für physische Echtzeit-Busdiagnose, automatische CSV-Prüfung, Daemon-Steuerungsschaltflächen und bestätigte Schreibbefehle mit Wiederholungen.\n\n- Wenn das Home Assistant eBUSd-Add-on oder ein lokaler eBUSd-Daemon automatisch erkannt wurde, sind Schalter, Host und Port **unten bereits vorausgefüllt**.\n- Wenn nichts erkannt wurde (z. B. eBUSd läuft auf einem anderen Host/IP), kannst du Host und Port manuell eingeben — oder es einfach **deaktiviert lassen und ohne Eingabe fortfahren**. Alle Hauptfunktionen (inkl. Steuerung und Zeitprogrammen) laufen regulär über MQTT und **du kannst dies jederzeit später in den Optionen der Integration ändern**.",
         "data": {
           "enable_ebusd_tcp": "eBUSd-TCP-Diagnose und -Befehle aktivieren (optional)",
           "ebusd_tcp_host": "eBUSd TCP-Host (IP oder Hostname)",
@@ -59,7 +59,7 @@
       },
       "reconfigure_ebusd_tcp": {
         "title": "eBUSd-TCP-Verbindung neu konfigurieren (Optional)",
-        "description": "**Optionaler Schritt.** Prüfe oder aktualisiere die direkte TCP-Verbindung zu deinem eBUSd-Daemon (Busdiagnose, CSV-Prüfung, bestätigte Schreibbefehle und Wochenzeitprogramm-Aktionen).\n\n- Wenn das Home Assistant eBUSd-Add-on oder ein lokaler Daemon erkannt wurde, sind Host und Port unten vorausgefüllt.\n- Du kannst die Option deaktiviert lassen, ohne den MQTT-Betrieb zu beeinträchtigen, und **sie jederzeit später in den Optionen der Integration ändern**.",
+        "description": "**Optionaler Schritt.** Prüfe oder aktualisiere die direkte TCP-Verbindung zu deinem eBUSd-Daemon (Busdiagnose, CSV-Prüfung, Daemon-Steuerungsschaltflächen und bestätigte Schreibbefehle mit Wiederholungen).\n\n- Wenn das Home Assistant eBUSd-Add-on oder ein lokaler Daemon erkannt wurde, sind Host und Port unten vorausgefüllt.\n- Du kannst die Option deaktiviert lassen, ohne den MQTT-Betrieb zu beeinträchtigen (Steuerung und Zeitprogramme laufen weiter über MQTT), und **sie jederzeit später in den Optionen der Integration ändern**.",
         "data": {
           "enable_ebusd_tcp": "eBUSd-TCP-Diagnose und -Befehle aktivieren (optional)",
           "ebusd_tcp_host": "eBUSd TCP-Host (IP oder Hostname)",
