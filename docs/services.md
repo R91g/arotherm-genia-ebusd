@@ -2,7 +2,7 @@
 
 **🇬🇧 English** | [🇪🇸 Versión en Español](services_es.md)
 
-The integration registers fourteen custom actions under the `arotherm_genia_ebusd` domain, available in **Developer Tools → Actions** and in automations and scripts.
+The integration registers sixteen custom actions under the `arotherm_genia_ebusd` domain, available in **Developer Tools → Actions** and in automations and scripts.
 
 | # | Action | Purpose |
 | :---: | :--- | :--- |
@@ -20,6 +20,8 @@ The integration registers fourteen custom actions under the `arotherm_genia_ebus
 | 12 | [`write_parameter`](#12-arotherm_genia_ebusdwrite_parameter) | Write a symbolic eBUS register |
 | 13 | [`start_ventilation_boost`](#13-arotherm_genia_ebusdstart_ventilation_boost) | Start the 30-minute intensive ventilation boost |
 | 14 | [`cancel_ventilation_boost`](#14-arotherm_genia_ebusdcancel_ventilation_boost) | Cancel active intensive ventilation boost |
+| 15 | [`read_time_program`](#15-arotherm_genia_ebusdread_time_program) | Read a full 7-day weekly time program as structured JSON |
+| 16 | [`write_time_program`](#16-arotherm_genia_ebusdwrite_time_program) | Replace one or more days of a weekly time program with bus read-back verification |
 
 ---
 
@@ -289,4 +291,64 @@ Immediately cancels an active Intensive Ventilation Boost (`VentilationBoost = o
 ```yaml
 action: arotherm_genia_ebusd.cancel_ventilation_boost
 ```
+
+---
+
+## 15. `arotherm_genia_ebusd.read_time_program`
+
+Reads the complete 7-day weekly schedule for a controller time program (`SupportsResponse.ONLY`), using cached telemetry and actively hydrating any missing slots from the eBUS when needed.
+
+| Parameter | Required | Allowed Values | Description |
+| :--- | :---: | :--- | :--- |
+| `program` | Yes | `Z1Timer`, `HwcTimer`, `CoolingTimer`, `CirculationTimer`, `SilentTimer` *(short aliases `z1`, `hwc`, `cooling`, `cc`, `silent` also accepted)* | Controller time program to read. Unsupported programs (e.g. `Z2Timer`) raise `"not available on this controller"`. |
+| `entry_id` | No | Config entry ID | Optional config entry selector when multiple integration instances are configured. |
+
+**Example:**
+```yaml
+action: arotherm_genia_ebusd.read_time_program
+data:
+  program: Z1Timer
+```
+
+---
+
+## 16. `arotherm_genia_ebusd.write_time_program`
+
+Replaces all daily time slots (`0` to `3` slots in `HH:MM` format, `24:00` for end-of-day midnight) for one or more weekdays of a controller time program (`SupportsResponse.ONLY`), then actively reads `<program>_Slots` and every written slot back from the eBUS to verify what the controller actually stored.
+
+| Parameter | Required | Allowed Values | Description |
+| :--- | :---: | :--- | :--- |
+| `program` | Yes | `Z1Timer`, `HwcTimer`, `CoolingTimer`, `CirculationTimer`, `SilentTimer` | Controller time program to write. |
+| `days` | Yes | List of lowercase English weekdays (`monday`..`sunday`) | Days to overwrite. |
+| `slots` | Yes | List of `0`–`3` `{start, end, temperature?}` objects | Pass `[]` to clear the day (`0` active slots). For `HwcTimer`, all slots share the single global DHW setpoint (`HwcTempDesired`); omitting `temperature` sends `-` (`0xFFFF`) so `HwcTempDesired` is left untouched. |
+| `entry_id` | No | Config entry ID | Optional config entry selector when multiple integration instances are configured. |
+
+**Example:**
+```yaml
+action: arotherm_genia_ebusd.write_time_program
+data:
+  program: Z1Timer
+  days: [monday, tuesday]
+  slots:
+    - start: "07:00"
+      end: "09:30"
+      temperature: 20.5
+    - start: "14:00"
+      end: "22:00"
+      temperature: 21.0
+```
+
+### Visual Weekly Schedule Editor Card
+
+Both `read_time_program` and `write_time_program` follow the service contract used by the **[eBUSd Time Program Card](https://github.com/citoki/ebusd-time-program)** (available via HACS / Home Assistant Marketplace), letting you view and edit Zone 1 heating, DHW and circulation schedules visually from any Lovelace dashboard without ebusd MQTT discovery sensors:
+
+```yaml
+type: custom:ebusd-time-program-card
+source: arotherm_genia_ebusd
+programs:
+  - z1
+  - hwc
+  - cc
+```
+
 

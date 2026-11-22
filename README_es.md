@@ -23,7 +23,7 @@ Las definiciones de registros que `ebusd` incluye por defecto son anteriores a e
 - Escucha pasiva del bus combinada con las lecturas programadas del propio `ebusd` (`r1` para potencia eléctrica, `r2` para impulsión/retorno/caudal); la integración añade un sondeo `/get` de respaldo suave solo cuando no hay pasarela cloud oficial.
 - Climatización de Zona 1 (calor / frío / apagado) con presets (programado, manual continuo, eco, quick veto, ventilación intensiva, vacaciones), filtrado de valores centinela del firmware, gestión automática del calendario del doble bloqueo de refrigeración y prioridad del modo vacaciones sobre el frío.
 - ACS con carga puntual (boost) que eleva temporalmente la consigna para sortear la histéresis de carga de fábrica, además de control semanal de día y hora antilegionella.
-- Escritura de programaciones horarias de calefacción, refrigeración, ACS, circulación y modo silencioso, con hasta 3 franjas diarias y resolución de 1 minuto.
+- Calendarios de programación semanal, sensores resumen y escritura de horarios de calefacción, refrigeración, ACS, circulación y modo silencioso (hasta 3 franjas diarias y resolución de 1 minuto), además de las acciones `read_time_program` / `write_time_program` para editarlos visualmente con **[citoki/ebusd-time-program](https://github.com/citoki/ebusd-time-program)** (`source: arotherm_genia_ebusd`).
 - Quick veto nativo en calefacción, quick veto temporal persistente en refrigeración, refuerzo de ventilación intensiva (30 minutos) y programación de vacaciones con fecha y hora y sensores unificados de tiempo restante entre reinicios.
 - Contadores de energía por modo con resolución de Wh, potencia térmica y COP/EER calculados, listos para el Panel de Energía.
 - Diagnóstico TCP opcional de `ebusd` (`info` y verificación CSV `find`), detección de CSV ausentes, volcados anonimizados y acciones de lectura/escritura simbólica de registros.
@@ -70,6 +70,7 @@ ruff format --check .
 - **[john30/ebusd](https://github.com/john30/ebusd) y [ebusd-configuration](https://github.com/john30/ebusd-configuration):** el demonio eBUS, las especificaciones del protocolo y la base de datos comunitaria de registros que hacen posible la comunicación local.
 - **[signalkraft/ebusd-vaillant-component](https://github.com/signalkraft/ebusd-vaillant-component):** inspiración para los servicios de volcado de diagnóstico y grabación de topics en vivo.
 - **[MarkBovee/vaillant-ebus](https://github.com/MarkBovee/vaillant-ebus):** exploración de registros de reguladores Vaillant y capturas reales de la comunidad.
+- **[citoki/ebusd-time-program](https://github.com/citoki/ebusd-time-program):** tarjeta Lovelace complementaria para la edición visual de la programación semanal (`source: arotherm_genia_ebusd`).
 
 ## Licencia y Aviso Legal
 

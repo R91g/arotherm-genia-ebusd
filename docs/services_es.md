@@ -2,7 +2,7 @@
 
 [🇬🇧 Read in English](services.md) | **🇪🇸 Español**
 
-La integración registra catorce acciones personalizadas bajo el dominio `arotherm_genia_ebusd`, disponibles en **Herramientas de Desarrollador → Acciones** y en automatizaciones y scripts.
+La integración registra dieciséis acciones personalizadas bajo el dominio `arotherm_genia_ebusd`, disponibles en **Herramientas de Desarrollador → Acciones** y en automatizaciones y scripts.
 
 | # | Acción | Propósito |
 | :---: | :--- | :--- |
@@ -20,6 +20,8 @@ La integración registra catorce acciones personalizadas bajo el dominio `arothe
 | 12 | [`write_parameter`](#12-arotherm_genia_ebusdwrite_parameter) | Escribir un registro eBUS simbólico |
 | 13 | [`start_ventilation_boost`](#13-arotherm_genia_ebusdstart_ventilation_boost) | Iniciar el refuerzo de ventilación intensiva (30 minutos) |
 | 14 | [`cancel_ventilation_boost`](#14-arotherm_genia_ebusdcancel_ventilation_boost) | Cancelar el refuerzo de ventilación intensiva activo |
+| 15 | [`read_time_program`](#15-arotherm_genia_ebusdread_time_program) | Leer un programa horario semanal completo (7 días) en JSON estructurado |
+| 16 | [`write_time_program`](#16-arotherm_genia_ebusdwrite_time_program) | Reemplazar uno o varios días de un programa horario con verificación por relectura en bus |
 
 ---
 
@@ -289,4 +291,64 @@ Cancela inmediatamente el refuerzo de ventilación intensiva activo (`Ventilatio
 ```yaml
 action: arotherm_genia_ebusd.cancel_ventilation_boost
 ```
+
+---
+
+## 15. `arotherm_genia_ebusd.read_time_program`
+
+Lee la programación semanal completa de 7 días de un programa horario del regulador (`SupportsResponse.ONLY`), usando los datos en caché e hidratando activamente desde el bus eBUS cualquier franja que falte.
+
+| Parámetro | Obligatorio | Valores Permitidos | Descripción |
+| :--- | :---: | :--- | :--- |
+| `program` | Sí | `Z1Timer`, `HwcTimer`, `CoolingTimer`, `CirculationTimer`, `SilentTimer` *(también acepta alias cortos `z1`, `hwc`, `cooling`, `cc`, `silent`)* | Programa horario a leer. Los programas no disponibles (p. ej. `Z2Timer`) devuelven `"not available on this controller"`. |
+| `entry_id` | No | ID de entrada de configuración | Selector opcional cuando hay varias instancias de la integración configuradas. |
+
+**Ejemplo:**
+```yaml
+action: arotherm_genia_ebusd.read_time_program
+data:
+  program: Z1Timer
+```
+
+---
+
+## 16. `arotherm_genia_ebusd.write_time_program`
+
+Reemplaza todas las franjas diarias (de `0` a `3` franjas en formato `HH:MM`, `"24:00"` para medianoche) para uno o varios días de un programa horario (`SupportsResponse.ONLY`) y relee activamente `<program>_Slots` y cada franja escrita desde el bus eBUS para confirmar lo que almacenó realmente el regulador.
+
+| Parámetro | Obligatorio | Valores Permitidos | Descripción |
+| :--- | :---: | :--- | :--- |
+| `program` | Sí | `Z1Timer`, `HwcTimer`, `CoolingTimer`, `CirculationTimer`, `SilentTimer` | Programa horario a escribir. |
+| `days` | Sí | Lista de días en inglés y minúsculas (`monday`..`sunday`) | Días a sobrescribir. |
+| `slots` | Sí | Lista de `0`–`3` objetos `{start, end, temperature?}` | Envía `[]` para vaciar el día (`0` franjas activas). En `HwcTimer`, todas las franjas comparten la consigna global de ACS (`HwcTempDesired`); si se omite `temperature` se envía `-` (`0xFFFF`) para no alterar `HwcTempDesired`. |
+| `entry_id` | No | ID de entrada de configuración | Selector opcional cuando hay varias instancias de la integración configuradas. |
+
+**Ejemplo:**
+```yaml
+action: arotherm_genia_ebusd.write_time_program
+data:
+  program: Z1Timer
+  days: [monday, tuesday]
+  slots:
+    - start: "07:00"
+      end: "09:30"
+      temperature: 20.5
+    - start: "14:00"
+      end: "22:00"
+      temperature: 21.0
+```
+
+### Tarjeta visual para editar la programación semanal
+
+Tanto `read_time_program` como `write_time_program` implementan el contrato compatible con la tarjeta **[eBUSd Time Program Card](https://github.com/citoki/ebusd-time-program)** (disponible en HACS / Marketplace de Home Assistant), que permite consultar y editar visualmente las programaciones de calefacción (Zona 1), ACS y recirculación desde cualquier panel Lovelace sin necesidad de sensores de autodescubrimiento MQTT de `ebusd`:
+
+```yaml
+type: custom:ebusd-time-program-card
+source: arotherm_genia_ebusd
+programs:
+  - z1
+  - hwc
+  - cc
+```
+
 
