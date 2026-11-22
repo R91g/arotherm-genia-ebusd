@@ -28,8 +28,8 @@ w,,,HydraulicScheme,system diagram,,,b524,020100003600,value,,UIN,,,system diagr
 r;u,,,MultiRelaySetting,multifunction relay setting,,,b524,020000004d00,ign,,IGN:4,,,,value,,UIN,0=circulation;1=dryer;2=zone;3=legiopump,,
 w,,,MultiRelaySetting,multifunction relay setting,,,b524,020100004d00,value,,UIN,0=circulation;1=dryer;2=zone;3=legiopump,,
 r;u,,,DisplayedOutsideTemp,outside temperature,,,b524,020000007300,ign,,IGN:4,,,,value,,EXP,,°C,outside temperature
-r;u,,,OutsideTempAvg,average outside temperature,,,b524,020000009500,ign,,IGN:4,,,,value,,EXP,,°C,rounded average outside temperature (updated every 3h)
-w,,,OutsideTempAvg,average outside temperature,,,b524,020100009500,value,,EXP,,°C,rounded average outside temperature (updated every 3h)
+r;u,,,OutsideTempAvg,average outside temperature,,,b524,020000009500,ign,,IGN:4,,,,value,,EXP,,°C,24h rolling average outside temperature (updated every 3h)
+w,,,OutsideTempAvg,average outside temperature,,,b524,020100009500,value,,EXP,,°C,24h rolling average outside temperature (updated every 3h)
 # Disabled active polling of non-existent solar registers to prevent bus saturation and read timeouts
 r;u,,,YieldTotal,total environmental yield,,,b524,020000003e00,ign,,IGN:4,,,,value,,ULG,,kWh,total environmental yield
 w,,,YieldTotal,total environmental yield,,,b524,020100003e00,value,,ULG,,kWh,total environmental yield

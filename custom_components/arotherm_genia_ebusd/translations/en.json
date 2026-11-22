@@ -731,7 +731,7 @@
         "name": "Displayed Outside Temperature"
       },
       "outside_temp_avg": {
-        "name": "Average Outside Temperature (3h)"
+        "name": "Average Outside Temperature (24h)"
       },
       "z1_room_temp": {
         "name": "Zone 1 Room Temperature"

@@ -731,7 +731,7 @@
         "name": "Angezeigte Außentemperatur"
       },
       "outside_temp_avg": {
-        "name": "Gedämpfte Außentemperatur (3h-Mittelwert)"
+        "name": "Gedämpfte Außentemperatur (24h-Mittelwert)"
       },
       "z1_room_temp": {
         "name": "Raumtemperatur Zone 1"

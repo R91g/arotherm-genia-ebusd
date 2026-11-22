@@ -731,7 +731,7 @@
         "name": "Temperatura exterior mostrada"
       },
       "outside_temp_avg": {
-        "name": "Temperatura exterior media (3h)"
+        "name": "Temperatura exterior media (24h)"
       },
       "z1_room_temp": {
         "name": "Temperatura ambiente Zona 1"
