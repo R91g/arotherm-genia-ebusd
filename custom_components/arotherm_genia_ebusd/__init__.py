@@ -65,6 +65,7 @@ from .const import (
     SERVICE_WRITE_PARAMETER,
     SERVICE_WRITE_TIME_PROGRAM,
     SET_CONFIRMATION_DELAY_SECONDS,
+    TEN_MINUTE_STEP_CONTROLLER_CIRCUITS,
     TIMER_CIRCUIT_PREFIXES,
     WEEKDAYS_LIST,
 )
@@ -912,6 +913,17 @@ def _async_register_services(hass: HomeAssistant) -> None:
                 if not coordinator.is_ebus_operational:
                     raise HomeAssistantError(
                         "Cannot execute service: eBUS communication is not operational."
+                    )
+                controller_circuit = coordinator.active_controller_circuit.lower()
+                if (
+                    action == "set"
+                    and controller_circuit in TEN_MINUTE_STEP_CONTROLLER_CIRCUITS
+                    and (from_m % 10 != 0 or wire_to_m % 10 != 0)
+                ):
+                    raise HomeAssistantError(
+                        f"Time slot '{start_time}'–'{end_time}' is not aligned to 10-minute increments: "
+                        f"controller '{controller_circuit}' only supports 10-minute schedule steps "
+                        "(e.g. :00, :10, :20, :30, :40, :50)."
                     )
 
                 async with coordinator.timer_write_lock:

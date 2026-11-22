@@ -25,6 +25,7 @@ from .const import (
     CIRCUIT_GLOBAL,
     DAY_SHORT_KEYS,
     DOMAIN,
+    TEN_MINUTE_STEP_CONTROLLER_CIRCUITS,
     WEEKDAYS_LIST,
 )
 from .coordinator import SaunierGeniaCoordinator
@@ -446,6 +447,9 @@ def validate_slots(
     raw_slots: list[dict[str, Any]],
     spec: TimeProgramSpec,
     default_temp: float,
+    *,
+    minute_step: int = 1,
+    controller_circuit: str | None = None,
 ) -> list[ParsedTimeSlot]:
     """Validate 0..3 slots in HH:MM format with no overlaps and valid temperatures."""
     if len(raw_slots) > MAX_SLOTS_PER_DAY:
@@ -458,6 +462,14 @@ def validate_slots(
         fh, fm = _parse_hhmm(item["start"], is_end=False)
         raw_th, raw_tm = _parse_hhmm(item["end"], is_end=True)
         th, tm = _normalize_end_hhmm(fh, fm, raw_th, raw_tm)
+
+        if minute_step > 1 and (fm % minute_step != 0 or tm % minute_step != 0):
+            ctrl_label = controller_circuit or "this controller"
+            raise HomeAssistantError(
+                f"Slot {idx} time '{item['start']}'–'{item['end']}' is not aligned to "
+                f"{minute_step}-minute increments: controller '{ctrl_label}' only supports "
+                f"{minute_step}-minute schedule steps (e.g. :00, :10, :20, :30, :40, :50)."
+            )
 
         start_min = fh * 60 + fm
         end_min = th * 60 + tm
@@ -626,7 +638,15 @@ async def async_handle_write_time_program(
     coordinator = _resolve_coordinator(hass, entry_id)
 
     default_temp = _get_default_program_temp(coordinator, spec)
-    parsed_slots = validate_slots(slots, spec, default_temp)
+    controller_circuit = coordinator.active_controller_circuit.lower()
+    minute_step = 10 if controller_circuit in TEN_MINUTE_STEP_CONTROLLER_CIRCUITS else 1
+    parsed_slots = validate_slots(
+        slots,
+        spec,
+        default_temp,
+        minute_step=minute_step,
+        controller_circuit=controller_circuit,
+    )
 
     if not coordinator.is_ebus_operational:
         raise HomeAssistantError(

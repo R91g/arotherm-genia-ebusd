@@ -854,6 +854,45 @@ class TestTimeProgramServices(unittest.IsolatedAsyncioTestCase):
         # Slot cache for Monday was invalidated for safety
         self.assertNotIn("mon", coord.get_message("bass3", "Z1Timer_Slots") or {})
 
+    async def test_ctlv2_enforces_ten_minute_increments_while_bass3_allows_one_minute(
+        self,
+    ) -> None:
+        """ctlv2 rejects non-10-minute slots before writing; bass3 accepts 1-minute resolution."""
+        hass, coord, registered = _make_hass_and_coordinator()
+        _async_register_services(hass)
+        coord._active_controller_circuit = "ctlv2"
+        coord.async_write_parameter = AsyncMock(return_value=True)
+
+        for bad_slots in (
+            [{"start": "06:05", "end": "09:00", "temperature": 21.0}],
+            [{"start": "06:00", "end": "09:15", "temperature": 21.0}],
+        ):
+            call = MagicMock()
+            call.data = {
+                "program": "Z1Timer",
+                "days": ["monday"],
+                "slots": bad_slots,
+            }
+            with self.assertRaises(HomeAssistantError) as ctx:
+                await registered[SERVICE_WRITE_TIME_PROGRAM]["handler"](call)
+            self.assertIn("10-minute", str(ctx.exception))
+            self.assertIn("ctlv2", str(ctx.exception))
+
+        coord.async_write_parameter.assert_not_called()
+
+        # 10-minute-aligned slots (including 24:00) pass validation on ctlv2
+        ok_slots = time_programs.validate_slots(
+            [
+                {"start": "06:10", "end": "09:50", "temperature": 21.0},
+                {"start": "18:00", "end": "24:00", "temperature": 20.5},
+            ],
+            time_programs.resolve_time_program_spec("Z1Timer"),
+            20.0,
+            minute_step=10,
+            controller_circuit="ctlv2",
+        )
+        self.assertEqual(len(ok_slots), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -233,6 +233,8 @@ CONTROLLER_CIRCUITS: tuple[str, ...] = (
     CIRCUIT_CTLV2,
     CIRCUIT_CTLV3,
 )
+# Controllers whose b5 55 schedule firmware enforces 10-minute time increments
+TEN_MINUTE_STEP_CONTROLLER_CIRCUITS: frozenset[str] = frozenset({CIRCUIT_CTLV2})
 CIRCUIT_VWZIO = "vwzio"
 CIRCUIT_NETX3 = "04"
 CIRCUIT_NETX3_ALT = "f6"

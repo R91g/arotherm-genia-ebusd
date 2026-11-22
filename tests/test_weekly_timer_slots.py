@@ -484,6 +484,38 @@ class TestWeeklyTimerSlots(unittest.TestCase):
         self.assertEqual(coord.async_write_parameter.await_count, 1)
         self.assertIsNone(_get_active_slot_count(coord, "Z1Timer", "Monday"))
 
+    def test_service_ctlv2_rejects_non_ten_minute_slot(self) -> None:
+        """set_weekly_timer rejects non-10-minute steps on ctlv2 before touching the bus."""
+        hass = MagicMock()
+        services: dict[str, Any] = {}
+        hass.services.has_service.return_value = False
+        hass.services.async_register.side_effect = (
+            lambda d, s, h, schema=None, *args, **kwargs: services.update({s: h})
+        )
+
+        coord = SaunierGeniaCoordinator(hass, MagicMock(data={"mqtt_prefix": "ebusd"}))
+        coord._state[("hmux0", "status01")] = {"temp1": 35.0}
+        coord._active_controller_circuit = "ctlv2"
+        coord.async_write_parameter = AsyncMock(return_value=True)
+        hass.data = {DOMAIN: {"entry_id": coord}}
+        _async_register_services(hass)
+
+        call = MagicMock()
+        call.data = {
+            "circuit_type": "heating",
+            "day": "Monday",
+            "slot": 1,
+            "start_time": "07:05",
+            "end_time": "11:00",
+            "reset_remaining": True,
+        }
+        with self.assertRaises(HomeAssistantError) as ctx:
+            asyncio.run(services[SERVICE_SET_WEEKLY_TIMER](call))
+
+        self.assertIn("10-minute", str(ctx.exception))
+        self.assertIn("ctlv2", str(ctx.exception))
+        coord.async_write_parameter.assert_not_called()
+
     def test_csv_defines_all_slots(self) -> None:
         """Every circuit/day/slot must have a read and write message with right IDs."""
         for fname in CONTROLLER_CSVS:
