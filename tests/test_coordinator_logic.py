@@ -3653,11 +3653,29 @@ class TestCoordinatorLogic(unittest.TestCase):
             # find VentilationBoost -> missing
             b"ERR: element not found\n",
             b"\n",
+            # find Z1QuickVetoEndTime -> missing
+            b"ERR: element not found\n",
+            b"\n",
+            # find Hc1CoolingEnabled -> missing
+            b"ERR: element not found\n",
+            b"\n",
+            # find -f CirculationTimer_Monday -> legacy IGN:2 without ffff
+            b"w,bass3,CirculationTimer_Monday,Timer,,15,b555,a600030000,ign_end,m,IGN:2,,,\n",
+            b"\n",
             # find CompressorSilentOperationLevel -> missing
             b"ERR: element not found\n",
             b"\n",
             # find RunDataElectricPowerConsumption -> present
             b"hmux0 RunDataElectricPowerConsumption = 450\n",
+            b"\n",
+            # find RunStatsAuxHeaterSwitches -> missing
+            b"ERR: element not found\n",
+            b"\n",
+            # find SubcoolingTemp -> missing
+            b"ERR: element not found\n",
+            b"\n",
+            # find -F type,circuit,name Status02 -> passive u
+            b"u,hmux0,Status02\n",
             b"\n",
         ]
         mock_reader = AsyncMock()
@@ -3675,8 +3693,13 @@ class TestCoordinatorLogic(unittest.TestCase):
         mock_writer.write.assert_any_call(b"find HwcLegionellaDay\n")
         mock_writer.write.assert_any_call(b"find SilentTimer_Slots\n")
         mock_writer.write.assert_any_call(b"find VentilationBoost\n")
+        mock_writer.write.assert_any_call(b"find Z1QuickVetoEndTime\n")
+        mock_writer.write.assert_any_call(b"find Hc1CoolingEnabled\n")
+        mock_writer.write.assert_any_call(b"find -f CirculationTimer_Monday\n")
         mock_writer.write.assert_any_call(b"find CompressorSilentOperationLevel\n")
         mock_writer.write.assert_any_call(b"find RunDataElectricPowerConsumption\n")
+        mock_writer.write.assert_any_call(b"find RunStatsAuxHeaterSwitches\n")
+        mock_writer.write.assert_any_call(b"find SubcoolingTemp\n")
         mock_writer.write.assert_any_call(b"quit\n")
 
         # 2. After user updates CSVs -> TCP find returns valid messages -> repairs auto-cleared
@@ -3692,9 +3715,21 @@ class TestCoordinatorLogic(unittest.TestCase):
             b"\n",
             b"bass3 VentilationBoost = off\n",
             b"\n",
+            b"bass3 Z1QuickVetoEndTime = 00:00:00\n",
+            b"\n",
+            b"bass3 Hc1CoolingEnabled = on\n",
+            b"\n",
+            b"w,bass3,CirculationTimer_Monday,Timer,,15,b555,a600030000,ign_end,m,HEX:2,=ffff,,\n",
+            b"\n",
             b"hmux0 CompressorSilentOperationLevel = 0\n",
             b"\n",
             b"hmux0 RunDataElectricPowerConsumption = 450\n",
+            b"\n",
+            b"hmux0 RunStatsAuxHeaterSwitches = 8\n",
+            b"\n",
+            b"hmux0 SubcoolingTemp = 3.5\n",
+            b"\n",
+            b"u,hmux0,Status02\n",
             b"\n",
         ]
         mock_reader2 = AsyncMock()
@@ -3711,8 +3746,8 @@ class TestCoordinatorLogic(unittest.TestCase):
         self.assertNotIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
         self.assertNotIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
 
-        # 3. Only VentilationBoost missing on TCP find -> outdated_controller_csv still raised
-        tcp_responses_only_vent_missing = [
+        # 3. Only CirculationTimer_Monday missing =ffff padding -> outdated_controller_csv raised
+        tcp_responses_only_ffff_missing = [
             b"version: ebusd 26.1.26.1\n",
             b"scan: finished\n",
             b'address 08: slave #11, scanned "MF=Vaillant;ID=HMUX0;SW=0407;HW=0504", loaded "vaillant/08.hmux0.csv"\n',
@@ -3722,15 +3757,27 @@ class TestCoordinatorLogic(unittest.TestCase):
             b"\n",
             b"bass3 SilentTimer_Slots = 0\n",
             b"\n",
-            b"ERR: element not found\n",
+            b"bass3 VentilationBoost = off\n",
+            b"\n",
+            b"bass3 Z1QuickVetoEndTime = 00:00:00\n",
+            b"\n",
+            b"bass3 Hc1CoolingEnabled = on\n",
+            b"\n",
+            b"w,bass3,CirculationTimer_Monday,Timer,,15,b555,a600030000,ign_end,m,IGN:2,,,\n",
             b"\n",
             b"hmux0 CompressorSilentOperationLevel = 0\n",
             b"\n",
             b"hmux0 RunDataElectricPowerConsumption = 450\n",
             b"\n",
+            b"hmux0 RunStatsAuxHeaterSwitches = 8\n",
+            b"\n",
+            b"hmux0 SubcoolingTemp = 3.5\n",
+            b"\n",
+            b"u,hmux0,Status02\n",
+            b"\n",
         ]
         mock_reader3 = AsyncMock()
-        mock_reader3.readline = AsyncMock(side_effect=tcp_responses_only_vent_missing)
+        mock_reader3.readline = AsyncMock(side_effect=tcp_responses_only_ffff_missing)
         mock_writer3 = MagicMock()
         mock_writer3.drain = AsyncMock()
         mock_writer3.wait_closed = AsyncMock()

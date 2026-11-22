@@ -469,6 +469,10 @@ class SaunierGeniaCoordinator:
         self._missing_controller_registers: set[str] = set()
         self._missing_outdoor_silent_circuits: set[str] = set()
         self._active_poll_legacy_outdoor_circuits: set[str] = set()
+        self._missing_hmux0_registers: set[str] = set()
+        self._missing_vwzio_registers: set[str] = set()
+        self._legacy_hmu_field_circuits: set[str] = set()
+        self._legacy_vwzio_active_poll: bool = False
         self._last_err_responses: dict[
             tuple[str, str], tuple[float, dict[str, Any]]
         ] = {}
@@ -1939,10 +1943,17 @@ class SaunierGeniaCoordinator:
                 self.get_message(CIRCUIT_HMUX0, "CompressorSilentOperationLevel")
             )
         )
+        has_missing_v132 = bool(
+            self._missing_hmux0_registers
+        ) or self._is_ebusd_err_msg(
+            self.get_message(CIRCUIT_HMUX0, "RunStatsAuxHeaterSwitches")
+        )
         has_active_diag_legacy = (
             CIRCUIT_HMUX0 in self._active_poll_legacy_outdoor_circuits
         )
-        return has_legacy_sc or is_silent_err or has_active_diag_legacy
+        return (
+            has_legacy_sc or is_silent_err or has_missing_v132 or has_active_diag_legacy
+        )
 
     def _has_hmu_csv_incompatibility(self, circuit_key: str) -> bool:
         """Return True if any cached 08.hmu/hmu00 register indicates an outdated CSV."""
@@ -1961,7 +1972,23 @@ class SaunierGeniaCoordinator:
         has_active_diag_legacy = (
             circuit_key in self._active_poll_legacy_outdoor_circuits
         )
-        return has_legacy_status or is_silent_err or has_active_diag_legacy
+        has_legacy_fields = circuit_key in self._legacy_hmu_field_circuits
+        return (
+            has_legacy_status
+            or is_silent_err
+            or has_active_diag_legacy
+            or has_legacy_fields
+        )
+
+    def _has_vwzio_csv_incompatibility(self) -> bool:
+        """Return True if any cached 76.vwzio check indicates an outdated CSV."""
+        return (
+            self._legacy_vwzio_active_poll
+            or bool(self._missing_vwzio_registers)
+            or self._is_ebusd_err_msg(
+                self.get_message(CIRCUIT_VWZIO, "RunStatsAuxHeaterSwitches")
+            )
+        )
 
     @callback
     def _async_check_csv_compatibility_on_message(
@@ -2021,6 +2048,17 @@ class SaunierGeniaCoordinator:
                             ISSUE_OUTDATED_HMUX0_CSV, active=False
                         )
 
+            elif msg_lower == "runstatsauxheaterswitches":
+                if raw_payload.strip().startswith("ERR:"):
+                    self._missing_hmux0_registers.add("runstatsauxheaterswitches")
+                    self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=True)
+                else:
+                    self._missing_hmux0_registers.discard("runstatsauxheaterswitches")
+                    if not self._has_hmux0_csv_incompatibility():
+                        self._async_set_repair_issue(
+                            ISSUE_OUTDATED_HMUX0_CSV, active=False
+                        )
+
         # 2a. Detect legacy/upstream vs custom 08.hmu.csv / 08.hmu.HW5103.csv
         if circuit_key in (CIRCUIT_HMU, CIRCUIT_HMU00):
             if msg_lower == "status01":
@@ -2051,7 +2089,7 @@ class SaunierGeniaCoordinator:
                             ISSUE_OUTDATED_HMU_CSV, active=False
                         )
 
-        # 2b. Detect legacy vs modern controller CSVs (Z1HolidayTemp/Z1DayTemp vs HolidayTemp/Z1CoolingManualTemp/SilentTimer/VentilationBoost)
+        # 2b. Detect legacy vs modern controller CSVs (v1.3.2+: Z1QuickVetoEndTime/Z1TimeSlotActive/Hc1CoolingEnabled/etc.)
         if circuit_key in CONTROLLER_CIRCUITS:
             is_err = raw_payload.strip().startswith("ERR:")
             probe_registers = (
@@ -2059,6 +2097,9 @@ class SaunierGeniaCoordinator:
                 "silenttimer_slots",
                 "z1coolingmanualtemp",
                 "ventilationboost",
+                "z1quickvetoendtime",
+                "z1timeslotactive",
+                "hc1coolingenabled",
             )
             if not is_err and msg_lower in ("z1holidaytemp", "z1daytemp"):
                 self._async_set_repair_issue(ISSUE_OUTDATED_CONTROLLER_CSV, active=True)
@@ -2070,10 +2111,7 @@ class SaunierGeniaCoordinator:
                     self._missing_controller_registers.discard(msg_lower)
                 if msg_lower in (
                     "holidaytemp",
-                    "hwclegionelladay",
-                    "z1coolingmanualtemp",
-                    "silenttimer_slots",
-                    "ventilationboost",
+                    *probe_registers,
                 ) or (
                     msg_lower == "holidaystartdate"
                     and isinstance(parsed, dict)
@@ -2090,6 +2128,16 @@ class SaunierGeniaCoordinator:
                         self._async_set_repair_issue(
                             ISSUE_OUTDATED_CONTROLLER_CSV, active=False
                         )
+
+        # 2c. Detect pre-v1.3.2 76.vwzio.csv via RunStatsAuxHeaterSwitches over MQTT
+        if circuit_key == CIRCUIT_VWZIO and msg_lower == "runstatsauxheaterswitches":
+            if raw_payload.strip().startswith("ERR:"):
+                self._missing_vwzio_registers.add("runstatsauxheaterswitches")
+                self._async_set_repair_issue(ISSUE_OUTDATED_VWZIO_CSV, active=True)
+            else:
+                self._missing_vwzio_registers.discard("runstatsauxheaterswitches")
+                if not self._has_vwzio_csv_incompatibility():
+                    self._async_set_repair_issue(ISSUE_OUTDATED_VWZIO_CSV, active=False)
 
         # 3. Clear 'missing_custom_csv' once all required custom CSV circuits report telemetry
         if (
@@ -3325,11 +3373,23 @@ class SaunierGeniaCoordinator:
                     rows.append((parts[0], parts[1], parts[2]))
             return rows
 
+        async def _tcp_find_defs(msg_name: str) -> list[str]:
+            writer.write(f"find -f {msg_name}\n".encode("ascii"))
+            await writer.drain()
+            resp = await self._async_read_tcp_block(reader, timeout=2.0)
+            return [
+                line
+                for line in resp
+                if line and not line.upper().startswith("ERR:") and "," in line
+            ]
+
         if has_ctrl_csv:
             ctrl_probe_names = (
                 ("HwcLegionellaDay", "hwclegionelladay"),
                 ("SilentTimer_Slots", "silenttimer_slots"),
                 ("VentilationBoost", "ventilationboost"),
+                ("Z1QuickVetoEndTime", "z1quickvetoendtime"),
+                ("Hc1CoolingEnabled", "hc1coolingenabled"),
             )
             ctrl_results = [
                 (key, await _tcp_find(name)) for name, key in ctrl_probe_names
@@ -3341,6 +3401,23 @@ class SaunierGeniaCoordinator:
                     has_ctrl_err = True
                 elif resp is not None:
                     self._missing_controller_registers.discard(key)
+
+            # Verify v1.3.2+ 0xFFFF trailing padding on CirculationTimer/SilentTimer writes
+            circ_write_defs = [
+                line
+                for line in await _tcp_find_defs("CirculationTimer_Monday")
+                if len(line.split(",", 3)) >= 4
+                and line.split(",", 3)[0].strip().lower().startswith("w")
+                and line.split(",", 3)[1].strip().lower() in CONTROLLER_CIRCUITS
+                and line.split(",", 3)[2].strip().lower() == "circulationtimer_monday"
+            ]
+            if circ_write_defs:
+                if any("ffff" in row.lower() for row in circ_write_defs):
+                    self._missing_controller_registers.discard("circulationtimer_ffff")
+                else:
+                    self._missing_controller_registers.add("circulationtimer_ffff")
+                    has_ctrl_err = True
+
             if has_ctrl_err:
                 self._async_set_repair_issue(ISSUE_OUTDATED_CONTROLLER_CSV, active=True)
             elif all(resp is not None for _key, resp in ctrl_results):
@@ -3378,6 +3455,20 @@ class SaunierGeniaCoordinator:
                 for c_out in active_out_circuits:
                     self._missing_outdoor_silent_circuits.discard(c_out)
 
+            # Verify v1.3.2+ registers on 08.hmux0.csv
+            has_hmux0_v132_err = False
+            if is_hmux0_csv:
+                for name, key in (
+                    ("RunStatsAuxHeaterSwitches", "runstatsauxheaterswitches"),
+                    ("SubcoolingTemp", "subcoolingtemp"),
+                ):
+                    v132_resp = await _tcp_find(name)
+                    if v132_resp is not None and v132_resp.startswith("ERR:"):
+                        self._missing_hmux0_registers.add(key)
+                        has_hmux0_v132_err = True
+                    elif v132_resp is not None:
+                        self._missing_hmux0_registers.discard(key)
+
             # Verify passive-only (u) v1.3.1+ definitions on diagnostic/status frames
             outdoor_diag_msg = "Status02" if is_hmux0_csv else "RunDataDiag000b"
             diag_rows = [
@@ -3392,8 +3483,29 @@ class SaunierGeniaCoordinator:
                 for c_out in active_out_circuits:
                     self._active_poll_legacy_outdoor_circuits.discard(c_out)
 
-            if any(r is not None and r.startswith("ERR:") for r in out_probes) or (
-                has_active_diag_poll
+            # Verify v1.3.2+ field updates (8=venting / UCH,2) on 08.hmu*.csv
+            has_legacy_hmu_fields = False
+            if not is_hmux0_csv:
+                hmu_status_defs = [
+                    line
+                    for line in await _tcp_find_defs("Status01")
+                    if len(line.split(",", 3)) >= 4
+                    and line.split(",", 3)[1].strip().lower() in active_out_circuits
+                    and line.split(",", 3)[2].strip().lower() == "status01"
+                ]
+                if hmu_status_defs:
+                    if any("venting" in row.lower() for row in hmu_status_defs):
+                        for c_out in active_out_circuits:
+                            self._legacy_hmu_field_circuits.discard(c_out)
+                    else:
+                        self._legacy_hmu_field_circuits.update(active_out_circuits)
+                        has_legacy_hmu_fields = True
+
+            if (
+                any(r is not None and r.startswith("ERR:") for r in out_probes)
+                or has_active_diag_poll
+                or has_hmux0_v132_err
+                or has_legacy_hmu_fields
             ):
                 self._async_set_repair_issue(outdoor_issue, active=True)
             elif all(r is not None and not r.startswith("ERR:") for r in out_probes):
@@ -3414,10 +3526,18 @@ class SaunierGeniaCoordinator:
                 if row[1] == CIRCUIT_VWZIO and row[2] == "secondarycircuitstatus"
             ]
             if vwzio_rows:
-                self._async_set_repair_issue(
-                    ISSUE_OUTDATED_VWZIO_CSV,
-                    active=any(row[0].startswith("r") for row in vwzio_rows),
+                self._legacy_vwzio_active_poll = any(
+                    row[0].startswith("r") for row in vwzio_rows
                 )
+            immersion_resp = await _tcp_find("ImmersionHeaterPower")
+            if immersion_resp is not None and immersion_resp.startswith("ERR:"):
+                self._missing_vwzio_registers.add("immersionheaterpower")
+            elif immersion_resp is not None:
+                self._missing_vwzio_registers.discard("immersionheaterpower")
+            if self._has_vwzio_csv_incompatibility():
+                self._async_set_repair_issue(ISSUE_OUTDATED_VWZIO_CSV, active=True)
+            elif vwzio_rows or immersion_resp is not None:
+                self._async_set_repair_issue(ISSUE_OUTDATED_VWZIO_CSV, active=False)
 
     async def _async_fetch_ebusd_tcp_info(self) -> None:
         """Fetch daemon health, metrics, and loaded CSV status directly from eBUSd TCP socket."""

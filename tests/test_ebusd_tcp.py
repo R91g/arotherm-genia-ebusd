@@ -804,7 +804,7 @@ class TestEbusdTcpScanMetadata(unittest.TestCase):
         self.assertFalse(any(cmd.startswith(b"read -c scan.") for cmd in cmds2))
 
     def test_tcp_verifies_passive_v131_csv_definitions_and_vwzio(self) -> None:
-        """TCP find -F flags active r* legacy rows on Status02, RunDataDiag000b, and SecondaryCircuitStatus."""
+        """TCP find/-F/-f flags v1.3.1/v1.3.2 regressions on HMUX0, HMU00, and VWZIO."""
         coord = self._make_coord()
         tcp_legacy = [
             b"version: ebusd 26.1\n",
@@ -816,11 +816,17 @@ class TestEbusdTcpScanMetadata(unittest.TestCase):
             b"\n",
             b"hmux0 RunDataElectricPowerConsumption = 300\n",
             b"\n",
+            b"hmux0 RunStatsAuxHeaterSwitches = 8\n",
+            b"\n",
+            b"hmux0 SubcoolingTemp = 3.0\n",
+            b"\n",
             b"r,hmux0,Status02\n",
             b"u,hmux0,Status02\n",
             b"\n",
-            # SecondaryCircuitStatus still has active `r` (pre-v1.3.1)
+            # SecondaryCircuitStatus still has active `r` (pre-v1.3.1) and ImmersionHeaterPower missing
             b"r,vwzio,SecondaryCircuitStatus\n",
+            b"\n",
+            b"ERR: element not found\n",
             b"\n",
         ]
         r1 = AsyncMock()
@@ -841,7 +847,7 @@ class TestEbusdTcpScanMetadata(unittest.TestCase):
         self.assertIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
         self.assertIn(ISSUE_OUTDATED_VWZIO_CSV, coord._active_repair_issues)
 
-        # Updating CSVs to passive `u` clears both repairs cleanly
+        # Updating CSVs to v1.3.2 definitions clears both repairs cleanly
         tcp_updated = [
             b"version: ebusd 26.1\n",
             b'address 08: slave #11, scanned "MF=Vaillant;ID=HMUX0;SW=0407;HW=0504", loaded "vaillant/08.hmux0.csv"\n',
@@ -851,9 +857,15 @@ class TestEbusdTcpScanMetadata(unittest.TestCase):
             b"\n",
             b"hmux0 RunDataElectricPowerConsumption = 300\n",
             b"\n",
+            b"hmux0 RunStatsAuxHeaterSwitches = 8\n",
+            b"\n",
+            b"hmux0 SubcoolingTemp = 3.0\n",
+            b"\n",
             b"u,hmux0,Status02\n",
             b"\n",
             b"u,vwzio,SecondaryCircuitStatus\n",
+            b"\n",
+            b"vwzio ImmersionHeaterPower = 0.0\n",
             b"\n",
         ]
         r2 = AsyncMock()
@@ -874,9 +886,9 @@ class TestEbusdTcpScanMetadata(unittest.TestCase):
         self.assertNotIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
         self.assertNotIn(ISSUE_OUTDATED_VWZIO_CSV, coord._active_repair_issues)
 
-        # Verify HMU00 RunDataDiag000b active `r` triggers ISSUE_OUTDATED_HMU_CSV
+        # Verify HMU00 Status01 missing 8=venting (v1.3.1 CSV) triggers ISSUE_OUTDATED_HMU_CSV and clears on v1.3.2
         coord_hmu = self._make_coord()
-        tcp_hmu_legacy = [
+        tcp_hmu_v131 = [
             b"version: ebusd 26.1\n",
             b'address 08: slave #3, scanned "MF=Vaillant;ID=HMU00;SW=0902;HW=5103", loaded "vaillant/08.hmu.HW5103.csv"\n',
             b"\n",
@@ -884,11 +896,13 @@ class TestEbusdTcpScanMetadata(unittest.TestCase):
             b"\n",
             b"hmu RunDataElectricPowerConsumption = 300\n",
             b"\n",
-            b"r,hmu,RunDataDiag000b\n",
+            b"u,hmu,RunDataDiag000b\n",
+            b"\n",
+            b"r,hmu,Status01,temps,,08,b511,01,pumpstate,s,UCH,0=off;1=on;2=overrun;4=hwc,,\n",
             b"\n",
         ]
         r3 = AsyncMock()
-        r3.readline = AsyncMock(side_effect=tcp_hmu_legacy)
+        r3.readline = AsyncMock(side_effect=tcp_hmu_v131)
         w3 = MagicMock()
         w3.drain = AsyncMock()
         w3.wait_closed = AsyncMock()
@@ -903,6 +917,73 @@ class TestEbusdTcpScanMetadata(unittest.TestCase):
             asyncio.run(coord_hmu._async_fetch_ebusd_tcp_info())
 
         self.assertIn(ISSUE_OUTDATED_HMU_CSV, coord_hmu._active_repair_issues)
+
+        tcp_hmu_v132 = [
+            b"version: ebusd 26.1\n",
+            b'address 08: slave #3, scanned "MF=Vaillant;ID=HMU00;SW=0902;HW=5103", loaded "vaillant/08.hmu.HW5103.csv"\n',
+            b"\n",
+            b"hmu CompressorSilentOperationLevel = 0\n",
+            b"\n",
+            b"hmu RunDataElectricPowerConsumption = 300\n",
+            b"\n",
+            b"u,hmu,RunDataDiag000b\n",
+            b"\n",
+            b"r,hmu,Status01,temps,,08,b511,01,pumpstate,s,UCH,0=off;1=on;2=overrun;4=hwc;8=venting,,\n",
+            b"\n",
+        ]
+        r4 = AsyncMock()
+        r4.readline = AsyncMock(side_effect=tcp_hmu_v132)
+        w4 = MagicMock()
+        w4.drain = AsyncMock()
+        w4.wait_closed = AsyncMock()
+
+        with (
+            patch("asyncio.open_connection", return_value=(r4, w4)),
+            patch(
+                "homeassistant.helpers.device_registry.async_get",
+                return_value=MagicMock(),
+            ),
+        ):
+            asyncio.run(coord_hmu._async_fetch_ebusd_tcp_info())
+
+        self.assertNotIn(ISSUE_OUTDATED_HMU_CSV, coord_hmu._active_repair_issues)
+
+    def test_mqtt_detects_v132_missing_registers_without_tcp(self) -> None:
+        """MQTT ERR responses on v1.3.2 registers trigger and clear HMUX0, VWZIO, and controller repairs."""
+        from custom_components.arotherm_genia_ebusd.const import (
+            ISSUE_OUTDATED_CONTROLLER_CSV,
+        )
+
+        entry = MagicMock()
+        entry.entry_id = "mqtt_v132_repairs"
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {}
+        coord = SaunierGeniaCoordinator(MagicMock(), entry)
+
+        def _pub(topic: str, payload: str) -> None:
+            msg = MagicMock()
+            msg.topic = topic
+            msg.payload = payload.encode("utf-8")
+            msg.retain = False
+            coord._async_on_mqtt_message(msg)
+
+        # 1. Missing v1.3.2 registers over MQTT activate repairs
+        _pub("ebusd/hmux0/RunStatsAuxHeaterSwitches", "ERR: element not found")
+        _pub("ebusd/vwzio/RunStatsAuxHeaterSwitches", "ERR: element not found")
+        _pub("ebusd/bass3/Z1QuickVetoEndTime", "ERR: element not found")
+
+        self.assertIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
+        self.assertIn(ISSUE_OUTDATED_VWZIO_CSV, coord._active_repair_issues)
+        self.assertIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+
+        # 2. Valid JSON payloads clear repairs cleanly
+        _pub("ebusd/hmux0/RunStatsAuxHeaterSwitches", '{"value": {"value": 8}}')
+        _pub("ebusd/vwzio/RunStatsAuxHeaterSwitches", '{"value": {"value": 8}}')
+        _pub("ebusd/bass3/Z1QuickVetoEndTime", '{"value": {"value": "00:00:00"}}')
+
+        self.assertNotIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
+        self.assertNotIn(ISSUE_OUTDATED_VWZIO_CSV, coord._active_repair_issues)
+        self.assertNotIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
 
     def test_tcp_write_confirmed_and_retries_on_transient_errors(self) -> None:
         """TCP write succeeds on retry after transient bus errors without MQTT /set fallback."""
