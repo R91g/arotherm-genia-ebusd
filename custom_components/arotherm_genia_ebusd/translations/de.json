@@ -1198,7 +1198,7 @@
     },
     "write_time_program": {
       "name": "Wochenzeitprogramm schreiben",
-      "description": "Ersetzt alle täglichen Zeitfenster (0 bis 3 Fenster im 10-Minuten-Raster) für einen oder mehrere Wochentage eines Zeitprogramms und liest anschließend vom eBUS zurück, um die gespeicherten Werte zu prüfen.",
+      "description": "Ersetzt alle täglichen Zeitfenster (0 bis 3 Fenster im Format HH:MM) für einen oder mehrere Wochentage eines Zeitprogramms und liest anschließend vom eBUS zurück, um die gespeicherten Werte zu prüfen.",
       "fields": {
         "program": {
           "name": "Zeitprogramm",
@@ -1210,7 +1210,7 @@
         },
         "slots": {
           "name": "Zeitfenster",
-          "description": "Liste von 0 bis 3 Zeitfenstern (start, end, optional temperature) im 10-Minuten-Raster. Eine leere Liste löscht den Tag."
+          "description": "Liste von 0 bis 3 Zeitfenstern (start, end, optional temperature) im Format HH:MM. Eine leere Liste löscht den Tag."
         },
         "entry_id": {
           "name": "Konfigurationseintrags-ID (Optional)",

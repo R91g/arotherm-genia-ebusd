@@ -32,7 +32,6 @@ from .coordinator import SaunierGeniaCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 MAX_SLOTS_PER_DAY = 3
-TIME_GRID_MINUTES = 10
 WRITE_PACING_SECONDS = 0.6
 READBACK_SETTLE_SECONDS = 0.5
 READBACK_STEP_DELAY_SECONDS = 0.3
@@ -51,6 +50,7 @@ class TimeProgramSpec:
     circuit_type: str
     has_temperature: bool
     optional_temperature: bool = False
+    shared_temperature: bool = False
     temp_field: str | None = None
     min_temp: float | None = None
     max_temp: float | None = None
@@ -72,11 +72,12 @@ TIME_PROGRAM_SPECS: tuple[TimeProgramSpec, ...] = (
     TimeProgramSpec(
         program="HwcTimer",
         circuit_type="dhw",
-        # HwcTimer reports the active DHW setpoint on each slot (matching ebusd-time-program's
-        # 35-70 °C range). When a write omits `temperature`, we send '-' (0xFFFF) so the
+        # HwcTimer shares a single global DHW setpoint (HwcTempDesired) across all slots
+        # and days. When a write omits `temperature`, we send '-' (0xFFFF) so the
         # controller updates the time windows without mutating HwcTempDesired.
         has_temperature=True,
         optional_temperature=True,
+        shared_temperature=True,
         temp_field="temp",
         min_temp=35.0,
         max_temp=70.0,
@@ -243,8 +244,8 @@ def _get_default_program_temp(
     return spec.default_temp
 
 
-def _parse_hhmm_grid(raw_time: str, *, is_end: bool) -> tuple[int, int]:
-    """Parse HH:MM and validate that it lies on the 10-minute hardware grid."""
+def _parse_hhmm(raw_time: str, *, is_end: bool) -> tuple[int, int]:
+    """Parse HH:MM (00:00 to 24:00, 1-minute resolution supported by b5 55)."""
     text = str(raw_time).strip()
     if not _HHMM_RE.match(text):
         raise HomeAssistantError(
@@ -259,10 +260,6 @@ def _parse_hhmm_grid(raw_time: str, *, is_end: bool) -> tuple[int, int]:
             )
         if not is_end:
             raise HomeAssistantError("Start time cannot be '24:00'.")
-    if minute % TIME_GRID_MINUTES != 0:
-        raise HomeAssistantError(
-            f"Time '{raw_time}' must be on the {TIME_GRID_MINUTES}-minute grid."
-        )
     return hour, minute
 
 
@@ -450,7 +447,7 @@ def validate_slots(
     spec: TimeProgramSpec,
     default_temp: float,
 ) -> list[ParsedTimeSlot]:
-    """Validate 0..3 slots on the 10-minute grid with no overlaps."""
+    """Validate 0..3 slots in HH:MM format with no overlaps and valid temperatures."""
     if len(raw_slots) > MAX_SLOTS_PER_DAY:
         raise HomeAssistantError(
             f"Too many slots ({len(raw_slots)}): at most {MAX_SLOTS_PER_DAY} slots per day are supported."
@@ -458,8 +455,8 @@ def validate_slots(
 
     parsed: list[ParsedTimeSlot] = []
     for idx, item in enumerate(raw_slots, start=1):
-        fh, fm = _parse_hhmm_grid(item["start"], is_end=False)
-        raw_th, raw_tm = _parse_hhmm_grid(item["end"], is_end=True)
+        fh, fm = _parse_hhmm(item["start"], is_end=False)
+        raw_th, raw_tm = _parse_hhmm(item["end"], is_end=True)
         th, tm = _normalize_end_hhmm(fh, fm, raw_th, raw_tm)
 
         start_min = fh * 60 + fm
@@ -505,6 +502,14 @@ def validate_slots(
             raise HomeAssistantError(
                 f"Time slots overlap: {prev_slot.start_str}-{prev_slot.end_str} "
                 f"and {next_slot.start_str}-{next_slot.end_str}."
+            )
+
+    if spec.shared_temperature:
+        explicit_temps = [s.temperature for s in parsed if s.temperature is not None]
+        if explicit_temps and (max(explicit_temps) - min(explicit_temps)) > 0.05:
+            raise HomeAssistantError(
+                f"{spec.program} shares a single global temperature setpoint across all slots; "
+                "all slots must use the same temperature (or omit temperature)."
             )
 
     return parsed

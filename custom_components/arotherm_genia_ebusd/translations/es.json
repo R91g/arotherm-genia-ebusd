@@ -1198,7 +1198,7 @@
     },
     "write_time_program": {
       "name": "Escribir programación horaria semanal",
-      "description": "Reemplaza todas las franjas diarias (de 0 a 3 franjas en rejilla de 10 minutos) para uno o varios días de un programa horario y relee desde el bus eBUS para verificar lo que almacenó realmente el regulador.",
+      "description": "Reemplaza todas las franjas diarias (de 0 a 3 franjas en formato HH:MM) para uno o varios días de un programa horario y relee desde el bus eBUS para verificar lo que almacenó realmente el regulador.",
       "fields": {
         "program": {
           "name": "Programa horario",
@@ -1210,7 +1210,7 @@
         },
         "slots": {
           "name": "Franjas horarias",
-          "description": "Lista de 0 a 3 franjas (start, end y temperature opcional) en rejilla de 10 minutos. Envía una lista vacía para limpiar el día."
+          "description": "Lista de 0 a 3 franjas (start, end y temperature opcional) en formato HH:MM. Envía una lista vacía para limpiar el día."
         },
         "entry_id": {
           "name": "ID de entrada de configuración (Opcional)",

@@ -651,6 +651,65 @@ class TestTimeProgramServices(unittest.IsolatedAsyncioTestCase):
             [{"start": "13:10", "end": "14:50", "temperature": 50.0}],
         )
 
+    async def test_write_accepts_one_minute_resolution(self) -> None:
+        """b5 55 hardware supports 1-minute resolution (e.g. 17:22-19:58)."""
+        hass, coord, registered = _make_hass_and_coordinator()
+        _async_register_services(hass)
+
+        written: list[tuple[str, str, str]] = []
+
+        async def _fake_write(circuit: str, msg_name: str, payload: str) -> None:
+            written.append((circuit, msg_name, payload))
+
+        async def _fake_get(_circuit: str, msg_name: str) -> None:
+            if msg_name == "Z1Timer_Slots":
+                coord._async_on_mqtt_message(
+                    _make_mqtt_msg(
+                        "ebusd/bass3/Z1Timer_Slots",
+                        {
+                            "mon": {"value": 1},
+                            "tue": {"value": 0},
+                            "wed": {"value": 0},
+                            "thu": {"value": 0},
+                            "fri": {"value": 0},
+                            "sat": {"value": 0},
+                            "sun": {"value": 0},
+                        },
+                    )
+                )
+            elif msg_name == "Z1Timer_Monday":
+                coord._async_on_mqtt_message(
+                    _make_mqtt_msg(
+                        "ebusd/bass3/Z1Timer_Monday",
+                        {
+                            "from_hour": {"value": 17},
+                            "from_min": {"value": 22},
+                            "to_hour": {"value": 19},
+                            "to_min": {"value": 58},
+                            "temp": {"value": 21.0},
+                        },
+                    )
+                )
+
+        coord.async_write_parameter = AsyncMock(side_effect=_fake_write)
+        coord.async_request_get = AsyncMock(side_effect=_fake_get)
+
+        call = MagicMock()
+        call.data = {
+            "program": "Z1Timer",
+            "days": ["monday"],
+            "slots": [{"start": "17:22", "end": "19:58", "temperature": 21.0}],
+        }
+        res = await registered[SERVICE_WRITE_TIME_PROGRAM]["handler"](call)
+        self.assertEqual(
+            written,
+            [(CIRCUIT_BASS3, "Z1Timer_Monday", "1;17;22;19;58;21.0")],
+        )
+        self.assertEqual(
+            res["days"]["monday"],
+            [{"start": "17:22", "end": "19:58", "temperature": 21.0}],
+        )
+
     async def test_write_validation_rejects_bad_grid_overlaps_count_and_temp(
         self,
     ) -> None:
@@ -660,11 +719,20 @@ class TestTimeProgramServices(unittest.IsolatedAsyncioTestCase):
         coord.async_write_parameter = AsyncMock()
 
         invalid_payloads = [
-            # Non-10-min grid
+            # Invalid time format / out of bounds
             {
                 "program": "Z1Timer",
                 "days": ["monday"],
-                "slots": [{"start": "06:05", "end": "09:00", "temperature": 21.0}],
+                "slots": [{"start": "25:00", "end": "24:00", "temperature": 21.0}],
+            },
+            # Conflicting temperatures on shared-setpoint HwcTimer
+            {
+                "program": "HwcTimer",
+                "days": ["monday"],
+                "slots": [
+                    {"start": "13:00", "end": "14:00", "temperature": 50.0},
+                    {"start": "15:00", "end": "16:00", "temperature": 55.0},
+                ],
             },
             # Overlapping slots
             {

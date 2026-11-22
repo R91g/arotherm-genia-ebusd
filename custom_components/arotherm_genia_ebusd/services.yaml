@@ -504,7 +504,7 @@ read_time_program:
 write_time_program:
   name: Write Weekly Time Program
   description: >
-    Replaces all daily time slots (0 to 3 slots on the 10-minute grid) for one or more
+    Replaces all daily time slots (0 to 3 slots in HH:MM format) for one or more
     weekdays of a controller time program, then reads back from the eBUS to verify what
     the controller actually stored.
   fields:
@@ -552,7 +552,7 @@ write_time_program:
               value: "sunday"
     slots:
       name: Time Slots
-      description: "List of 0 to 3 time slots ({start, end, temperature?}) on the 10-minute grid. Pass an empty list [] to clear the day."
+      description: "List of 0 to 3 time slots ({start, end, temperature?}) in HH:MM format. Pass an empty list [] to clear the day."
       required: true
       example:
         - start: "14:00"
