@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.2] - 2026-11-22
+
+> [!IMPORTANT]
+> **Recommended CSV update:** Updating via HACS does **not** overwrite your local `ebusd` CSV files. Please copy the updated `ebusd-configuration/vaillant/*.csv` files (`15.bass3.csv`, `15.basv3.csv`, `15.ctlv2.csv`, `15.ctlv3.csv`, `08.hmux0.csv`, `08.hmu.csv`, `08.hmu.HW5103.csv`, and `76.vwzio.csv`) into your `ebusd` configuration folder and restart `ebusd`. Built-in Home Assistant Repair notices will automatically alert you if any older CSV remains loaded.
+>
+> **Entity rename:** Register `020000002600` (`25 °C` factory default, previously mislabeled `CoolingFlowTempDesiredMax`) has been verified on hardware as the **Emergency Operation Flow Temperature** (`EmergencyFlowTempDesired`, `20–80 °C`). The old `cooling_flow_temp_desired_max` entity is cleaned up automatically on upgrade, while a message alias preserves seamless reading on older CSVs.
+
+### Added
+- **Weekly Time Program Services & Visual Editor Card Integration (`time_programs.py`, `services.yaml`):**
+  - Added `arotherm_genia_ebusd.read_time_program` and `arotherm_genia_ebusd.write_time_program` response actions (`SupportsResponse.ONLY`), fully compatible with the **[eBUSd Time Program Card](https://github.com/citoki/ebusd-time-program)** (`source: arotherm_genia_ebusd`) for visual weekly schedule editing directly from Home Assistant dashboards.
+  - Works 100% over MQTT (without requiring eBUSd TCP), with mandatory bus read-back verification after writing, `0xFFFF` no-op temperature preservation when DHW writes omit `temperature`, uniform-setpoint pre-validation on `HwcTimer` (matching the controller's shared `HwcTempDesired` setpoint), 1-minute resolution on `bass3`/`basv3`/`ctlv3`, and automatic 10-minute increment enforcement on `ctlv2` controllers (in both `write_time_program` and `set_weekly_timer`).
+- **Read-Only Weekly Schedule Calendars (`calendar.py`):**
+  - Added 5 read-only Home Assistant `calendar` entities projecting the controller's active weekly schedules (`Zone 1 Heating`, `DHW`, and `Zone 1 Cooling` enabled by default; `DHW Circulation` and `Silent Mode` hidden by default) with zero extra eBUS traffic, controlled by the new `enable_schedule_calendars` option.
+- **Optional eBUSd TCP Step in Initial Setup & Reconfigure Flows (`config_flow.py`):**
+  - Added an optional final step (`ebusd_tcp` / `reconfigure_ebusd_tcp`) that auto-detects and pre-fills the Home Assistant eBUSd add-on or local daemon when reachable, validates manual host/port entries, allows leaving TCP disabled to run purely over MQTT, and preserves all other options when reconfiguring.
+- **New Hardware-Verified Entities & Active Fault Binary Sensor:**
+  - Added `active_fault` binary sensor (consolidating outdoor, controller, and hydraulic error states), `z1_time_slot_active`, `z1_cooling_time_slot_active`, `hc1_cooling_enabled`, `hc1_dew_point_offset`, and direct `SubcoolingTemp` (D.375) support.
+- **v1.3.2 CSV Repair Detection (MQTT & TCP `find`/`find -f`):**
+  - Extended `outdated_controller_csv`, `outdated_hmux0_csv`, `outdated_vwzio_csv`, and `outdated_hmu_csv` Repair checks to detect pre-v1.3.2 CSVs both over MQTT (`RunStatsAuxHeaterSwitches`, `Z1QuickVetoEndTime`, `Z1TimeSlotActive`, `Hc1CoolingEnabled`) and via zero-traffic eBUSd TCP `find`/`find -f` (`SubcoolingTemp`, `ImmersionHeaterPower`, `CirculationTimer_Monday` `=ffff` padding, and `Status01` `8=venting`).
+
+### Changed
+- **Confirmed TCP Writes with Automatic Retries & Explicit Service Failure Propagation (`coordinator.py`, `__init__.py`, `time_programs.py`):**
+  - When optional eBUSd TCP is enabled and healthy, `async_write_parameter` now uses synchronous `write -c <circuit> <msg> <payload>` with up to 3 retries (`0.6 s` / `1.2 s` backoff) on transient bus errors (`ERR: read timeout`, `ERR: SYN received`, `ERR: arbitration lost`, etc.), logs a warning on non-transient errors before falling back to MQTT `/set`, withholds false optimistic state if all retries fail, and returns `False` so explicit actions (`set_weekly_timer`, `write_time_program`, `write_parameter`, `set_legionella_protection`) abort cleanly instead of advancing optimistic counters.
+- **Upstream CSV Alignment & Verified D-Codes (`08.hmux0.csv`, `08.hmu*.csv`, `76.vwzio.csv`, `15.*.csv`):**
+  - Synced community/upstream `HMUX0`/`VWZIO` register updates (all `r;u` or `u` with zero new periodic polling): renamed `RunStatsHcStarts` → `RunStatsAuxHeaterSwitches` (D.074) and `RunDataNominalFlowRate` → `RunDataMaxResidualHead` (D.231) with backward-compatible `MESSAGE_ALIASES`, mapped `Status01` `pumpstate` `8=venting`, and added 20+ display-verified installer D-codes (`SubcoolingTemp`, `SubcoolingTargetTemp`, `ImmersionHeaterPower`, etc.).
+- **Outside Average Temperature Label (`OutsideTempAvg`):** Updated the display name from `(3h)` to `(24h)` across EN/ES/DE translations to match the controller's 24-hour rolling average (`Temp. ext. acumulada 24 h`), keeping `unique_id` unchanged.
+- **Documentation:** Added Home Assistant eBUSd add-on screenshot & YAML example, `--latency=50` guidance for Wi-Fi adapters (`ens:`), visual schedule editing guide for `citoki/ebusd-time-program`, updated setup/reconfigure docs, and refreshed technical reference write semantics.
+
+### Fixed
+- **Compressor Modulation Scaling (`08.hmux0.csv`, `08.hmu.csv`, `08.hmu.HW5103.csv`, `coordinator.py`):** Applied divisor `2` (`0.5 %` steps) to `StateCompressor` `modulation` and `_get_compressor_modulation()` to match the heat pump display (fixes readings showing 2× too high).
+- **`CirculationTimer` & `SilentTimer` Schedule Writes (`15.*.csv`):** Replaced trailing `ign_end,,IGN:2` with `ign_end,,HEX:2,=ffff` across all 42 `w` lines in the 4 controller CSVs so `BASS3`/`BASV3`/`CTLV2`/`CTLV3` accept Circulation and Silent schedule writes instead of silently ignoring `0x0000`-padded frames.
+- **`EmergencyFlowTempDesired` (`020000002600`):** Fixed mislabeled `CoolingFlowTempDesiredMax` (`15–30 °C`) to `EmergencyFlowTempDesired` (*Emergency Operation Flow Temperature*, `20–80 °C`) across all 4 controller CSVs and `number.py`.
+- **`DewPointMonitoring` Register ID (`15.*.csv`):** Corrected subcommand from `020002000400` (which collided with `Hc1DesiredReturnTemp`) to `020002000500` (`r;u` / `w`).
+- **Quick Veto Cancellation & Hardware End-Time Sync (`coordinator.py`):** Cancelling a heating Quick Veto now writes only `Z1SFMode = auto` (avoiding firmware re-triggering a 0.5 h veto when writing `Z1QuickVetoDuration`); countdown syncs against `Z1QuickVetoEndDate`/`Z1QuickVetoEndTime` and filters inactive `2019` sentinels.
+- **Error History BCD Decoding (`08.*.csv`, `76.vwzio.csv`):** Switched `Errorhistory` timestamp fields to `BTM` / `BDA:3` (BCD) for accurate fault dates and times.
+- **Instantaneous Electric Power Selection (`coordinator.py`):** Always selects the freshest reading between `RunDataElectricPowerConsumption` and `PowerStatus` rather than holding a stale primary reading.
+
+---
+
 ## [1.3.1] - 2026-11-17
 
 > [!IMPORTANT]
