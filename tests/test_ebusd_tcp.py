@@ -175,7 +175,7 @@ class TestEbusdTcpAutocompleteFlows(unittest.TestCase):
     """Test ConfigFlow, OptionsFlow, and Coordinator TCP auto-configuration."""
 
     def test_config_flow_autodetects_and_enables_tcp_on_new_entry(self) -> None:
-        """New setup enables and stores detected eBUSd TCP endpoint automatically."""
+        """New setup transitions to ebusd_tcp step, prefills detected add-on, and saves it."""
         flow = SaunierGeniaConfigFlow()
         flow.hass = MagicMock()
         flow.async_create_entry = MagicMock(
@@ -185,8 +185,8 @@ class TestEbusdTcpAutocompleteFlows(unittest.TestCase):
         with patch(
             "custom_components.arotherm_genia_ebusd.config_flow.async_probe_ebusd_tcp",
             new=AsyncMock(return_value=("b4d7ad18-ebusd", 8888)),
-        ):
-            res = asyncio.run(
+        ) as mock_probe:
+            step_tcp = asyncio.run(
                 flow.async_step_models(
                     {
                         CONF_OUTDOOR_MODEL: "GeniaAir Max ES 15",
@@ -196,10 +196,247 @@ class TestEbusdTcpAutocompleteFlows(unittest.TestCase):
                     }
                 )
             )
+            self.assertEqual(step_tcp["type"], "form")
+            self.assertEqual(step_tcp["step_id"], "ebusd_tcp")
+            defaults = {k.schema: k.default for k in step_tcp["data_schema"].schema}
+            self.assertTrue(defaults[CONF_ENABLE_EBUSD_TCP])
+            self.assertEqual(defaults[CONF_EBUSD_TCP_HOST], "b4d7ad18-ebusd")
+            self.assertEqual(defaults[CONF_EBUSD_TCP_PORT], 8888)
 
+            res = asyncio.run(
+                flow.async_step_ebusd_tcp(
+                    {
+                        CONF_ENABLE_EBUSD_TCP: True,
+                        CONF_EBUSD_TCP_HOST: "b4d7ad18-ebusd",
+                        CONF_EBUSD_TCP_PORT: 8888,
+                    }
+                )
+            )
+
+        # Already verified on form render; submitting unchanged detected endpoint skips redundant probe
+        mock_probe.assert_awaited_once()
+        self.assertEqual(res["type"], "create_entry")
         self.assertTrue(res["options"][CONF_ENABLE_EBUSD_TCP])
         self.assertEqual(res["options"][CONF_EBUSD_TCP_HOST], "b4d7ad18-ebusd")
         self.assertEqual(res["options"][CONF_EBUSD_TCP_PORT], 8888)
+
+    def test_config_flow_tcp_optional_skip_and_manual_validation(self) -> None:
+        """Setup allows leaving TCP blank/disabled, auto-enables manual host, and handles probe errors."""
+        # 1. Nothing auto-detected -> defaults disabled & blank host; submitting skips TCP cleanly
+        flow_skip = SaunierGeniaConfigFlow()
+        flow_skip.hass = MagicMock()
+        flow_skip.async_create_entry = MagicMock(
+            side_effect=lambda **kwargs: {"type": "create_entry", **kwargs}
+        )
+        with patch(
+            "custom_components.arotherm_genia_ebusd.config_flow.async_probe_ebusd_tcp",
+            new=AsyncMock(return_value=None),
+        ):
+            step_tcp = asyncio.run(
+                flow_skip.async_step_models(
+                    {
+                        CONF_OUTDOOR_MODEL: "GeniaAir Max ES 15",
+                        CONF_INDOOR_MODEL: "HPIM 7 230V",
+                        CONF_HAS_WIRELESS_ROOM_UNIT: False,
+                        CONF_HAS_MIGO_LINK: True,
+                    }
+                )
+            )
+            defaults = {k.schema: k.default for k in step_tcp["data_schema"].schema}
+            self.assertFalse(defaults[CONF_ENABLE_EBUSD_TCP])
+            self.assertEqual(defaults[CONF_EBUSD_TCP_HOST], "")
+            self.assertEqual(defaults[CONF_EBUSD_TCP_PORT], 8888)
+
+            res_skip = asyncio.run(
+                flow_skip.async_step_ebusd_tcp(
+                    {
+                        CONF_ENABLE_EBUSD_TCP: False,
+                        CONF_EBUSD_TCP_HOST: "",
+                        CONF_EBUSD_TCP_PORT: 8888,
+                    }
+                )
+            )
+        self.assertEqual(res_skip["type"], "create_entry")
+        self.assertFalse(res_skip["options"][CONF_ENABLE_EBUSD_TCP])
+        self.assertNotIn(CONF_EBUSD_TCP_HOST, res_skip["options"])
+
+        # 2. Manual host entry verifies connectivity; unreachable host shows error; disabling recovers
+        flow_manual = SaunierGeniaConfigFlow()
+        flow_manual.hass = MagicMock()
+        flow_manual.async_create_entry = MagicMock(
+            side_effect=lambda **kwargs: {"type": "create_entry", **kwargs}
+        )
+        with patch(
+            "custom_components.arotherm_genia_ebusd.config_flow.async_probe_ebusd_tcp",
+            new=AsyncMock(side_effect=[None, None, ("192.168.1.50", 8889)]),
+        ):
+            asyncio.run(
+                flow_manual.async_step_models(
+                    {
+                        CONF_OUTDOOR_MODEL: "GeniaAir Max ES 15",
+                        CONF_INDOOR_MODEL: "HPIM 7 230V",
+                        CONF_HAS_WIRELESS_ROOM_UNIT: True,
+                        CONF_HAS_MIGO_LINK: True,
+                    }
+                )
+            )
+            # User types IP into initially-empty host without flipping switch -> probed & shows error
+            res_err = asyncio.run(
+                flow_manual.async_step_ebusd_tcp(
+                    {
+                        CONF_ENABLE_EBUSD_TCP: False,
+                        CONF_EBUSD_TCP_HOST: "192.168.1.99",
+                        CONF_EBUSD_TCP_PORT: 8888,
+                    }
+                )
+            )
+            self.assertEqual(res_err["type"], "form")
+            self.assertEqual(res_err["errors"], {"base": "cannot_connect_ebusd_tcp"})
+
+            # Enabling TCP with empty host -> field error
+            res_empty_err = asyncio.run(
+                flow_manual.async_step_ebusd_tcp(
+                    {
+                        CONF_ENABLE_EBUSD_TCP: True,
+                        CONF_EBUSD_TCP_HOST: "   ",
+                        CONF_EBUSD_TCP_PORT: 8888,
+                    }
+                )
+            )
+            self.assertEqual(res_empty_err["type"], "form")
+            self.assertEqual(
+                res_empty_err["errors"],
+                {CONF_EBUSD_TCP_HOST: "invalid_ebusd_tcp_host"},
+            )
+
+            # Valid remote IP succeeds and saves host/port
+            res_ok = asyncio.run(
+                flow_manual.async_step_ebusd_tcp(
+                    {
+                        CONF_ENABLE_EBUSD_TCP: True,
+                        CONF_EBUSD_TCP_HOST: "192.168.1.50",
+                        CONF_EBUSD_TCP_PORT: 8889,
+                    }
+                )
+            )
+        self.assertEqual(res_ok["type"], "create_entry")
+        self.assertTrue(res_ok["options"][CONF_ENABLE_EBUSD_TCP])
+        self.assertEqual(res_ok["options"][CONF_EBUSD_TCP_HOST], "192.168.1.50")
+        self.assertEqual(res_ok["options"][CONF_EBUSD_TCP_PORT], 8889)
+
+    def test_reconfigure_flow_includes_optional_tcp_and_preserves_other_options(
+        self,
+    ) -> None:
+        """Reconfigure step 3 preserves non-TCP options, probes when needed, and avoids blocking unchanged hosts."""
+        entry = MagicMock()
+        entry.data = {
+            "mqtt_prefix": "ebusd",
+            "manufacturer": "Saunier Duval",
+            CONF_OUTDOOR_MODEL: "GeniaAir Max ES 15",
+            CONF_INDOOR_MODEL: "HPIM 7 230V",
+            CONF_HAS_WIRELESS_ROOM_UNIT: True,
+            CONF_HAS_MIGO_LINK: True,
+        }
+        entry.options = {
+            "force_dhw_boost": False,
+            "fallback_poll_interval": 180,
+            CONF_ENABLE_EBUSD_TCP: True,
+            CONF_EBUSD_TCP_HOST: "192.168.1.50",
+            CONF_EBUSD_TCP_PORT: 8888,
+        }
+
+        flow = SaunierGeniaConfigFlow()
+        flow.hass = MagicMock()
+        flow._get_reconfigure_entry = MagicMock(return_value=entry)
+        flow.async_update_reload_and_abort = MagicMock(
+            side_effect=lambda target, **kwargs: {
+                "type": "abort",
+                "reason": "reconfigure_successful",
+                "entry": target,
+                **kwargs,
+            }
+        )
+
+        # 1. Existing custom host is NOT overwritten on render and NOT blocked when unchanged
+        with patch(
+            "custom_components.arotherm_genia_ebusd.config_flow.async_probe_ebusd_tcp",
+            new=AsyncMock(return_value=None),
+        ) as mock_probe:
+            asyncio.run(flow.async_step_reconfigure({"manufacturer": "Saunier Duval"}))
+            step_tcp = asyncio.run(
+                flow.async_step_reconfigure_models(
+                    {
+                        CONF_OUTDOOR_MODEL: "GeniaAir Max ES 12",
+                        CONF_INDOOR_MODEL: "HPIM 7 230V",
+                        CONF_HAS_WIRELESS_ROOM_UNIT: True,
+                        CONF_HAS_MIGO_LINK: True,
+                    }
+                )
+            )
+            self.assertEqual(step_tcp["type"], "form")
+            self.assertEqual(step_tcp["step_id"], "reconfigure_ebusd_tcp")
+            defaults = {k.schema: k.default for k in step_tcp["data_schema"].schema}
+            self.assertTrue(defaults[CONF_ENABLE_EBUSD_TCP])
+            self.assertEqual(defaults[CONF_EBUSD_TCP_HOST], "192.168.1.50")
+
+            res = asyncio.run(
+                flow.async_step_reconfigure_ebusd_tcp(
+                    {
+                        CONF_ENABLE_EBUSD_TCP: True,
+                        CONF_EBUSD_TCP_HOST: "192.168.1.50",
+                        CONF_EBUSD_TCP_PORT: 8888,
+                    }
+                )
+            )
+        mock_probe.assert_not_awaited()
+        self.assertEqual(res["type"], "abort")
+        self.assertEqual(res["data"][CONF_OUTDOOR_MODEL], "GeniaAir Max ES 12")
+        self.assertFalse(res["options"]["force_dhw_boost"])
+        self.assertEqual(res["options"]["fallback_poll_interval"], 180)
+        self.assertTrue(res["options"][CONF_ENABLE_EBUSD_TCP])
+        self.assertEqual(res["options"][CONF_EBUSD_TCP_HOST], "192.168.1.50")
+
+        # 2. Unconfigured entry auto-detects add-on during reconfigure
+        entry_unconf = MagicMock()
+        entry_unconf.data = dict(entry.data)
+        entry_unconf.options = {"force_dhw_boost": True}
+        flow2 = SaunierGeniaConfigFlow()
+        flow2.hass = MagicMock()
+        flow2._get_reconfigure_entry = MagicMock(return_value=entry_unconf)
+        flow2.async_update_reload_and_abort = MagicMock(
+            side_effect=lambda target, **kwargs: {"type": "abort", **kwargs}
+        )
+        with patch(
+            "custom_components.arotherm_genia_ebusd.config_flow.async_probe_ebusd_tcp",
+            new=AsyncMock(return_value=("b4d7ad18-ebusd", 8888)),
+        ):
+            asyncio.run(flow2.async_step_reconfigure({"manufacturer": "Saunier Duval"}))
+            step_tcp2 = asyncio.run(
+                flow2.async_step_reconfigure_models(
+                    {
+                        CONF_OUTDOOR_MODEL: "GeniaAir Max ES 15",
+                        CONF_INDOOR_MODEL: "HPIM 7 230V",
+                        CONF_HAS_WIRELESS_ROOM_UNIT: True,
+                        CONF_HAS_MIGO_LINK: True,
+                    }
+                )
+            )
+            defaults2 = {k.schema: k.default for k in step_tcp2["data_schema"].schema}
+            self.assertTrue(defaults2[CONF_ENABLE_EBUSD_TCP])
+            self.assertEqual(defaults2[CONF_EBUSD_TCP_HOST], "b4d7ad18-ebusd")
+
+            # User explicitly opts out during reconfigure
+            res2 = asyncio.run(
+                flow2.async_step_reconfigure_ebusd_tcp(
+                    {
+                        CONF_ENABLE_EBUSD_TCP: False,
+                        CONF_EBUSD_TCP_HOST: "b4d7ad18-ebusd",
+                        CONF_EBUSD_TCP_PORT: 8888,
+                    }
+                )
+            )
+        self.assertFalse(res2["options"][CONF_ENABLE_EBUSD_TCP])
+        self.assertTrue(res2["options"]["force_dhw_boost"])
 
     def test_options_flow_autocompletes_unconfigured_host_only_when_detected(
         self,

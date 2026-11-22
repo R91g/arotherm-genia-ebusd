@@ -101,6 +101,7 @@ class MockMarker:
 
     def __init__(self, schema: Any, **kwargs: Any) -> None:
         self.schema = schema
+        self.default = kwargs.get("default")
 
 
 sys.modules["voluptuous"].Schema = MockSchema

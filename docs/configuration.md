@@ -4,11 +4,12 @@
 
 ---
 
-## Reconfiguring Hardware or Brand
+## Reconfiguring Hardware, Brand, or eBUSd TCP
 
-To change the heat pump model, switch brand labels, or toggle the wireless thermostat / cloud gateway after setup:
+To change the heat pump model, switch brand labels, toggle the wireless thermostat / cloud gateway, or update the optional eBUSd TCP endpoint after setup:
 
 - Go to **Settings → Devices & Services → aroTHERM & GeniaAir (eBUS)**, open the **three-dot menu (`⋮`)** on the config entry and select **Reconfigure**.
+- The wizard walks through manufacturer, hardware models, and the optional eBUSd TCP step (auto-detecting local/add-on `ebusd` when unconfigured, while keeping custom hosts intact). You can also edit eBUSd TCP settings at any time under **Configure** below.
 - Device titles and hardware specs update while preserving all entity IDs and historical statistics. Entity `unique_id`s are brand-neutral (`{entry_id}_{circuit}_{message}_{field}`), so changing the manufacturer or models never orphans entities or breaks energy history.
 
 ## Runtime Options (`Configure`)

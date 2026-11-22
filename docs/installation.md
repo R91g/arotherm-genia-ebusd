@@ -171,15 +171,19 @@ Setup is done entirely through the UI; no `configuration.yaml` edits are require
 
 1. Go to **Settings → Devices & Services** (or use the button above).
 2. Click **+ Add Integration** and search for **aroTHERM & GeniaAir (eBUS)**.
-3. **Step 1 - MQTT & Manufacturer:**
+3. **Step 1 - Prerequisites Confirmation:** confirm that the repository CSV files, required `ebusd` flags, and `seed_mqtt_cfg: false` (for the HA add-on) are in place.
+4. **Step 2 - MQTT & Manufacturer:**
    - **eBUSd MQTT topic prefix:** default `ebusd` (matching `--mqtttopic=ebusd/%circuit/%name`).
    - **Equipment manufacturer:** `Vaillant` or `Saunier Duval`.
-4. **Step 2 - Hardware Models:**
+5. **Step 3 - Hardware Models:**
    - **Outdoor unit (heat pump):** filtered by brand (e.g. `aroTHERM plus ES VWL 85/7.1 A 230V` or `GeniaAir Max ES 15`).
    - **Indoor hydraulic module:** filtered by brand (e.g. `VWZ MEH 97/7`, `uniTOWER VIH QW 190/7`, `HPIM 7 230V`, `GeniaSet FEW/FIW 200-7`).
    - **Wireless room thermostat (`04.netx3`):** enable if you have a wireless `sensoCOMFORT RF` / `MiPro Sense RF` room unit; disable for wired-only setups.
    - **Official cloud gateway (`f1`):** enable if a `myVAILLANT connect` / `MiGo Link` is on the bus (passive listening); disable otherwise (activates paced fallback `/get` polling).
-5. Click **Submit**. The staggered hydration queue populates all registers within about 60 seconds.
+6. **Step 4 - eBUSd TCP Connection (Optional):**
+   - If the Home Assistant eBUSd add-on or a local eBUSd daemon is detected, the toggle, host (e.g. `b4d7ad18-ebusd`), and port (`8888`) are **automatically pre-filled**.
+   - If eBUSd runs on another host/IP, you can enter its address and port here (verified before saving) — or simply **leave it disabled** to run over MQTT only. You can always enable or change it later in the integration's **Configure** options.
+7. Click **Submit**. The staggered hydration queue populates all registers within about 60 seconds.
 
 ---
 

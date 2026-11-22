@@ -4,11 +4,12 @@
 
 ---
 
-## Reconfigurar Hardware o Marca
+## Reconfigurar Hardware, Marca o eBUSd TCP
 
-Para cambiar el modelo de bomba de calor, cambiar las etiquetas de marca o activar/desactivar el termostato inalámbrico o la pasarela cloud tras la instalación:
+Para cambiar el modelo de bomba de calor, cambiar las etiquetas de marca, activar/desactivar el termostato inalámbrico o la pasarela cloud, o ajustar la conexión opcional eBUSd TCP tras la instalación:
 
 - Ve a **Ajustes → Dispositivos y Servicios → aroTHERM & GeniaAir (eBUS)**, abre el **menú de tres puntos (`⋮`)** de la entrada y selecciona **Reconfigurar**.
+- El asistente recorre el fabricante, los modelos de hardware y el paso opcional de eBUSd TCP (autodetectando el add-on o demonio local si no estaba configurado y respetando hosts personalizados). También puedes cambiar eBUSd TCP en cualquier momento desde **Configurar**.
 - Los títulos de los dispositivos y las especificaciones se actualizan preservando todos los IDs de entidad y las estadísticas históricas. Los `unique_id` de las entidades son neutros respecto a la marca (`{entry_id}_{circuit}_{message}_{field}`), así que cambiar de fabricante o modelos nunca deja entidades huérfanas ni rompe el histórico de energía.
 
 ## Opciones en Caliente (`Configurar`)

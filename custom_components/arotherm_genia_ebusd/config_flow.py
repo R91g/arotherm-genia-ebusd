@@ -77,6 +77,159 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):  # pyright: ignore[repo
         """Initialize the config flow."""
         self._mqtt_prefix: str = DEFAULT_MQTT_PREFIX
         self._manufacturer: str = DEFAULT_MANUFACTURER
+        self._models_data: dict[str, Any] = {}
+        self._tcp_detected_endpoint: tuple[str, int] | None = None
+        self._tcp_initial_enabled: bool = False
+        self._tcp_initial_host: str = ""
+        self._tcp_initial_port: int = DEFAULT_EBUSD_TCP_PORT
+        self._tcp_last_rendered_enabled: bool = False
+        self._tcp_last_rendered_host: str = ""
+
+    @staticmethod
+    def _build_ebusd_tcp_schema(
+        enable_default: bool,
+        host_default: str,
+        port_default: int,
+    ) -> vol.Schema:
+        """Build the optional eBUSd TCP configuration schema."""
+        return vol.Schema(
+            {
+                vol.Required(
+                    CONF_ENABLE_EBUSD_TCP,
+                    default=enable_default,
+                ): BooleanSelector(),
+                vol.Optional(
+                    CONF_EBUSD_TCP_HOST,
+                    default=host_default,
+                ): TextSelector(),
+                vol.Optional(
+                    CONF_EBUSD_TCP_PORT,
+                    default=port_default,
+                ): NumberSelector(
+                    NumberSelectorConfig(
+                        min=1,
+                        max=65535,
+                        step=1,
+                        mode=NumberSelectorMode.BOX,
+                    )
+                ),
+            }
+        )
+
+    async def _async_prepare_ebusd_tcp_defaults(
+        self,
+        existing_options: dict[str, Any] | None = None,
+    ) -> tuple[bool, str, int]:
+        """Compute defaults for the eBUSd TCP step, probing add-ons/local daemon when appropriate."""
+        options = existing_options or {}
+        adv_options = options.get(SECTION_ADVANCED_OPTIONS, {})
+        if not isinstance(adv_options, dict):
+            adv_options = {}
+
+        tcp_explicitly_configured = (
+            CONF_ENABLE_EBUSD_TCP in options or CONF_ENABLE_EBUSD_TCP in adv_options
+        )
+        enable_default = bool(
+            options.get(
+                CONF_ENABLE_EBUSD_TCP,
+                adv_options.get(CONF_ENABLE_EBUSD_TCP, DEFAULT_ENABLE_EBUSD_TCP),
+            )
+        )
+        raw_host = str(
+            options.get(
+                CONF_EBUSD_TCP_HOST,
+                adv_options.get(CONF_EBUSD_TCP_HOST, ""),
+            )
+            or ""
+        ).strip()
+        port_default = int(
+            options.get(
+                CONF_EBUSD_TCP_PORT,
+                adv_options.get(CONF_EBUSD_TCP_PORT, DEFAULT_EBUSD_TCP_PORT),
+            )
+            or DEFAULT_EBUSD_TCP_PORT
+        )
+
+        self._tcp_initial_enabled = enable_default
+        self._tcp_initial_host = raw_host
+        self._tcp_initial_port = port_default
+        self._tcp_detected_endpoint = None
+
+        host_default = raw_host
+        if getattr(self, "hass", None) is not None and (
+            existing_options is None
+            or (not enable_default and not tcp_explicitly_configured)
+            or raw_host in ("", *LOOPBACK_HOSTS)
+        ):
+            detected = await async_probe_ebusd_tcp(
+                self.hass,
+                configured_host=raw_host or None,
+                port=port_default,
+            )
+            if detected is not None:
+                detected_host, detected_port = detected
+                self._tcp_detected_endpoint = (detected_host, detected_port)
+                host_default = detected_host
+                port_default = detected_port
+                if existing_options is None or not tcp_explicitly_configured:
+                    enable_default = True
+
+        self._tcp_last_rendered_enabled = enable_default
+        self._tcp_last_rendered_host = host_default
+        return enable_default, host_default, port_default
+
+    async def _async_validate_ebusd_tcp_input(
+        self,
+        user_input: dict[str, Any],
+        *,
+        is_reconfigure: bool,
+    ) -> tuple[dict[str, str], bool, str, int]:
+        """Validate optional eBUSd TCP settings and verify connectivity when enabled."""
+        errors: dict[str, str] = {}
+        enable_tcp = bool(user_input.get(CONF_ENABLE_EBUSD_TCP, False))
+        host = str(user_input.get(CONF_EBUSD_TCP_HOST) or "").strip()
+        port = int(user_input.get(CONF_EBUSD_TCP_PORT) or DEFAULT_EBUSD_TCP_PORT)
+
+        # If the step opened disabled with an empty host and the user typed a host
+        # without flipping the switch, treat that as wanting TCP enabled.
+        if (
+            not enable_tcp
+            and host
+            and not self._tcp_last_rendered_enabled
+            and not self._tcp_last_rendered_host
+        ):
+            enable_tcp = True
+
+        if enable_tcp:
+            if not host:
+                errors[CONF_EBUSD_TCP_HOST] = "invalid_ebusd_tcp_host"
+            else:
+                already_verified = self._tcp_detected_endpoint == (host, port)
+                unchanged_existing = (
+                    is_reconfigure
+                    and self._tcp_initial_enabled
+                    and host == self._tcp_initial_host
+                    and port == self._tcp_initial_port
+                )
+                if (
+                    getattr(self, "hass", None) is not None
+                    and not already_verified
+                    and not unchanged_existing
+                ):
+                    probed = await async_probe_ebusd_tcp(
+                        self.hass,
+                        configured_host=host,
+                        port=port,
+                    )
+                    if probed is None:
+                        errors["base"] = "cannot_connect_ebusd_tcp"
+                    else:
+                        host, port = probed
+                        self._tcp_detected_endpoint = (host, port)
+
+        self._tcp_last_rendered_enabled = enable_tcp
+        self._tcp_last_rendered_host = host
+        return errors, enable_tcp, host, port
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -174,35 +327,13 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):  # pyright: ignore[repo
     ) -> ConfigFlowResult:
         """Step 3: Select specific hardware models based on chosen manufacturer."""
         if user_input is not None:
-            entry_data = {
-                CONF_MQTT_PREFIX: self._mqtt_prefix,
-                CONF_MANUFACTURER: self._manufacturer,
+            self._models_data = {
                 CONF_OUTDOOR_MODEL: user_input[CONF_OUTDOOR_MODEL],
                 CONF_INDOOR_MODEL: user_input[CONF_INDOOR_MODEL],
                 CONF_HAS_WIRELESS_ROOM_UNIT: user_input[CONF_HAS_WIRELESS_ROOM_UNIT],
                 CONF_HAS_MIGO_LINK: user_input[CONF_HAS_MIGO_LINK],
             }
-            title = f"{self._manufacturer} {user_input[CONF_OUTDOOR_MODEL]} ({self._mqtt_prefix})"
-            options: dict[str, Any] = {
-                CONF_FORCE_DHW_BOOST: DEFAULT_FORCE_DHW_BOOST,
-                CONF_AUTO_COOLING_LOCK_BYPASS: DEFAULT_AUTO_COOLING_LOCK_BYPASS,
-                CONF_FALLBACK_POLL_INTERVAL: DEFAULT_FALLBACK_POLL_INTERVAL,
-            }
-            if getattr(self, "hass", None) is not None:
-                detected = await async_probe_ebusd_tcp(
-                    self.hass,
-                    port=DEFAULT_EBUSD_TCP_PORT,
-                )
-                if detected is not None:
-                    detected_host, detected_port = detected
-                    options[CONF_ENABLE_EBUSD_TCP] = True
-                    options[CONF_EBUSD_TCP_HOST] = detected_host
-                    options[CONF_EBUSD_TCP_PORT] = detected_port
-            return self.async_create_entry(
-                title=title,
-                data=entry_data,
-                options=options,
-            )
+            return await self.async_step_ebusd_tcp()
 
         is_vaillant = self._manufacturer == MANUFACTURER_VAILLANT
         outdoor_models = OUTDOOR_MODELS_BY_MANUFACTURER.get(
@@ -254,6 +385,58 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):  # pyright: ignore[repo
             data_schema=schema,
         )
 
+    async def async_step_ebusd_tcp(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Step 4: Optional eBUSd TCP configuration with add-on auto-detection."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            (
+                errors,
+                enable_tcp,
+                host,
+                port,
+            ) = await self._async_validate_ebusd_tcp_input(
+                user_input, is_reconfigure=False
+            )
+            if not errors:
+                entry_data = {
+                    CONF_MQTT_PREFIX: self._mqtt_prefix,
+                    CONF_MANUFACTURER: self._manufacturer,
+                    **self._models_data,
+                }
+                title = f"{self._manufacturer} {self._models_data[CONF_OUTDOOR_MODEL]} ({self._mqtt_prefix})"
+                options: dict[str, Any] = {
+                    CONF_FORCE_DHW_BOOST: DEFAULT_FORCE_DHW_BOOST,
+                    CONF_AUTO_COOLING_LOCK_BYPASS: DEFAULT_AUTO_COOLING_LOCK_BYPASS,
+                    CONF_FALLBACK_POLL_INTERVAL: DEFAULT_FALLBACK_POLL_INTERVAL,
+                    CONF_ENABLE_EBUSD_TCP: enable_tcp,
+                }
+                if host:
+                    options[CONF_EBUSD_TCP_HOST] = host
+                    options[CONF_EBUSD_TCP_PORT] = port
+                return self.async_create_entry(
+                    title=title,
+                    data=entry_data,
+                    options=options,
+                )
+            enable_default, host_default, port_default = enable_tcp, host, port
+        else:
+            (
+                enable_default,
+                host_default,
+                port_default,
+            ) = await self._async_prepare_ebusd_tcp_defaults()
+
+        return self.async_show_form(
+            step_id="ebusd_tcp",
+            data_schema=self._build_ebusd_tcp_schema(
+                enable_default, host_default, port_default
+            ),
+            errors=errors,
+        )
+
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -293,20 +476,13 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):  # pyright: ignore[repo
         entry = self._get_reconfigure_entry()
 
         if user_input is not None:
-            new_data = {
-                **entry.data,
-                CONF_MANUFACTURER: self._manufacturer,
+            self._models_data = {
                 CONF_OUTDOOR_MODEL: user_input[CONF_OUTDOOR_MODEL],
                 CONF_INDOOR_MODEL: user_input[CONF_INDOOR_MODEL],
                 CONF_HAS_WIRELESS_ROOM_UNIT: user_input[CONF_HAS_WIRELESS_ROOM_UNIT],
                 CONF_HAS_MIGO_LINK: user_input[CONF_HAS_MIGO_LINK],
             }
-            title = f"{self._manufacturer} {user_input[CONF_OUTDOOR_MODEL]} ({self._mqtt_prefix})"
-            return self.async_update_reload_and_abort(
-                entry,
-                title=title,
-                data=new_data,
-            )
+            return await self.async_step_reconfigure_ebusd_tcp()
 
         outdoor_models = OUTDOOR_MODELS_BY_MANUFACTURER.get(
             self._manufacturer, OUTDOOR_MODELS_SAUNIER
@@ -364,6 +540,66 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):  # pyright: ignore[repo
         return self.async_show_form(
             step_id="reconfigure_models",
             data_schema=schema,
+        )
+
+    async def async_step_reconfigure_ebusd_tcp(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle reconfiguration step 3: Optional eBUSd TCP settings."""
+        entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            (
+                errors,
+                enable_tcp,
+                host,
+                port,
+            ) = await self._async_validate_ebusd_tcp_input(
+                user_input, is_reconfigure=True
+            )
+            if not errors:
+                new_data = {
+                    **entry.data,
+                    CONF_MANUFACTURER: self._manufacturer,
+                    **self._models_data,
+                }
+                title = f"{self._manufacturer} {self._models_data[CONF_OUTDOOR_MODEL]} ({self._mqtt_prefix})"
+                new_options = dict(entry.options)
+                if SECTION_ADVANCED_OPTIONS in new_options and isinstance(
+                    new_options[SECTION_ADVANCED_OPTIONS], dict
+                ):
+                    nested = new_options.pop(SECTION_ADVANCED_OPTIONS)
+                    for key, value in nested.items():
+                        new_options.setdefault(key, value)
+                new_options[CONF_ENABLE_EBUSD_TCP] = enable_tcp
+                if host:
+                    new_options[CONF_EBUSD_TCP_HOST] = host
+                    new_options[CONF_EBUSD_TCP_PORT] = port
+                elif not enable_tcp:
+                    new_options.pop(CONF_EBUSD_TCP_HOST, None)
+                    new_options[CONF_EBUSD_TCP_PORT] = port
+
+                return self.async_update_reload_and_abort(
+                    entry,
+                    title=title,
+                    data=new_data,
+                    options=new_options,
+                )
+            enable_default, host_default, port_default = enable_tcp, host, port
+        else:
+            (
+                enable_default,
+                host_default,
+                port_default,
+            ) = await self._async_prepare_ebusd_tcp_defaults(dict(entry.options))
+
+        return self.async_show_form(
+            step_id="reconfigure_ebusd_tcp",
+            data_schema=self._build_ebusd_tcp_schema(
+                enable_default, host_default, port_default
+            ),
+            errors=errors,
         )
 
     @staticmethod

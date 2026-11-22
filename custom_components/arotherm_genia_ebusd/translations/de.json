@@ -26,6 +26,20 @@
           "has_migo_link": "Offizielles Internet-Gateway (MiGo Link / myVAILLANT connect an eBUS f1)"
         }
       },
+      "ebusd_tcp": {
+        "title": "eBUSd-TCP-Verbindung (Optional)",
+        "description": "**Optionaler Schritt.** Konfiguriere eine direkte TCP-Verbindung zum eBUSd-Daemon für physische Echtzeit-Busdiagnose, automatische CSV-Prüfung, bestätigte Schreibbefehle und Wochenzeitprogramm-Aktionen (`read_time_program` / `write_time_program`).\n\n- Wenn das Home Assistant eBUSd-Add-on oder ein lokaler eBUSd-Daemon automatisch erkannt wurde, sind Schalter, Host und Port **unten bereits vorausgefüllt**.\n- Wenn nichts erkannt wurde (z. B. eBUSd läuft auf einem anderen Host/IP), kannst du Host und Port manuell eingeben — oder es einfach **deaktiviert lassen und ohne Eingabe fortfahren**. Die Integration funktioniert regulär über MQTT und **du kannst dies jederzeit später in den Optionen der Integration ändern**.",
+        "data": {
+          "enable_ebusd_tcp": "eBUSd-TCP-Diagnose und -Befehle aktivieren (optional)",
+          "ebusd_tcp_host": "eBUSd TCP-Host (IP oder Hostname)",
+          "ebusd_tcp_port": "eBUSd TCP-Port"
+        },
+        "data_description": {
+          "enable_ebusd_tcp": "Optional. Deaktiviert lassen, wenn nur MQTT genutzt werden soll; lässt sich jederzeit unter Konfigurieren aktivieren oder ändern.",
+          "ebusd_tcp_host": "Wird beim Home Assistant eBUSd-Add-on (z. B. 'b4d7ad18-ebusd') oder lokalem Daemon ('127.0.0.1') automatisch erkannt. Leer lassen, wenn kein TCP genutzt wird.",
+          "ebusd_tcp_port": "eBUSd TCP-Daemon-Port (Standard: 8888)."
+        }
+      },
       "reconfigure": {
         "title": "Hersteller neu konfigurieren",
         "description": "Ändere den Hersteller der installierten Anlage.",
@@ -42,12 +56,28 @@
           "has_wireless_room_unit": "Funk-Raumthermostat (Funkempfänger 04.netx3)",
           "has_migo_link": "Offizielles Internet-Gateway (MiGo Link / myVAILLANT connect an eBUS f1)"
         }
+      },
+      "reconfigure_ebusd_tcp": {
+        "title": "eBUSd-TCP-Verbindung neu konfigurieren (Optional)",
+        "description": "**Optionaler Schritt.** Prüfe oder aktualisiere die direkte TCP-Verbindung zu deinem eBUSd-Daemon (Busdiagnose, CSV-Prüfung, bestätigte Schreibbefehle und Wochenzeitprogramm-Aktionen).\n\n- Wenn das Home Assistant eBUSd-Add-on oder ein lokaler Daemon erkannt wurde, sind Host und Port unten vorausgefüllt.\n- Du kannst die Option deaktiviert lassen, ohne den MQTT-Betrieb zu beeinträchtigen, und **sie jederzeit später in den Optionen der Integration ändern**.",
+        "data": {
+          "enable_ebusd_tcp": "eBUSd-TCP-Diagnose und -Befehle aktivieren (optional)",
+          "ebusd_tcp_host": "eBUSd TCP-Host (IP oder Hostname)",
+          "ebusd_tcp_port": "eBUSd TCP-Port"
+        },
+        "data_description": {
+          "enable_ebusd_tcp": "Optional. Deaktiviert lassen, wenn nur MQTT genutzt werden soll; lässt sich jederzeit unter Konfigurieren aktivieren oder ändern.",
+          "ebusd_tcp_host": "Wird beim Home Assistant eBUSd-Add-on (z. B. 'b4d7ad18-ebusd') oder lokalem Daemon ('127.0.0.1') automatisch erkannt. Leer lassen, wenn kein TCP genutzt wird.",
+          "ebusd_tcp_port": "eBUSd TCP-Daemon-Port (Standard: 8888)."
+        }
       }
     },
     "error": {
       "prerequisites_not_confirmed": "Bitte bestätige vor dem Fortfahren, dass eBUSd und die CSV-Dateien des Repositorys korrekt eingerichtet sind.",
       "invalid_mqtt_prefix": "Das MQTT-Präfix darf nicht leer sein.",
-      "mqtt_not_configured": "Die Home Assistant MQTT-Integration ist nicht konfiguriert oder nicht aktiv."
+      "mqtt_not_configured": "Die Home Assistant MQTT-Integration ist nicht konfiguriert oder nicht aktiv.",
+      "invalid_ebusd_tcp_host": "Gib einen eBUSd-TCP-Host oder eine IP-Adresse ein, oder deaktiviere TCP, um ohne fortzufahren.",
+      "cannot_connect_ebusd_tcp": "Es konnte keine Verbindung zu einem eBUSd-TCP-Daemon unter dem angegebenen Host und Port hergestellt werden. Prüfe Adresse/Port oder deaktiviere TCP, um fortzufahren und es später in den Optionen einzurichten."
     },
     "abort": {
       "already_configured": "Diese eBUSd-Instanz ist in Home Assistant bereits konfiguriert."

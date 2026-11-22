@@ -26,6 +26,20 @@
           "has_migo_link": "Official cloud gateway (MiGo Link / myVAILLANT connect on eBUS f1)"
         }
       },
+      "ebusd_tcp": {
+        "title": "eBUSd TCP Connection (Optional)",
+        "description": "**Optional step.** Configure direct TCP connectivity with your eBUSd daemon to enable real-time physical bus diagnostics, automatic CSV verification, confirmed bus writes, and weekly time-program actions (`read_time_program` / `write_time_program`).\n\n- If the Home Assistant eBUSd add-on or a local eBUSd daemon was detected automatically, the toggle, host, and port are **already pre-filled below**.\n- If nothing was detected (for example, eBUSd runs on another host/IP), you can enter the host and port manually — or simply **leave it disabled and click Submit**. The integration works normally over MQTT and **you can always configure or change this later in the integration options**.",
+        "data": {
+          "enable_ebusd_tcp": "Enable eBUSd TCP diagnostics and commands (optional)",
+          "ebusd_tcp_host": "eBUSd TCP Host (IP or hostname)",
+          "ebusd_tcp_port": "eBUSd TCP Port"
+        },
+        "data_description": {
+          "enable_ebusd_tcp": "Optional. Leave disabled if you only want to use MQTT; you can enable or change it anytime under Configure.",
+          "ebusd_tcp_host": "Auto-detected when using the Home Assistant eBUSd add-on (e.g. 'b4d7ad18-ebusd') or local daemon ('127.0.0.1'). Leave blank if not using TCP.",
+          "ebusd_tcp_port": "eBUSd TCP daemon port (default: 8888)."
+        }
+      },
       "reconfigure": {
         "title": "Reconfigure Equipment Manufacturer",
         "description": "Change the equipment manufacturer.",
@@ -42,12 +56,28 @@
           "has_wireless_room_unit": "Wireless room thermostat (04.netx3 radio receiver)",
           "has_migo_link": "Official cloud gateway (MiGo Link / myVAILLANT connect on eBUS f1)"
         }
+      },
+      "reconfigure_ebusd_tcp": {
+        "title": "Reconfigure eBUSd TCP Connection (Optional)",
+        "description": "**Optional step.** Review or update direct TCP connectivity with your eBUSd daemon (bus diagnostics, CSV verification, confirmed writes, and weekly time-program actions).\n\n- If the Home Assistant eBUSd add-on or a local daemon was detected, its host and port are pre-filled below.\n- You can leave it disabled without affecting MQTT operation, and **you can always change it later from the integration options**.",
+        "data": {
+          "enable_ebusd_tcp": "Enable eBUSd TCP diagnostics and commands (optional)",
+          "ebusd_tcp_host": "eBUSd TCP Host (IP or hostname)",
+          "ebusd_tcp_port": "eBUSd TCP Port"
+        },
+        "data_description": {
+          "enable_ebusd_tcp": "Optional. Leave disabled if you only want to use MQTT; you can enable or change it anytime under Configure.",
+          "ebusd_tcp_host": "Auto-detected when using the Home Assistant eBUSd add-on (e.g. 'b4d7ad18-ebusd') or local daemon ('127.0.0.1'). Leave blank if not using TCP.",
+          "ebusd_tcp_port": "eBUSd TCP daemon port (default: 8888)."
+        }
       }
     },
     "error": {
       "prerequisites_not_confirmed": "You must confirm that eBUSd and the repository CSV files are configured before continuing.",
       "invalid_mqtt_prefix": "The MQTT prefix cannot be empty.",
-      "mqtt_not_configured": "Home Assistant's MQTT integration is not configured or active."
+      "mqtt_not_configured": "Home Assistant's MQTT integration is not configured or active.",
+      "invalid_ebusd_tcp_host": "Enter an eBUSd TCP host or IP address, or disable TCP to continue without it.",
+      "cannot_connect_ebusd_tcp": "Could not connect to an eBUSd TCP daemon at the specified host and port. Check the address/port, or disable TCP to continue and configure it later in Options."
     },
     "abort": {
       "already_configured": "This eBUSd instance is already configured in Home Assistant."

@@ -26,6 +26,20 @@
           "has_migo_link": "Pasarela oficial en nube (MiGo Link / myVAILLANT connect en eBUS f1)"
         }
       },
+      "ebusd_tcp": {
+        "title": "Conexión TCP con eBUSd (Opcional)",
+        "description": "**Paso opcional.** Configura la conexión directa por TCP con tu demonio eBUSd para activar diagnósticos físicos del bus en tiempo real, verificación automática de los CSV, escrituras confirmadas y las acciones de programación horaria semanal (`read_time_program` / `write_time_program`).\n\n- Si se ha detectado automáticamente el add-on de eBUSd en Home Assistant o un demonio local, el interruptor, el host y el puerto ya aparecerán **autocompletados abajo**.\n- Si no se ha detectado (por ejemplo, si eBUSd corre en otro equipo/IP), puedes escribir el host y el puerto manualmente o simplemente **dejarlo desactivado sin rellenar nada y continuar**. La integración funciona con normalidad por MQTT y **siempre podrás configurarlo o cambiarlo más adelante en las opciones de la integración**.",
+        "data": {
+          "enable_ebusd_tcp": "Habilitar diagnóstico físico y comandos de eBUSd por TCP (opcional)",
+          "ebusd_tcp_host": "Host TCP de eBUSd (IP o nombre de host)",
+          "ebusd_tcp_port": "Puerto TCP de eBUSd"
+        },
+        "data_description": {
+          "enable_ebusd_tcp": "Opcional. Déjalo desactivado si solo quieres usar MQTT; podrás activarlo o cambiarlo en cualquier momento desde Configurar.",
+          "ebusd_tcp_host": "Se autocompleta si usas el add-on de eBUSd en Home Assistant (p. ej. 'b4d7ad18-ebusd') o un demonio local ('127.0.0.1'). Déjalo vacío si no vas a usar TCP.",
+          "ebusd_tcp_port": "Puerto TCP del demonio eBUSd (por defecto: 8888)."
+        }
+      },
       "reconfigure": {
         "title": "Reconfigurar Fabricante",
         "description": "Cambia el fabricante del equipo instalado.",
@@ -42,12 +56,28 @@
           "has_wireless_room_unit": "Termostato de ambiente inalámbrico (receptor radio 04.netx3)",
           "has_migo_link": "Pasarela oficial en nube (MiGo Link / myVAILLANT connect en eBUS f1)"
         }
+      },
+      "reconfigure_ebusd_tcp": {
+        "title": "Reconfigurar Conexión TCP con eBUSd (Opcional)",
+        "description": "**Paso opcional.** Revisa o actualiza la conexión directa por TCP con tu demonio eBUSd (diagnósticos físicos del bus, verificación de CSV, escrituras confirmadas y acciones de programación horaria semanal).\n\n- Si se ha detectado automáticamente el add-on de eBUSd o un demonio local, su host y puerto aparecen autocompletados abajo.\n- Puedes dejarlo desactivado sin afectar al funcionamiento por MQTT y **siempre podrás cambiarlo más adelante desde las opciones de la integración**.",
+        "data": {
+          "enable_ebusd_tcp": "Habilitar diagnóstico físico y comandos de eBUSd por TCP (opcional)",
+          "ebusd_tcp_host": "Host TCP de eBUSd (IP o nombre de host)",
+          "ebusd_tcp_port": "Puerto TCP de eBUSd"
+        },
+        "data_description": {
+          "enable_ebusd_tcp": "Opcional. Déjalo desactivado si solo quieres usar MQTT; podrás activarlo o cambiarlo en cualquier momento desde Configurar.",
+          "ebusd_tcp_host": "Se autocompleta si usas el add-on de eBUSd en Home Assistant (p. ej. 'b4d7ad18-ebusd') o un demonio local ('127.0.0.1'). Déjalo vacío si no vas a usar TCP.",
+          "ebusd_tcp_port": "Puerto TCP del demonio eBUSd (por defecto: 8888)."
+        }
       }
     },
     "error": {
       "prerequisites_not_confirmed": "Debes confirmar que eBUSd y los archivos CSV del repositorio están configurados para poder continuar.",
       "invalid_mqtt_prefix": "El prefijo MQTT no puede estar vacío.",
-      "mqtt_not_configured": "La integración MQTT de Home Assistant no está configurada o activa."
+      "mqtt_not_configured": "La integración MQTT de Home Assistant no está configurada o activa.",
+      "invalid_ebusd_tcp_host": "Introduce un host o dirección IP de eBUSd TCP, o desactiva TCP para continuar sin él.",
+      "cannot_connect_ebusd_tcp": "No se pudo conectar con un demonio eBUSd TCP en el host y puerto indicados. Revisa la dirección/puerto o desactiva TCP para continuar y configurarlo más tarde en Opciones."
     },
     "abort": {
       "already_configured": "Esta instancia de eBUSd ya está configurada en Home Assistant."

@@ -171,15 +171,19 @@ La configuración se realiza íntegramente desde la interfaz; no hace falta edit
 
 1. Ve a **Ajustes → Dispositivos y Servicios** (o usa el botón de arriba).
 2. Pulsa **+ Añadir Integración** y busca **aroTHERM & GeniaAir (eBUS)**.
-3. **Paso 1 - MQTT y Fabricante:**
+3. **Paso 1 - Confirmación de Requisitos Previos:** confirma que has copiado los CSV del repositorio, configurado los flags de `ebusd` y desactivado `seed_mqtt_cfg` (si usas el add-on de HA).
+4. **Paso 2 - MQTT y Fabricante:**
    - **Prefijo de topic MQTT de ebusd:** por defecto `ebusd` (coincide con `--mqtttopic=ebusd/%circuit/%name`).
    - **Fabricante del equipo:** `Vaillant` o `Saunier Duval`.
-4. **Paso 2 - Modelos de Hardware:**
+5. **Paso 3 - Modelos de Hardware:**
    - **Unidad exterior (bomba de calor):** filtrada por marca (p. ej. `aroTHERM plus ES VWL 85/7.1 A 230V` o `GeniaAir Max ES 15`).
    - **Módulo hidráulico interior:** filtrado por marca (p. ej. `VWZ MEH 97/7`, `uniTOWER VIH QW 190/7`, `HPIM 7 230V`, `GeniaSet FEW/FIW 200-7`).
    - **Termostato inalámbrico (`04.netx3`):** actívalo si tienes una unidad de ambiente `sensoCOMFORT RF` / `MiPro Sense RF`; desactívalo en instalaciones solo cableadas.
    - **Pasarela cloud oficial (`f1`):** actívala si hay una `myVAILLANT connect` / `MiGo Link` en el bus (escucha pasiva); desactívala en caso contrario (activa el sondeo `/get` de respaldo pausado).
-5. Pulsa **Enviar**. La cola de hidratación escalonada rellena todos los registros en unos 60 segundos.
+6. **Paso 4 - Conexión TCP con eBUSd (Opcional):**
+   - Si se detecta el add-on de eBUSd en Home Assistant o un demonio eBUSd local, el interruptor, el host (p. ej. `b4d7ad18-ebusd`) y el puerto (`8888`) aparecerán **autocompletados**.
+   - Si `ebusd` corre en otro equipo/IP, puedes introducir su dirección y puerto aquí (se verifica antes de guardar) o simplemente **dejarlo desactivado** para usar solo MQTT. Siempre podrás activarlo o cambiarlo más adelante desde **Configurar** en las opciones de la integración.
+7. Pulsa **Enviar**. La cola de hidratación escalonada rellena todos los registros en unos 60 segundos.
 
 ---
 
