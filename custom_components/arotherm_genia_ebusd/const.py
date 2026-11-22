@@ -251,6 +251,7 @@ MESSAGE_ALIASES: dict[str, str] = {
     "energyintegral": "EnergyIntegral",
     "runstatshcstarts": "RunStatsAuxHeaterSwitches",
     "rundatanominalflowrate": "RunDataMaxResidualHead",
+    "coolingflowtempdesiredmax": "EmergencyFlowTempDesired",
 }
 
 # Weekly timer passive update aliases for eavesdropping MiGo Link / gateway writes
@@ -344,6 +345,10 @@ DEPRECATED_UNIQUE_ID_SUFFIXES: tuple[str, ...] = (
     "bass3_holidaystartdate_day;month;year",
     "bass3_holidayenddate_day;month;year",
     "bass3_yieldtotal_value",
+    "number_bass3_coolingflowtempdesiredmax_value",
+    "number_basv3_coolingflowtempdesiredmax_value",
+    "number_ctlv2_coolingflowtempdesiredmax_value",
+    "number_ctlv3_coolingflowtempdesiredmax_value",
 )
 
 # Timing & Hydration Constants
@@ -527,7 +532,7 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_BASS3, "Hc1MaxFlowTempDesired"),
     (CIRCUIT_BASS3, "Hc1SummerTempLimit"),
     (CIRCUIT_BASS3, "CoolingFlowTempDesiredMin"),
-    (CIRCUIT_BASS3, "CoolingFlowTempDesiredMax"),
+    (CIRCUIT_BASS3, "EmergencyFlowTempDesired"),
     (CIRCUIT_BASS3, "Hc1AutoOffMode"),
     (CIRCUIT_BASS3, "Hc1RoomTempSwitchOn"),
     (CIRCUIT_BASS3, "HwcMaxFlowTempDesired"),

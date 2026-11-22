@@ -225,8 +225,8 @@
       "cooling_flow_temp_desired_min": {
         "name": "Minimale Vorlauf-Solltemperatur Kühlen"
       },
-      "cooling_flow_temp_desired_max": {
-        "name": "Maximale Vorlauf-Solltemperatur Kühlen"
+      "emergency_flow_temp_desired": {
+        "name": "Vorlauftemperatur Notbetrieb"
       },
       "z1_night_temp": {
         "name": "Absenk-Raumtemperatur Zone 1 (Nacht)"

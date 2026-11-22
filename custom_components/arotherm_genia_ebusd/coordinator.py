@@ -296,7 +296,7 @@ ACTIVE_READ_CONFIRMATION_MESSAGES: frozenset[tuple[str, str]] = frozenset(
         (CIRCUIT_BASS3.lower(), "BivalencePointHc"),
         (CIRCUIT_BASS3.lower(), "BivalencePointHwc"),
         (CIRCUIT_BASS3.lower(), "BufferChargeOffset"),
-        (CIRCUIT_BASS3.lower(), "CoolingFlowTempDesiredMax"),
+        (CIRCUIT_BASS3.lower(), "EmergencyFlowTempDesired"),
         (CIRCUIT_BASS3.lower(), "CoolingFlowTempDesiredMin"),
         (CIRCUIT_BASS3.lower(), "CylinderChargeHyst"),
         (CIRCUIT_BASS3.lower(), "CylinderChargeOffset"),

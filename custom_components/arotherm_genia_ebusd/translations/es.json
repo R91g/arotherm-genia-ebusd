@@ -225,8 +225,8 @@
       "cooling_flow_temp_desired_min": {
         "name": "Temperatura mínima de impulsión refrigeración"
       },
-      "cooling_flow_temp_desired_max": {
-        "name": "Temperatura máxima de impulsión refrigeración"
+      "emergency_flow_temp_desired": {
+        "name": "Temperatura de impulsión en modo emergencia"
       },
       "z1_night_temp": {
         "name": "Consigna reducción nocturna Zona 1 (Noche)"

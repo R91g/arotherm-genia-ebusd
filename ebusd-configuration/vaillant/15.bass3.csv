@@ -182,8 +182,8 @@ w,,,Z1CoolingTempDesired,cooling room temperature desired zone 1,,,b524,02010300
 r;u,,,CoolingReleaseStatus,cooling release status,,,b524,020000000900,ign,,IGN:4,,,,value,,UCH,0=off;1=on,,cooling release status
 r;u,,,CoolingFlowTempDesiredMin,cooling min flow temp desired,,,b524,020002001100,ign,,IGN:4,,,,value,,EXP,,°C,min flow temperature setpoint for cooling (Circuit 1: 10.0 °C on MiPro Sense)
 w,,,CoolingFlowTempDesiredMin,cooling min flow temp desired,,,b524,020102001100,value,,EXP,,°C,min flow temperature setpoint for cooling (Circuit 1: 10.0 °C on MiPro Sense)
-r;u,,,CoolingFlowTempDesiredMax,cooling max flow temp desired,,,b524,020000002600,ign,,IGN:4,,,,value,,EXP,,°C,max flow temperature setpoint for cooling
-w,,,CoolingFlowTempDesiredMax,cooling max flow temp desired,,,b524,020100002600,value,,EXP,,°C,max flow temperature setpoint for cooling
+r;u,,,EmergencyFlowTempDesired,emergency operation flow temperature setpoint,,,b524,020000002600,ign,,IGN:4,,,,value,,EXP,,°C,"emergency mode flow temperature setpoint (20..80 °C, MiPro Sense)"
+w,,,EmergencyFlowTempDesired,emergency operation flow temperature setpoint,,,b524,020100002600,value,,EXP,,°C,"emergency mode flow temperature setpoint (20..80 °C, MiPro Sense)"
 r;u,,,CoolingOutsideTempThreshold,cooling outside temperature threshold,,,b524,020000003800,ign,,IGN:4,,,,value,,EXP,,°C,cooling outside temperature threshold
 w,,,CoolingOutsideTempThreshold,cooling outside temperature threshold,,,b524,020100003800,value,,EXP,,°C,cooling outside temperature threshold
 r;u,,,DewPointOffset,dew point offset,,,b524,020000003a00,ign,,IGN:4,,,,value,,EXP,,K,dew point offset

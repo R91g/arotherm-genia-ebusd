@@ -835,8 +835,8 @@
       "cooling_flow_temp_desired_min": {
         "default": "mdi:thermometer-chevron-down"
       },
-      "cooling_flow_temp_desired_max": {
-        "default": "mdi:thermometer-chevron-up"
+      "emergency_flow_temp_desired": {
+        "default": "mdi:thermometer-alert"
       },
       "hc1_summer_temp_limit": {
         "default": "mdi:weather-sunny-alert"

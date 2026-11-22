@@ -225,8 +225,8 @@
       "cooling_flow_temp_desired_min": {
         "name": "Minimum Cooling Flow Setpoint"
       },
-      "cooling_flow_temp_desired_max": {
-        "name": "Maximum Cooling Flow Setpoint"
+      "emergency_flow_temp_desired": {
+        "name": "Emergency Operation Flow Temperature"
       },
       "z1_night_temp": {
         "name": "Zone 1 Night Setback Temperature (Night)"
