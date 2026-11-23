@@ -33,6 +33,10 @@ w,,,OutsideTempAvg,average outside temperature,,,b524,020100009500,value,,EXP,,Â
 # Disabled active polling of non-existent solar registers to prevent bus saturation and read timeouts
 r;u,,,YieldTotal,total environmental yield,,,b524,020000003e00,ign,,IGN:4,,,,value,,ULG,,kWh,total environmental yield
 w,,,YieldTotal,total environmental yield,,,b524,020100003e00,value,,ULG,,kWh,total environmental yield
+r;u,,,YieldThisMonth,this months environmental yield,,,b524,02000000e000,ign,,IGN:4,,,,value,,ULG,,kWh,current month environmental yield
+r;u,,,YieldLastMonth,last months environmental yield,,,b524,02000000d600,ign,,IGN:4,,,,value,,ULG,,kWh,last month environmental yield
+r;u,,,YieldThisYear,this years environmental yield,,,b524,02000000d800,ign,,IGN:4,,,,value,,ULG,,kWh,current year environmental yield
+r;u,,,YieldLastYear,last years environmental yield,,,b524,02000000d700,ign,,IGN:4,,,,value,,ULG,,kWh,last year environmental yield
 r;u,,,SolarYieldTotal,total solar yield,,,b524,020000003d00,ign,,IGN:4,,,,value,,ULG,,kWh,total solar yield
 w,,,SolarYieldTotal,total solar yield,,,b524,020100003d00,value,,ULG,,kWh,total solar yield
 r9;u,,,PrEnergySumHc,total energy consumption heating,,,b524,020000005700,ign,,IGN:4,,,,value,,ULG,,kWh,total heating electricity consumption
@@ -41,12 +45,22 @@ r9;u,,,PrEnergySumHcThisMonth,this months energy consumption heating,,,b524,0200
 w,,,PrEnergySumHcThisMonth,this months energy consumption heating,,,b524,020100004f00,value,,ULG,,kWh,current month heating electricity consumption
 r9;u,,,PrEnergySumHcLastMonth,last months energy consumption heating,,,b524,020000005300,ign,,IGN:4,,,,value,,ULG,,kWh,last month heating electricity consumption
 w,,,PrEnergySumHcLastMonth,last months energy consumption heating,,,b524,020100005300,value,,ULG,,kWh,last month heating electricity consumption
+r;u,,,PrEnergySumHcThisYear,this years energy consumption heating,,,b524,02000000c100,ign,,IGN:4,,,,value,,ULG,,kWh,current year heating electricity consumption
+r;u,,,PrEnergySumHcLastYear,last years energy consumption heating,,,b524,02000000c000,ign,,IGN:4,,,,value,,ULG,,kWh,last year heating electricity consumption
 r9;u,,,PrEnergySumHwc,total energy consumption hot water,,,b524,020000005800,ign,,IGN:4,,,,value,,ULG,,kWh,total hot water electricity consumption
 w,,,PrEnergySumHwc,total energy consumption hot water,,,b524,020100005800,value,,ULG,,kWh,total hot water electricity consumption
 r9;u,,,PrEnergySumHwcThisMonth,this months energy consumption hot water,,,b524,020000005000,ign,,IGN:4,,,,value,,ULG,,kWh,current month hot water electricity consumption
 w,,,PrEnergySumHwcThisMonth,this months energy consumption hot water,,,b524,020100005000,value,,ULG,,kWh,current month hot water electricity consumption
 r9;u,,,PrEnergySumHwcLastMonth,last months energy consumption hot water,,,b524,020000005400,ign,,IGN:4,,,,value,,ULG,,kWh,last month hot water electricity consumption
 w,,,PrEnergySumHwcLastMonth,last months energy consumption hot water,,,b524,020100005400,value,,ULG,,kWh,last month hot water electricity consumption
+r;u,,,PrEnergySumHwcThisYear,this years energy consumption hot water,,,b524,02000000bb00,ign,,IGN:4,,,,value,,ULG,,kWh,current year hot water electricity consumption
+r;u,,,PrEnergySumHwcLastYear,last years energy consumption hot water,,,b524,02000000bc00,ign,,IGN:4,,,,value,,ULG,,kWh,last year hot water electricity consumption
+r;u,,,PrEnergySumCooling,total energy consumption cooling,,,b524,02000000b100,ign,,IGN:4,,,,value,,ULG,,kWh,total cooling electricity consumption
+r;u,,,PrEnergySumTotal,total installation energy consumption,,,b524,02000000c600,ign,,IGN:4,,,,value,,ULG,,kWh,total installation electricity consumption
+r;u,,,PrEnergySumTotalThisMonth,this months installation energy consumption,,,b524,02000000c200,ign,,IGN:4,,,,value,,ULG,,kWh,current month installation electricity consumption
+r;u,,,PrEnergySumTotalLastMonth,last months installation energy consumption,,,b524,02000000c300,ign,,IGN:4,,,,value,,ULG,,kWh,last month installation electricity consumption
+r;u,,,PrEnergySumTotalThisYear,this years installation energy consumption,,,b524,02000000c400,ign,,IGN:4,,,,value,,ULG,,kWh,current year installation electricity consumption
+r;u,,,PrEnergySumTotalLastYear,last years installation energy consumption,,,b524,02000000c500,ign,,IGN:4,,,,value,,ULG,,kWh,last year installation electricity consumption
 r;u,,,KeyCodeforConfigMenu,code for installer menu,,,b524,020000007600,ign,,IGN:4,,,,value,,UIN,,,000-999; code for the installer's menues
 w,,,KeyCodeforConfigMenu,code for installer menu,,,b524,020100007600,value,,UIN,,,000-999; code for the installer's menues
 r;u,,,MaintenanceDate,next maintenance,,,b524,020000002c00,ign,,IGN:4,,,,value,,HDA:3,,,next maintenance date
@@ -64,8 +78,8 @@ r;u,,,SolarStorageTempBottom,solar storage temperature bottom,,,b524,02000000670
 r;u,,,SolarStorageTempTop,solar storage temperature top,,,b524,020000006800,ign,,IGN:4,,,,value,,EXP,,Â°C,"solar temperature sensor, top"
 r;u,,,UnknownSettingB6,unknown setting b6 (uninstalled),,,b524,02000000b600,data,,HEX:4,,,
 r;u,,,PrEnergySolarTotal,total solar energy sum,,,b516,1000ffff01000000,ign,,IGN:7,,,,energy,,EXP,,Wh,
-r;u,,,MultiInputSetting,multifunction input setting,,,b524,020000006a00,ign,,IGN:4,,,,value,,UCH,0=off;1=circulation;2=photovoltaic;3=cooling,,multifunction input setting
-w,,,MultiInputSetting,multifunction input setting,,,b524,020100006a00,value,,UCH,0=off;1=circulation;2=photovoltaic;3=cooling,,multifunction input setting
+r;u,,,MultiInputSetting,multifunction input setting,,,b524,020000006a00,ign,,IGN:4,,,,value,,UIN,0=off;1=circulation;2=photovoltaic;3=cooling,,multifunction input setting
+w,,,MultiInputSetting,multifunction input setting,,,b524,020100006a00,value,,UIN,0=off;1=circulation;2=photovoltaic;3=cooling,,multifunction input setting
 r;u,,,OffsetOutsideTemp,outside temperature calibration offset,,,b524,020000002d00,ign,,IGN:4,,,,value,,EXP,,K,outside temperature calibration offset
 w,,,OffsetOutsideTemp,outside temperature calibration offset,,,b524,020100002d00,value,,EXP,,K,outside temperature calibration offset
 
