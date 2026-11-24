@@ -801,6 +801,12 @@
       "bass3_energy_hc_total": {
         "name": "Heizenergie-Verbrauch Gesamt (BASS3)"
       },
+      "bass3_energy_hc_this_year": {
+        "name": "Heizenergie-Verbrauch aktuelles Jahr"
+      },
+      "bass3_energy_hc_last_year": {
+        "name": "Heizenergie-Verbrauch letztes Jahr"
+      },
       "bass3_energy_hwc_this_month": {
         "name": "Warmwasserenergie-Verbrauch aktueller Monat (BASS3)"
       },
@@ -809,6 +815,45 @@
       },
       "bass3_energy_hwc_total": {
         "name": "Warmwasserenergie-Verbrauch Gesamt (BASS3)"
+      },
+      "bass3_energy_hwc_this_year": {
+        "name": "Warmwasserenergie-Verbrauch aktuelles Jahr"
+      },
+      "bass3_energy_hwc_last_year": {
+        "name": "Warmwasserenergie-Verbrauch letztes Jahr"
+      },
+      "bass3_energy_cooling_total": {
+        "name": "Kühlenergie-Verbrauch Gesamt"
+      },
+      "bass3_energy_total": {
+        "name": "Gesamtenergie-Verbrauch Anlage"
+      },
+      "bass3_energy_total_this_month": {
+        "name": "Gesamtenergie-Verbrauch aktueller Monat"
+      },
+      "bass3_energy_total_last_month": {
+        "name": "Gesamtenergie-Verbrauch letzter Monat"
+      },
+      "bass3_energy_total_this_year": {
+        "name": "Gesamtenergie-Verbrauch aktuelles Jahr"
+      },
+      "bass3_energy_total_last_year": {
+        "name": "Gesamtenergie-Verbrauch letztes Jahr"
+      },
+      "bass3_yield_total": {
+        "name": "Umweltertrag Gesamt"
+      },
+      "bass3_yield_this_month": {
+        "name": "Umweltertrag aktueller Monat"
+      },
+      "bass3_yield_last_month": {
+        "name": "Umweltertrag letzter Monat"
+      },
+      "bass3_yield_this_year": {
+        "name": "Umweltertrag aktuelles Jahr"
+      },
+      "bass3_yield_last_year": {
+        "name": "Umweltertrag letztes Jahr"
       },
       "solar_yield_total": {
         "name": "Solarer Gesamtertrag"

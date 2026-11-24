@@ -22,6 +22,7 @@ from .const import (
     DAY_SHORT_KEYS,
     DEVICE_CLIMATE_CONTROLLER,
     DOMAIN,
+    OPTIONAL_CONTROLLER_ENERGY_MESSAGES,
     OUTDOOR_CIRCUITS,
     WEEKDAYS_LIST,
 )
@@ -175,6 +176,20 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
         }:
             self._attr_entity_registry_enabled_default = (
                 coordinator.is_ebusd_tcp_enabled
+            )
+
+    async def async_added_to_hass(self) -> None:
+        """Subscribe to updates and register optional energy counters for 6h polling."""
+        await super().async_added_to_hass()
+        desc = self.entity_description
+        if (
+            desc.circuit == CIRCUIT_BASS3
+            and desc.message in OPTIONAL_CONTROLLER_ENERGY_MESSAGES
+        ):
+            self.async_on_remove(
+                self.coordinator.async_register_optional_poll(
+                    desc.circuit, desc.message
+                )
             )
 
     @property

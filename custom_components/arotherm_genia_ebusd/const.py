@@ -346,7 +346,6 @@ DEPRECATED_UNIQUE_ID_SUFFIXES: tuple[str, ...] = (
     "bass3_coolingenddate_day;month;year",
     "bass3_holidaystartdate_day;month;year",
     "bass3_holidayenddate_day;month;year",
-    "bass3_yieldtotal_value",
     "number_bass3_coolingflowtempdesiredmax_value",
     "number_basv3_coolingflowtempdesiredmax_value",
     "number_ctlv2_coolingflowtempdesiredmax_value",
@@ -646,6 +645,32 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
 
 # No-MiGo Fallback Polling Tiers (mimicking MiGo Link fast operational vs hourly slow sync)
 FALLBACK_SLOW_POLL_INTERVAL_SECONDS: int = 3600
+
+# On-demand polling interval for user-enabled optional controller energy/yield counters (6 hours)
+OPTIONAL_ENERGY_POLL_INTERVAL_SECONDS: int = 21600
+
+# Disabled-by-default controller energy/yield registers polled on demand (startup/enable + every 6h)
+# ONLY while the corresponding Home Assistant sensor entity is enabled.
+OPTIONAL_CONTROLLER_ENERGY_MESSAGES: frozenset[str] = frozenset(
+    {
+        "YieldTotal",
+        "YieldThisMonth",
+        "YieldLastMonth",
+        "YieldThisYear",
+        "YieldLastYear",
+        "PrEnergySumHcThisYear",
+        "PrEnergySumHcLastYear",
+        "PrEnergySumHwcThisYear",
+        "PrEnergySumHwcLastYear",
+        "PrEnergySumCooling",
+        "PrEnergySumTotal",
+        "PrEnergySumTotalThisMonth",
+        "PrEnergySumTotalLastMonth",
+        "PrEnergySumTotalThisYear",
+        "PrEnergySumTotalLastYear",
+        "SolarYieldTotal",
+    }
+)
 
 FALLBACK_FAST_BASS3_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_BASS3, "Z1SFMode"),

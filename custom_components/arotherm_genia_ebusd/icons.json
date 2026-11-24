@@ -719,6 +719,12 @@
       "bass3_energy_hc_total": {
         "default": "mdi:fire"
       },
+      "bass3_energy_hc_this_year": {
+        "default": "mdi:fire"
+      },
+      "bass3_energy_hc_last_year": {
+        "default": "mdi:fire"
+      },
       "bass3_energy_hwc_this_month": {
         "default": "mdi:water-boiler"
       },
@@ -727,6 +733,45 @@
       },
       "bass3_energy_hwc_total": {
         "default": "mdi:water-boiler"
+      },
+      "bass3_energy_hwc_this_year": {
+        "default": "mdi:water-boiler"
+      },
+      "bass3_energy_hwc_last_year": {
+        "default": "mdi:water-boiler"
+      },
+      "bass3_energy_cooling_total": {
+        "default": "mdi:snowflake"
+      },
+      "bass3_energy_total": {
+        "default": "mdi:lightning-bolt"
+      },
+      "bass3_energy_total_this_month": {
+        "default": "mdi:lightning-bolt"
+      },
+      "bass3_energy_total_last_month": {
+        "default": "mdi:lightning-bolt"
+      },
+      "bass3_energy_total_this_year": {
+        "default": "mdi:lightning-bolt"
+      },
+      "bass3_energy_total_last_year": {
+        "default": "mdi:lightning-bolt"
+      },
+      "bass3_yield_total": {
+        "default": "mdi:leaf"
+      },
+      "bass3_yield_this_month": {
+        "default": "mdi:leaf"
+      },
+      "bass3_yield_last_month": {
+        "default": "mdi:leaf"
+      },
+      "bass3_yield_this_year": {
+        "default": "mdi:leaf"
+      },
+      "bass3_yield_last_year": {
+        "default": "mdi:leaf"
       },
       "vwzio_electric_power": {
         "default": "mdi:lightning-bolt"

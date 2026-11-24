@@ -801,6 +801,12 @@
       "bass3_energy_hc_total": {
         "name": "Consumo calefacción total (BASS3)"
       },
+      "bass3_energy_hc_this_year": {
+        "name": "Consumo calefacción este año"
+      },
+      "bass3_energy_hc_last_year": {
+        "name": "Consumo calefacción año pasado"
+      },
       "bass3_energy_hwc_this_month": {
         "name": "Consumo ACS este mes (BASS3)"
       },
@@ -809,6 +815,45 @@
       },
       "bass3_energy_hwc_total": {
         "name": "Consumo ACS total (BASS3)"
+      },
+      "bass3_energy_hwc_this_year": {
+        "name": "Consumo ACS este año"
+      },
+      "bass3_energy_hwc_last_year": {
+        "name": "Consumo ACS año pasado"
+      },
+      "bass3_energy_cooling_total": {
+        "name": "Consumo refrigeración total"
+      },
+      "bass3_energy_total": {
+        "name": "Consumo total de la instalación"
+      },
+      "bass3_energy_total_this_month": {
+        "name": "Consumo total este mes"
+      },
+      "bass3_energy_total_last_month": {
+        "name": "Consumo total mes pasado"
+      },
+      "bass3_energy_total_this_year": {
+        "name": "Consumo total este año"
+      },
+      "bass3_energy_total_last_year": {
+        "name": "Consumo total año pasado"
+      },
+      "bass3_yield_total": {
+        "name": "Rendimiento ambiental total"
+      },
+      "bass3_yield_this_month": {
+        "name": "Rendimiento ambiental este mes"
+      },
+      "bass3_yield_last_month": {
+        "name": "Rendimiento ambiental mes pasado"
+      },
+      "bass3_yield_this_year": {
+        "name": "Rendimiento ambiental este año"
+      },
+      "bass3_yield_last_year": {
+        "name": "Rendimiento ambiental año pasado"
       },
       "solar_yield_total": {
         "name": "Rendimiento solar térmico acumulado"

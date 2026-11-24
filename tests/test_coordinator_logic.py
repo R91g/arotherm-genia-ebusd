@@ -6516,6 +6516,148 @@ class TestCoordinatorLogic(unittest.TestCase):
         self.assertGreaterEqual(rem2, 89)
         self.assertLessEqual(rem2, 91)
 
+    def test_optional_controller_energy_sensors_disabled_by_default_and_6h_on_demand_poll(
+        self,
+    ) -> None:
+        """Optional controller energy/yield counters stay disabled by default and poll on-demand every 6h only when enabled."""
+        from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
+        from homeassistant.const import UnitOfEnergy
+
+        from custom_components.arotherm_genia_ebusd.const import (
+            ESSENTIAL_HYDRATION_MESSAGES,
+            FALLBACK_FAST_BASS3_MESSAGES,
+            OPTIONAL_CONTROLLER_ENERGY_MESSAGES,
+            OPTIONAL_ENERGY_POLL_INTERVAL_SECONDS,
+        )
+
+        # 1. Exact 16 optional controller energy/yield sensors exist and are disabled by default
+        optional_descs = [
+            d
+            for d in SENSOR_DESCRIPTIONS
+            if d.circuit == CIRCUIT_BASS3
+            and d.message in OPTIONAL_CONTROLLER_ENERGY_MESSAGES
+        ]
+        self.assertEqual(
+            {d.message for d in optional_descs}, OPTIONAL_CONTROLLER_ENERGY_MESSAGES
+        )
+        self.assertEqual(len(optional_descs), 16)
+
+        total_increasing_msgs = {
+            "YieldTotal",
+            "PrEnergySumCooling",
+            "PrEnergySumTotal",
+            "SolarYieldTotal",
+        }
+        for desc in optional_descs:
+            self.assertFalse(desc.entity_registry_enabled_default)
+            self.assertEqual(desc.device_class, SensorDeviceClass.ENERGY)
+            self.assertEqual(
+                desc.native_unit_of_measurement, UnitOfEnergy.KILO_WATT_HOUR
+            )
+            self.assertTrue(desc.is_integer)
+            expected_sc = (
+                SensorStateClass.TOTAL_INCREASING
+                if desc.message in total_increasing_msgs
+                else SensorStateClass.TOTAL
+            )
+            self.assertEqual(desc.state_class, expected_sc)
+
+        # 2. Zero default traffic: none of them appear in hydration or fallback poll queues
+        for queue in (
+            ESSENTIAL_HYDRATION_MESSAGES,
+            FALLBACK_FAST_BASS3_MESSAGES,
+            FALLBACK_SLOW_BASS3_MESSAGES,
+        ):
+            for _c, msg in queue:
+                self.assertNotIn(msg, OPTIONAL_CONTROLLER_ENERGY_MESSAGES)
+
+        # 3. Enabling an optional sensor registers it, starts 6h timer, and piggybacks on startup hydration
+        hass = MagicMock()
+        hass.async_create_background_task = MagicMock(
+            side_effect=lambda coro, name=None: coro.close()
+        )
+        entry = MagicMock()
+        entry.entry_id = "test_opt_energy"
+        entry.data = {CONF_HAS_MIGO_LINK: True}
+        entry.options = {}
+        coord = SaunierGeniaCoordinator(hass, entry)
+        coord._state[(CIRCUIT_GLOBAL, "running")] = {"value": "true"}
+        coord._state[(CIRCUIT_GLOBAL, "signal")] = {"value": "true"}
+
+        yield_desc = next(d for d in optional_descs if d.key == "bass3_yield_this_year")
+        sensor_yield = SaunierGeniaSensor(coord, yield_desc)
+        remove_callbacks: list[Any] = []
+        sensor_yield.async_on_remove = remove_callbacks.append  # type: ignore[method-assign]
+
+        unsub_timer = MagicMock()
+        with patch(
+            "custom_components.arotherm_genia_ebusd.coordinator.async_track_time_interval",
+            return_value=unsub_timer,
+        ) as mock_interval:
+            asyncio.run(sensor_yield.async_added_to_hass())
+
+            mock_interval.assert_called_once()
+            self.assertEqual(
+                mock_interval.call_args[0][2],
+                timedelta(seconds=OPTIONAL_ENERGY_POLL_INTERVAL_SECONDS),
+            )
+            self.assertEqual(OPTIONAL_ENERGY_POLL_INTERVAL_SECONDS, 6 * 3600)
+
+            # Startup hydration includes the enabled optional register (and not disabled ones)
+            with patch.object(
+                coord, "_async_run_hydration_queue", return_value=None
+            ) as mock_hydrate:
+                coord._async_start_initial_hydration(datetime.now())
+                hydrated_queue = mock_hydrate.call_args[0][0]
+                self.assertIn((CIRCUIT_BASS3, "YieldThisYear"), hydrated_queue)
+                self.assertNotIn((CIRCUIT_BASS3, "YieldLastYear"), hydrated_queue)
+
+            # 4. Enabling a second sensor AFTER startup hydration triggers an immediate /get
+            cool_desc = next(
+                d for d in optional_descs if d.key == "bass3_energy_cooling_total"
+            )
+            sensor_cool = SaunierGeniaSensor(coord, cool_desc)
+            cool_remove_callbacks: list[Any] = []
+            sensor_cool.async_on_remove = cool_remove_callbacks.append  # type: ignore[method-assign]
+
+            with patch.object(
+                coord, "async_request_get", new_callable=AsyncMock
+            ) as mock_get:
+                asyncio.run(sensor_cool.async_added_to_hass())
+                # Still only one 6h timer created
+                mock_interval.assert_called_once()
+                mock_get.assert_called_once_with(CIRCUIT_BASS3, "PrEnergySumCooling")
+
+            # 5. 6-hour timer polls ONLY the enabled optional registers
+            with patch.object(
+                coord, "_async_force_poll_queue", return_value=None
+            ) as mock_force:
+                coord._async_run_optional_energy_poll(datetime.now())
+                mock_force.assert_called_once()
+                polled = mock_force.call_args[0][0]
+                self.assertEqual(
+                    set(polled),
+                    {
+                        (CIRCUIT_BASS3, "YieldThisYear"),
+                        (CIRCUIT_BASS3, "PrEnergySumCooling"),
+                    },
+                )
+
+            # 6. Removing first sensor keeps timer active; removing second cancels timer cleanly
+            for cb in remove_callbacks:
+                cb()
+            unsub_timer.assert_not_called()
+            self.assertEqual(
+                set(coord._optional_poll_counts.keys()),
+                {(CIRCUIT_BASS3, "PrEnergySumCooling")},
+            )
+
+            for cb in cool_remove_callbacks:
+                cb()
+            unsub_timer.assert_called_once()
+            self.assertEqual(coord._optional_poll_counts, {})
+            self.assertIsNone(coord._optional_energy_poll_unsub)
+
 
 if __name__ == "__main__":
     unittest.main()

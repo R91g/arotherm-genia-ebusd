@@ -121,6 +121,7 @@ from .const import (
     ISSUE_OUTDATED_VWZIO_CSV,
     MANUFACTURER_VAILLANT,
     MESSAGE_ALIASES,
+    OPTIONAL_ENERGY_POLL_INTERVAL_SECONDS,
     OUTDOOR_CIRCUITS,
     SCAN_ADDRESS_TO_DEVICE_KEY,
     SCAN_TOPIC_CIRCUITS,
@@ -356,6 +357,9 @@ class SaunierGeniaCoordinator:
         self._hydration_timer_unsub: CALLBACK_TYPE | None = None
         self._fallback_poll_unsub: CALLBACK_TYPE | None = None
         self._fallback_slow_poll_unsub: CALLBACK_TYPE | None = None
+        self._optional_poll_counts: dict[tuple[str, str], int] = {}
+        self._optional_energy_poll_unsub: CALLBACK_TYPE | None = None
+        self._optional_energy_poll_task: asyncio.Task[None] | None = None
         self._ebusd_tcp_poll_unsub: CALLBACK_TYPE | None = None
         self._tcp_autodiscover_task: asyncio.Task[None] | None = None
         self._seed_check_task: asyncio.Task[None] | None = None
@@ -1274,6 +1278,11 @@ class SaunierGeniaCoordinator:
             self._fallback_slow_poll_unsub()
             self._fallback_slow_poll_unsub = None
 
+        if self._optional_energy_poll_unsub is not None:
+            self._optional_energy_poll_unsub()
+            self._optional_energy_poll_unsub = None
+        self._optional_poll_counts.clear()
+
         if self._ebusd_tcp_poll_unsub is not None:
             self._ebusd_tcp_poll_unsub()
             self._ebusd_tcp_poll_unsub = None
@@ -1317,6 +1326,13 @@ class SaunierGeniaCoordinator:
         if self._hydration_task is not None and not self._hydration_task.done():
             self._hydration_task.cancel()
             self._hydration_task = None
+
+        if (
+            self._optional_energy_poll_task is not None
+            and not self._optional_energy_poll_task.done()
+        ):
+            self._optional_energy_poll_task.cancel()
+            self._optional_energy_poll_task = None
 
         if (
             self._tcp_autodiscover_task is not None
@@ -2966,6 +2982,10 @@ class SaunierGeniaCoordinator:
             if item not in missing:
                 missing.append(item)
 
+        for item in self._optional_poll_counts:
+            if item not in missing and not self.has_message(item[0], item[1]):
+                missing.append(item)
+
         if not missing:
             _LOGGER.debug(
                 "All essential eBUSd messages already hydrated via retained MQTT payloads"
@@ -3178,6 +3198,66 @@ class SaunierGeniaCoordinator:
         self._hydration_task = self.hass.async_create_background_task(
             self._async_force_poll_queue(slow_messages, expand_timer_slots=True),
             name=f"{self.entry.domain}_fallback_slow_poll",
+        )
+
+    @callback
+    def async_register_optional_poll(self, circuit: str, message: str) -> CALLBACK_TYPE:
+        """Register an enabled optional energy counter for startup and 6-hour polling.
+
+        Disabled-by-default entities never call async_added_to_hass, so zero bus
+        traffic is generated until a user explicitly enables an entity.
+        """
+        key = (circuit, message)
+        self._optional_poll_counts[key] = self._optional_poll_counts.get(key, 0) + 1
+        if self._optional_energy_poll_unsub is None and not self._unloaded:
+            self._optional_energy_poll_unsub = async_track_time_interval(
+                self.hass,
+                self._async_run_optional_energy_poll,
+                timedelta(seconds=OPTIONAL_ENERGY_POLL_INTERVAL_SECONDS),
+            )
+        if (
+            self._initial_hydration_started
+            and not self._unloaded
+            and not self.has_message(circuit, message)
+            and self.is_ebus_operational
+        ):
+            self._schedule_background_task(
+                self.async_request_get(circuit, message),
+                name=f"{DOMAIN}_optional_hydrate_{message}_{self.entry.entry_id}",
+            )
+
+        @callback
+        def _unsub() -> None:
+            remaining = self._optional_poll_counts.get(key, 0) - 1
+            if remaining > 0:
+                self._optional_poll_counts[key] = remaining
+                return
+            self._optional_poll_counts.pop(key, None)
+            if (
+                not self._optional_poll_counts
+                and self._optional_energy_poll_unsub is not None
+            ):
+                self._optional_energy_poll_unsub()
+                self._optional_energy_poll_unsub = None
+
+        return _unsub
+
+    @callback
+    def _async_run_optional_energy_poll(self, _now: datetime) -> None:
+        """Periodic 6-hour poll for user-enabled optional controller energy counters."""
+        if self._unloaded or not self._optional_poll_counts:
+            return
+        if not self.is_ebus_operational:
+            return
+        if (
+            self._optional_energy_poll_task is not None
+            and not self._optional_energy_poll_task.done()
+        ):
+            return
+        messages = list(self._optional_poll_counts.keys())
+        self._optional_energy_poll_task = self._schedule_background_task(
+            self._async_force_poll_queue(messages),
+            name=f"{DOMAIN}_optional_energy_poll_{self.entry.entry_id}",
         )
 
     async def _async_force_poll_queue(

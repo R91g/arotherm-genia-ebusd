@@ -801,6 +801,12 @@
       "bass3_energy_hc_total": {
         "name": "Total Heating Energy Consumed (BASS3)"
       },
+      "bass3_energy_hc_this_year": {
+        "name": "Heating Energy Consumed This Year"
+      },
+      "bass3_energy_hc_last_year": {
+        "name": "Heating Energy Consumed Last Year"
+      },
       "bass3_energy_hwc_this_month": {
         "name": "DHW Energy Consumed This Month (BASS3)"
       },
@@ -809,6 +815,45 @@
       },
       "bass3_energy_hwc_total": {
         "name": "Total DHW Energy Consumed (BASS3)"
+      },
+      "bass3_energy_hwc_this_year": {
+        "name": "DHW Energy Consumed This Year"
+      },
+      "bass3_energy_hwc_last_year": {
+        "name": "DHW Energy Consumed Last Year"
+      },
+      "bass3_energy_cooling_total": {
+        "name": "Total Cooling Energy Consumed"
+      },
+      "bass3_energy_total": {
+        "name": "Total Installation Energy Consumed"
+      },
+      "bass3_energy_total_this_month": {
+        "name": "Installation Energy Consumed This Month"
+      },
+      "bass3_energy_total_last_month": {
+        "name": "Installation Energy Consumed Last Month"
+      },
+      "bass3_energy_total_this_year": {
+        "name": "Installation Energy Consumed This Year"
+      },
+      "bass3_energy_total_last_year": {
+        "name": "Installation Energy Consumed Last Year"
+      },
+      "bass3_yield_total": {
+        "name": "Total Environmental Energy Yield"
+      },
+      "bass3_yield_this_month": {
+        "name": "Environmental Energy Yield This Month"
+      },
+      "bass3_yield_last_month": {
+        "name": "Environmental Energy Yield Last Month"
+      },
+      "bass3_yield_this_year": {
+        "name": "Environmental Energy Yield This Year"
+      },
+      "bass3_yield_last_year": {
+        "name": "Environmental Energy Yield Last Year"
       },
       "solar_yield_total": {
         "name": "Total Solar Thermal Yield"
