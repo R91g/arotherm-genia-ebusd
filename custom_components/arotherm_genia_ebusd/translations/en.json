@@ -709,12 +709,6 @@
       "stats_deice_starts": {
         "name": "Defrost Total Cycles"
       },
-      "stats_immersion_heater_hours": {
-        "name": "Backup Immersion Heater Operating Hours"
-      },
-      "stats_immersion_heater_starts": {
-        "name": "Backup Immersion Heater Total Starts"
-      },
       "system_operating_state": {
         "name": "System Operating State",
         "state": {

@@ -77,8 +77,8 @@ r;u,,,RunStatsCoolingHours,,,,b509,540200e10b,ign,,IGN:4,,,,value,,UIN,,h,coolin
 r;u,,,RunStatsCoolingStarts,,,,b509,540200e20b,ign,,IGN:4,,,,value,,UIN,,,cooling start count
 r;u,,,RunStatsDeiceHours,,,,b509,540200e30b,ign,,IGN:4,,,,value,,UIN,,h,defrost operating hours
 r;u,,,RunStatsDeiceStarts,,,,b509,540200e40b,ign,,IGN:4,,,,value,,UIN,,,defrost start count
-r;u,,,RunStatsImmersionHeaterHours,,,,b509,540200e50b,ign,,IGN:4,,,,value,,UIN,,h,backup electric heater operating hours
-r;u,,,RunStatsImmersionHeaterStarts,,,,b509,540200e60b,ign,,IGN:4,,,,value,,UIN,,,backup electric heater start count
+u,,,RunStatsDiage50b,unverified outdoor cycle runtime counter e50b (tracks compressor cycles; not hydraulic backup heater),,,b509,540200e50b,ign,,IGN:4,,,,value,,UIN,,h,hours
+u,,,RunStatsDiage60b,unverified outdoor cycle count e60b (tracks compressor starts 1:1; not hydraulic backup heater),,,b509,540200e60b,ign,,IGN:4,,,,value,,UIN,,,count
 
 # Refrigeration circuit thermodynamics and energy integral (display-verified)
 r;u,,,RunDataFlowTempDesired,compressor flow temperature target,,,b509,5402004a0d,ign,,IGN:4,,,,value,,EXP,,°C,"compressor flow temperature target"

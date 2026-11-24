@@ -474,12 +474,6 @@
       "stats_fan2_hours": {
         "default": "mdi:timer-sand"
       },
-      "stats_immersion_heater_hours": {
-        "default": "mdi:timer-sand"
-      },
-      "stats_immersion_heater_starts": {
-        "default": "mdi:counter"
-      },
       "z1_weekly_schedule_summary": {
         "default": "mdi:calendar-clock"
       },

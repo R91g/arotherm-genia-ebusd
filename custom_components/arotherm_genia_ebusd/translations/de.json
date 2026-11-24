@@ -709,12 +709,6 @@
       "stats_deice_starts": {
         "name": "Gesamte Abtauzyklen"
       },
-      "stats_immersion_heater_hours": {
-        "name": "Betriebsstunden Zusatzheizung"
-      },
-      "stats_immersion_heater_starts": {
-        "name": "Gesamte Starts Zusatzheizung"
-      },
       "system_operating_state": {
         "name": "System-Betriebszustand",
         "state": {

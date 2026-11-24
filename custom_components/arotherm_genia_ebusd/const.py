@@ -350,6 +350,8 @@ DEPRECATED_UNIQUE_ID_SUFFIXES: tuple[str, ...] = (
     "number_basv3_coolingflowtempdesiredmax_value",
     "number_ctlv2_coolingflowtempdesiredmax_value",
     "number_ctlv3_coolingflowtempdesiredmax_value",
+    "hmux0_runstatsimmersionheaterhours_value",
+    "hmux0_runstatsimmersionheaterstarts_value",
 )
 
 # Timing & Hydration Constants
@@ -614,8 +616,6 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_HMUX0, "RunStatsFan2Starts"),
     (CIRCUIT_HMUX0, "RunStatsDeiceHours"),
     (CIRCUIT_HMUX0, "RunStatsDeiceStarts"),
-    (CIRCUIT_HMUX0, "RunStatsImmersionHeaterHours"),
-    (CIRCUIT_HMUX0, "RunStatsImmersionHeaterStarts"),
     (CIRCUIT_HMUX0, "RunStatsCompressorHc"),
     (CIRCUIT_HMUX0, "RunStatsCompressorHwc"),
     (CIRCUIT_HMUX0, "RunStatsCompressorCool"),
@@ -743,8 +743,6 @@ FALLBACK_SLOW_OUTDOOR_COMMON_MESSAGES: tuple[str, ...] = (
     "RunStatsFan2Starts",
     "RunStatsDeiceHours",
     "RunStatsDeiceStarts",
-    "RunStatsImmersionHeaterHours",
-    "RunStatsImmersionHeaterStarts",
     "RunStatsCompressorHc",
     "RunStatsCompressorHwc",
     "RunStatsCompressorCool",

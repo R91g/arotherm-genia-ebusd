@@ -103,8 +103,8 @@ r;u,,,RunStatsCoolingHours,cooling operating hours,,,b509,540200e10b,ign,,IGN:4,
 r;u,,,RunStatsCoolingStarts,cooling start count,,,b509,540200e20b,ign,,IGN:4,,,,value,,UIN,,,cooling start count
 r;u,,,RunStatsDeiceHours,defrost operating hours,,,b509,540200e30b,ign,,IGN:4,,,,value,,UIN,,h,defrost operating hours
 r;u,,,RunStatsDeiceStarts,defrost start count,,,b509,540200e40b,ign,,IGN:4,,,,value,,UIN,,,defrost start count
-r;u,,,RunStatsImmersionHeaterHours,backup electric heater operating hours,,,b509,540200e50b,ign,,IGN:4,,,,value,,UIN,,h,backup electric heater operating hours
-r;u,,,RunStatsImmersionHeaterStarts,backup electric heater start count,,,b509,540200e60b,ign,,IGN:4,,,,value,,UIN,,,backup electric heater start count
+u,,,RunStatsDiage50b,unverified outdoor cycle runtime counter e50b (tracks compressor cycles; not hydraulic backup heater),,,b509,540200e50b,ign,,IGN:4,,,,value,,UIN,,h,hours
+u,,,RunStatsDiage60b,unverified outdoor cycle count e60b (tracks compressor starts 1:1; not hydraulic backup heater),,,b509,540200e60b,ign,,IGN:4,,,,value,,UIN,,,count
 # Passive-only (u) diagnostic & unverified inverter parameters (no active polling)
 u,,,RunDataDiag000b,inverter compressor dynamic control offset,,,b509,540200000b,ign,,IGN:4,,,,value,,SLG,,,inverter compressor dynamic control offset
 u,,,RunDataDiag010b,inverter fan load diagnostic index,,,b509,540200010b,ign,,IGN:4,,,,value,,ULG,,,inverter secondary stage or fan load index

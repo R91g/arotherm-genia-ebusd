@@ -709,12 +709,6 @@
       "stats_deice_starts": {
         "name": "Ciclos acumulados de desescarche"
       },
-      "stats_immersion_heater_hours": {
-        "name": "Horas de funcionamiento resistencia de apoyo"
-      },
-      "stats_immersion_heater_starts": {
-        "name": "Arranques acumulados resistencia de apoyo"
-      },
       "system_operating_state": {
         "name": "Estado operativo del sistema",
         "state": {

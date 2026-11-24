@@ -494,7 +494,7 @@ class TestSensorRegistry(unittest.TestCase):
         from homeassistant.const import EntityCategory
 
         stats_descs = [d for d in SENSOR_DESCRIPTIONS if d.key.startswith("stats_")]
-        self.assertEqual(len(stats_descs), 29)
+        self.assertEqual(len(stats_descs), 27)
         for desc in stats_descs:
             self.assertEqual(
                 desc.entity_category,
