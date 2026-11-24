@@ -348,6 +348,7 @@ if [ -n "$BACKUP_DIR" ]; then
 fi
 
 # Optional live TCP reload
+RELOAD_OK=0
 if [ "$DO_RELOAD" -eq 1 ] && [ "$DRY_RUN" -eq 0 ]; then
     if [ $((INSTALLED + UPDATED)) -eq 0 ]; then
         log "No CSV changes detected; skipping eBUSd reload."
@@ -362,10 +363,27 @@ if [ "$DO_RELOAD" -eq 1 ] && [ "$DRY_RUN" -eq 0 ]; then
         fi
         log ""
         log "Sending 'reload' to eBUSd (${reload_host}:${EBUSD_PORT})..."
+        reload_out=""
         if command -v ebusctl >/dev/null 2>&1; then
-            ebusctl -s "$reload_host" -p "$EBUSD_PORT" reload || log "Warning: ebusctl reload failed; please restart eBUSd manually."
+            if reload_out=$(ebusctl -s "$reload_host" -p "$EBUSD_PORT" reload 2>&1); then
+                log "$reload_out"
+                case "$reload_out" in
+                    *done*) RELOAD_OK=1 ;;
+                esac
+            else
+                [ -n "$reload_out" ] && log "$reload_out"
+                log "Warning: ebusctl reload failed; please restart eBUSd manually."
+            fi
         elif command -v nc >/dev/null 2>&1; then
-            printf 'reload\n' | nc -w 5 "$reload_host" "$EBUSD_PORT" || log "Warning: TCP reload failed; please restart eBUSd manually."
+            if reload_out=$(printf 'reload\n' | nc -w 5 "$reload_host" "$EBUSD_PORT" 2>&1); then
+                log "$reload_out"
+                case "$reload_out" in
+                    *done*) RELOAD_OK=1 ;;
+                esac
+            else
+                [ -n "$reload_out" ] && log "$reload_out"
+                log "Warning: TCP reload failed; please restart eBUSd manually."
+            fi
         else
             log "Warning: neither 'ebusctl' nor 'nc' is available; please restart eBUSd manually."
         fi
@@ -375,25 +393,29 @@ fi
 # Helpful next steps
 if [ "$DRY_RUN" -eq 0 ] && [ $((INSTALLED + UPDATED)) -gt 0 ]; then
     log ""
-    log "Next steps:"
-    if [ "$DETECTED_ENV" = "ha_addon" ]; then
-        if [ "$IS_FRESH_INSTALL" -eq 1 ]; then
-            log "  1. Open Settings -> Apps/Add-ons -> eBUSd -> Configuration."
-            log "  2. Disable 'Seed HA MQTT integration config' (seed_mqtt_cfg: false)."
-            log "  3. Add these commandline_options:"
-            log "       --mqttjson"
-            log "       --configpath=/config/ebusd-configuration/en"
-            log "       --scanconfig"
-            log "       --accesslevel=*"
-            log "       --mqtttopic=ebusd/%circuit/%name"
-            log "       --mqttvar=filter-direction=r|u|^w"
-            log "  4. Restart the eBUSd add-on."
-        else
-            log "  - Restart the eBUSd add-on (Settings -> Apps/Add-ons -> eBUSd -> Restart) to load the updated CSVs."
-        fi
-    elif [ "$DETECTED_ENV" = "linux" ]; then
-        log "  - Restart eBUSd: sudo systemctl restart ebusd"
+    if [ "$RELOAD_OK" -eq 1 ] && [ "$IS_FRESH_INSTALL" -eq 0 ]; then
+        log "eBUSd reloaded the updated CSVs live (no add-on/service restart needed)."
     else
-        log "  - Make sure eBUSd uses '--configpath=${TARGET_DIR}' and restart eBUSd."
+        log "Next steps:"
+        if [ "$DETECTED_ENV" = "ha_addon" ]; then
+            if [ "$IS_FRESH_INSTALL" -eq 1 ]; then
+                log "  1. Open Settings -> Apps/Add-ons -> eBUSd -> Configuration."
+                log "  2. Disable 'Seed HA MQTT integration config' (seed_mqtt_cfg: false)."
+                log "  3. Add these commandline_options:"
+                log "       --mqttjson"
+                log "       --configpath=/config/ebusd-configuration/en"
+                log "       --scanconfig"
+                log "       --accesslevel=*"
+                log "       --mqtttopic=ebusd/%circuit/%name"
+                log "       --mqttvar=filter-direction=r|u|^w"
+                log "  4. Restart the eBUSd add-on."
+            else
+                log "  - Restart the eBUSd add-on (Settings -> Apps/Add-ons -> eBUSd -> Restart) to load the updated CSVs."
+            fi
+        elif [ "$DETECTED_ENV" = "linux" ]; then
+            log "  - Restart eBUSd: sudo systemctl restart ebusd"
+        else
+            log "  - Make sure eBUSd uses '--configpath=${TARGET_DIR}' and restart eBUSd."
+        fi
     fi
 fi
