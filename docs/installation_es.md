@@ -68,6 +68,16 @@ Copia los archivos CSV en el directorio de configuración de `ebusd` respetando 
 
 ### Opción A: Add-on eBUSd de Home Assistant ([LukasGrebe/ha-addons](https://github.com/LukasGrebe/ha-addons))
 
+**Instalación / actualización rápida en 1 línea (recomendada):** ejecuta este comando desde **Terminal & SSH** o **Studio Code Server** en Home Assistant (detecta automáticamente `/addon_configs/*_ebusd/ebusd-configuration/en`, hace copia de seguridad de los archivos modificados y nunca toca otros CSV propios):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/R91g/arotherm-genia-ebusd/main/scripts/install_ebusd_csvs.sh | sh
+```
+
+> Puedes ejecutar exactamente el mismo comando cuando salga una nueva versión con mejoras en los CSV. Usa `sh -s -- --main` para descargar cambios aún no publicados de `main`, o `sh -s -- --help` para ver todas las opciones (`--dir`, `--version`, `--dry-run`, `--reload`).
+
+**O instalación manual:**
+
 1. Copia `ebusd-configuration/broadcast.csv` a:
    `/addon_configs/b4d7ad18_ebusd/ebusd-configuration/en/broadcast.csv`
 2. Copia todos los archivos de `ebusd-configuration/vaillant/*.csv` a:
@@ -129,6 +139,15 @@ Copia los archivos CSV en el directorio de configuración de `ebusd` respetando 
 4. Reinicia el add-on `eBUSd` y comprueba en su registro que los circuitos `08.hmux0` (o `08.hmu`), `15.bass3` (o `15.basv3` / `15.ctlv2` / `15.ctlv3`) y `76.vwzio` se cargan tras el escaneo del bus.
 
 ### Opción B: ebusd independiente en Linux / Docker
+
+**Instalación / actualización rápida en 1 línea (recomendada):**
+
+```bash
+# Detecta automáticamente /etc/ebusd/en (o pasa -d /ruta/a/tu/volumen/en):
+curl -fsSL https://raw.githubusercontent.com/R91g/arotherm-genia-ebusd/main/scripts/install_ebusd_csvs.sh | sudo sh
+```
+
+**O instalación manual:**
 
 1. Copia `ebusd-configuration/broadcast.csv` a `/etc/ebusd/en/broadcast.csv` (o tu volumen Docker mapeado).
 2. Copia `ebusd-configuration/vaillant/*.csv` a `/etc/ebusd/en/vaillant/`.

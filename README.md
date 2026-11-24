@@ -37,7 +37,7 @@ The full model tables and the per-board validation status (which boards are veri
 
 ## Quick Start
 
-1. **Deploy the ebusd CSV files** from [`ebusd-configuration/`](ebusd-configuration/) into your ebusd config directory and start ebusd with `--mqttjson`.
+1. **Deploy the ebusd CSV files** from [`ebusd-configuration/`](ebusd-configuration/) using the one-line installer/updater (`curl -fsSL https://raw.githubusercontent.com/R91g/arotherm-genia-ebusd/main/scripts/install_ebusd_csvs.sh | sh`) or manually, and start ebusd with `--mqttjson`.
 2. **Install the integration** from the HACS default catalog (or copy `custom_components/arotherm_genia_ebusd` manually) and restart Home Assistant.
 3. **Add the integration** under **Settings → Devices & Services**, pick your manufacturer and hardware models, and wait about a minute for initial hydration.
 

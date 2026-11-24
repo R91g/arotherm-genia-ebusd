@@ -32,6 +32,20 @@ This directory contains **reverse-engineered and collision-free** eBUS message d
 
 ## Deployment
 
+### Quick Install / Update (One-Liner)
+
+Works both for a fresh eBUSd add-on/Linux setup and for updating existing CSVs (automatically backs up changed files and preserves any unrelated CSVs):
+
+```bash
+# Home Assistant eBUSd Add-on (run from Terminal & SSH / Studio Code Server):
+curl -fsSL https://raw.githubusercontent.com/R91g/arotherm-genia-ebusd/main/scripts/install_ebusd_csvs.sh | sh
+
+# Standalone Linux / Docker (use -d <path> for custom Docker volumes):
+curl -fsSL https://raw.githubusercontent.com/R91g/arotherm-genia-ebusd/main/scripts/install_ebusd_csvs.sh | sudo sh -s -- -d /etc/ebusd/en
+```
+
+Pass `--main` to fetch unreleased fixes from `main`, `--version v1.3.2` for a specific tag, `--dry-run` to preview changes, or `--help` for all options.
+
 ### 1. Home Assistant eBUSd Add-on (`b4d7ad18_ebusd`)
 
 1. Copy `broadcast.csv` → `/addon_configs/b4d7ad18_ebusd/ebusd-configuration/en/broadcast.csv`
