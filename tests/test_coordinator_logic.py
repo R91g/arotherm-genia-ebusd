@@ -56,6 +56,7 @@ from custom_components.arotherm_genia_ebusd.const import (
     DEVICE_WIRELESS_THERMOSTAT,
     DOMAIN,
     EBUSD_TRAFFIC_TIMEOUT_SECONDS,
+    FALLBACK_SLOW_BASS3_MESSAGES,
     HMU_HW5103_HYDRATION_MESSAGES,
     HMUX0_EXCLUSIVE_MESSAGES,
     ISSUE_EBUSD_SLOW_POLLING_SEED,
@@ -1573,8 +1574,6 @@ class TestCoordinatorLogic(unittest.TestCase):
                 "HwcTempDesired",
                 "HwcStatus",
                 "HwcStorageTemp",
-                "HwcLegionellaDay",
-                "HwcLegionellaTime",
                 "DisplayedOutsideTemp",
                 "WaterPressure",
                 "Hc1FlowTemp",
@@ -1583,6 +1582,9 @@ class TestCoordinatorLogic(unittest.TestCase):
                 "Hc1PumpStatus",
             ):
                 self.assertIn((CIRCUIT_BASS3, msg), hmux0_poll_queue)
+            for slow_msg in ("HwcLegionellaDay", "HwcLegionellaTime"):
+                self.assertNotIn((CIRCUIT_BASS3, slow_msg), hmux0_poll_queue)
+                self.assertIn((CIRCUIT_BASS3, slow_msg), FALLBACK_SLOW_BASS3_MESSAGES)
 
         # 2. Fallback poll on HMU
         coord_hmu = SaunierGeniaCoordinator(hass, entry)

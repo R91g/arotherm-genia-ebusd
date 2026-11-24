@@ -672,8 +672,6 @@ FALLBACK_FAST_BASS3_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_BASS3, "HwcStatus"),
     (CIRCUIT_BASS3, "HwcStorageTemp"),
     (CIRCUIT_BASS3, "HwcFlowTemp"),
-    (CIRCUIT_BASS3, "HwcLegionellaDay"),
-    (CIRCUIT_BASS3, "HwcLegionellaTime"),
     (CIRCUIT_BASS3, "DisplayedOutsideTemp"),
     (CIRCUIT_BASS3, "OutsideTempAvg"),
     (CIRCUIT_BASS3, "WaterPressure"),
