@@ -57,6 +57,8 @@ from .const import (
     CONF_MQTT_PREFIX,
     CONF_OUTDOOR_MODEL,
     CONTROLLER_CIRCUITS,
+    CSV_INSTALL_ONE_LINER,
+    CSV_REPAIR_ISSUES,
     DAY_SHORT_KEYS,
     DEFAULT_AUTO_COOLING_LOCK_BYPASS,
     DEFAULT_COMFORT_TEMP,
@@ -1791,6 +1793,12 @@ class SaunierGeniaCoordinator:
             if issue_id in self._active_repair_issues:
                 return
             self._active_repair_issues.add(issue_id)
+            effective_placeholders = placeholders
+            if issue_id in CSV_REPAIR_ISSUES:
+                effective_placeholders = {
+                    "install_cmd": CSV_INSTALL_ONE_LINER,
+                    **(placeholders or {}),
+                }
             ir.async_create_issue(
                 self.hass,
                 DOMAIN,
@@ -1798,7 +1806,7 @@ class SaunierGeniaCoordinator:
                 is_fixable=False,
                 severity=ir.IssueSeverity.WARNING,
                 translation_key=issue_id,
-                translation_placeholders=placeholders,
+                translation_placeholders=effective_placeholders,
                 learn_more_url="https://github.com/R91g/arotherm-genia-ebusd/blob/main/docs/installation.md#2-deploy-the-ebusd-csv-configuration",
             )
         else:

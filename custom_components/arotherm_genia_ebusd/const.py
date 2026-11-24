@@ -916,6 +916,19 @@ ISSUE_OUTDATED_HMU_CSV = "outdated_hmu_csv"
 ISSUE_OUTDATED_CONTROLLER_CSV = "outdated_controller_csv"
 ISSUE_OUTDATED_VWZIO_CSV = "outdated_vwzio_csv"
 ISSUE_MISSING_CUSTOM_CSV = "missing_custom_csv"
+CSV_REPAIR_ISSUES: frozenset[str] = frozenset(
+    {
+        ISSUE_OUTDATED_HMUX0_CSV,
+        ISSUE_OUTDATED_HMU_CSV,
+        ISSUE_OUTDATED_CONTROLLER_CSV,
+        ISSUE_OUTDATED_VWZIO_CSV,
+        ISSUE_MISSING_CUSTOM_CSV,
+    }
+)
+CSV_INSTALL_ONE_LINER = (
+    "curl -fsSL https://raw.githubusercontent.com/R91g/arotherm-genia-ebusd/"
+    "main/scripts/install_ebusd_csvs.sh | sh"
+)
 ISSUE_NO_EBUSD_MQTT_TRAFFIC = "no_ebusd_mqtt_traffic"
 ISSUE_MQTTJSON_NOT_ENABLED = "mqttjson_not_enabled"
 ISSUE_EBUSD_SLOW_POLLING_SEED = "ebusd_slow_polling_seed"

@@ -50,6 +50,7 @@ from custom_components.arotherm_genia_ebusd.const import (
     CONF_HAS_MIGO_LINK,
     CONF_MANUFACTURER,
     CONTROLLER_CIRCUITS,
+    CSV_INSTALL_ONE_LINER,
     DEVICE_CLIMATE_CONTROLLER,
     DEVICE_HYDRAULIC_INTERFACE,
     DEVICE_OUTDOOR_UNIT,
@@ -1762,6 +1763,10 @@ class TestCoordinatorLogic(unittest.TestCase):
         )
         self.assertIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
         ir_mod.async_create_issue.assert_called_once()
+        self.assertEqual(
+            ir_mod.async_create_issue.call_args.kwargs["translation_placeholders"],
+            {"install_cmd": CSV_INSTALL_ONE_LINER},
+        )
 
         # Upgrading 08.hmux0.csv ('flow_temp' present) automatically deletes outdated_hmux0_csv
         push_mqtt(
@@ -1863,6 +1868,10 @@ class TestCoordinatorLogic(unittest.TestCase):
         coord._async_verify_custom_csv_after_hydration()
         self.assertIn(ISSUE_MISSING_CUSTOM_CSV, coord._active_repair_issues)
         ir_mod.async_create_issue.assert_called_once()
+        self.assertEqual(
+            ir_mod.async_create_issue.call_args.kwargs["translation_placeholders"],
+            {"install_cmd": CSV_INSTALL_ONE_LINER},
+        )
 
         # Only 08.hmux0 and 15.bass3 loaded (e.g. scan config 76 timed out) -> still active
         push_mqtt("ebusd/hmux0/RunDataFlowTemp", '{"value": {"value": 35.5}}')
@@ -1914,6 +1923,11 @@ class TestCoordinatorLogic(unittest.TestCase):
         coord._async_verify_custom_csv_after_hydration()
         self.assertIn(ISSUE_NO_EBUSD_MQTT_TRAFFIC, coord._active_repair_issues)
         ir_mod.async_create_issue.assert_called_once()
+        self.assertNotIn(
+            "install_cmd",
+            ir_mod.async_create_issue.call_args.kwargs["translation_placeholders"]
+            or {},
+        )
 
         # First incoming message clears no_ebusd_mqtt_traffic automatically
         push_mqtt("ebusd/global/signal", "true")
