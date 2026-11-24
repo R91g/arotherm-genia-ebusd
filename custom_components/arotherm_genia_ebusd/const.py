@@ -875,6 +875,42 @@ HMU_STATUS_CODES: list[str] = [
     "four_port_valve_position_fault",
 ]
 
+# Subset of HMUStatusCode values representing genuine outdoor faults or protective shutdowns
+# (S.252..S.590; excludes normal ambient throttling such as fan wind load or current limitation)
+HMU_FAULT_STATUS_CODES: frozenset[str] = frozenset(
+    {
+        "fan1_blocked",
+        "fan1_airinlet_too_high",
+        "fan1_airinlet_too_low",
+        "fan2_blocked",
+        "building_circuit_flow_too_low",
+        "building_circuit_pump_fault",
+        "frequency_converter_fault_compressor",
+        "frequency_converter_fault_mains_voltage",
+        "frequency_converter_fault_overheating",
+        "deicing_time_too_long",
+        "deicing_flow_temp_too_low",
+        "compressor_outlet_temp_too_high",
+        "hot_gas_temp_switch_open",
+        "high_pressure_switch_open",
+        "compressor_outlet_temp_too_high_1",
+        "evaporation_temp_too_low",
+        "condensation_temp_too_low",
+        "evaporation_temp_too_high",
+        "condensation_temp_too_high",
+        "building_circuit_return_temp_too_low",
+        "building_circuit_return_temp_too_high",
+        "immersion_heater_flow_temp_too_high",
+        "frequency_converter_fault",
+        "connection_fault_frequency_converter",
+        "four_port_valve_position_fault",
+    }
+)
+
+# Safe hydraulic water pressure bounds (bar) for aggregated system_health_alert
+WATER_PRESSURE_LOW_BAR: float = 0.8
+WATER_PRESSURE_HIGH_BAR: float = 2.8
+
 SYSTEM_OPERATING_STATES: list[str] = [
     "standby",
     "heating",

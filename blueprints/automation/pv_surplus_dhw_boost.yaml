@@ -1,0 +1,166 @@
+blueprint:
+  name: aroTHERM & GeniaAir — PV Solar Surplus DHW Boost
+  description: >
+    Automatically triggers a one-time Domestic Hot Water (DHW) boost using
+    arotherm_genia_ebusd.force_dhw_boost when sustained photovoltaic export
+    surplus is available, the DHW tank is below your start threshold, and the
+    cooldown window has elapsed.
+  domain: automation
+  source_url: https://github.com/R91g/arotherm-genia-ebusd/blob/main/blueprints/automation/pv_surplus_dhw_boost.yaml
+  input:
+    surplus_power_sensor:
+      name: Solar Surplus / Grid Export Power Sensor
+      description: >
+        Power sensor (W) measuring exported solar surplus. If your grid meter
+        reports export as a negative number (e.g. -1800 W), enable 'Invert Grid
+        Sensor Sign' below.
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: power
+    invert_grid_sensor:
+      name: Invert Grid Sensor Sign (Negative = Export)
+      description: Enable if your sensor reports negative values when exporting power to the grid.
+      default: false
+      selector:
+        boolean:
+    min_surplus_watts:
+      name: Minimum Surplus Power (W)
+      description: Minimum sustained surplus power required to start DHW boost.
+      default: 1500
+      selector:
+        number:
+          min: 200
+          max: 10000
+          step: 100
+          unit_of_measurement: W
+          mode: box
+    sustain_minutes:
+      name: Sustained Surplus Duration (minutes)
+      description: Surplus must stay above the threshold continuously for this duration to avoid cloud-edge flapping.
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 60
+          step: 1
+          unit_of_measurement: min
+          mode: slider
+    dhw_storage_temp_sensor:
+      name: DHW Storage Tank Temperature Sensor
+      description: Select the DHW Storage Temperature sensor (HwcStorageTemp) from aroTHERM & GeniaAir (eBUS).
+      selector:
+        entity:
+          filter:
+            - integration: arotherm_genia_ebusd
+              domain: sensor
+              device_class: temperature
+    max_start_tank_temp:
+      name: Maximum Tank Temperature to Start Boost (°C)
+      description: Only start the PV DHW boost if the current tank temperature is below this value.
+      default: 48.0
+      selector:
+        number:
+          min: 30.0
+          max: 60.0
+          step: 0.5
+          unit_of_measurement: "°C"
+          mode: box
+    boost_target_temp:
+      name: Temporary Boost Target Temperature (°C)
+      description: Temporary DHW setpoint passed to arotherm_genia_ebusd.force_dhw_boost (automatically restored after completion).
+      default: 58.0
+      selector:
+        number:
+          min: 45.0
+          max: 65.0
+          step: 0.5
+          unit_of_measurement: "°C"
+          mode: box
+    dhw_boost_switch:
+      name: DHW Boost Switch (Optional)
+      description: Optional. Select the 'Force DHW Boost' switch to avoid re-triggering while a boost is already active.
+      default: ""
+      selector:
+        entity:
+          filter:
+            - integration: arotherm_genia_ebusd
+              domain: switch
+    window_start:
+      name: Allowed Time Window Start
+      description: Earliest local time of day when PV DHW boost may start.
+      default: "10:00:00"
+      selector:
+        time:
+    window_end:
+      name: Allowed Time Window End
+      description: Latest local time of day when PV DHW boost may start.
+      default: "17:00:00"
+      selector:
+        time:
+    cooldown_hours:
+      name: Cooldown Between Boosts (hours)
+      description: Minimum hours before this automation can trigger another PV DHW boost.
+      default: 6
+      selector:
+        number:
+          min: 1
+          max: 24
+          step: 1
+          unit_of_measurement: h
+          mode: slider
+    custom_actions:
+      name: Additional Actions After Starting Boost (Optional)
+      description: Optional actions (e.g. mobile notification) executed after force_dhw_boost is called.
+      default: []
+      selector:
+        action:
+
+mode: single
+max_exceeded: silent
+
+trigger_variables:
+  surplus_entity: !input surplus_power_sensor
+  invert_sign: !input invert_grid_sensor
+  min_watts: !input min_surplus_watts
+
+triggers:
+  - trigger: template
+    value_template: >-
+      {% if states(surplus_entity) | is_number %}
+        {% set raw = states(surplus_entity) | float %}
+        {% set surplus = (-raw) if invert_sign else raw %}
+        {{ surplus >= (min_watts | float) }}
+      {% else %}
+        false
+      {% endif %}
+    for:
+      minutes: !input sustain_minutes
+
+variables:
+  tank_entity: !input dhw_storage_temp_sensor
+  max_tank_temp: !input max_start_tank_temp
+  boost_switch_entity: !input dhw_boost_switch
+  cooldown_h: !input cooldown_hours
+
+conditions:
+  - condition: time
+    after: !input window_start
+    before: !input window_end
+  - condition: template
+    value_template: >-
+      {{ states(tank_entity) | is_number and (states(tank_entity) | float) < (max_tank_temp | float) }}
+  - condition: template
+    value_template: >-
+      {{ boost_switch_entity | default('') == '' or not is_state(boost_switch_entity, 'on') }}
+  - condition: template
+    value_template: >-
+      {% set last = this.attributes.last_triggered %}
+      {{ last is none or (now() - last).total_seconds() >= (cooldown_h | float) * 3600 }}
+
+actions:
+  - action: arotherm_genia_ebusd.force_dhw_boost
+    data:
+      boost_temp: !input boost_target_temp
+  - sequence: !input custom_actions

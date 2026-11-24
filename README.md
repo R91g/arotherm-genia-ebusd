@@ -43,6 +43,15 @@ The full model tables and the per-board validation status (which boards are veri
 
 The full guide, including wiring, ebusd startup flags and first-run verification, is in **[docs/installation.md](docs/installation.md)**.
 
+## Official Automation Blueprints
+
+Import ready-to-use Home Assistant automations in one click:
+
+| Blueprint | Purpose | Import |
+| :--- | :--- | :--- |
+| [System Health & Fault Alerts](blueprints/automation/system_health_alerts.yaml) | Notifies on active faults (`Currenterror` / `HMUStatusCode`), low/high water pressure, eBUS loss, or maintenance due | [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FR91g%2Farotherm-genia-ebusd%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsystem_health_alerts.yaml) |
+| [PV Solar Surplus DHW Boost](blueprints/automation/pv_surplus_dhw_boost.yaml) | Triggers `force_dhw_boost` automatically when sustained solar export surplus is available | [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FR91g%2Farotherm-genia-ebusd%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fpv_surplus_dhw_boost.yaml) |
+
 ## Documentation
 
 | Document | Contents |

@@ -724,6 +724,167 @@ class TestSensorRegistry(unittest.TestCase):
             },
         )
 
+    def test_system_health_alert_and_hmu_fault_status_codes(self) -> None:
+        """Verify active_fault HMUStatusCode fault detection and aggregated system_health_alert."""
+        from unittest.mock import MagicMock
+
+        from custom_components.arotherm_genia_ebusd.binary_sensor import (
+            SaunierGeniaBinarySensor,
+        )
+        from custom_components.arotherm_genia_ebusd.const import (
+            CIRCUIT_GLOBAL,
+            CIRCUIT_HMU,
+            HMU_FAULT_STATUS_CODES,
+            HMU_STATUS_CODES,
+        )
+        from custom_components.arotherm_genia_ebusd.coordinator import (
+            SaunierGeniaCoordinator,
+        )
+
+        # Every fault status code must be a valid member of HMU_STATUS_CODES
+        self.assertTrue(HMU_FAULT_STATUS_CODES.issubset(set(HMU_STATUS_CODES)))
+
+        hass = MagicMock()
+        entry = MagicMock()
+        entry.entry_id = "test_health_alert"
+        entry.data = {}
+        entry.options = {}
+        coord = SaunierGeniaCoordinator(hass, entry)
+
+        binary_by_key = {d.key: d for d in BINARY_SENSOR_DESCRIPTIONS}
+        fault_ent = SaunierGeniaBinarySensor(coord, binary_by_key["active_fault"])
+        health_ent = SaunierGeniaBinarySensor(
+            coord, binary_by_key["system_health_alert"]
+        )
+
+        # Subscriptions cover Currenterror, HMUStatusCode, WaterPressure/FlowPressure, and eBUS status
+        self.assertIn((CIRCUIT_HMUX0, "HMUStatusCode"), fault_ent._subscriptions)
+        for required_sub in (
+            (CIRCUIT_HMUX0, "Currenterror"),
+            (CIRCUIT_HMUX0, "HMUStatusCode"),
+            (CIRCUIT_HMU, "FlowPressure"),
+            (CIRCUIT_BASS3, "Currenterror"),
+            (CIRCUIT_BASS3, "WaterPressure"),
+            (CIRCUIT_VWZIO, "Currenterror"),
+            (CIRCUIT_GLOBAL, "running"),
+            (CIRCUIT_GLOBAL, "signal"),
+        ):
+            self.assertIn(required_sub, health_ent._subscriptions)
+
+        # Unhydrated state returns None (no false startup alert)
+        self.assertIsNone(fault_ent.is_on)
+        self.assertIsNone(health_ent.is_on)
+
+        # Healthy state
+        coord._state[(CIRCUIT_GLOBAL, "running")] = {"value": "true"}
+        coord._state[(CIRCUIT_GLOBAL, "signal")] = {"value": "true"}
+        coord._state[(CIRCUIT_HMUX0, "Currenterror")] = {"error": "-"}
+        coord._state[(CIRCUIT_BASS3, "Currenterror")] = {"error": "0"}
+        coord._state[(CIRCUIT_VWZIO, "Currenterror")] = {"error": "-"}
+        coord._state[(CIRCUIT_HMUX0, "HMUStatusCode")] = {"status": "standby"}
+        coord._state[(CIRCUIT_BASS3, "WaterPressure")] = {"press": 1.5}
+        self.assertFalse(fault_ent.is_on)
+        self.assertFalse(health_ent.is_on)
+        attrs = health_ent.extra_state_attributes
+        self.assertIsNotNone(attrs)
+        assert attrs is not None
+        self.assertEqual(attrs["alerts"], [])
+        self.assertEqual(attrs["alert_count"], 0)
+        self.assertTrue(attrs["ebus_operational"])
+        self.assertEqual(attrs["water_pressure_bar"], 1.5)
+
+        # Transient ambient statuses (wind / current limit) do NOT trigger faults
+        for non_fault in ("fan1_wind", "fan2_wind", "current_limt_active"):
+            coord._state[(CIRCUIT_HMUX0, "HMUStatusCode")] = {"status": non_fault}
+            self.assertFalse(fault_ent.is_on)
+            self.assertFalse(health_ent.is_on)
+
+        # Genuine HMUStatusCode fault triggers BOTH active_fault and system_health_alert
+        coord._state[(CIRCUIT_HMUX0, "HMUStatusCode")] = {
+            "status": "building_circuit_flow_too_low"
+        }
+        self.assertTrue(fault_ent.is_on)
+        self.assertEqual(
+            (fault_ent.extra_state_attributes or {}).get("hmu_fault_status"),
+            "building_circuit_flow_too_low",
+        )
+        self.assertTrue(health_ent.is_on)
+        self.assertIn(
+            "hmu_status_fault", (health_ent.extra_state_attributes or {})["alerts"]
+        )
+
+        # Restore HMU status; test low & high water pressure (including FlowPressure fallback)
+        coord._state[(CIRCUIT_HMUX0, "HMUStatusCode")] = {"status": "standby"}
+        coord._state[(CIRCUIT_BASS3, "WaterPressure")] = {"press": 0.7}
+        self.assertFalse(fault_ent.is_on)
+        self.assertTrue(health_ent.is_on)
+        self.assertEqual(
+            (health_ent.extra_state_attributes or {})["alerts"],
+            ["low_water_pressure"],
+        )
+
+        coord._state.pop((CIRCUIT_BASS3, "WaterPressure"))
+        coord._state[(CIRCUIT_HMUX0, "FlowPressure")] = {"value": 2.9}
+        self.assertTrue(health_ent.is_on)
+        self.assertEqual(
+            (health_ent.extra_state_attributes or {})["alerts"],
+            ["high_water_pressure"],
+        )
+
+        # Restore pressure; test eBUS offline detection
+        coord._state[(CIRCUIT_HMUX0, "FlowPressure")] = {"value": 1.6}
+        coord._state[(CIRCUIT_GLOBAL, "signal")] = {"value": "false"}
+        self.assertTrue(health_ent.is_on)
+        self.assertEqual(
+            (health_ent.extra_state_attributes or {})["alerts"],
+            ["ebus_offline"],
+        )
+        self.assertFalse((health_ent.extra_state_attributes or {})["ebus_operational"])
+
+    def test_official_automation_blueprints_integrity(self) -> None:
+        """Verify official Home Assistant blueprints declare valid metadata and matching !input refs."""
+        import re
+        from pathlib import Path
+
+        repo_root = Path(__file__).resolve().parent.parent
+        bp_dir = repo_root / "blueprints" / "automation"
+        expected_files = {
+            "system_health_alerts.yaml",
+            "pv_surplus_dhw_boost.yaml",
+        }
+        actual_files = {p.name for p in bp_dir.glob("*.yaml")}
+        self.assertEqual(actual_files, expected_files)
+
+        for filename in sorted(expected_files):
+            path = bp_dir / filename
+            raw = path.read_bytes()
+            self.assertNotIn(
+                b"\r\n", raw, f"Blueprint {filename} must use Unix LF line endings"
+            )
+            text = raw.decode("utf-8")
+            self.assertIn("domain: automation", text)
+            self.assertIn(
+                f"source_url: https://github.com/R91g/arotherm-genia-ebusd/blob/main/blueprints/automation/{filename}",
+                text,
+            )
+
+            # Extract declared inputs under blueprint -> input: (4-space indented keys)
+            input_block = re.search(
+                r"^  input:\n((?:    .*\n|\n)+?)(?=^\S)", text, re.MULTILINE
+            )
+            self.assertIsNotNone(input_block, f"Missing input block in {filename}")
+            assert input_block is not None
+            declared_inputs = set(
+                re.findall(
+                    r"^    ([a-zA-Z0-9_]+):$", input_block.group(1), re.MULTILINE
+                )
+            )
+            referenced_inputs = set(re.findall(r"!input\s+([a-zA-Z0-9_]+)", text))
+            self.assertTrue(
+                referenced_inputs.issubset(declared_inputs),
+                f"{filename} references undeclared !input(s): {referenced_inputs - declared_inputs}",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

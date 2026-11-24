@@ -43,6 +43,15 @@ Las tablas completas de modelos y el estado de validación de cada placa (cuále
 
 La guía completa, con cableado, flags de arranque de `ebusd` y verificación inicial, está en **[docs/installation_es.md](docs/installation_es.md)**.
 
+## Blueprints Oficiales de Automatización
+
+Importa automatizaciones listas para usar en Home Assistant con un clic:
+
+| Blueprint | Función | Importar |
+| :--- | :--- | :--- |
+| [Alertas de Salud y Averías](blueprints/automation/system_health_alerts.yaml) | Notifica ante fallos activos (`Currenterror` / `HMUStatusCode`), presión de agua baja/alta, pérdida de eBUS o mantenimiento pendiente | [![Importar Blueprint en Home Assistant](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FR91g%2Farotherm-genia-ebusd%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsystem_health_alerts.yaml) |
+| [Boost de ACS con Excedentes Solares](blueprints/automation/pv_surplus_dhw_boost.yaml) | Lanza `force_dhw_boost` automáticamente cuando hay excedente fotovoltaico sostenido | [![Importar Blueprint en Home Assistant](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FR91g%2Farotherm-genia-ebusd%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fpv_surplus_dhw_boost.yaml) |
+
 ## Documentación
 
 | Documento | Contenido |

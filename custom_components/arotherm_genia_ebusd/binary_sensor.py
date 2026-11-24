@@ -17,6 +17,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
+    CALC_CIRCUIT,
     CIRCUIT_BASS3,
     CIRCUIT_BROADCAST,
     CIRCUIT_GLOBAL,
@@ -26,7 +27,10 @@ from .const import (
     DEVICE_CLIMATE_CONTROLLER,
     DEVICE_OUTDOOR_UNIT,
     DOMAIN,
+    HMU_FAULT_STATUS_CODES,
     OUTDOOR_CIRCUITS,
+    WATER_PRESSURE_HIGH_BAR,
+    WATER_PRESSURE_LOW_BAR,
 )
 from .coordinator import SaunierGeniaCoordinator
 from .entity import SaunierGeniaEntity
@@ -186,27 +190,123 @@ def _check_z1_cooling_time_slot_active(coord: SaunierGeniaCoordinator) -> bool |
     return val.lower() in ("yes", "1", "on", "true")
 
 
+def _get_hmu_fault_status(coord: SaunierGeniaCoordinator) -> str | None:
+    """Return the active HMUStatusCode if it represents a fault/protection code, else None."""
+    status = coord.get_str(CIRCUIT_HMUX0, "HMUStatusCode", "status")
+    if status is None:
+        return None
+    s_lower = status.lower().strip()
+    return s_lower if s_lower in HMU_FAULT_STATUS_CODES else None
+
+
+def _get_system_water_pressure(coord: SaunierGeniaCoordinator) -> float | None:
+    """Return hydraulic water pressure (bar) from controller WaterPressure or HMU FlowPressure."""
+    pressure = coord.get_float(CIRCUIT_BASS3, "WaterPressure", "press")
+    if pressure is None:
+        pressure = coord.get_float(CIRCUIT_HMUX0, "FlowPressure", "value")
+    return round(pressure, 2) if pressure is not None else None
+
+
 def _check_active_fault(coord: SaunierGeniaCoordinator) -> bool | None:
-    """Return True if any board reports an active Currenterror, False if OK, None if unhydrated."""
+    """Return True if any board reports Currenterror or HMUStatusCode is a fault code, False if OK, None if unhydrated."""
     statuses = (
         _get_outdoor_error(coord),
         _get_controller_error(coord),
         _get_vwzio_error(coord),
     )
     reported = [s for s in statuses if s is not None]
-    if not reported:
+    hmu_status = coord.get_str(CIRCUIT_HMUX0, "HMUStatusCode", "status")
+    if not reported and hmu_status is None:
         return None
-    return any(s != "OK" for s in reported)
+    if any(s != "OK" for s in reported):
+        return True
+    return _get_hmu_fault_status(coord) is not None
 
 
 def _get_active_fault_attrs(coord: SaunierGeniaCoordinator) -> dict[str, Any]:
-    """Return per-board Currenterror diagnostics for the unified active_fault binary sensor."""
+    """Return per-board Currenterror and HMUStatusCode fault diagnostics for active_fault."""
     attrs: dict[str, Any] = {
         "outdoor_unit": _get_outdoor_error(coord),
         "climate_controller": _get_controller_error(coord),
         "hydraulic_interface": _get_vwzio_error(coord),
+        "hmu_fault_status": _get_hmu_fault_status(coord),
     }
     return {k: v for k, v in attrs.items() if v is not None}
+
+
+def _evaluate_system_health(
+    coord: SaunierGeniaCoordinator,
+) -> tuple[bool | None, dict[str, Any]]:
+    """Evaluate aggregated heat-pump health alerts across faults, HMU status, pressure, and eBUS link."""
+    outdoor_err = _get_outdoor_error(coord)
+    controller_err = _get_controller_error(coord)
+    hydraulic_err = _get_vwzio_error(coord)
+    hmu_raw = coord.get_str(CIRCUIT_HMUX0, "HMUStatusCode", "status")
+    hmu_fault = _get_hmu_fault_status(coord)
+    pressure = _get_system_water_pressure(coord)
+    ebus_known = (
+        coord.get_str(CIRCUIT_GLOBAL, "running", "value") is not None
+        or coord.get_str(CIRCUIT_GLOBAL, "signal", "value") is not None
+        or coord._last_telemetry_time is not None
+    )
+    ebus_ok = coord.is_ebus_operational
+
+    any_hydrated = (
+        any(
+            x is not None
+            for x in (outdoor_err, controller_err, hydraulic_err, hmu_raw, pressure)
+        )
+        or ebus_known
+    )
+    if not any_hydrated:
+        return None, {}
+
+    alerts: list[str] = []
+    if outdoor_err is not None and outdoor_err != "OK":
+        alerts.append("outdoor_fault")
+    if controller_err is not None and controller_err != "OK":
+        alerts.append("controller_fault")
+    if hydraulic_err is not None and hydraulic_err != "OK":
+        alerts.append("hydraulic_fault")
+    if hmu_fault is not None:
+        alerts.append("hmu_status_fault")
+    if pressure is not None:
+        if pressure < WATER_PRESSURE_LOW_BAR:
+            alerts.append("low_water_pressure")
+        elif pressure > WATER_PRESSURE_HIGH_BAR:
+            alerts.append("high_water_pressure")
+    if ebus_known and not ebus_ok:
+        alerts.append("ebus_offline")
+
+    attrs: dict[str, Any] = {
+        "alerts": alerts,
+        "alert_count": len(alerts),
+        "ebus_operational": ebus_ok,
+    }
+    if pressure is not None:
+        attrs["water_pressure_bar"] = pressure
+    if outdoor_err is not None:
+        attrs["outdoor_unit_error"] = outdoor_err
+    if controller_err is not None:
+        attrs["climate_controller_error"] = controller_err
+    if hydraulic_err is not None:
+        attrs["hydraulic_interface_error"] = hydraulic_err
+    if hmu_fault is not None:
+        attrs["hmu_fault_status"] = hmu_fault
+
+    return bool(alerts), attrs
+
+
+def _check_system_health_alert(coord: SaunierGeniaCoordinator) -> bool | None:
+    """Return True if any aggregated heat-pump health alert is active."""
+    is_alert, _ = _evaluate_system_health(coord)
+    return is_alert
+
+
+def _get_system_health_alert_attrs(coord: SaunierGeniaCoordinator) -> dict[str, Any]:
+    """Return structured health alert details for notifications and dashboards."""
+    _, attrs = _evaluate_system_health(coord)
+    return attrs
 
 
 BINARY_SENSOR_DESCRIPTIONS: tuple[SaunierGeniaBinarySensorEntityDescription, ...] = (
@@ -356,6 +456,18 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[SaunierGeniaBinarySensorEntityDescription, ...
         is_on_fn=_check_active_fault,
         attr_fn=_get_active_fault_attrs,
     ),
+    SaunierGeniaBinarySensorEntityDescription(
+        key="system_health_alert",
+        translation_key="system_health_alert",
+        device_key=DEVICE_OUTDOOR_UNIT,
+        circuit=CALC_CIRCUIT,
+        message="SystemHealthAlert",
+        field="value",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        is_on_fn=_check_system_health_alert,
+        attr_fn=_get_system_health_alert_attrs,
+    ),
 )
 
 
@@ -391,8 +503,18 @@ class SaunierGeniaBinarySensor(SaunierGeniaEntity, BinarySensorEntity):
             subs.append((CIRCUIT_HMUX0, "HMUStatusCode"))
         elif description.key == "active_fault":
             subs.extend([(c, "Currenterror") for c in OUTDOOR_CIRCUITS])
+            subs.extend([(c, "HMUStatusCode") for c in OUTDOOR_CIRCUITS])
             subs.extend([(c, "Currenterror") for c in CONTROLLER_CIRCUITS])
             subs.append((CIRCUIT_VWZIO, "Currenterror"))
+        elif description.key == "system_health_alert":
+            subs.extend([(c, "Currenterror") for c in OUTDOOR_CIRCUITS])
+            subs.extend([(c, "HMUStatusCode") for c in OUTDOOR_CIRCUITS])
+            subs.extend([(c, "FlowPressure") for c in OUTDOOR_CIRCUITS])
+            subs.extend([(c, "Currenterror") for c in CONTROLLER_CIRCUITS])
+            subs.append((CIRCUIT_VWZIO, "Currenterror"))
+            subs.append((CIRCUIT_BASS3, "WaterPressure"))
+            subs.append((CIRCUIT_GLOBAL, "running"))
+            subs.append((CIRCUIT_GLOBAL, "signal"))
 
         c = description.circuit.lower()
         m = description.message.lower()

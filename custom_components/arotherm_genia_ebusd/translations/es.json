@@ -474,6 +474,9 @@
       },
       "active_fault": {
         "name": "Fallo activo del sistema"
+      },
+      "system_health_alert": {
+        "name": "Alerta de salud del sistema"
       }
     },
     "sensor": {

@@ -1,0 +1,204 @@
+blueprint:
+  name: aroTHERM & GeniaAir — System Health & Fault Alerts
+  description: >
+    Sends alerts when your Vaillant aroTHERM / Saunier Duval GeniaAir heat pump
+    reports a fault (Currenterror or HMUStatusCode S.252+), out-of-range water
+    pressure, eBUS communication loss, or maintenance due. Supports built-in
+    Home Assistant persistent notifications and any custom mobile/messenger
+    notify action via {{ alert_title }} and {{ alert_message }}.
+  domain: automation
+  source_url: https://github.com/R91g/arotherm-genia-ebusd/blob/main/blueprints/automation/system_health_alerts.yaml
+  input:
+    health_alert_sensor:
+      name: System Health Alert Binary Sensor
+      description: >
+        Select the 'System Health Alert' (or 'Active System Fault') binary sensor
+        created by aroTHERM & GeniaAir (eBUS).
+      selector:
+        entity:
+          filter:
+            - integration: arotherm_genia_ebusd
+              domain: binary_sensor
+              device_class: problem
+    alert_delay_minutes:
+      name: Debounce Delay (minutes)
+      description: >
+        How long a fault or offline condition must persist before notifying
+        (prevents false positives during eBUSd add-on restarts or CSV reloads).
+      default: 3
+      selector:
+        number:
+          min: 0
+          max: 30
+          step: 1
+          unit_of_measurement: min
+          mode: slider
+    water_pressure_sensor:
+      name: Water Pressure Sensor (Optional custom thresholds)
+      description: >
+        Optional. Leave empty to rely on the built-in bounds (< 0.8 bar or > 2.8 bar)
+        inside 'System Health Alert'. Select your Water Pressure sensor to alert on
+        custom thresholds below.
+      default: ""
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: pressure
+    low_pressure_threshold:
+      name: Custom Low Water Pressure Threshold
+      description: Trigger a pressure alert below this value (used only if Water Pressure Sensor is set).
+      default: 0.9
+      selector:
+        number:
+          min: 0.3
+          max: 1.5
+          step: 0.1
+          unit_of_measurement: bar
+          mode: box
+    high_pressure_threshold:
+      name: Custom High Water Pressure Threshold
+      description: Trigger a pressure alert above this value (used only if Water Pressure Sensor is set).
+      default: 2.7
+      selector:
+        number:
+          min: 2.0
+          max: 3.5
+          step: 0.1
+          unit_of_measurement: bar
+          mode: box
+    maintenance_sensor:
+      name: Maintenance Due Binary Sensor (Optional)
+      description: Optional. Select the 'Maintenance Due' binary sensor to be notified when scheduled maintenance is due.
+      default: ""
+      selector:
+        entity:
+          filter:
+            - integration: arotherm_genia_ebusd
+              domain: binary_sensor
+              device_class: problem
+    send_persistent_notification:
+      name: Create Persistent Notification in Home Assistant
+      description: Shows a dismissible notification in the Home Assistant sidebar (auto-dismissed on recovery).
+      default: true
+      selector:
+        boolean:
+    notify_on_recovery:
+      name: Notify When System Recovers
+      description: Send a confirmation notification when the System Health Alert returns to normal.
+      default: true
+      selector:
+        boolean:
+    custom_actions:
+      name: Additional Notification Actions (Optional)
+      description: >
+        Add any notify actions (Mobile App, Telegram, Pushover, email, etc.).
+        Templates {{ alert_title }}, {{ alert_message }}, and {{ is_recovery }}
+        are available in your action fields.
+      default: []
+      selector:
+        action:
+
+mode: queued
+max: 5
+
+trigger_variables:
+  health_entity: !input health_alert_sensor
+  pressure_entity: !input water_pressure_sensor
+  low_pressure: !input low_pressure_threshold
+  high_pressure: !input high_pressure_threshold
+  maintenance_entity: !input maintenance_sensor
+
+triggers:
+  - id: health_alert
+    trigger: state
+    entity_id: !input health_alert_sensor
+    to: "on"
+    for:
+      minutes: !input alert_delay_minutes
+  - id: health_recovered
+    trigger: state
+    entity_id: !input health_alert_sensor
+    from: "on"
+    to: "off"
+  - id: pressure_alert
+    trigger: template
+    value_template: >-
+      {% if pressure_entity | default('') != '' and states(pressure_entity) | is_number %}
+        {% set p = states(pressure_entity) | float %}
+        {{ p < (low_pressure | float) or p > (high_pressure | float) }}
+      {% else %}
+        false
+      {% endif %}
+    for:
+      minutes: !input alert_delay_minutes
+  - id: maintenance_alert
+    trigger: template
+    value_template: >-
+      {{ maintenance_entity | default('') != '' and is_state(maintenance_entity, 'on') }}
+    for:
+      minutes: !input alert_delay_minutes
+
+variables:
+  health_entity: !input health_alert_sensor
+  pressure_entity: !input water_pressure_sensor
+  low_pressure: !input low_pressure_threshold
+  high_pressure: !input high_pressure_threshold
+  send_persistent: !input send_persistent_notification
+  notify_recovery: !input notify_on_recovery
+  is_recovery: "{{ trigger.id == 'health_recovered' }}"
+  active_alerts: "{{ state_attr(health_entity, 'alerts') | default([], true) }}"
+  alert_title: >-
+    {% if trigger.id == 'health_recovered' %}
+      Heat Pump Health Restored
+    {% elif trigger.id == 'pressure_alert' %}
+      Heat Pump Water Pressure Alert
+    {% elif trigger.id == 'maintenance_alert' %}
+      Heat Pump Maintenance Due
+    {% else %}
+      Heat Pump Health Alert
+    {% endif %}
+  alert_message: >-
+    {% if trigger.id == 'health_recovered' %}
+      All monitored heat pump health checks have returned to normal.
+    {% elif trigger.id == 'pressure_alert' %}
+      Water pressure is {{ states(pressure_entity) }} bar (configured safe range: {{ low_pressure }}–{{ high_pressure }} bar).
+    {% elif trigger.id == 'maintenance_alert' %}
+      The climate controller reports that scheduled system maintenance is due.
+    {% else %}
+      Active alerts: {{ active_alerts | join(', ') if active_alerts else 'problem detected' }}.
+      {%- set out_err = state_attr(health_entity, 'outdoor_unit_error') %}
+      {%- set ctl_err = state_attr(health_entity, 'climate_controller_error') %}
+      {%- set hyd_err = state_attr(health_entity, 'hydraulic_interface_error') %}
+      {%- set hmu_fault = state_attr(health_entity, 'hmu_fault_status') %}
+      {%- set press = state_attr(health_entity, 'water_pressure_bar') %}
+      {%- if out_err and out_err != 'OK' %} Outdoor error: {{ out_err }}.{% endif %}
+      {%- if ctl_err and ctl_err != 'OK' %} Controller error: {{ ctl_err }}.{% endif %}
+      {%- if hyd_err and hyd_err != 'OK' %} Hydraulic error: {{ hyd_err }}.{% endif %}
+      {%- if hmu_fault %} HMU status: {{ hmu_fault }}.{% endif %}
+      {%- if press is not none %} Water pressure: {{ press }} bar.{% endif %}
+    {% endif %}
+
+conditions:
+  - condition: template
+    value_template: "{{ not is_recovery or notify_recovery }}"
+
+actions:
+  - if:
+      - condition: template
+        value_template: "{{ send_persistent }}"
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ is_recovery }}"
+        then:
+          - action: persistent_notification.dismiss
+            data:
+              notification_id: arotherm_genia_ebusd_health_alert
+        else:
+          - action: persistent_notification.create
+            data:
+              notification_id: arotherm_genia_ebusd_health_alert
+              title: "{{ alert_title }}"
+              message: "{{ alert_message }}"
+  - sequence: !input custom_actions
