@@ -346,18 +346,6 @@ NUMBER_DESCRIPTIONS: tuple[SaunierGeniaNumberEntityDescription, ...] = (
         is_integer=True,
     ),
     SaunierGeniaNumberEntityDescription(
-        key="dew_point_offset",
-        translation_key="dew_point_offset",
-        message="DewPointOffset",
-        field="value",
-        native_min_value=-5.0,
-        native_max_value=10.0,
-        native_step=0.5,
-        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-        device_class=TEMP_DELTA_NUMBER_DEVICE_CLASS,
-        entity_category=EntityCategory.CONFIG,
-    ),
-    SaunierGeniaNumberEntityDescription(
         key="hc1_dew_point_offset",
         translation_key="hc1_dew_point_offset",
         message="Hc1DewPointOffset",

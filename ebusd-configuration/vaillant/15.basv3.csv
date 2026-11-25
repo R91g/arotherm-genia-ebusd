@@ -174,10 +174,10 @@ r;u,,,Z1OpModeCooling,cooling operation mode zone 1,,,b524,020003000100,ign,,IGN
 w,,,Z1OpModeCooling,cooling operation mode zone 1,,,b524,020103000100,value,,UIN,0=off;1=auto;2=day;3=night,,operation mode for cooling of zone 1
 r;u,,,Z1CoolingTemp,cooling setpoint zone 1,,,b524,020003000200,ign,,IGN:4,,,,value,,EXP,,°C,desired cooling setpoint for zone 1
 w,,,Z1CoolingTemp,cooling setpoint zone 1,,,b524,020103000200,value,,EXP,,°C,desired cooling setpoint for zone 1
-r;u,,,CoolingStartDate,cooling start date,,,b524,02000000da00,ign,,IGN:4,,,,day,,UCH,,,,month,,UCH,,,,year,,UCH,,,"Start date for active cooling (day, month, year)"
-w,,,CoolingStartDate,cooling start date,,,b524,02010000da00,day,,UCH,,,,month,,UCH,,,,year,,UCH,,,"Start date for active cooling (day, month, year)"
-r;u,,,CoolingEndDate,cooling end date,,,b524,02000000db00,ign,,IGN:4,,,,day,,UCH,,,,month,,UCH,,,,year,,UCH,,,"End date for active cooling (day, month, year)"
-w,,,CoolingEndDate,cooling end date,,,b524,02010000db00,day,,UCH,,,,month,,UCH,,,,year,,UCH,,,"End date for active cooling (day, month, year)"
+r;u,,,CoolingStartDate,manual cooling period start date,,,b524,02000000da00,ign,,IGN:4,,,,day,,UCH,,,,month,,UCH,,,,year,,UCH,,,"Start date for active manual cooling period (day, month, year)"
+w,,,CoolingStartDate,manual cooling period start date,,,b524,02010000da00,day,,UCH,,,,month,,UCH,,,,year,,UCH,,,"Start date for active manual cooling period (day, month, year)"
+r;u,,,CoolingEndDate,manual cooling period end date,,,b524,02000000db00,ign,,IGN:4,,,,day,,UCH,,,,month,,UCH,,,,year,,UCH,,,"End date for active manual cooling period (day, month, year)"
+w,,,CoolingEndDate,manual cooling period end date,,,b524,02010000db00,day,,UCH,,,,month,,UCH,,,,year,,UCH,,,"End date for active manual cooling period (day, month, year)"
 r;u,,,Z1CoolingTempDesired,cooling room temperature desired zone 1,,,b524,020003001500,ign,,IGN:4,,,,value,,EXP,,°C,temperature
 w,,,Z1CoolingTempDesired,cooling room temperature desired zone 1,,,b524,020103001500,value,,EXP,,°C,temperature
 r;u,,,CoolingReleaseStatus,cooling release status,,,b524,020000000900,ign,,IGN:4,,,,value,,UCH,0=off;1=on,,cooling release status
@@ -187,8 +187,7 @@ r;u,,,EmergencyFlowTempDesired,emergency operation flow temperature setpoint,,,b
 w,,,EmergencyFlowTempDesired,emergency operation flow temperature setpoint,,,b524,020100002600,value,,EXP,,°C,"emergency mode flow temperature setpoint (20..80 °C, MiPro Sense)"
 r;u,,,CoolingOutsideTempThreshold,cooling outside temperature threshold,,,b524,020000003800,ign,,IGN:4,,,,value,,EXP,,°C,cooling outside temperature threshold
 w,,,CoolingOutsideTempThreshold,cooling outside temperature threshold,,,b524,020100003800,value,,EXP,,°C,cooling outside temperature threshold
-r;u,,,DewPointOffset,dew point offset,,,b524,020000003a00,ign,,IGN:4,,,,value,,EXP,,K,dew point offset
-w,,,DewPointOffset,dew point offset,,,b524,020100003a00,value,,EXP,,K,dew point offset
+r;u,,,DewPointOffset,live calculated value (read-only; flag byte 00; circuit 1 writable offset is Hc1DewPointOffset),,,b524,020000003a00,ign,,IGN:4,,,,value,,EXP,,,live calculated value (read-only)
 r;u,,,DewPointMonitoring,dew point monitoring,,,b524,020002000500,ign,,IGN:4,,,,value,,UCH,0=off;1=on,,dew point monitoring
 w,,,DewPointMonitoring,dew point monitoring,,,b524,020102000500,value,,UCH,0=off;1=on,,dew point monitoring
 r;u,,,Z1CoolingTimeSlotActive,cooling time slot active zone 1,,,b524,020003001a00,ign,,IGN:4,,,,value,,UCH,0=no;1=yes,,cooling time slot active for zone 1

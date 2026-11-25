@@ -352,6 +352,10 @@ DEPRECATED_UNIQUE_ID_SUFFIXES: tuple[str, ...] = (
     "number_ctlv3_coolingflowtempdesiredmax_value",
     "hmux0_runstatsimmersionheaterhours_value",
     "hmux0_runstatsimmersionheaterstarts_value",
+    "number_bass3_dewpointoffset_value",
+    "number_basv3_dewpointoffset_value",
+    "number_ctlv2_dewpointoffset_value",
+    "number_ctlv3_dewpointoffset_value",
 )
 
 # Timing & Hydration Constants
@@ -552,7 +556,6 @@ ESSENTIAL_HYDRATION_MESSAGES: list[tuple[str, str]] = [
     (CIRCUIT_BASS3, "BivalencePointHwc"),
     (CIRCUIT_BASS3, "AlternativePoint"),
     (CIRCUIT_BASS3, "CoolingOutsideTempThreshold"),
-    (CIRCUIT_BASS3, "DewPointOffset"),
     (CIRCUIT_BASS3, "DewPointMonitoring"),
     (CIRCUIT_BASS3, "Hc1CoolingEnabled"),
     (CIRCUIT_BASS3, "Hc1DewPointOffset"),

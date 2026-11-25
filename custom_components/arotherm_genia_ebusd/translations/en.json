@@ -291,9 +291,6 @@
       "compressor_silent_operation_level": {
         "name": "Compressor Silent Operation Level"
       },
-      "dew_point_offset": {
-        "name": "Dew Point Offset"
-      },
       "hc1_dew_point_offset": {
         "name": "Circuit 1 Dew Point Offset"
       },

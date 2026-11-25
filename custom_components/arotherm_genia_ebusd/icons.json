@@ -902,9 +902,6 @@
       "compressor_silent_operation_level": {
         "default": "mdi:volume-mute"
       },
-      "dew_point_offset": {
-        "default": "mdi:water-thermometer"
-      },
       "hc1_dew_point_offset": {
         "default": "mdi:water-thermometer"
       },

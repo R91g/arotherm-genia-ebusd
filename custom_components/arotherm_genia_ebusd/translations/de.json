@@ -291,9 +291,6 @@
       "compressor_silent_operation_level": {
         "name": "Flüstermodus-Leistungsstufe"
       },
-      "dew_point_offset": {
-        "name": "Taupunkt-Offset"
-      },
       "hc1_dew_point_offset": {
         "name": "Heizkreis 1 Taupunkt-Offset"
       },

@@ -552,7 +552,7 @@ class TestSensorRegistry(unittest.TestCase):
         number_keys = {d.key for d in NUMBER_DESCRIPTIONS}
         self.assertTrue(
             {
-                "dew_point_offset",
+                "hc1_dew_point_offset",
                 "cooling_outside_temp_threshold",
                 "offset_outside_temp",
                 "continuous_heating_threshold",
@@ -567,7 +567,6 @@ class TestSensorRegistry(unittest.TestCase):
         self.assertTrue(
             {
                 "DewPointMonitoring",
-                "DewPointOffset",
                 "Hc1CoolingEnabled",
                 "Hc1DewPointOffset",
                 "Z1TimeSlotActive",
