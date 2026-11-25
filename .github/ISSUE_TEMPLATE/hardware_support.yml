@@ -1,0 +1,55 @@
+name: Hardware / Device Support Request
+description: Share your eBUS scan and MQTT dump to request support for a new board, controller, or model.
+title: "[Hardware]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for sharing your hardware details!
+        Before submitting, please make sure any personal info (serial numbers, installer PINs, local IPs) is redacted (`arotherm_genia_ebusd.dump_mqtt_values` anonymizes by default).
+
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Hardware Models
+      description: Which outdoor unit, hydraulic module, mixer module, or controller are you using?
+      value: |
+        - Outdoor unit:
+        - Hydraulic / mixer module (e.g. VWZIO, VR 70, VR 71):
+        - Controller (e.g. VRC 720, SRC 720, VRC 700):
+        - eBUSd version:
+        - Integration version:
+    validations:
+      required: true
+
+  - type: textarea
+    id: ebusctl_info
+    attributes:
+      label: "`ebusctl info` output (required)"
+      description: >
+        Paste the full output of `ebusctl info` showing all scanned addresses, MF/ID/SW/HW,
+        and loaded CSV files (also included automatically inside `ebusd_info` in `dump_mqtt_values`
+        when eBUSd TCP diagnostics are enabled).
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: dump
+    attributes:
+      label: MQTT Dump (`arotherm_genia_ebusd.dump_mqtt_values`) or `ebusctl find`
+      description: >
+        Run **Developer Tools → Actions → `arotherm_genia_ebusd.dump_mqtt_values`** (with `anonymize: true`)
+        and paste or attach the `.yaml` output, plus any relevant `ebusctl find` output for the new board.
+      render: yaml
+    validations:
+      required: false
+
+  - type: textarea
+    id: goals
+    attributes:
+      label: Requested Entities / Features
+      description: Which sensors, controls, or CSV definitions would you like supported?
+    validations:
+      required: false

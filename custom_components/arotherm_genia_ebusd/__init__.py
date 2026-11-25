@@ -1469,7 +1469,22 @@ def _async_register_services(hass: HomeAssistant) -> None:
                     else entry_id
                 )
 
-                results[safe_entry_id] = {
+                device_versions = {
+                    dev_key: {
+                        k: (
+                            "**REDACTED**"
+                            if anonymize and k == "serial_number" and v is not None
+                            else v
+                        )
+                        for k, v in ver_info.items()
+                    }
+                    for dev_key, ver_info in coordinator._device_versions.items()
+                }
+                ebusd_info = await coordinator.async_get_ebusd_info_lines(
+                    anonymize=anonymize
+                )
+
+                entry_dump: dict[str, Any] = {
                     "domain": DOMAIN,
                     "entry_id": safe_entry_id,
                     "anonymized": anonymize,
@@ -1479,11 +1494,16 @@ def _async_register_services(hass: HomeAssistant) -> None:
                     "indoor_model": coordinator.indoor_model,
                     "active_outdoor_circuit": coordinator.active_outdoor_circuit,
                     "active_controller_circuit": coordinator.active_controller_circuit,
+                    "active_repair_issues": sorted(coordinator._active_repair_issues),
+                    "device_versions": device_versions,
                     "cached_messages_count": sum(
                         len(msgs) for msgs in bus_state.values()
                     ),
-                    "values": bus_state,
                 }
+                if ebusd_info is not None:
+                    entry_dump["ebusd_info"] = ebusd_info
+                entry_dump["values"] = bus_state
+                results[safe_entry_id] = entry_dump
 
             if len(results) == 1:
                 return next(iter(results.values()))

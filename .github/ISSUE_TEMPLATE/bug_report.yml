@@ -1,0 +1,57 @@
+name: Bug Report / Troubleshooting
+description: Report a bug, unexpected entity value, or CSV compatibility issue.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report an issue!
+        Please review any pasted dumps before submitting and redact serial numbers or local IP addresses if needed (`dump_mqtt_values` anonymizes them automatically by default).
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the issue clearly, including what you expected to happen and any relevant Home Assistant logs or Repair messages.
+      placeholder: "Example: Sensor X stays unknown / shows value Y instead of Z..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: System & Hardware Information
+      description: List your heat pump, hydraulic module, controller, and software versions.
+      value: |
+        - Integration version:
+        - Home Assistant version:
+        - eBUSd version (and add-on / standalone):
+        - Outdoor unit (e.g. aroTHERM plus VWL 75/6, GeniaAir Max ES 15):
+        - Hydraulic module (e.g. VWZ MEH 97, uniTOWER, HPIM 7):
+        - Controller (e.g. sensoCOMFORT VRC 720/3, MiPro Sense SRC 720/3):
+        - Cloud gateway (MiGo Link / VR 921 / VR 940f / None):
+    validations:
+      required: true
+
+  - type: textarea
+    id: ebusctl_info
+    attributes:
+      label: eBUSd `info` output
+      description: >
+        Paste the output of `ebusctl info` (or leave blank if it is already included inside
+        `ebusd_info` in your `dump_mqtt_values` output below when eBUSd TCP diagnostics are enabled).
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: dump
+    attributes:
+      label: MQTT Dump (`arotherm_genia_ebusd.dump_mqtt_values`) or Diagnostics
+      description: >
+        Run **Developer Tools → Actions → `arotherm_genia_ebusd.dump_mqtt_values`** (with `anonymize: true`)
+        and paste the YAML response here (or drag & drop a `.yaml` / HA Diagnostics `.json` file).
+      render: yaml
+    validations:
+      required: false

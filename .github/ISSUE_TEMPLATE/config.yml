@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Installation & CSV Setup Guide
+    url: https://github.com/R91g/arotherm-genia-ebusd/blob/main/docs/installation.md
+    about: Check the setup guide and one-line CSV installer/updater before opening an issue.
+  - name: Troubleshooting & FAQ
+    url: https://github.com/R91g/arotherm-genia-ebusd/blob/main/docs/troubleshooting.md
+    about: Common eBUSd issues, Repair warnings, and diagnostic tools.

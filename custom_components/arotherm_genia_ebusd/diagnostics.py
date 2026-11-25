@@ -104,6 +104,10 @@ async def async_get_config_entry_diagnostics(
             "active_outdoor_circuit": coordinator.active_outdoor_circuit,
             "saved_dhw_target_temp": coordinator.saved_dhw_target_temp,
             "last_active_cop": coordinator.last_active_cop,
+            "active_repair_issues": sorted(coordinator._active_repair_issues),
+            "ebusd_info": coordinator.sanitize_ebusd_info_lines(
+                coordinator._last_ebusd_tcp_info_lines, anonymize=True
+            ),
             "active_listeners_count": sum(
                 len(listeners) for listeners in coordinator._listeners.values()
             ),

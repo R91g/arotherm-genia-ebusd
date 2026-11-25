@@ -7,6 +7,7 @@ import contextlib
 import json
 import logging
 import math
+import re
 import time
 from collections.abc import Callable, Coroutine
 from datetime import UTC, date, datetime, timedelta
@@ -366,6 +367,7 @@ class SaunierGeniaCoordinator:
         self._resolved_tcp_host: str | None = None
         self._resolved_tcp_port: int | None = None
         self._tcp_autodiscover_attempted: bool = False
+        self._last_ebusd_tcp_info_lines: list[str] = []
         self._external_sweep_canaries: dict[tuple[str, str], list[float]] = {}
         self._self_requested_canaries: dict[tuple[str, str], float] = {}
         self._hassio_seed_mqtt_enabled: bool | None = None
@@ -3681,6 +3683,7 @@ class SaunierGeniaCoordinator:
                 return
 
             self._tcp_write_available = True
+            self._last_ebusd_tcp_info_lines = list(lines)
 
             for line in lines:
                 if ":" not in line:
@@ -3892,6 +3895,44 @@ class SaunierGeniaCoordinator:
         res = await self._async_send_ebusd_tcp_command("reload\n")
         await self._async_fetch_ebusd_tcp_info()
         return res
+
+    @staticmethod
+    def sanitize_ebusd_info_lines(
+        lines: list[str], *, anonymize: bool = True
+    ) -> list[str]:
+        """Redact local IPs, MACs, and long serial numbers from eBUSd `info` lines."""
+        if not anonymize:
+            return list(lines)
+        sanitized: list[str] = []
+        for line in lines:
+            clean = re.sub(r"\b\d{1,3}(?:\.\d{1,3}){3}\b", "**REDACTED_IP**", line)
+            clean = re.sub(
+                r"\b(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\b",
+                "**REDACTED_MAC**",
+                clean,
+            )
+            clean = re.sub(r"\b\d{16,28}\b", "**REDACTED_SERIAL**", clean)
+            sanitized.append(clean)
+        return sanitized
+
+    async def async_get_ebusd_info_lines(
+        self, *, anonymize: bool = True
+    ) -> list[str] | None:
+        """Return live (or cached) eBUSd TCP `info` output when TCP diagnostics are enabled."""
+        if not self.is_ebusd_tcp_enabled:
+            return None
+        raw_lines: list[str] = []
+        try:
+            res = await self._async_send_ebusd_tcp_command("info\n")
+            if res:
+                raw_lines = [line.strip() for line in res.splitlines() if line.strip()]
+                if raw_lines:
+                    self._last_ebusd_tcp_info_lines = list(raw_lines)
+        except (HomeAssistantError, OSError, TimeoutError):
+            raw_lines = list(self._last_ebusd_tcp_info_lines)
+        if not raw_lines:
+            return None
+        return self.sanitize_ebusd_info_lines(raw_lines, anonymize=anonymize)
 
     async def async_ebusd_tcp_scan(self) -> str:
         """Send scan config command to eBUSd via TCP socket to restart device scanning."""

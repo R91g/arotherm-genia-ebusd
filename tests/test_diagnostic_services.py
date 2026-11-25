@@ -974,6 +974,87 @@ class TestDiagnosticServices(unittest.TestCase):
             self.assertTrue(result["cached"])
             self.assertEqual(result["value"], {"temp1": 33.5})
 
+    def test_dump_mqtt_values_includes_ebusd_info_and_redacts_when_anonymized(
+        self,
+    ) -> None:
+        """dump_mqtt_values appends sanitized ebusd TCP info, repair issues, and device versions."""
+        from pathlib import Path
+
+        entry = MagicMock()
+        entry.entry_id = "test_tcp_dump"
+        entry.data = {"mqtt_prefix": "ebusd"}
+        entry.options = {CONF_ENABLE_EBUSD_TCP: True}
+
+        coord = SaunierGeniaCoordinator(self.hass, entry)
+        coord._active_repair_issues.add("outdated_controller_csv")
+        coord._device_versions["outdoor_unit"] = {
+            "sw_version": "05.02",
+            "hw_version": "51.03",
+            "serial_number": "21244100100353470001001234",
+        }
+        sample_info = (
+            "version: ebusd 25.1\n"
+            "device: enh:192.168.1.45:9999, enhanced 1.0\n"
+            'address 08: slave #11, scanned "MF=Vaillant;ID=HMUX0;SW=0502;HW=5103", loaded "vaillant/08.hmux0.csv"\n'
+            "serial: 21244100100353470001001234\n"
+        )
+
+        self.hass.data = {DOMAIN: {entry.entry_id: coord}}
+        _async_register_services(self.hass)
+        handler = self.registered_services[SERVICE_DUMP_MQTT_VALUES]
+
+        with patch.object(
+            coord,
+            "_async_send_ebusd_tcp_command",
+            new=AsyncMock(return_value=sample_info),
+        ):
+            call = MagicMock()
+            call.data = {"anonymize": True}
+            result = asyncio.run(handler(call))
+
+        self.assertEqual(result["active_repair_issues"], ["outdated_controller_csv"])
+        self.assertEqual(
+            result["device_versions"]["outdoor_unit"]["serial_number"], "**REDACTED**"
+        )
+        self.assertIn("ebusd_info", result)
+        joined = "\n".join(result["ebusd_info"])
+        self.assertIn("enh:**REDACTED_IP**:9999", joined)
+        self.assertIn("**REDACTED_SERIAL**", joined)
+        self.assertNotIn("192.168.1.45", joined)
+        self.assertNotIn("21244100100353470001001234", joined)
+
+        # Fallback to cached info when live TCP command fails; anonymize=False keeps raw lines
+        with patch.object(
+            coord,
+            "_async_send_ebusd_tcp_command",
+            new=AsyncMock(side_effect=OSError("connection refused")),
+        ):
+            call_raw = MagicMock()
+            call_raw.data = {"anonymize": False}
+            result_raw = asyncio.run(handler(call_raw))
+
+        self.assertIn("ebusd_info", result_raw)
+        self.assertIn("192.168.1.45", "\n".join(result_raw["ebusd_info"]))
+
+        # When TCP is disabled, ebusd_info is omitted cleanly
+        entry.options = {CONF_ENABLE_EBUSD_TCP: False}
+        call_no_tcp = MagicMock()
+        call_no_tcp.data = {}
+        result_no_tcp = asyncio.run(handler(call_no_tcp))
+        self.assertNotIn("ebusd_info", result_no_tcp)
+
+        # Verify GitHub Issue Form templates exist with LF endings and request key diagnostics
+        tpl_dir = Path(__file__).resolve().parent.parent / ".github" / "ISSUE_TEMPLATE"
+        for name in ("config.yml", "bug_report.yml", "hardware_support.yml"):
+            p = tpl_dir / name
+            self.assertTrue(p.is_file(), f"Missing issue template: {name}")
+            raw = p.read_bytes()
+            self.assertNotIn(b"\r\n", raw, f"{name} must use LF line endings")
+        for form_name in ("bug_report.yml", "hardware_support.yml"):
+            txt = (tpl_dir / form_name).read_text(encoding="utf-8")
+            self.assertIn("dump_mqtt_values", txt)
+            self.assertIn("ebusctl info", txt)
+
 
 if __name__ == "__main__":
     unittest.main()
