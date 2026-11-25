@@ -6658,6 +6658,57 @@ class TestCoordinatorLogic(unittest.TestCase):
             self.assertEqual(coord._optional_poll_counts, {})
             self.assertIsNone(coord._optional_energy_poll_unsub)
 
+    def test_transient_ebusd_bus_errors_do_not_trigger_outdated_csv_repairs(
+        self,
+    ) -> None:
+        """Transient bus errors (read timeout, arbitration lost, SYN received) must never raise outdated CSV repairs (refs #13)."""
+        from custom_components.arotherm_genia_ebusd.const import (
+            ISSUE_OUTDATED_VWZIO_CSV,
+        )
+
+        hass = MagicMock()
+        entry = MagicMock()
+        entry.entry_id = "test_transient_err_repairs"
+        entry.data = {}
+        entry.options = {}
+        coord = SaunierGeniaCoordinator(hass, entry)
+
+        def push_mqtt(topic: str, payload: str) -> None:
+            msg = MagicMock()
+            msg.topic = topic
+            msg.payload = payload
+            coord._async_on_mqtt_message(msg)
+
+        # Transient bus errors on CSV probe registers across all circuits must NOT raise outdated CSV repairs
+        for topic, payload in (
+            ("ebusd/hmux0/CompressorSilentOperationLevel", "ERR: read timeout"),
+            ("ebusd/hmux0/RunStatsAuxHeaterSwitches", "ERR: arbitration lost"),
+            ("ebusd/hmu/CompressorSilentOperationLevel", "ERR: SYN received"),
+            ("ebusd/bass3/Z1TimeSlotActive", "ERR: read timeout"),
+            ("ebusd/bass3/VentilationBoost", "ERR: CRC error"),
+            ("ebusd/bass3/HwcLegionellaDay", "ERR: no signal"),
+            ("ebusd/vwzio/RunStatsAuxHeaterSwitches", "ERR: wrong symbol"),
+        ):
+            push_mqtt(topic, payload)
+
+        for issue_id in (
+            ISSUE_OUTDATED_HMUX0_CSV,
+            ISSUE_OUTDATED_HMU_CSV,
+            ISSUE_OUTDATED_CONTROLLER_CSV,
+            ISSUE_OUTDATED_VWZIO_CSV,
+        ):
+            self.assertNotIn(issue_id, coord._active_repair_issues)
+
+        # Real 'ERR: element not found' still raises outdated CSV repair and is NOT falsely cleared by a transient error
+        push_mqtt("ebusd/bass3/VentilationBoost", "ERR: element not found")
+        self.assertIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+        push_mqtt("ebusd/bass3/VentilationBoost", "ERR: read timeout")
+        self.assertIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+
+        # Valid telemetry clears it cleanly
+        push_mqtt("ebusd/bass3/VentilationBoost", '{"value": {"value": "off"}}')
+        self.assertNotIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+
 
 if __name__ == "__main__":
     unittest.main()
