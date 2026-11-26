@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.0-beta.1] - 2026-11-26
+
+> [!NOTE]
+> **Pre-release (HACS Beta):** This beta version is available in HACS when **"Show beta versions"** is enabled. To pull the matching beta eBUSd CSV files (`52.vr_70.csv`, `08.hmux0.csv`, `08.hmu*.csv`, and `15.*.csv`), run:
+> ```sh
+> curl -fsSL https://raw.githubusercontent.com/R91g/arotherm-genia-ebusd/main/scripts/install_ebusd_csvs.sh | sh -s -- -v v1.4.0-beta.1 --reload
+> ```
+
+### Added
+- **Optional VR 70 Mixer / Expansion Module Support (`52.vr_70.csv`, `entity.py`, `sensor_descriptions.py`, `binary_sensor.py`, refs #14):**
+  - Bundled self-contained `ebusd-configuration/vaillant/52.vr_70.csv` (aligned with upstream `52.vr_70.tsp`: `SensorData` `s1`–`s6`, `SetActorState`, `Mc1Operation`, `Mc2Operation`, `Currenterror`, `Errorhistory`, `Clearerrorhistory`) and added it to `scripts/install_ebusd_csvs.sh`.
+  - Added an opt-in **VR 70 (`has_vr70`)** toggle in Initial Setup and Reconfigure (disabled by default so setups without a VR 70 stay clean), exposing a dedicated **VR 70 (Mixer / Expansion Module)** device with `VR 70 Sensor S1`–`S6`, `MC1`/`MC2` flow setpoint, mixer position & pump (`MC2` disabled by default), `VR 70 Active Error` (wired into `active_fault` and `system_health_alert`), and automatic `SW`/`HW`/serial detection on address `52`.
+- **Automatic eBUS Hardware Pre-Detection in Setup Flow (`ebusd_tcp.py`, `config_flow.py`):**
+  - During initial setup, probes reachable local/add-on `ebusd` TCP `info` once (reused in the TCP step with zero extra roundtrips) to pre-fill **manufacturer** (`BASS3` → Saunier Duval; `BASV3`/`CTLV2`/`CTLV3` → Vaillant), **official cloud gateway** (`f1`/`f6`), **wireless RF thermostat** (`04`/`f6` `NETX3`, distinguishing `NETX2` internet-only gateways), and **VR 70** (`52`/`53`). Falls back cleanly to defaults when `ebusd` is remote or bus scan has not completed.
+- **One-Line POSIX eBUSd CSV Installer & Updater (`scripts/install_ebusd_csvs.sh`):**
+  - Auto-detects the HAOS eBUSd add-on or `/etc/ebusd`, validates downloaded CSVs, creates timestamped backups, supports `--dry-run`, `--version`, `--main`, and `--reload`, skips redundant restart hints when TCP `reload` succeeds, and is embedded directly into CSV Repair notices (`{install_cmd}`).
+- **System Health Alert Binary Sensor & Official Home Assistant Blueprints (`binary_sensor.py`, `blueprints/automation/`):**
+  - Added aggregated `system_health_alert` binary sensor combining per-board `Currenterror`, genuine `HMUStatusCode` fault codes (`S.252`–`S.590`), hydraulic water pressure bounds (`< 0.8 bar` / `> 2.8 bar`), and eBUS link health.
+  - Shipped two 1-click importable HA automation blueprints: `system_health_alerts.yaml` and `pv_surplus_dhw_boost.yaml`.
+- **15 Optional Controller Energy & Yield Counters (`15.*.csv`, `sensor_descriptions.py`, `coordinator.py`):**
+  - Added disabled-by-default controller energy/yield counters (`Yield*`, `PrEnergySumHc*`, `PrEnergySumHwc*`, `PrEnergySumCooling`, `PrEnergySumTotal*`, `SolarYieldTotal`) with on-demand 6-hour polling active **only** for entities explicitly enabled by the user.
+- **Richer Diagnostics & GitHub Issue Form Templates (`__init__.py`, `diagnostics.py`, `.github/ISSUE_TEMPLATE/`):**
+  - `dump_mqtt_values` and HA Diagnostics now include sanitized `ebusd_info`, `active_repair_issues`, and `device_versions` for faster troubleshooting, alongside structured bug report and hardware support issue forms.
+
+### Fixed
+- **False Outdated CSV Repair Notices on Transient Bus Errors (`coordinator.py`, #13):** Restricted CSV probe Repair triggers to genuine `ERR: element not found` responses so transient `ERR: read timeout` / `ERR: arbitration lost` / `ERR: SYN received` glitches never flash false Repair warnings.
+- **Read-Only Controller Registers & `0x3a` `DewPointOffset` (`15.*.csv`, `number.py`, refs #11):** Removed 13 erroneous write lines from read-only controller registers, dropped `w` from `0x3a` `DewPointOffset` (behaves as a read-only live calculated value; `Hc1DewPointOffset` `02 0a00` is the writable circuit 1 offset), deprecated duplicate `number.dew_point_offset`, clarified `CoolingStartDate`/`CoolingEndDate` manual cooling comments, and fixed `MultiInputSetting` data type (`UIN`).
+- **Outdoor Unit `e50b`/`e60b` Cycle Counters (`08.hmux0.csv`, `08.hmu*.csv`, `sensor_descriptions.py`):** Reclassified `540200e50b`/`540200e60b` as passive unverified diagnostics (`RunStatsDiage50b`/`RunStatsDiage60b`) after confirming they track compressor cycles rather than the hydraulic backup heater, and deprecated the mislabeled `stats_immersion_heater_*` outdoor sensors.
+- **Fallback Polling Efficiency (`coordinator.py`):** Moved `HwcLegionellaDay` and `HwcLegionellaTime` from fast to slow hourly fallback polling.
+
+---
+
 ## [1.3.2] - 2026-11-22
 
 > [!IMPORTANT]
