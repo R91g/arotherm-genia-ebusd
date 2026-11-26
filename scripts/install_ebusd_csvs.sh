@@ -197,7 +197,15 @@ detect_target_dir() {
         fi
     done
 
-    # 2. Standalone Linux / Docker host (/etc/ebusd)
+    # 2. Home Assistant shared folder (/share/ebusd-configuration — accessible from both HA Core shell_command and eBUSd add-on)
+    if [ -d "/share/ebusd-configuration" ]; then
+        DETECTED_ENV="ha_share"
+        DETECTED_ADDON_SLUG="b4d7ad18_ebusd"
+        TARGET_DIR="/share/ebusd-configuration/en"
+        return 0
+    fi
+
+    # 3. Standalone Linux / Docker host (/etc/ebusd)
     if [ -d "/etc/ebusd" ]; then
         DETECTED_ENV="linux"
         TARGET_DIR="/etc/ebusd/en"
@@ -205,7 +213,7 @@ detect_target_dir() {
     fi
 
     err "Could not auto-detect an eBUSd configuration directory."
-    err "Checked: /addon_configs/*_ebusd and /etc/ebusd."
+    err "Checked: /addon_configs/*_ebusd, /share/ebusd-configuration, and /etc/ebusd."
     err "Please specify your directory explicitly with: -d /path/to/ebusd-configuration/en"
     exit 1
 }
@@ -356,10 +364,17 @@ if [ "$DO_RELOAD" -eq 1 ] && [ "$DRY_RUN" -eq 0 ]; then
     else
         reload_host="$EBUSD_HOST"
         if [ -z "$reload_host" ]; then
-            if [ "$DETECTED_ENV" = "ha_addon" ] && [ -n "$DETECTED_ADDON_SLUG" ]; then
-                reload_host=$(printf '%s' "$DETECTED_ADDON_SLUG" | tr '_' '-')
+            if [ "$DETECTED_ENV" = "ha_addon" ] || [ "$DETECTED_ENV" = "ha_share" ]; then
+                if [ -n "$DETECTED_ADDON_SLUG" ]; then
+                    reload_host=$(printf '%s' "$DETECTED_ADDON_SLUG" | tr '_' '-')
+                else
+                    reload_host="b4d7ad18-ebusd"
+                fi
             else
-                reload_host="127.0.0.1"
+                case "$TARGET_DIR" in
+                    /share/*) reload_host="b4d7ad18-ebusd" ;;
+                    *) reload_host="127.0.0.1" ;;
+                esac
             fi
         fi
         log ""

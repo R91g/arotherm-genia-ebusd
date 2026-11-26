@@ -62,6 +62,7 @@ Copia los archivos CSV en el directorio de configuración de `ebusd` respetando 
     ├── 15.basv3.csv           <-- Regulador climático (sensoCOMFORT VRC 720 reportando BASV3)
     ├── 15.ctlv2.csv           <-- Regulador climático (sensoCOMFORT VRC 720/2)
     ├── 15.ctlv3.csv           <-- Regulador climático (sensoCOMFORT VRC 720/3)
+    ├── 52.vr_70.csv           <-- Módulo opcional mezclador / expansión solar VR 70
     ├── 76.vwzio.csv           <-- Módulo hidráulico / torre (VWZ MEH / uniTOWER / HPIM 7 / GeniaSet)
     └── f6.netx3.csv           <-- Tramas RF pasivas del termostato inalámbrico
 ```
@@ -156,6 +157,43 @@ curl -fsSL https://raw.githubusercontent.com/R91g/arotherm-genia-ebusd/main/scri
    --configpath=/etc/ebusd/en --scanconfig '--accesslevel=*' --mqttjson '--mqtttopic=ebusd/%circuit/%name' '--mqttvar=filter-direction=r|u|^w' --mqtthost=<IP_BROKER> --mqttport=1883 --mqttuser=<USUARIO> --mqttpass=<CLAVE>
    ```
 4. Reinicia `ebusd` (`sudo systemctl restart ebusd` o `docker compose restart ebusd`).
+
+### Opción C (Opcional): Actualización Automática de CSV tras cada Actualización de HACS (`shell_command`)
+
+Como las actualizaciones de HACS nunca sobrescriben archivos fuera de `custom_components/`, puedes automatizar la actualización de los CSV directamente desde Home Assistant para que `ebusd` quede sincronizado solo tras cada nueva versión:
+
+- **Nota importante sobre contenedores en HAOS:** `shell_command` se ejecuta dentro del contenedor `homeassistant`, que tiene acceso a `/share` (y `/config`) pero **no** puede acceder a `/addon_configs/b4d7ad18_ebusd`. El add-on de eBUSd (`LukasGrebe/ha-addons`) monta `/share` con lectura/escritura, así que guardar los CSV en `/share/ebusd-configuration/en` permite que **tanto Home Assistant como eBUSd** compartan la carpeta directamente sin usar SSH.
+  1. Ejecuta una vez el instalador apuntando a `/share/ebusd-configuration/en`:
+     ```bash
+     curl -fsSL https://raw.githubusercontent.com/R91g/arotherm-genia-ebusd/main/scripts/install_ebusd_csvs.sh | sh -s -- -d /share/ebusd-configuration/en
+     ```
+  2. En las `commandline_options` del add-on de eBUSd, apunta `--configpath` a `/share/ebusd-configuration/en` y reinicia el add-on una vez.
+  3. Añade un `shell_command` en `configuration.yaml` (el script detecta `/share/ebusd-configuration/en` y recarga `b4d7ad18-ebusd:8888` en caliente sin reiniciar el add-on; añade `-v {{ tag }}` si también pruebas betas de HACS):
+     ```yaml
+     shell_command:
+       update_ebusd_csvs: >-
+         curl -fsSL https://raw.githubusercontent.com/R91g/arotherm-genia-ebusd/main/scripts/install_ebusd_csvs.sh
+         | sh -s -- -d /share/ebusd-configuration/en --reload
+     ```
+  4. (Opcional) Crea una automatización en Home Assistant que llame a `shell_command.update_ebusd_csvs` en cuanto termine una actualización en HACS y envíe una notificación con el resultado exacto del script (qué archivos cambiaron, código de salida y confirmación de `reload`; puedes cambiar `persistent_notification.create` por `notify.mobile_app_<tu_movil>`):
+     ```yaml
+     alias: "eBUSd: Actualizar CSV automáticamente tras actualizar la integración"
+     trigger:
+       - trigger: state
+         entity_id: update.arotherm_genia_ebusd_update
+         from: "on"
+         to: "off"
+     action:
+       - action: shell_command.update_ebusd_csvs
+         response_variable: csv_result
+       - action: persistent_notification.create
+         data:
+           title: >-
+             {{ "CSV de eBUSd actualizados" if csv_result.returncode == 0 else "Error al actualizar CSV de eBUSd" }}
+           message: >-
+             {{ csv_result.stdout if csv_result.returncode == 0 else (csv_result.stderr or csv_result.stdout) }}
+     ```
+- **¿Prefieres mantener los CSV en `/addon_configs/b4d7ad18_ebusd`?** Ejecuta el instalador en una línea desde el add-on **Terminal & SSH** cuando aparezca un aviso de Repair, o lánzalo por SSH desde `shell_command` si ya utilizas claves SSH hacia tu host o add-on de Terminal.
 
 ---
 

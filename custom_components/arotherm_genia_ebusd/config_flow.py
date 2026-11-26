@@ -41,6 +41,7 @@ from .const import (
     CONF_MQTT_PREFIX,
     CONF_OUTDOOR_MODEL,
     CONF_PREREQUISITES_CONFIRMED,
+    CSV_INSTALL_ONE_LINER,
     DEFAULT_AUTO_COOLING_LOCK_BYPASS,
     DEFAULT_EBUSD_TCP_HOST,
     DEFAULT_EBUSD_TCP_PORT,
@@ -307,6 +308,7 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):  # pyright: ignore[repo
             description_placeholders={
                 "csv_url": "https://github.com/R91g/arotherm-genia-ebusd/tree/main/ebusd-configuration",
                 "guide_url": guide_url,
+                "install_cmd": CSV_INSTALL_ONE_LINER,
             },
         )
 

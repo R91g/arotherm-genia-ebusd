@@ -168,6 +168,10 @@ class TestConfigFlowPrerequisites(unittest.TestCase):
         self.assertEqual(res_init["type"], "form")
         self.assertEqual(res_init["step_id"], "user")
         self.assertIn("csv_url", res_init["description_placeholders"])
+        self.assertIn("install_cmd", res_init["description_placeholders"])
+        self.assertIn(
+            "install_ebusd_csvs.sh", res_init["description_placeholders"]["install_cmd"]
+        )
         self.assertIn(
             "installation_es.md", res_init["description_placeholders"]["guide_url"]
         )
