@@ -1174,5 +1174,158 @@ class TestEbusdTcpScanMetadata(unittest.TestCase):
         )
 
 
+class TestEbusdBusHardwarePreDetection(unittest.TestCase):
+    """Test eBUSd `info` hardware parsing and ConfigFlow pre-detection."""
+
+    def test_parse_ebusd_info_hardware_topologies(self) -> None:
+        """Verify gateway, wireless RF unit, VR 70, and manufacturer detection across real topologies."""
+        from custom_components.arotherm_genia_ebusd.const import (
+            MANUFACTURER_SAUNIER_DUVAL,
+            MANUFACTURER_VAILLANT,
+        )
+        from custom_components.arotherm_genia_ebusd.ebusd_tcp import (
+            parse_ebusd_info_hardware,
+        )
+
+        ep = ("b4d7ad18-ebusd", 8888)
+
+        # 1. Saunier Duval with wireless 04.netx3 + f1 MiGo Link, no VR 70
+        saunier_lines = [
+            "version: ebusd 26.1.26.1",
+            "signal: acquired",
+            "address 03: master #11",
+            'address 04: slave #25, scanned "MF=Vaillant;ID=NETX3;SW=0129;HW=0404", loaded "vaillant/04.netx3.csv"',
+            'address 08: slave #11, scanned "MF=Vaillant;ID=HMUX0;SW=0407;HW=0504", loaded "vaillant/08.hmux0.csv"',
+            'address 15: slave #2, scanned "MF=Vaillant;ID=BASS3;SW=0708;HW=4304", loaded "vaillant/15.bass3.csv"',
+            "address 31: master #8, ebusd",
+            "address 36: slave #8, ebusd",
+            'address 76: slave #9, scanned "MF=Vaillant;ID=VWZIO;SW=0500;HW=0504", loaded "vaillant/76.vwzio.csv"',
+            "address f1: master #10",
+            'address f6: slave #10, scanned "MF=Vaillant;ID=NETX3;SW=0300;HW=0404"',
+        ]
+        hw1 = parse_ebusd_info_hardware(saunier_lines, ep)
+        self.assertEqual(hw1.manufacturer, MANUFACTURER_SAUNIER_DUVAL)
+        self.assertTrue(hw1.has_migo_link)
+        self.assertTrue(hw1.has_wireless_room_unit)
+        self.assertFalse(hw1.has_vr70)
+
+        # 2. Vaillant with CTLV2 + VR 70 + NETX2 (VR 921 internet gateway, no wireless RF thermostat)
+        vaillant_vr70_lines = [
+            "version: ebusd 26.1.26.1",
+            "signal: acquired",
+            'address 08: slave #11, scanned "MF=Vaillant;ID=HMU00;SW=0902;HW=5103", loaded "vaillant/08.hmu.HW5103.csv"',
+            'address 15: slave #2, scanned "MF=Vaillant;ID=CTLV2;SW=0514;HW=1104", loaded "vaillant/15.ctlv2.csv"',
+            'address 52: slave #15, scanned "MF=Vaillant;ID=VR_70;SW=0101;HW=5804"',
+            'address 76: slave #9, scanned "MF=Vaillant;ID=VWZIO;SW=0500;HW=0504", loaded "vaillant/76.vwzio.csv"',
+            "address f1: master #10",
+            'address f6: slave #10, scanned "MF=Vaillant;ID=NETX2;SW=4040;HW=5703"',
+        ]
+        hw2 = parse_ebusd_info_hardware(vaillant_vr70_lines, ep)
+        self.assertEqual(hw2.manufacturer, MANUFACTURER_VAILLANT)
+        self.assertTrue(hw2.has_migo_link)
+        self.assertFalse(hw2.has_wireless_room_unit)
+        self.assertTrue(hw2.has_vr70)
+
+        # 3. Vaillant without cloud gateway, wired CTLV3, no VR 70
+        no_gateway_lines = [
+            "version: ebusd 26.1.26.1",
+            "signal: acquired",
+            'address 08: slave #11, scanned "MF=Vaillant;ID=HMUX0;SW=0502;HW=0504"',
+            'address 15: slave #2, scanned "MF=Vaillant;ID=CTLV3;SW=0708;HW=4304"',
+            'address 76: slave #9, scanned "MF=Vaillant;ID=VWZIO;SW=0500;HW=0504"',
+        ]
+        hw3 = parse_ebusd_info_hardware(no_gateway_lines, ep)
+        self.assertEqual(hw3.manufacturer, MANUFACTURER_VAILLANT)
+        self.assertFalse(hw3.has_migo_link)
+        self.assertFalse(hw3.has_wireless_room_unit)
+        self.assertFalse(hw3.has_vr70)
+
+        # 4. No bus signal / unscanned bus -> flags remain None so defaults are preserved
+        no_signal_lines = [
+            "version: ebusd 26.1.26.1",
+            "signal: no signal",
+            "address 31: master #8, ebusd",
+        ]
+        hw4 = parse_ebusd_info_hardware(no_signal_lines, ep)
+        self.assertIsNone(hw4.manufacturer)
+        self.assertIsNone(hw4.has_migo_link)
+        self.assertIsNone(hw4.has_wireless_room_unit)
+        self.assertIsNone(hw4.has_vr70)
+
+    def test_config_flow_prefills_detected_hardware_and_reuses_probe(self) -> None:
+        """Initial setup pre-fills manufacturer, gateway, wireless, VR 70, and TCP from a single probe."""
+        from custom_components.arotherm_genia_ebusd.const import (
+            CONF_HAS_VR70,
+            CONF_MANUFACTURER,
+            CONF_MQTT_PREFIX,
+            MANUFACTURER_VAILLANT,
+        )
+        from custom_components.arotherm_genia_ebusd.ebusd_tcp import EbusdBusHardware
+
+        flow = SaunierGeniaConfigFlow()
+        flow.hass = MagicMock()
+        flow.hass.config.components = {"mqtt"}
+        flow.async_set_unique_id = AsyncMock()
+        flow._abort_if_unique_id_configured = MagicMock()
+
+        detected = EbusdBusHardware(
+            endpoint=("b4d7ad18-ebusd", 8888),
+            has_migo_link=False,
+            has_wireless_room_unit=False,
+            has_vr70=True,
+            manufacturer=MANUFACTURER_VAILLANT,
+        )
+
+        with (
+            patch(
+                "custom_components.arotherm_genia_ebusd.config_flow.async_probe_ebusd_bus_hardware",
+                new=AsyncMock(return_value=detected),
+            ) as mock_hw_probe,
+            patch(
+                "custom_components.arotherm_genia_ebusd.config_flow.async_probe_ebusd_tcp",
+                new=AsyncMock(return_value=("should-not-be-called", 8888)),
+            ) as mock_tcp_probe,
+        ):
+            step_mqtt = asyncio.run(flow.async_step_mqtt())
+            mqtt_defaults = {
+                k.schema: k.default for k in step_mqtt["data_schema"].schema
+            }
+            self.assertEqual(mqtt_defaults[CONF_MANUFACTURER], MANUFACTURER_VAILLANT)
+
+            step_models = asyncio.run(
+                flow.async_step_mqtt(
+                    {
+                        CONF_MQTT_PREFIX: "ebusd",
+                        CONF_MANUFACTURER: MANUFACTURER_VAILLANT,
+                    }
+                )
+            )
+            model_defaults = {
+                k.schema: k.default for k in step_models["data_schema"].schema
+            }
+            self.assertFalse(model_defaults[CONF_HAS_MIGO_LINK])
+            self.assertFalse(model_defaults[CONF_HAS_WIRELESS_ROOM_UNIT])
+            self.assertTrue(model_defaults[CONF_HAS_VR70])
+
+            step_tcp = asyncio.run(
+                flow.async_step_models(
+                    {
+                        CONF_OUTDOOR_MODEL: "aroTHERM plus VWL 55/6 A 230V",
+                        CONF_INDOOR_MODEL: "VWZ MEH 97/7",
+                        CONF_HAS_WIRELESS_ROOM_UNIT: False,
+                        CONF_HAS_MIGO_LINK: False,
+                        CONF_HAS_VR70: True,
+                    }
+                )
+            )
+            tcp_defaults = {k.schema: k.default for k in step_tcp["data_schema"].schema}
+            self.assertTrue(tcp_defaults[CONF_ENABLE_EBUSD_TCP])
+            self.assertEqual(tcp_defaults[CONF_EBUSD_TCP_HOST], "b4d7ad18-ebusd")
+            self.assertEqual(tcp_defaults[CONF_EBUSD_TCP_PORT], 8888)
+
+        mock_hw_probe.assert_awaited_once()
+        mock_tcp_probe.assert_not_awaited()
+
+
 if __name__ == "__main__":
     unittest.main()

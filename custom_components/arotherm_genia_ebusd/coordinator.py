@@ -44,6 +44,7 @@ from .const import (
     CIRCUIT_HMUX0,
     CIRCUIT_NETX3,
     CIRCUIT_NETX3_ALT,
+    CIRCUIT_VR70,
     CIRCUIT_VWZIO,
     CONF_AUTO_COOLING_LOCK_BYPASS,
     CONF_EBUSD_TCP_HOST,
@@ -52,6 +53,7 @@ from .const import (
     CONF_FALLBACK_POLL_INTERVAL,
     CONF_FORCE_DHW_BOOST,
     CONF_HAS_MIGO_LINK,
+    CONF_HAS_VR70,
     CONF_HAS_WIRELESS_ROOM_UNIT,
     CONF_INDOOR_MODEL,
     CONF_MANUFACTURER,
@@ -73,6 +75,7 @@ from .const import (
     DEFAULT_FALLBACK_POLL_INTERVAL,
     DEFAULT_FORCE_DHW_BOOST,
     DEFAULT_HAS_MIGO_LINK,
+    DEFAULT_HAS_VR70,
     DEFAULT_HAS_WIRELESS_ROOM_UNIT,
     DEFAULT_HOLIDAY_TEMP,
     DEFAULT_INDOOR_MODEL,
@@ -549,6 +552,11 @@ class SaunierGeniaCoordinator:
         return bool(self.entry.data.get(CONF_HAS_MIGO_LINK, DEFAULT_HAS_MIGO_LINK))
 
     @property
+    def has_vr70(self) -> bool:
+        """Return True if a VR 70 mixer / expansion module (52.vr_70) is enabled."""
+        return bool(self.entry.data.get(CONF_HAS_VR70, DEFAULT_HAS_VR70))
+
+    @property
     def force_dhw_boost(self) -> bool:
         """Return True if Smart Forced DHW Boost algorithm is enabled."""
         return bool(
@@ -596,6 +604,7 @@ class SaunierGeniaCoordinator:
             or c
             in (
                 CIRCUIT_VWZIO,
+                CIRCUIT_VR70,
                 CIRCUIT_NETX3,
                 CIRCUIT_NETX3_ALT,
                 CIRCUIT_BROADCAST,
@@ -1039,6 +1048,7 @@ class SaunierGeniaCoordinator:
             *CONTROLLER_CIRCUITS,
             *OUTDOOR_CIRCUITS,
             CIRCUIT_VWZIO,
+            CIRCUIT_VR70,
             CIRCUIT_NETX3,
             CIRCUIT_NETX3_ALT,
             "Broadcast",
@@ -3005,6 +3015,11 @@ class SaunierGeniaCoordinator:
         ):
             missing.append((CIRCUIT_NETX3, "RoomTempDial"))
 
+        if self.has_vr70:
+            for vr70_msg in ("SensorData", "Currenterror"):
+                if not self.has_message(CIRCUIT_VR70, vr70_msg):
+                    missing.append((CIRCUIT_VR70, vr70_msg))
+
         for item in self._collect_active_timer_slot_messages(only_if_missing=True):
             if item not in missing:
                 missing.append(item)
@@ -3176,6 +3191,8 @@ class SaunierGeniaCoordinator:
         core_messages = list(
             dict.fromkeys([*FALLBACK_FAST_BASS3_MESSAGES, *fallback_energy_messages])
         )
+        if self.has_vr70:
+            core_messages.append((CIRCUIT_VR70, "SensorData"))
         self._hydration_task = self.hass.async_create_background_task(
             self._async_force_poll_queue(core_messages),
             name=f"{self.entry.domain}_fallback_poll",
@@ -3222,6 +3239,8 @@ class SaunierGeniaCoordinator:
                 ]
             )
         )
+        if self.has_vr70:
+            slow_messages.append((CIRCUIT_VR70, "Currenterror"))
         self._hydration_task = self.hass.async_create_background_task(
             self._async_force_poll_queue(slow_messages, expand_timer_slots=True),
             name=f"{self.entry.domain}_fallback_slow_poll",

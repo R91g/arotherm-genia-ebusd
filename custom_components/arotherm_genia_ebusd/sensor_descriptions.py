@@ -56,10 +56,12 @@ from .const import (
     CIRCUIT_HMUX0,
     CIRCUIT_NETX3,
     CIRCUIT_NETX3_ALT,
+    CIRCUIT_VR70,
     CIRCUIT_VWZIO,
     CONTROLLER_CIRCUITS,
     DEVICE_CLIMATE_CONTROLLER,
     DEVICE_HYDRAULIC_INTERFACE,
+    DEVICE_MIXER_MODULE,
     DEVICE_OUTDOOR_UNIT,
     DEVICE_WIRELESS_THERMOSTAT,
     HC1_CIRCUIT_TYPE_OPTIONS,
@@ -94,6 +96,7 @@ class SaunierGeniaSensorEntityDescription(SensorEntityDescription):
     value_fn: Callable[[SaunierGeniaCoordinator], Any] | None = None
     attr_fn: Callable[[SaunierGeniaCoordinator], dict[str, Any]] | None = None
     requires_wireless_unit: bool = False
+    requires_vr70: bool = False
     hmux0_only: bool = False
     # Optional override to keep a stable unique_id when the data source changes
     unique_id_suffix: str | None = None
@@ -115,6 +118,11 @@ def _format_currenterror_msg(msg: dict[str, Any] | None) -> str | None:
 def _get_vwzio_error(coord: SaunierGeniaCoordinator) -> str | None:
     """Format vwzio Currenterror (error..error_4), returning 'OK' when all slots are '-' or 0."""
     return _format_currenterror_msg(coord.get_message(CIRCUIT_VWZIO, "Currenterror"))
+
+
+def _get_vr70_error(coord: SaunierGeniaCoordinator) -> str | None:
+    """Format vr_70 Currenterror (error..error_4), returning 'OK' when all slots are '-' or 0."""
+    return _format_currenterror_msg(coord.get_message(CIRCUIT_VR70, "Currenterror"))
 
 
 def _get_outdoor_error(coord: SaunierGeniaCoordinator) -> str | None:
@@ -2312,6 +2320,150 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         field="value",
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
+    ),
+    # -------------------------------------------------------------------------
+    # Section F: Optional VR 70 Mixer / Expansion Module (52.vr_70)
+    # -------------------------------------------------------------------------
+    SaunierGeniaSensorEntityDescription(
+        key="vr70_sensor_s1",
+        translation_key="vr70_sensor_s1",
+        device_key=DEVICE_MIXER_MODULE,
+        circuit=CIRCUIT_VR70,
+        message="SensorData",
+        field="s1",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        requires_vr70=True,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="vr70_sensor_s2",
+        translation_key="vr70_sensor_s2",
+        device_key=DEVICE_MIXER_MODULE,
+        circuit=CIRCUIT_VR70,
+        message="SensorData",
+        field="s2",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        requires_vr70=True,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="vr70_sensor_s3",
+        translation_key="vr70_sensor_s3",
+        device_key=DEVICE_MIXER_MODULE,
+        circuit=CIRCUIT_VR70,
+        message="SensorData",
+        field="s3",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        requires_vr70=True,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="vr70_sensor_s4",
+        translation_key="vr70_sensor_s4",
+        device_key=DEVICE_MIXER_MODULE,
+        circuit=CIRCUIT_VR70,
+        message="SensorData",
+        field="s4",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        requires_vr70=True,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="vr70_sensor_s5",
+        translation_key="vr70_sensor_s5",
+        device_key=DEVICE_MIXER_MODULE,
+        circuit=CIRCUIT_VR70,
+        message="SensorData",
+        field="s5",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        requires_vr70=True,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="vr70_sensor_s6",
+        translation_key="vr70_sensor_s6",
+        device_key=DEVICE_MIXER_MODULE,
+        circuit=CIRCUIT_VR70,
+        message="SensorData",
+        field="s6",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        requires_vr70=True,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="vr70_mc1_flow_temp_desired",
+        translation_key="vr70_mc1_flow_temp_desired",
+        device_key=DEVICE_MIXER_MODULE,
+        circuit=CIRCUIT_VR70,
+        message="Mc1Operation",
+        field="flowtempdesired",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        requires_vr70=True,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="vr70_mc1_mixer_position",
+        translation_key="vr70_mc1_mixer_position",
+        device_key=DEVICE_MIXER_MODULE,
+        circuit=CIRCUIT_VR70,
+        message="Mc1Operation",
+        field="mixer",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        is_integer=True,
+        requires_vr70=True,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="vr70_mc2_flow_temp_desired",
+        translation_key="vr70_mc2_flow_temp_desired",
+        device_key=DEVICE_MIXER_MODULE,
+        circuit=CIRCUIT_VR70,
+        message="Mc2Operation",
+        field="flowtempdesired",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        entity_registry_enabled_default=False,
+        requires_vr70=True,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="vr70_mc2_mixer_position",
+        translation_key="vr70_mc2_mixer_position",
+        device_key=DEVICE_MIXER_MODULE,
+        circuit=CIRCUIT_VR70,
+        message="Mc2Operation",
+        field="mixer",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        is_integer=True,
+        entity_registry_enabled_default=False,
+        requires_vr70=True,
+    ),
+    SaunierGeniaSensorEntityDescription(
+        key="vr70_current_error",
+        translation_key="vr70_current_error",
+        device_key=DEVICE_MIXER_MODULE,
+        circuit=CIRCUIT_VR70,
+        message="Currenterror",
+        field="error",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=_get_vr70_error,
+        requires_vr70=True,
     ),
 )
 

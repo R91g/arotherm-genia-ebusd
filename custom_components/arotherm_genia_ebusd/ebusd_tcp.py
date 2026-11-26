@@ -7,9 +7,14 @@ import contextlib
 import importlib
 import inspect
 import logging
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from .const import DEFAULT_EBUSD_TCP_PORT
+from .const import (
+    DEFAULT_EBUSD_TCP_PORT,
+    MANUFACTURER_SAUNIER_DUVAL,
+    MANUFACTURER_VAILLANT,
+)
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -406,6 +411,153 @@ async def async_probe_ebusd_tcp(
                         cand_port,
                     )
                     return cand_host, cand_port
+        except (TimeoutError, OSError):
+            continue
+        finally:
+            if writer is not None:
+                writer.close()
+                with contextlib.suppress(OSError):
+                    await writer.wait_closed()
+
+    return None
+
+
+@dataclass(frozen=True, slots=True)
+class EbusdBusHardware:
+    """Hardware topology auto-detected from an eBUSd TCP `info` probe."""
+
+    endpoint: tuple[str, int]
+    has_migo_link: bool | None = None
+    has_wireless_room_unit: bool | None = None
+    has_vr70: bool | None = None
+    manufacturer: str | None = None
+
+
+def parse_ebusd_info_hardware(
+    lines: list[str],
+    endpoint: tuple[str, int],
+) -> EbusdBusHardware:
+    """Parse eBUSd `info` lines into detected bus accessories and manufacturer.
+
+    Only sets boolean accessory flags when eBUS signal is acquired and at least
+    one non-ebusd slave device has been scanned, avoiding false negatives on a
+    cold/unscanned bus.
+    """
+    signal_acquired: bool | None = None
+    master_addrs: set[str] = set()
+    scanned_devices: dict[str, tuple[str, str]] = {}
+
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line:
+            continue
+        low = line.lower()
+        if low.startswith("signal:"):
+            signal_acquired = "acquired" in low
+            continue
+        if not low.startswith("address ") or ":" not in line:
+            continue
+        addr_part, _, rest = line.partition(":")
+        addr = addr_part[len("address ") :].strip().lower()
+        rest_low = rest.lower()
+        if "ebusd" in rest_low:
+            continue
+        if "master" in rest_low:
+            master_addrs.add(addr)
+        if 'scanned "' in rest:
+            scanned_str = rest.partition('scanned "')[2].partition('"')[0]
+            fields = dict(
+                item.split("=", 1) for item in scanned_str.split(";") if "=" in item
+            )
+            dev_id = fields.get("ID", "").strip().upper()
+            loaded_csv = (
+                rest.partition(', loaded "')[2].partition('"')[0].strip().lower()
+                if ', loaded "' in rest
+                else ""
+            )
+            scanned_devices[addr] = (dev_id, loaded_csv)
+
+    if signal_acquired is False or not scanned_devices:
+        return EbusdBusHardware(endpoint=endpoint)
+
+    f6_id, f6_csv = scanned_devices.get("f6", ("", ""))
+    addr04_id, addr04_csv = scanned_devices.get("04", ("", ""))
+
+    has_migo_link = "f1" in master_addrs or f6_id.startswith(("NETX", "VR9"))
+    has_wireless_room_unit = ("NETX3" in addr04_id or "04.netx3" in addr04_csv) or (
+        "NETX3" in f6_id or "f6.netx3" in f6_csv
+    )
+    has_vr70 = any(
+        "VR_70" in dev_id or "vr_70" in loaded_csv
+        for addr, (dev_id, loaded_csv) in scanned_devices.items()
+        if addr in ("52", "53")
+    )
+
+    manufacturer: str | None = None
+    ctrl_id = scanned_devices.get("15", ("", ""))[0]
+    if ctrl_id == "BASS3":
+        manufacturer = MANUFACTURER_SAUNIER_DUVAL
+    elif ctrl_id in ("BASV3", "CTLV2", "CTLV3"):
+        manufacturer = MANUFACTURER_VAILLANT
+
+    return EbusdBusHardware(
+        endpoint=endpoint,
+        has_migo_link=has_migo_link,
+        has_wireless_room_unit=has_wireless_room_unit,
+        has_vr70=has_vr70,
+        manufacturer=manufacturer,
+    )
+
+
+async def async_probe_ebusd_bus_hardware(
+    hass: HomeAssistant | None,
+    configured_host: str | None = None,
+    port: int = DEFAULT_EBUSD_TCP_PORT,
+    timeout: float = DEFAULT_TCP_PROBE_TIMEOUT,
+) -> EbusdBusHardware | None:
+    """Probe eBUSd TCP candidates and parse `info` to pre-detect bus hardware."""
+    candidates = await async_get_ebusd_tcp_candidates(hass, configured_host, port)
+
+    for cand_host, cand_port in candidates:
+        writer: asyncio.StreamWriter | None = None
+        try:
+            connect_coro = asyncio.open_connection(cand_host, cand_port)
+            reader, writer = await asyncio.wait_for(connect_coro, timeout=timeout)
+            writer.write(b"info\n")
+            await asyncio.wait_for(writer.drain(), timeout=timeout)
+
+            lines: list[str] = []
+            is_ebusd = False
+            for _ in range(80):
+                try:
+                    line_bytes = await asyncio.wait_for(
+                        reader.readline(), timeout=timeout
+                    )
+                except TimeoutError:
+                    break
+                if not line_bytes:
+                    break
+                decoded = line_bytes.decode("ascii", errors="replace").strip()
+                if not decoded:
+                    if lines:
+                        break
+                    continue
+                lines.append(decoded)
+                if any(marker in decoded.lower() for marker in _EBUSD_INFO_MARKERS):
+                    is_ebusd = True
+
+            if is_ebusd:
+                detected = parse_ebusd_info_hardware(lines, (cand_host, cand_port))
+                _LOGGER.info(
+                    "Auto-detected eBUSd hardware at %s:%s (manufacturer=%s, gateway=%s, wireless=%s, vr70=%s)",
+                    cand_host,
+                    cand_port,
+                    detected.manufacturer,
+                    detected.has_migo_link,
+                    detected.has_wireless_room_unit,
+                    detected.has_vr70,
+                )
+                return detected
         except (TimeoutError, OSError):
             continue
         finally:

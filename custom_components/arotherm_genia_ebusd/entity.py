@@ -15,6 +15,7 @@ from .const import (
     CIRCUIT_GLOBAL,
     DEVICE_CLIMATE_CONTROLLER,
     DEVICE_HYDRAULIC_INTERFACE,
+    DEVICE_MIXER_MODULE,
     DEVICE_OUTDOOR_UNIT,
     DEVICE_WIRELESS_THERMOSTAT,
     DOMAIN,
@@ -109,6 +110,25 @@ def build_device_info(
             "name": display_name,
             "manufacturer": manufacturer,
             "model": INDOOR_MODEL_SPECS.get(indoor_model, indoor_model),
+            "sw_version": sw_version,
+            "hw_version": hw_version,
+            "serial_number": serial_number,
+        }
+        if outdoor_device_id:
+            info_kwargs["via_device_id"] = outdoor_device_id
+        return DeviceInfo(**info_kwargs)
+
+    if device_key == DEVICE_MIXER_MODULE:
+        mixer_name = (
+            "VR 70 (Mixer / Expansion Module)"
+            if is_vaillant
+            else "VR 70 / RED-3 (Mixer / Expansion Module)"
+        )
+        info_kwargs = {
+            "identifiers": {(DOMAIN, f"{entry_id}_{DEVICE_MIXER_MODULE}")},
+            "name": mixer_name,
+            "manufacturer": manufacturer,
+            "model": "Expansion / Mixer Module VR 70 (52.vr_70)",
             "sw_version": sw_version,
             "hw_version": hw_version,
             "serial_number": serial_number,

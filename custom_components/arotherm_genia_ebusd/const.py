@@ -184,6 +184,9 @@ DEFAULT_HAS_WIRELESS_ROOM_UNIT = True
 CONF_HAS_MIGO_LINK = "has_migo_link"
 DEFAULT_HAS_MIGO_LINK = True
 
+CONF_HAS_VR70 = "has_vr70"
+DEFAULT_HAS_VR70 = False
+
 # Options keys and defaults (OptionsFlow)
 CONF_FORCE_DHW_BOOST = "force_dhw_boost"
 DEFAULT_FORCE_DHW_BOOST = True
@@ -217,6 +220,7 @@ DEVICE_OUTDOOR_UNIT = "outdoor_unit"
 DEVICE_CLIMATE_CONTROLLER = "climate_controller"
 DEVICE_HYDRAULIC_INTERFACE = "hydraulic_interface"
 DEVICE_WIRELESS_THERMOSTAT = "wireless_thermostat"
+DEVICE_MIXER_MODULE = "mixer_module"
 
 # eBUS Circuits
 CIRCUIT_HMUX0 = "hmux0"
@@ -236,6 +240,7 @@ CONTROLLER_CIRCUITS: tuple[str, ...] = (
 # Controllers whose b5 55 schedule firmware enforces 10-minute time increments
 TEN_MINUTE_STEP_CONTROLLER_CIRCUITS: frozenset[str] = frozenset({CIRCUIT_CTLV2})
 CIRCUIT_VWZIO = "vwzio"
+CIRCUIT_VR70 = "vr_70"
 CIRCUIT_NETX3 = "04"
 CIRCUIT_NETX3_ALT = "f6"
 CIRCUIT_BROADCAST = "broadcast"
@@ -274,6 +279,7 @@ for _day in (
 SCAN_ADDRESS_TO_DEVICE_KEY: dict[str, str] = {
     "08": DEVICE_OUTDOOR_UNIT,
     "15": DEVICE_CLIMATE_CONTROLLER,
+    "52": DEVICE_MIXER_MODULE,
     "76": DEVICE_HYDRAULIC_INTERFACE,
     "04": DEVICE_WIRELESS_THERMOSTAT,
     "f6": DEVICE_WIRELESS_THERMOSTAT,
@@ -282,11 +288,13 @@ SCAN_ADDRESS_TO_DEVICE_KEY: dict[str, str] = {
 SCAN_TOPIC_CIRCUITS: tuple[str, ...] = (
     "scan.08",
     "scan.15",
+    "scan.52",
     "scan.76",
     "scan.04",
     "scan.f6",
     "Scan.08",
     "Scan.15",
+    "Scan.52",
     "Scan.76",
     "Scan.04",
     "Scan.f6",

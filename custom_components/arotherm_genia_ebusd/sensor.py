@@ -53,6 +53,8 @@ async def async_setup_entry(
             and not coordinator.has_wireless_room_unit
         ):
             continue
+        if description.requires_vr70 and not coordinator.has_vr70:
+            continue
         entities.append(SaunierGeniaSensor(coordinator, description))
 
     # Weekly schedule summary entities (aggregates the 7 daily time slots into weekly timetable sensors)

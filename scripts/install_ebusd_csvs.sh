@@ -39,6 +39,7 @@ vaillant/15.bass3.csv
 vaillant/15.basv3.csv
 vaillant/15.ctlv2.csv
 vaillant/15.ctlv3.csv
+vaillant/52.vr_70.csv
 vaillant/76.vwzio.csv
 vaillant/f6.netx3.csv
 "

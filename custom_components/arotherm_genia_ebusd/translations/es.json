@@ -23,7 +23,8 @@
           "outdoor_model": "Modelo de unidad exterior (Bomba de Calor)",
           "indoor_model": "Modelo de interfaz / módulo hidráulico interior",
           "has_wireless_room_unit": "Termostato de ambiente inalámbrico (receptor radio 04.netx3)",
-          "has_migo_link": "Pasarela oficial en nube (MiGo Link / myVAILLANT connect en eBUS f1)"
+          "has_migo_link": "Pasarela oficial en nube (MiGo Link / myVAILLANT connect en eBUS f1)",
+          "has_vr70": "Módulo mezclador / expansión VR 70 (52.vr_70)"
         }
       },
       "ebusd_tcp": {
@@ -54,7 +55,8 @@
           "outdoor_model": "Modelo de unidad exterior (Bomba de Calor)",
           "indoor_model": "Modelo de interfaz / módulo hidráulico interior",
           "has_wireless_room_unit": "Termostato de ambiente inalámbrico (receptor radio 04.netx3)",
-          "has_migo_link": "Pasarela oficial en nube (MiGo Link / myVAILLANT connect en eBUS f1)"
+          "has_migo_link": "Pasarela oficial en nube (MiGo Link / myVAILLANT connect en eBUS f1)",
+          "has_vr70": "Módulo mezclador / expansión VR 70 (52.vr_70)"
         }
       },
       "reconfigure_ebusd_tcp": {
@@ -474,6 +476,12 @@
       },
       "system_health_alert": {
         "name": "Alerta de salud del sistema"
+      },
+      "vr70_mc1_pump": {
+        "name": "VR 70 Bomba Circuito Mezclador 1"
+      },
+      "vr70_mc2_pump": {
+        "name": "VR 70 Bomba Circuito Mezclador 2"
       }
     },
     "sensor": {
@@ -1027,6 +1035,39 @@
           "zone": "Bomba de zona",
           "legiopump": "Bomba antilegionela"
         }
+      },
+      "vr70_sensor_s1": {
+        "name": "VR 70 Sonda S1"
+      },
+      "vr70_sensor_s2": {
+        "name": "VR 70 Sonda S2"
+      },
+      "vr70_sensor_s3": {
+        "name": "VR 70 Sonda S3"
+      },
+      "vr70_sensor_s4": {
+        "name": "VR 70 Sonda S4"
+      },
+      "vr70_sensor_s5": {
+        "name": "VR 70 Sonda S5"
+      },
+      "vr70_sensor_s6": {
+        "name": "VR 70 Sonda S6"
+      },
+      "vr70_mc1_flow_temp_desired": {
+        "name": "VR 70 MC1 Consigna Impulsión"
+      },
+      "vr70_mc1_mixer_position": {
+        "name": "VR 70 MC1 Posición Mezcladora"
+      },
+      "vr70_mc2_flow_temp_desired": {
+        "name": "VR 70 MC2 Consigna Impulsión"
+      },
+      "vr70_mc2_mixer_position": {
+        "name": "VR 70 MC2 Posición Mezcladora"
+      },
+      "vr70_current_error": {
+        "name": "VR 70 Error Activo"
       }
     },
     "button": {

@@ -34,6 +34,7 @@ from .const import (
     CONF_FALLBACK_POLL_INTERVAL,
     CONF_FORCE_DHW_BOOST,
     CONF_HAS_MIGO_LINK,
+    CONF_HAS_VR70,
     CONF_HAS_WIRELESS_ROOM_UNIT,
     CONF_INDOOR_MODEL,
     CONF_MANUFACTURER,
@@ -49,6 +50,7 @@ from .const import (
     DEFAULT_FALLBACK_POLL_INTERVAL,
     DEFAULT_FORCE_DHW_BOOST,
     DEFAULT_HAS_MIGO_LINK,
+    DEFAULT_HAS_VR70,
     DEFAULT_HAS_WIRELESS_ROOM_UNIT,
     DEFAULT_INDOOR_MODEL_SAUNIER,
     DEFAULT_INDOOR_MODEL_VAILLANT,
@@ -65,7 +67,12 @@ from .const import (
     OUTDOOR_MODELS_SAUNIER,
     SECTION_ADVANCED_OPTIONS,
 )
-from .ebusd_tcp import LOOPBACK_HOSTS, async_probe_ebusd_tcp
+from .ebusd_tcp import (
+    LOOPBACK_HOSTS,
+    EbusdBusHardware,
+    async_probe_ebusd_bus_hardware,
+    async_probe_ebusd_tcp,
+)
 
 
 class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):  # pyright: ignore[reportCallIssue, reportGeneralTypeIssues]
@@ -84,6 +91,26 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):  # pyright: ignore[repo
         self._tcp_initial_port: int = DEFAULT_EBUSD_TCP_PORT
         self._tcp_last_rendered_enabled: bool = False
         self._tcp_last_rendered_host: str = ""
+        self._bus_hardware_probed: bool = False
+        self._bus_hardware: EbusdBusHardware | None = None
+
+    async def _async_detect_bus_hardware_once(
+        self,
+        configured_host: str | None = None,
+        port: int = DEFAULT_EBUSD_TCP_PORT,
+    ) -> EbusdBusHardware | None:
+        """Probe eBUSd `info` at most once per flow to pre-fill hardware toggles."""
+        if self._bus_hardware_probed:
+            return self._bus_hardware
+        self._bus_hardware_probed = True
+        if getattr(self, "hass", None) is None:
+            return None
+        self._bus_hardware = await async_probe_ebusd_bus_hardware(
+            self.hass,
+            configured_host=configured_host,
+            port=port,
+        )
+        return self._bus_hardware
 
     @staticmethod
     def _build_ebusd_tcp_schema(
@@ -156,7 +183,17 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):  # pyright: ignore[repo
         self._tcp_detected_endpoint = None
 
         host_default = raw_host
-        if getattr(self, "hass", None) is not None and (
+        if (
+            existing_options is None
+            and self._bus_hardware is not None
+            and self._bus_hardware.endpoint is not None
+        ):
+            detected_host, detected_port = self._bus_hardware.endpoint
+            self._tcp_detected_endpoint = (detected_host, detected_port)
+            host_default = detected_host
+            port_default = detected_port
+            enable_default = True
+        elif getattr(self, "hass", None) is not None and (
             existing_options is None
             or (not enable_default and not tcp_explicitly_configured)
             or raw_host in ("", *LOOPBACK_HOSTS)
@@ -300,13 +337,20 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):  # pyright: ignore[repo
                 )
                 return await self.async_step_models()
 
+        detected_hw = await self._async_detect_bus_hardware_once()
+        default_manufacturer = (
+            detected_hw.manufacturer
+            if detected_hw is not None and detected_hw.manufacturer in MANUFACTURERS
+            else DEFAULT_MANUFACTURER
+        )
+
         schema = vol.Schema(
             {
                 vol.Required(
                     CONF_MQTT_PREFIX, default=DEFAULT_MQTT_PREFIX
                 ): TextSelector(),
                 vol.Required(
-                    CONF_MANUFACTURER, default=DEFAULT_MANUFACTURER
+                    CONF_MANUFACTURER, default=default_manufacturer
                 ): SelectSelector(
                     SelectSelectorConfig(
                         options=MANUFACTURERS,
@@ -332,6 +376,7 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):  # pyright: ignore[repo
                 CONF_INDOOR_MODEL: user_input[CONF_INDOOR_MODEL],
                 CONF_HAS_WIRELESS_ROOM_UNIT: user_input[CONF_HAS_WIRELESS_ROOM_UNIT],
                 CONF_HAS_MIGO_LINK: user_input[CONF_HAS_MIGO_LINK],
+                CONF_HAS_VR70: bool(user_input.get(CONF_HAS_VR70, DEFAULT_HAS_VR70)),
             }
             return await self.async_step_ebusd_tcp()
 
@@ -353,6 +398,24 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):  # pyright: ignore[repo
             else DEFAULT_INDOOR_MODEL_SAUNIER
         )
 
+        detected_hw = await self._async_detect_bus_hardware_once()
+        default_wireless = (
+            detected_hw.has_wireless_room_unit
+            if detected_hw is not None
+            and detected_hw.has_wireless_room_unit is not None
+            else DEFAULT_HAS_WIRELESS_ROOM_UNIT
+        )
+        default_migo_link = (
+            detected_hw.has_migo_link
+            if detected_hw is not None and detected_hw.has_migo_link is not None
+            else DEFAULT_HAS_MIGO_LINK
+        )
+        default_vr70 = (
+            detected_hw.has_vr70
+            if detected_hw is not None and detected_hw.has_vr70 is not None
+            else DEFAULT_HAS_VR70
+        )
+
         schema = vol.Schema(
             {
                 vol.Required(
@@ -371,11 +434,15 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):  # pyright: ignore[repo
                 ),
                 vol.Required(
                     CONF_HAS_WIRELESS_ROOM_UNIT,
-                    default=DEFAULT_HAS_WIRELESS_ROOM_UNIT,
+                    default=default_wireless,
                 ): BooleanSelector(),
                 vol.Required(
                     CONF_HAS_MIGO_LINK,
-                    default=DEFAULT_HAS_MIGO_LINK,
+                    default=default_migo_link,
+                ): BooleanSelector(),
+                vol.Required(
+                    CONF_HAS_VR70,
+                    default=default_vr70,
                 ): BooleanSelector(),
             }
         )
@@ -481,6 +548,12 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):  # pyright: ignore[repo
                 CONF_INDOOR_MODEL: user_input[CONF_INDOOR_MODEL],
                 CONF_HAS_WIRELESS_ROOM_UNIT: user_input[CONF_HAS_WIRELESS_ROOM_UNIT],
                 CONF_HAS_MIGO_LINK: user_input[CONF_HAS_MIGO_LINK],
+                CONF_HAS_VR70: bool(
+                    user_input.get(
+                        CONF_HAS_VR70,
+                        entry.data.get(CONF_HAS_VR70, DEFAULT_HAS_VR70),
+                    )
+                ),
             }
             return await self.async_step_reconfigure_ebusd_tcp()
 
@@ -508,6 +581,26 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):  # pyright: ignore[repo
         if default_indoor not in indoor_models:
             default_indoor = indoor_models[0]
 
+        if CONF_HAS_VR70 in entry.data:
+            default_vr70 = bool(entry.data[CONF_HAS_VR70])
+        else:
+            existing_host = (
+                str(entry.options.get(CONF_EBUSD_TCP_HOST) or "").strip() or None
+            )
+            existing_port = int(
+                entry.options.get(CONF_EBUSD_TCP_PORT, DEFAULT_EBUSD_TCP_PORT)
+                or DEFAULT_EBUSD_TCP_PORT
+            )
+            detected_hw = await self._async_detect_bus_hardware_once(
+                configured_host=existing_host,
+                port=existing_port,
+            )
+            default_vr70 = (
+                detected_hw.has_vr70
+                if detected_hw is not None and detected_hw.has_vr70 is not None
+                else DEFAULT_HAS_VR70
+            )
+
         schema = vol.Schema(
             {
                 vol.Required(
@@ -533,6 +626,10 @@ class SaunierGeniaConfigFlow(ConfigFlow, domain=DOMAIN):  # pyright: ignore[repo
                 vol.Required(
                     CONF_HAS_MIGO_LINK,
                     default=entry.data.get(CONF_HAS_MIGO_LINK, DEFAULT_HAS_MIGO_LINK),
+                ): BooleanSelector(),
+                vol.Required(
+                    CONF_HAS_VR70,
+                    default=default_vr70,
                 ): BooleanSelector(),
             }
         )

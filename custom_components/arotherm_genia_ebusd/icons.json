@@ -276,6 +276,20 @@
           "on": "mdi:shield-alert",
           "off": "mdi:shield-check-outline"
         }
+      },
+      "vr70_mc1_pump": {
+        "default": "mdi:pump",
+        "state": {
+          "on": "mdi:pump",
+          "off": "mdi:pump-off"
+        }
+      },
+      "vr70_mc2_pump": {
+        "default": "mdi:pump",
+        "state": {
+          "on": "mdi:pump",
+          "off": "mdi:pump-off"
+        }
       }
     },
     "sensor": {
@@ -815,6 +829,39 @@
       },
       "multi_relay_setting": {
         "default": "mdi:electric-switch"
+      },
+      "vr70_sensor_s1": {
+        "default": "mdi:thermometer"
+      },
+      "vr70_sensor_s2": {
+        "default": "mdi:thermometer"
+      },
+      "vr70_sensor_s3": {
+        "default": "mdi:thermometer"
+      },
+      "vr70_sensor_s4": {
+        "default": "mdi:thermometer"
+      },
+      "vr70_sensor_s5": {
+        "default": "mdi:thermometer"
+      },
+      "vr70_sensor_s6": {
+        "default": "mdi:thermometer"
+      },
+      "vr70_mc1_flow_temp_desired": {
+        "default": "mdi:thermometer-chevron-up"
+      },
+      "vr70_mc1_mixer_position": {
+        "default": "mdi:valve"
+      },
+      "vr70_mc2_flow_temp_desired": {
+        "default": "mdi:thermometer-chevron-up"
+      },
+      "vr70_mc2_mixer_position": {
+        "default": "mdi:valve"
+      },
+      "vr70_current_error": {
+        "default": "mdi:alert-circle-outline"
       }
     },
     "number": {

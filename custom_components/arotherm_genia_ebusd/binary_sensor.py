@@ -22,9 +22,11 @@ from .const import (
     CIRCUIT_BROADCAST,
     CIRCUIT_GLOBAL,
     CIRCUIT_HMUX0,
+    CIRCUIT_VR70,
     CIRCUIT_VWZIO,
     CONTROLLER_CIRCUITS,
     DEVICE_CLIMATE_CONTROLLER,
+    DEVICE_MIXER_MODULE,
     DEVICE_OUTDOOR_UNIT,
     DOMAIN,
     HMU_FAULT_STATUS_CODES,
@@ -37,6 +39,7 @@ from .entity import SaunierGeniaEntity
 from .sensor_descriptions import (
     _get_controller_error,
     _get_outdoor_error,
+    _get_vr70_error,
     _get_vwzio_error,
 )
 
@@ -51,6 +54,7 @@ class SaunierGeniaBinarySensorEntityDescription(BinarySensorEntityDescription):
     field: str
     is_on_fn: Callable[[SaunierGeniaCoordinator], bool | None]
     attr_fn: Callable[[SaunierGeniaCoordinator], dict[str, Any]] | None = None
+    requires_vr70: bool = False
 
 
 def _check_compressor_active(coord: SaunierGeniaCoordinator) -> bool | None:
@@ -207,12 +211,29 @@ def _get_system_water_pressure(coord: SaunierGeniaCoordinator) -> float | None:
     return round(pressure, 2) if pressure is not None else None
 
 
+def _check_vr70_mc1_pump(coord: SaunierGeniaCoordinator) -> bool | None:
+    """Return True if VR 70 mixer circuit 1 pump is running."""
+    val = coord.get_str(CIRCUIT_VR70, "Mc1Operation", "pump")
+    if val is None:
+        return None
+    return val.lower() in ("on", "1", "true", "yes")
+
+
+def _check_vr70_mc2_pump(coord: SaunierGeniaCoordinator) -> bool | None:
+    """Return True if VR 70 mixer circuit 2 pump is running."""
+    val = coord.get_str(CIRCUIT_VR70, "Mc2Operation", "pump")
+    if val is None:
+        return None
+    return val.lower() in ("on", "1", "true", "yes")
+
+
 def _check_active_fault(coord: SaunierGeniaCoordinator) -> bool | None:
     """Return True if any board reports Currenterror or HMUStatusCode is a fault code, False if OK, None if unhydrated."""
     statuses = (
         _get_outdoor_error(coord),
         _get_controller_error(coord),
         _get_vwzio_error(coord),
+        _get_vr70_error(coord),
     )
     reported = [s for s in statuses if s is not None]
     hmu_status = coord.get_str(CIRCUIT_HMUX0, "HMUStatusCode", "status")
@@ -229,6 +250,7 @@ def _get_active_fault_attrs(coord: SaunierGeniaCoordinator) -> dict[str, Any]:
         "outdoor_unit": _get_outdoor_error(coord),
         "climate_controller": _get_controller_error(coord),
         "hydraulic_interface": _get_vwzio_error(coord),
+        "mixer_module": _get_vr70_error(coord),
         "hmu_fault_status": _get_hmu_fault_status(coord),
     }
     return {k: v for k, v in attrs.items() if v is not None}
@@ -241,6 +263,7 @@ def _evaluate_system_health(
     outdoor_err = _get_outdoor_error(coord)
     controller_err = _get_controller_error(coord)
     hydraulic_err = _get_vwzio_error(coord)
+    vr70_err = _get_vr70_error(coord)
     hmu_raw = coord.get_str(CIRCUIT_HMUX0, "HMUStatusCode", "status")
     hmu_fault = _get_hmu_fault_status(coord)
     pressure = _get_system_water_pressure(coord)
@@ -254,7 +277,14 @@ def _evaluate_system_health(
     any_hydrated = (
         any(
             x is not None
-            for x in (outdoor_err, controller_err, hydraulic_err, hmu_raw, pressure)
+            for x in (
+                outdoor_err,
+                controller_err,
+                hydraulic_err,
+                vr70_err,
+                hmu_raw,
+                pressure,
+            )
         )
         or ebus_known
     )
@@ -268,6 +298,8 @@ def _evaluate_system_health(
         alerts.append("controller_fault")
     if hydraulic_err is not None and hydraulic_err != "OK":
         alerts.append("hydraulic_fault")
+    if vr70_err is not None and vr70_err != "OK":
+        alerts.append("mixer_module_fault")
     if hmu_fault is not None:
         alerts.append("hmu_status_fault")
     if pressure is not None:
@@ -291,6 +323,8 @@ def _evaluate_system_health(
         attrs["climate_controller_error"] = controller_err
     if hydraulic_err is not None:
         attrs["hydraulic_interface_error"] = hydraulic_err
+    if vr70_err is not None:
+        attrs["mixer_module_error"] = vr70_err
     if hmu_fault is not None:
         attrs["hmu_fault_status"] = hmu_fault
 
@@ -468,6 +502,29 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[SaunierGeniaBinarySensorEntityDescription, ...
         is_on_fn=_check_system_health_alert,
         attr_fn=_get_system_health_alert_attrs,
     ),
+    SaunierGeniaBinarySensorEntityDescription(
+        key="vr70_mc1_pump",
+        translation_key="vr70_mc1_pump",
+        device_key=DEVICE_MIXER_MODULE,
+        circuit=CIRCUIT_VR70,
+        message="Mc1Operation",
+        field="pump",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        is_on_fn=_check_vr70_mc1_pump,
+        requires_vr70=True,
+    ),
+    SaunierGeniaBinarySensorEntityDescription(
+        key="vr70_mc2_pump",
+        translation_key="vr70_mc2_pump",
+        device_key=DEVICE_MIXER_MODULE,
+        circuit=CIRCUIT_VR70,
+        message="Mc2Operation",
+        field="pump",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        entity_registry_enabled_default=False,
+        is_on_fn=_check_vr70_mc2_pump,
+        requires_vr70=True,
+    ),
 )
 
 
@@ -479,10 +536,11 @@ async def async_setup_entry(
     """Set up Saunier Duval eBUSd Binary Sensor entities."""
     coordinator: SaunierGeniaCoordinator = hass.data[DOMAIN][entry.entry_id]
     # Entity Factory: Instantiate diagnostic binary sensors (compressor state, primary pump,
-    # heating demand, cooling lock release, and physical eBUS bus signal quality).
+    # heating demand, cooling lock release, physical eBUS bus signal quality, and optional VR 70 pumps).
     async_add_entities(
         SaunierGeniaBinarySensor(coordinator, description)
         for description in BINARY_SENSOR_DESCRIPTIONS
+        if not (description.requires_vr70 and not coordinator.has_vr70)
     )
 
 
@@ -506,12 +564,14 @@ class SaunierGeniaBinarySensor(SaunierGeniaEntity, BinarySensorEntity):
             subs.extend([(c, "HMUStatusCode") for c in OUTDOOR_CIRCUITS])
             subs.extend([(c, "Currenterror") for c in CONTROLLER_CIRCUITS])
             subs.append((CIRCUIT_VWZIO, "Currenterror"))
+            subs.append((CIRCUIT_VR70, "Currenterror"))
         elif description.key == "system_health_alert":
             subs.extend([(c, "Currenterror") for c in OUTDOOR_CIRCUITS])
             subs.extend([(c, "HMUStatusCode") for c in OUTDOOR_CIRCUITS])
             subs.extend([(c, "FlowPressure") for c in OUTDOOR_CIRCUITS])
             subs.extend([(c, "Currenterror") for c in CONTROLLER_CIRCUITS])
             subs.append((CIRCUIT_VWZIO, "Currenterror"))
+            subs.append((CIRCUIT_VR70, "Currenterror"))
             subs.append((CIRCUIT_BASS3, "WaterPressure"))
             subs.append((CIRCUIT_GLOBAL, "running"))
             subs.append((CIRCUIT_GLOBAL, "signal"))

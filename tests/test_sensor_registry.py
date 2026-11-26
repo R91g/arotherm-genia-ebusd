@@ -21,10 +21,12 @@ from custom_components.arotherm_genia_ebusd.const import (
     CIRCUIT_HMUX0,
     CIRCUIT_NETX3,
     CIRCUIT_NETX3_ALT,
+    CIRCUIT_VR70,
     CIRCUIT_VWZIO,
     DEPRECATED_UNIQUE_ID_SUFFIXES,
     DEVICE_CLIMATE_CONTROLLER,
     DEVICE_HYDRAULIC_INTERFACE,
+    DEVICE_MIXER_MODULE,
     DEVICE_OUTDOOR_UNIT,
     DEVICE_WIRELESS_THERMOSTAT,
     HMUX0_ONLY_SENSOR_UNIQUE_ID_SUFFIXES,
@@ -51,6 +53,7 @@ class TestSensorRegistry(unittest.TestCase):
             CIRCUIT_HMUX0,
             CIRCUIT_BASS3,
             CIRCUIT_VWZIO,
+            CIRCUIT_VR70,
             CIRCUIT_NETX3,
             CIRCUIT_NETX3_ALT,
             CIRCUIT_BROADCAST,
@@ -61,6 +64,7 @@ class TestSensorRegistry(unittest.TestCase):
             DEVICE_OUTDOOR_UNIT,
             DEVICE_CLIMATE_CONTROLLER,
             DEVICE_HYDRAULIC_INTERFACE,
+            DEVICE_MIXER_MODULE,
             DEVICE_WIRELESS_THERMOSTAT,
         }
 
@@ -883,6 +887,156 @@ class TestSensorRegistry(unittest.TestCase):
                 referenced_inputs.issubset(declared_inputs),
                 f"{filename} references undeclared !input(s): {referenced_inputs - declared_inputs}",
             )
+
+    def test_vr70_optional_device_gating_and_telemetry(self) -> None:
+        """Verify optional VR 70 device/entities are gated by has_vr70 and decode SensorData/Mc1/Currenterror."""
+        import asyncio
+        from unittest.mock import MagicMock
+
+        from custom_components.arotherm_genia_ebusd.binary_sensor import (
+            SaunierGeniaBinarySensor,
+        )
+        from custom_components.arotherm_genia_ebusd.binary_sensor import (
+            async_setup_entry as async_setup_binary_sensors,
+        )
+        from custom_components.arotherm_genia_ebusd.const import (
+            CONF_HAS_VR70,
+            DOMAIN,
+            MANUFACTURER_VAILLANT,
+        )
+        from custom_components.arotherm_genia_ebusd.coordinator import (
+            SaunierGeniaCoordinator,
+        )
+        from custom_components.arotherm_genia_ebusd.entity import build_device_info
+        from custom_components.arotherm_genia_ebusd.sensor import (
+            SaunierGeniaSensor,
+        )
+        from custom_components.arotherm_genia_ebusd.sensor import (
+            async_setup_entry as async_setup_sensors,
+        )
+
+        def _make_coord(
+            has_vr70: bool,
+        ) -> tuple[MagicMock, MagicMock, SaunierGeniaCoordinator]:
+            hass = MagicMock()
+            entry = MagicMock()
+            entry.entry_id = f"vr70_test_{has_vr70}"
+            entry.data = {
+                "mqtt_prefix": "ebusd",
+                "manufacturer": MANUFACTURER_VAILLANT,
+                CONF_HAS_VR70: has_vr70,
+            }
+            entry.options = {}
+            coord = SaunierGeniaCoordinator(hass, entry)
+            hass.data = {DOMAIN: {entry.entry_id: coord}}
+            return hass, entry, coord
+
+        # 1. Disabled by default: zero VR 70 sensors or binary sensors created
+        hass_off, entry_off, _ = _make_coord(False)
+        sensors_off: list = []
+        bins_off: list = []
+        asyncio.run(async_setup_sensors(hass_off, entry_off, sensors_off.extend))
+        asyncio.run(async_setup_binary_sensors(hass_off, entry_off, bins_off.extend))
+        self.assertFalse(
+            any(
+                isinstance(e, SaunierGeniaSensor)
+                and e.entity_description.device_key == DEVICE_MIXER_MODULE
+                for e in sensors_off
+            )
+        )
+        self.assertFalse(
+            any(
+                isinstance(e, SaunierGeniaBinarySensor)
+                and e.entity_description.device_key == DEVICE_MIXER_MODULE
+                for e in bins_off
+            )
+        )
+
+        # 2. Enabled: all 11 VR 70 sensors + 2 VR 70 binary sensors created on DEVICE_MIXER_MODULE
+        hass_on, entry_on, coord = _make_coord(True)
+        sensors_on: list = []
+        bins_on: list = []
+        asyncio.run(async_setup_sensors(hass_on, entry_on, sensors_on.extend))
+        asyncio.run(async_setup_binary_sensors(hass_on, entry_on, bins_on.extend))
+
+        vr70_sensors = {
+            e.entity_description.key: e
+            for e in sensors_on
+            if isinstance(e, SaunierGeniaSensor)
+            and e.entity_description.device_key == DEVICE_MIXER_MODULE
+        }
+        vr70_bins = {
+            e.entity_description.key: e
+            for e in bins_on
+            if isinstance(e, SaunierGeniaBinarySensor)
+            and e.entity_description.device_key == DEVICE_MIXER_MODULE
+        }
+        self.assertEqual(len(vr70_sensors), 11)
+        self.assertEqual(len(vr70_bins), 2)
+        self.assertFalse(
+            vr70_sensors[
+                "vr70_mc2_flow_temp_desired"
+            ].entity_description.entity_registry_enabled_default
+        )
+        self.assertFalse(
+            vr70_sensors[
+                "vr70_mc2_mixer_position"
+            ].entity_description.entity_registry_enabled_default
+        )
+        self.assertFalse(
+            vr70_bins[
+                "vr70_mc2_pump"
+            ].entity_description.entity_registry_enabled_default
+        )
+
+        # 3. Verify DeviceInfo for VR 70
+        dev_info = build_device_info(coord, DEVICE_MIXER_MODULE)
+        self.assertEqual(dev_info["name"], "VR 70 (Mixer / Expansion Module)")
+        self.assertIn("52.vr_70", dev_info["model"])
+
+        # 4. Feed live solar/mixer telemetry matching @rmalbrecht's VR 70 + MC1
+        coord._state[(CIRCUIT_VR70, "SensorData")] = {
+            "s1": 50.4,
+            "s2": 12.8,
+            "s5": -3.3,
+            "s6": 18.8,
+        }
+        coord._state[(CIRCUIT_VR70, "Mc1Operation")] = {
+            "status": "on",
+            "flowtempdesired": 35.5,
+            "pump": "on",
+            "mixer": 42,
+        }
+        coord._state[(CIRCUIT_VR70, "Currenterror")] = {"error": "-"}
+
+        self.assertEqual(vr70_sensors["vr70_sensor_s1"].native_value, 50.4)
+        self.assertEqual(vr70_sensors["vr70_sensor_s2"].native_value, 12.8)
+        self.assertIsNone(vr70_sensors["vr70_sensor_s3"].native_value)
+        self.assertEqual(vr70_sensors["vr70_sensor_s5"].native_value, -3.3)
+        self.assertEqual(vr70_sensors["vr70_sensor_s6"].native_value, 18.8)
+        self.assertEqual(vr70_sensors["vr70_mc1_flow_temp_desired"].native_value, 35.5)
+        self.assertEqual(vr70_sensors["vr70_mc1_mixer_position"].native_value, 42)
+        self.assertEqual(vr70_sensors["vr70_current_error"].native_value, "OK")
+        self.assertTrue(vr70_bins["vr70_mc1_pump"].is_on)
+
+        # 5. VR 70 fault propagates to active_fault and system_health_alert
+        fault_ent = next(
+            e for e in bins_on if e.entity_description.key == "active_fault"
+        )
+        health_ent = next(
+            e for e in bins_on if e.entity_description.key == "system_health_alert"
+        )
+        self.assertFalse(fault_ent.is_on)
+        coord._state[(CIRCUIT_VR70, "Currenterror")] = {"error": 42}
+        self.assertEqual(vr70_sensors["vr70_current_error"].native_value, "42")
+        self.assertTrue(fault_ent.is_on)
+        self.assertEqual(
+            (fault_ent.extra_state_attributes or {}).get("mixer_module"), "42"
+        )
+        self.assertTrue(health_ent.is_on)
+        self.assertIn(
+            "mixer_module_fault", (health_ent.extra_state_attributes or {})["alerts"]
+        )
 
 
 if __name__ == "__main__":

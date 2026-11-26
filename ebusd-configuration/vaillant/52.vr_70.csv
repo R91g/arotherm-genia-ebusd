@@ -1,0 +1,24 @@
+type,circuit,level,name,comment,qq,zz,pbsb,id,*name,part,type,divisor/values,unit,comment
+*r,
+*u,
+*uw,
+*w,
+
+# ==============================================================================
+# 1. TEMPERATURE SENSORS (S1-S6) - ON-DEMAND READ (r) & PASSIVE (u)
+# ==============================================================================
+r;u,,,SensorData,VR 70 temperature sensors S1-S6,,,b523,03,s1,,D2C,,°C,sensor 1 temperature,s2,,D2C,,°C,sensor 2 temperature,s3,,D2C,,°C,sensor 3 temperature,s4,,D2C,,°C,sensor 4 temperature,s5,,D2C,,°C,sensor 5 temperature,s6,,D2C,,°C,sensor 6 temperature,ignore,,HEX:3,,,status bytes
+
+# ==============================================================================
+# 2. MIXER CIRCUITS (MC1/MC2) AND RELAY OUTPUTS (CONTROLLER -> 52)
+# ==============================================================================
+uw,,,SetActorState,relay and actor states from controller,,,b523,01,r1,,UCH,0=off;20=on,,,r2,,UCH,0=off;20=on,,,r3,,UCH,0=off;20=on,,,r4,,UCH,0=off;20=on,,,r5,,UCH,0=off;20=on,,,r6,,UCH,0=off;20=on,,,s7,,UCH,0=off;20=on,,
+uw,,,Mc1Operation,mixer circuit 1 operation,,,b523,0200,status,,UCH,0=off;1=on,,,flowtempdesired,,D1C,,°C,desired flow temperature,pump,s,UCH,0=off;1=on,,,mixer,s,SCH,,%,mixer position
+uw,,,Mc2Operation,mixer circuit 2 operation,,,b523,0201,status,,UCH,0=off;1=on,,,flowtempdesired,,D1C,,°C,desired flow temperature,pump,s,UCH,0=off;1=on,,,mixer,s,SCH,,%,mixer position
+
+# ==============================================================================
+# 3. DIAGNOSTICS AND ERROR LOGGING
+# ==============================================================================
+r;u,,,Currenterror,Current errors,,,b503,0001,error,,UIN,,,error number,error_1,,UIN,,,error number,error_2,,UIN,,,error number,error_3,,UIN,,,error number,error_4,,UIN,,,error number
+r;u,,,Errorhistory,Error history,,,b503,0101,index,m,UCH,,,,status,,UCH,,,status,time,,VTM,,,time,date,,HDA:3,,,date,error,,UIN,,,error number
+w,,install,Clearerrorhistory,Clear error history,,,b503,0201,cleared,s,UCH,0=no;1=yes,,
