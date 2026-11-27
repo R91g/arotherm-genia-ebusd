@@ -31,7 +31,7 @@ r9;u,,,RunDataHighPressure,high pressure sensor,,,b509,5402006a09,ign,,IGN:4,,,,
 # 2. ELECTRICAL POWER AND ENERGY REGISTERS
 # ==============================================================================
 r1;u,,,RunDataElectricPowerConsumption,current electrical power consumption,,,b509,5402005b0d,ign,,IGN:4,,,,power,,EXP,,W,"current electrical power consumption (Watt)"
-r;u,,,PowerStatus,instantaneous power consumption and active mode,,,b516,14,status,,UCH,0=standby;1=heating;2=hwc;3=cooling,,active energy integration mode,power,,EXP,,W,"instantaneous electrical power",fuel_power,,EXP,,W,"instantaneous fuel power"
+r;u,,,PowerStatus,instantaneous power consumption and active mode,,,b516,14,status,,UCH,0=standby;1=heating;2=hwc;3=cooling;4=defrost,,active energy integration mode,power,,EXP,,W,"instantaneous electrical power",fuel_power,,EXP,,W,"instantaneous fuel power"
 
 # Daily, monthly, and cumulative yield / COP registers (b51a)
 r;u,,,YieldHcDay,heating energy yield today,,,b51a,05ff3200,ign,,IGN:3,,,,value,,UIN,10,kWh,
@@ -87,24 +87,24 @@ r;u,,,RunDataCondensateTemp,condenser liquid outlet temperature,,,b509,540200db1
 
 r;u,,,RunStatsHMUHours,HMU total operating hours,,,b509,540200b80b,ign,,IGN:4,,,,value,,UIN,,h,hours
 r;u,,,RunStatsHcHours,heating operating hours,,,b509,540200b90b,ign,,IGN:4,,,,value,,UIN,,h,hours
-u,,,RunStatsDiagbb0b,diagnostic runtime counter bb0b,,,b509,540200bb0b,ign,,IGN:4,,,,value,,UIN,,h,hours
+u,,,RunStatsCoolingHours,cooling operating hours (Vaillant: ApplianceOperatingHoursCooling),,,b509,540200bb0b,ign,,IGN:4,,,,value,,ULG,,h,hours
 r;u,,,RunStatsHwcHours,hot water operating hours,,,b509,540200bc0b,ign,,IGN:4,,,,value,,UIN,,h,total runtime of Hwc mode
 r;u,,,RunStatsCompressorHours,compressor operating hours,,,b509,540200c20b,ign,,IGN:4,,,,value,,UIN,,h,hours
 r;u,,,RunStatsCompressorStarts,compressor start count,,,b509,540200c30b,ign,,IGN:4,,,,value,,UIN,,,start count
 r;u,,,RunStatsBuildingPumpHours,building pump operating hours,,,b509,540200c40b,ign,,IGN:4,,,,value,,UIN,,h,hours
 r;u,,,RunStatsBuildingCPumpStarts,building pump start count,,,b509,540200c50b,ign,,IGN:4,,,,value,,UIN,,,total starts of building circuit pump
-r;u,,,RunStats4PortValveHours,4-port valve operating hours,,,b509,540200c80b,ign,,IGN:4,,,,value,,UIN,,h,hours
-r;u,,,RunStats4PortValveSwitches,4-port valve switch count,,,b509,540200c90b,ign,,IGN:4,,,,value,,UIN,,,start count
+r;u,,,RunStats4PortValveHours,4-port reversing valve hours (defrost + active cooling),,,b509,540200c80b,ign,,IGN:4,,,,value,,UIN,,h,hours
+r;u,,,RunStats4PortValveSwitches,4-port reversing valve switches (defrost + active cooling),,,b509,540200c90b,ign,,IGN:4,,,,value,,UIN,,,switch count
 r;u,,,RunStatsFan1Hours,fan 1 operating hours,,,b509,540200d70b,ign,,IGN:4,,,,value,,UIN,,h,hours
 r;u,,,RunStatsFan1Starts,fan 1 start count,,,b509,540200d80b,ign,,IGN:4,,,,value,,UIN,,,start count
 r;u,,,RunStatsFan2Hours,fan 2 operating hours,,,b509,540200d90b,ign,,IGN:4,,,,value,,UIN,,h,hours
 r;u,,,RunStatsFan2Starts,fan 2 start count,,,b509,540200da0b,ign,,IGN:4,,,,value,,UIN,,,start count
-r;u,,,RunStatsCoolingHours,cooling operating hours,,,b509,540200e10b,ign,,IGN:4,,,,value,,UIN,,h,cooling operating hours
-r;u,,,RunStatsCoolingStarts,cooling start count,,,b509,540200e20b,ign,,IGN:4,,,,value,,UIN,,,cooling start count
-r;u,,,RunStatsDeiceHours,defrost operating hours,,,b509,540200e30b,ign,,IGN:4,,,,value,,UIN,,h,defrost operating hours
-r;u,,,RunStatsDeiceStarts,defrost start count,,,b509,540200e40b,ign,,IGN:4,,,,value,,UIN,,,defrost start count
-u,,,RunStatsDiage50b,unverified outdoor cycle runtime counter e50b (tracks compressor cycles; not hydraulic backup heater),,,b509,540200e50b,ign,,IGN:4,,,,value,,UIN,,h,hours
-u,,,RunStatsDiage60b,unverified outdoor cycle count e60b (tracks compressor starts 1:1; not hydraulic backup heater),,,b509,540200e60b,ign,,IGN:4,,,,value,,UIN,,,count
+r;u,,,RunStatsCrankCaseHeaterHours,crank case heater hours (Vaillant: HP_CrankCaseHeaterOperatingHours),,,b509,540200e10b,ign,,IGN:4,,,,value,,ULG,,h,crank case heater hours
+r;u,,,RunStatsCrankCaseHeaterSwitches,crank case heater switches (Vaillant: HP_CrankCaseHeaterCommutations),,,b509,540200e20b,ign,,IGN:4,,,,value,,ULG,,,crank case heater switches
+r;u,,,RunStatsCondensateTrayHeaterHours,condensate tray heater hours (Vaillant: HP_CondensateTrayHeaterOperatingHours),,,b509,540200e30b,ign,,IGN:4,,,,value,,ULG,,h,condensate tray heater hours
+r;u,,,RunStatsCondensateTrayHeaterSwitches,condensate tray heater switches (Vaillant: HP_CondensateTrayHeaterCommutations),,,b509,540200e40b,ign,,IGN:4,,,,value,,ULG,,,condensate tray heater switches
+u,,,RunStatsCompressorSafetyRelayHours,compressor safety relay hours (Vaillant: HP_CompressorSafetyRelayOperatingHours),,,b509,540200e50b,ign,,IGN:4,,,,value,,ULG,,h,hours
+u,,,RunStatsCompressorSafetyRelaySwitches,compressor safety relay switches (Vaillant: HP_CompressorSafetyRelayCommutations),,,b509,540200e60b,ign,,IGN:4,,,,value,,ULG,,,switches
 # Passive-only (u) diagnostic & unverified inverter parameters (no active polling)
 u,,,RunDataDiag000b,inverter compressor dynamic control offset,,,b509,540200000b,ign,,IGN:4,,,,value,,SLG,,,inverter compressor dynamic control offset
 u,,,RunDataDiag010b,inverter fan load diagnostic index,,,b509,540200010b,ign,,IGN:4,,,,value,,ULG,,,inverter secondary stage or fan load index

@@ -14,7 +14,7 @@ uw,,,StatusCirPumpTarget,Status circulation pump target,,,b512,04,value,,UCH,,,
 
 # Instantaneous power and IEEE 754 precision energy counters (b516 - passive u & on-demand read r)
 r;u,,,EnergyStatsDescriptor,energy statistics EEPROM table descriptor,,,b516,11,data,,HEX:9,,,
-r;u,,,PowerStatus,instantaneous power consumption and active mode,,,b516,14,status,,UCH,0=standby;1=heating;2=hwc;3=cooling,,active energy integration mode,power,,EXP,,W,"instantaneous electrical power",fuel_power,,EXP,,W,"instantaneous fuel power"
+r;u,,,PowerStatus,instantaneous power consumption and active mode,,,b516,14,status,,UCH,0=standby;1=heating;2=hwc;3=cooling;4=defrost,,active energy integration mode,power,,EXP,,W,"instantaneous electrical power",fuel_power,,EXP,,W,"instantaneous fuel power"
 r;u,,,PrEnergySolarTotal,total solar energy sum,,,b516,1000ffff01000000,ign,,IGN:7,,,,energy,,EXP,,Wh,
 r;u,,,PrEnergyElectricHc,total heating electrical energy consumed,,,b516,1000ffff83030000,ign,,IGN:7,,,,energy,,EXP,,Wh,"cumulative heating consumed electrical energy"
 r;u,,,PrEnergyElectricHwc,total hot water electrical energy consumed,,,b516,1000ffff83040000,ign,,IGN:7,,,,energy,,EXP,,Wh,"cumulative hot water consumed electrical energy"
@@ -50,35 +50,35 @@ r9;u,,,RunDataHighPressure,,,,b509,5402006a09,ign,,IGN:4,,,,press,,EXP,,bar,pres
 r9;u,,,RunDataCompressorInletTemp,,,,b509,5402009808,ign,,IGN:4,,,,value,,EXP,,°C,temperature
 r9;u,,,RunDataCompressorOutletTemp,,,,b509,540200a208,ign,,IGN:4,,,,value,,EXP,,°C,temperature
 r9;u,,,RunDataEEVOutletTemp,,,,b509,540200ac08,ign,,IGN:4,,,,value,,EXP,,°C,temperature
-r;u,,,RunDataCondenserOutTemp,,,,b509,540200b608,ign,,IGN:4,,,,value,,EXP,,°C,condenser outlet temperature
+r;u,,,RunDataCondenserOutTemp,refrigerant temperature after building heat exchanger / EEV (Vaillant: TRefriBuildHexEev),,,b509,540200b608,ign,,IGN:4,,,,value,,EXP,,°C,refrigerant temperature after building heat exchanger
 r2;u,,,RunDataFlowTemp,,,,b509,540200fc08,ign,,IGN:4,,,,value,,EXP,,°C,"current flow temp, accurate to 2 decimal places"
 r2;u,,,RunDataReturnTemp,,,,b509,5402000609,ign,,IGN:4,,,,value,,EXP,,°C,"current return temp, accurate to 2 decimal places"
 r2;u,,,RunDataFlowRate,building circuit water flow rate (display D.060),,,b509,540200090b,ign,,IGN:4,,,,value,,UIN,,l/h,"building circuit volumetric water flow rate"
 r;u,,,RunDataMaxResidualHead,"maximum residual pump head (display D.231, constant setting)",,,b509,540200680b,ign,,IGN:4,,,,value,,UIN,,mbar,
 r;u,,,RunStatsHMUHours,,,,b509,540200b80b,ign,,IGN:4,,,,value,,UIN,,h,hours
 r;u,,,RunStatsHcHours,,,,b509,540200b90b,ign,,IGN:4,,,,value,,UIN,,h,hours
-u,,,RunStatsDiagbb0b,,,,b509,540200bb0b,ign,,IGN:4,,,,value,,UIN,,h,hours
+u,,,RunStatsCoolingHours,cooling operating hours (Vaillant: ApplianceOperatingHoursCooling),,,b509,540200bb0b,ign,,IGN:4,,,,value,,ULG,,h,hours
 r;u,,,RunStatsHwcHours,,,,b509,540200bc0b,ign,,IGN:4,,,,value,,UIN,,h,total runtime of Hwc mode
 r9;u,,,RunStatsAuxHeaterSwitches,switching operations of the auxiliary heater (display D.074),,,b509,540200c00b,ign,,IGN:4,,,,value,,UIN,,,
-r;u,,,RunStatsHwcStarts,,,,b509,540200c10b,ign,,IGN:4,,,,value,,UIN,,,total starts of Hwc mode
+r;u,,,RunStatsHwcValveSwitches,DHW 3-way valve switches (Vaillant: DHW_TWV_Commutations),,,b509,540200c10b,ign,,IGN:4,,,,value,,ULG,,,DHW 3-way valve switches
 r;u,,,RunStatsCompressorHours,,,,b509,540200c20b,ign,,IGN:4,,,,value,,UIN,,h,hours
 r;u,,,RunStatsCompressorStarts,,,,b509,540200c30b,ign,,IGN:4,,,,value,,UIN,,,start count
 r;u,,,RunStatsBuildingPumpHours,,,,b509,540200c40b,ign,,IGN:4,,,,value,,UIN,,h,hours
 r;u,,,RunDataBuildingCPumpPower,,,,b509,540200c509,ign,,IGN:4,,,,value,,EXP,,%,
 r;u,,,RunStatsBuildingCPumpStarts,,,,b509,540200c50b,ign,,IGN:4,,,,value,,UIN,,,total starts of building circuit pump
-r;u,,,RunStats4PortValveHours,,,,b509,540200c80b,ign,,IGN:4,,,,value,,UIN,,h,hours
-r;u,,,RunStats4PortValveSwitches,,,,b509,540200c90b,ign,,IGN:4,,,,value,,UIN,,,start count
+r;u,,,RunStats4PortValveHours,4-way reversing valve hours (defrost + active cooling),,,b509,540200c80b,ign,,IGN:4,,,,value,,UIN,,h,hours
+r;u,,,RunStats4PortValveSwitches,4-way reversing valve switches (defrost + active cooling),,,b509,540200c90b,ign,,IGN:4,,,,value,,UIN,,,switch count
 r;u,,,RunStatsFan1Hours,,,,b509,540200d70b,ign,,IGN:4,,,,value,,UIN,,h,hours
 r;u,,,RunStatsFan1Starts,,,,b509,540200d80b,ign,,IGN:4,,,,value,,UIN,,,start count
 r;u,,,RunStatsFan2Hours,,,,b509,540200d90b,ign,,IGN:4,,,,value,,UIN,,h,hours
 r;u,,,RunStatsFan2Starts,,,,b509,540200da0b,ign,,IGN:4,,,,value,,UIN,,,start count
 r9;u,,,RunDataAirInletTemp,,,,b509,540200de08,ign,,IGN:4,,,,value,,EXP,,°C,temperature
-r;u,,,RunStatsCoolingHours,,,,b509,540200e10b,ign,,IGN:4,,,,value,,UIN,,h,cooling operating hours
-r;u,,,RunStatsCoolingStarts,,,,b509,540200e20b,ign,,IGN:4,,,,value,,UIN,,,cooling start count
-r;u,,,RunStatsDeiceHours,,,,b509,540200e30b,ign,,IGN:4,,,,value,,UIN,,h,defrost operating hours
-r;u,,,RunStatsDeiceStarts,,,,b509,540200e40b,ign,,IGN:4,,,,value,,UIN,,,defrost start count
-u,,,RunStatsDiage50b,unverified outdoor cycle runtime counter e50b (tracks compressor cycles; not hydraulic backup heater),,,b509,540200e50b,ign,,IGN:4,,,,value,,UIN,,h,hours
-u,,,RunStatsDiage60b,unverified outdoor cycle count e60b (tracks compressor starts 1:1; not hydraulic backup heater),,,b509,540200e60b,ign,,IGN:4,,,,value,,UIN,,,count
+r;u,,,RunStatsCrankCaseHeaterHours,crank case heater hours (Vaillant: HP_CrankCaseHeaterOperatingHours),,,b509,540200e10b,ign,,IGN:4,,,,value,,ULG,,h,crank case heater hours
+r;u,,,RunStatsCrankCaseHeaterSwitches,crank case heater switches (Vaillant: HP_CrankCaseHeaterCommutations),,,b509,540200e20b,ign,,IGN:4,,,,value,,ULG,,,crank case heater switches
+r;u,,,RunStatsCondensateTrayHeaterHours,condensate tray heater hours (Vaillant: HP_CondensateTrayHeaterOperatingHours),,,b509,540200e30b,ign,,IGN:4,,,,value,,ULG,,h,condensate tray heater hours
+r;u,,,RunStatsCondensateTrayHeaterSwitches,condensate tray heater switches (Vaillant: HP_CondensateTrayHeaterCommutations),,,b509,540200e40b,ign,,IGN:4,,,,value,,ULG,,,condensate tray heater switches
+u,,,RunStatsCompressorSafetyRelayHours,compressor safety relay hours (Vaillant: HP_CompressorSafetyRelayOperatingHours),,,b509,540200e50b,ign,,IGN:4,,,,value,,ULG,,h,hours
+u,,,RunStatsCompressorSafetyRelaySwitches,compressor safety relay switches (Vaillant: HP_CompressorSafetyRelayCommutations),,,b509,540200e60b,ign,,IGN:4,,,,value,,ULG,,,switches
 
 # Refrigeration circuit thermodynamics and energy integral (display-verified)
 r;u,,,RunDataFlowTempDesired,compressor flow temperature target,,,b509,5402004a0d,ign,,IGN:4,,,,value,,EXP,,°C,"compressor flow temperature target"
@@ -105,28 +105,41 @@ r;u,,,RunDataCondensationTemp,condensation temperature,,,b51a,05ff3546,ign,,IGN:
 r9;u,,,CompressorSilentOperationLevel,compressor silent operation level,,,b51a,05ff3428,ign,,IGN:3,,,,value,,UCH,,%,"compressor silent operation level"
 w,,,CompressorSilentOperationLevel,compressor silent operation level,,,b51a,06ff3428,value,,UCH,,%,"compressor silent operation level"
 u,,,Heartbeat,central regulator heartbeat,,,b513,0528,value,,UCH,,,heartbeat watchdog
-u,,,RunDataDiagnostic,diagnostic telemetry readout cc10 (tracks load/temp),,,b509,540200cc10,ign,,IGN:4,,,,value,,HEX:2,,,
-u,,,RunDataDiag030b,diagnostic telemetry readout 030b (tracks compressor load),,,b509,540200030b,ign,,IGN:4,,,,value,,HEX:2,,,
-u,,,RunDataDiagfd0a,diagnostic telemetry readout fd0a (tracks load/temp),,,b509,540200fd0a,ign,,IGN:4,,,,value,,HEX:2,,,
-u,,,RunDataDiag8813,passive status mirror (uint16 matches HMUStatusCode b503 0003),,,b509,5402008813,ign,,IGN:4,,,,value,,HEX:10,,,HMUStatusCode mirror + ff padding
-u,,,RunDataDiag8b13,diagnostic code 8b13 readout,,,b509,5402008b13,ign,,IGN:4,,,,value,,HEX:10,,,
-# Passive-only (u) diagnostic & unverified inverter parameters (no active polling)
-u,,,RunDataDiag000b,inverter compressor dynamic control offset,,,b509,540200000b,ign,,IGN:4,,,,value,,SLG,,,inverter compressor dynamic control offset
-u,,,RunDataElectricPower100,"electrical power consumption in 100 W steps (= RunDataElectricPowerConsumption rounded, also during defrost)",,,b509,540200010b,ign,,IGN:4,,,,value,,ULG,-100,W,
-u,,,RunDataDiag7c08,target evaporator reference temperature,,,b509,5402007c08,ign,,IGN:4,,,,value,,EXP,,°C,target evaporator reference temperature
-u,,,RunDataDiagd610,secondary economizer circuit diagnostic,,,b509,540200d610,ign,,IGN:4,,,,value,,SIN,16,°C,secondary economizer circuit diagnostic
-u,,,RunDataDiagf40a,unverified diagnostic byte f40a (observed 29..30),,,b509,540200f40a,ign,,IGN:4,,,,value,,UCH,,,unverified diagnostic byte f40a
-u,,,RunDataDiagf60a,unverified diagnostic byte f60a (observed 27..29),,,b509,540200f60a,ign,,IGN:4,,,,value,,UCH,,,unverified diagnostic byte f60a
-u,,,RunDataDiagf80a,unverified diagnostic byte f80a (observed 30..31),,,b509,540200f80a,ign,,IGN:4,,,,value,,UCH,,,unverified diagnostic byte f80a
-u,,,RunDataDiagfa0a,unverified diagnostic byte fa0a (observed constant 34),,,b509,540200fa0a,ign,,IGN:4,,,,value,,UCH,,,unverified diagnostic byte fa0a
+u,,,RunDataReturnTempSensor,return temperature sensor (Vaillant: ReturnTemperatureSensor),,,b509,540200cc10,ign,,IGN:4,,,,value,,SIN,16,°C,
+u,,,RunDataFanAirInletTemp,fan unit air inlet temperature (Vaillant: FanUnitAirInletTemperature),,,b509,540200030b,ign,,IGN:4,,,,value,,SIN,16,°C,
+u,,,RunDataFlowTempSensor,flow temperature sensor (Vaillant: FlowTemperatureSensor),,,b509,540200fd0a,ign,,IGN:4,,,,value,,SIN,16,°C,
+u,,,RunDataStatusList,"status list, first entry matches HMUStatusCode b503 0003 (Vaillant: StatusList; 0xffff = empty)",,,b509,5402008813,ign,,IGN:4,,,,s1,,UIN,,,,s2,,UIN,,,,s3,,UIN,,,,s4,,UIN,,,,s5,,UIN,,,
+u,,,RunDataFaultList,"fault list (Vaillant: FaultList; 0xffff = empty)",,,b509,5402008b13,ign,,IGN:4,,,,s1,,UIN,,,,s2,,UIN,,,,s3,,UIN,,,,s4,,UIN,,,,s5,,UIN,,,
+# Passive-only (u) telemetry & parameters (Vaillant EU Data Act export)
+u,,,RunDataEvapCapacity,"evaporator capacity (Vaillant: AI_EvapCapacity, 0.1 kW)",,,b509,540200000b,ign,,IGN:4,,,,value,,ULG,10,kW,
+u,,,RunDataElectricPower100,"electrical power consumption in 100 W steps (Vaillant: AI_ApplCapacity)",,,b509,540200010b,ign,,IGN:4,,,,value,,ULG,-100,W,
+u,,,RunDataInverterCurrentLimit,"inverter input current limit (Vaillant: Inv_InputCurrentLimit)",,,b509,5402007c08,ign,,IGN:4,,,,value,,EXP,,A,
+u,,,RunDataSuperheatTarget,superheat target (Vaillant: RefrigerantCircuitTargetSuperheating),,,b509,540200d610,ign,,IGN:4,,,,value,,SIN,16,K,
+u,,,RunDataScopHcMonth,"SCOP heating, current month (Vaillant: ScopCurrentMonthCentralHeating)",,,b509,540200f40a,ign,,IGN:4,,,,value,,UCH,10,,
+u,,,RunDataScopHcTotal,"SCOP heating, total (Vaillant: ScopTotalCentralHeating)",,,b509,540200f60a,ign,,IGN:4,,,,value,,UCH,10,,
+u,,,RunDataScopHwcMonth,"SCOP domestic hot water, current month (Vaillant: ScopCurrentMonthDomesticHotWater)",,,b509,540200f80a,ign,,IGN:4,,,,value,,UCH,10,,
+u,,,RunDataScopHwcTotal,"SCOP domestic hot water, total (Vaillant: ScopTotalDomesticHotWater)",,,b509,540200fa0a,ign,,IGN:4,,,,value,,UCH,10,,
 r;u,,,SubcoolingTargetTemp,D.374 subcooling target (display verified),,,b51a,05ff354a,ign,,IGN:3,,,,value,,SIN,16,K,,ign_2,,IGN:5,,,
 r;u,,,SubcoolingTemp,D.375 subcooling (display verified),,,b51a,05ff354b,ign,,IGN:3,,,,value,,SIN,16,K,,ign_2,,IGN:5,,,
-u,,,RunDataDiag3702,inverter electric diagnostic 3702,,,b51a,05ff3702,ign,,IGN:3,,,,value,,UIN,,,"inverter electric diagnostic 3702",ign_2,,IGN:5,,,
-u,,,RunDataEvaporationTempB51a,evaporation temperature (= RunDataEvaporationTemp d110 within 0.1 K; D.504 by the #637 key),,,b51a,05ff3704,ign,,IGN:3,,,,value,,SIN,16,°C,,ign_2,,IGN:5,,,
-u,,,RunDataDiag3705,inverter electric diagnostic 3705,,,b51a,05ff3705,ign,,IGN:3,,,,value,,UIN,,,"inverter electric diagnostic 3705",ign_2,,IGN:5,,,
-u,,,RunDataHighPressureB51a,refrigerant high pressure (= RunDataHighPressure 6a09 within 0.1 bar in 40 same-minute samples; D.511 by the #637 key),,,b51a,05ff370b,ign,,IGN:3,,,,value,,UIN,10,bar,,ign_2,,IGN:5,,,
-u,,,RunDataActiveErrors,"currently active error codes of the outdoor unit (0xffff = empty slot; seen: 22 = F.22 low water pressure, 733 = F.733 evaporation temperature too low)",,,b509,5402008c13,ign,,IGN:4,,,,error,,UIN,,,,error_1,,UIN,,,,error_2,,UIN,,,,error_3,,UIN,,,,error_4,,UIN,,,
+u,,,RunDataEnvHexInletTempB51a,evaporator inlet temperature (Vaillant: EnvironmentCircuitHeatExchangerInletTemperature),,,b51a,05ff3702,ign,,IGN:3,,,,value,,SIN,16,°C,,ign_2,,IGN:5,,,
+u,,,RunDataCompressorInletTempB51a,compressor suction gas temperature (Vaillant: CompressorInletTemperature),,,b51a,05ff3704,ign,,IGN:3,,,,value,,SIN,16,°C,,ign_2,,IGN:5,,,
+u,,,RunDataCompressorOutletTempB51a,compressor outlet temperature (Vaillant: CompressorOutletTemperature),,,b51a,05ff3705,ign,,IGN:3,,,,value,,SIN,16,°C,,ign_2,,IGN:5,,,
+u,,,RunDataHighPressureB51a,refrigerant high pressure (Vaillant: RefrigerantCircuitHighPressureSensor),,,b51a,05ff370b,ign,,IGN:3,,,,value,,UIN,10,bar,,ign_2,,IGN:5,,,
+u,,,RunDataActiveErrors,"currently active error codes of the outdoor unit (Vaillant: MaintenanceList; 0xffff = empty)",,,b509,5402008c13,ign,,IGN:4,,,,error,,UIN,,,,error_1,,UIN,,,,error_2,,UIN,,,,error_3,,UIN,,,,error_4,,UIN,,,
 u,,,RunDataWaterPressure,"building circuit water pressure (1/64 bar, follows the controller water pressure)",,,b509,5402003b0b,ign,,IGN:4,,,,value,,UIN,64,bar,
+u,,,RunDataFourWayValve,"4-way valve status, observed on during core defrost phase (Vaillant: FourWayValve)",,,b509,540200190a,ign,,IGN:4,,,,value,,UCH,0=off;1=on,,
+u,,,RunDataReqOpMode,"requested operation mode (Vaillant: ASW1_ReqOpMode)",,,b509,540200480d,ign,,IGN:4,,,,value,,UCH,,,
+u,,,RunDataCurOpMode,"current operation mode (Vaillant: ASW1_CurOpMode)",,,b509,540200490d,ign,,IGN:4,,,,value,,UCH,0=standby;1=heating;2=hwc;3=cooling;4=defrost,,
+u,,,RunDataNoiseReductionDemand,noise reduction demand (Vaillant: ASW1_NoiseReductionDemand),,,b509,5402004e0d,ign,,IGN:4,,,,value,,UCH,0=off;1=on,,
+u,,,RunDataTankSetpoint,tank setpoint at heat pump (Vaillant: TankSetpoint),,,b509,540200580b,ign,,IGN:4,,,,value,,UIN,16,°C,
+u,,,RunDataBuildPumpModeCH,"building circuit pump mode heating, 29 = Auto (Vaillant: BuildPumpModeAndManualStpCH)",,,b509,540200600b,ign,,IGN:4,,,,value,,UCH,,%,
+u,,,RunDataBuildPumpModeCool,"building circuit pump mode cooling, 29 = Auto (Vaillant: BuildPumpModeAndManualStpCool)",,,b509,540200610b,ign,,IGN:4,,,,value,,UCH,,%,
+u,,,RunDataBuildPumpModeHwc,"building circuit pump mode DHW, 29 = Auto (Vaillant: BuildPumpModeAndManualStpDHW)",,,b509,540200620b,ign,,IGN:4,,,,value,,UCH,,%,
+u,,,RunDataCoolingTechnology,cooling technology (Vaillant: CoolingTechnology),,,b509,540200650b,ign,,IGN:4,,,,value,,UCH,0=no_cooling;1=active_cooling,,
+u,,,RunDataHwcOperationMode,DHW operation mode at indoor unit (Vaillant: DomesticHotWaterOperationMode),,,b509,540200770b,ign,,IGN:4,,,,value,,UCH,0=eco;1=normal;2=balance,,
+u,,,RunDataMaxNoiseRedPower,maximum power in noise reduction mode (Vaillant: HP_MaxNoiseRedPower),,,b509,5402007c0b,ign,,IGN:4,,,,value,,UCH,,%,
+u,,,RunDataHighPressureSwitch,"refrigerant high pressure switch, 1 = closed (Vaillant: RefrigerantCircuitHighPressureSwitch)",,,b509,540200f709,ign,,IGN:4,,,,value,,UCH,,,
+u,,,RunDataLimpHomeList,"irreversible limp home list (Vaillant: LimpHomeModeIrreversibleList; 0xffff = empty)",,,b509,5402008a13,ign,,IGN:4,,,,s1,,UIN,,,,s2,,UIN,,,,s3,,UIN,,,,s4,,UIN,,,,s5,,UIN,,,
 # Installer settings and counters via b51a 05ff HH LL (display-verified D-codes)
 r;u,,,CompressorStartHeatingFrom,"D.230 compressor start heating at energy integral (display -60 °min; setting, range -120..-30 step 5)",,,b51a,05ff341e,ign,,IGN:3,,,,value,,SIN,,°min,,ign_2,,IGN:5,,,
 r;u,,,CompressorStartCoolingFrom,"D.233 compressor start cooling at energy integral (display 60 °min; setting, range 30..120 step 5)",,,b51a,05ff3421,ign,,IGN:3,,,,value,,SIN,,°min,,ign_2,,IGN:5,,,

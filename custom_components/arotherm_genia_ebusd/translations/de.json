@@ -681,8 +681,8 @@
       "stats_hwc_hours": {
         "name": "Betriebsstunden Warmwassermodus"
       },
-      "stats_hwc_starts": {
-        "name": "Gesamte Starts Warmwassermodus"
+      "stats_hwc_valve_switches": {
+        "name": "Schaltzyklen 3-Wege-Warmwasserventil"
       },
       "stats_building_cpump_hours": {
         "name": "Betriebsstunden Gebäudekreispumpe"
@@ -691,10 +691,10 @@
         "name": "Gesamte Starts Gebäudekreispumpe"
       },
       "stats_4port_valve_hours": {
-        "name": "Betriebsstunden 4-Wege-Umschaltventil (Kühlen)"
+        "name": "Betriebsstunden 4-Wege-Umschaltventil (Kühlen / Abtauen)"
       },
       "stats_4port_valve_switches": {
-        "name": "Gesamte Schaltzyklen 4-Wege-Umschaltventil"
+        "name": "Gesamte Schaltzyklen 4-Wege-Umschaltventil (Kühlen / Abtauen)"
       },
       "stats_fan1_hours": {
         "name": "Betriebsstunden Lüfter 1"
@@ -708,11 +708,11 @@
       "stats_fan2_starts": {
         "name": "Gesamte Starts Lüfter 2"
       },
-      "stats_deice_hours": {
-        "name": "Gesamte Betriebsstunden Abtauung"
+      "stats_condensate_tray_heater_hours": {
+        "name": "Betriebsstunden Kondensatwannenheizung"
       },
-      "stats_deice_starts": {
-        "name": "Gesamte Abtauzyklen"
+      "stats_condensate_tray_heater_switches": {
+        "name": "Schaltzyklen Kondensatwannenheizung"
       },
       "system_operating_state": {
         "name": "System-Betriebszustand",

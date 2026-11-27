@@ -120,6 +120,48 @@ def _get_vwzio_error(coord: SaunierGeniaCoordinator) -> str | None:
     return _format_currenterror_msg(coord.get_message(CIRCUIT_VWZIO, "Currenterror"))
 
 
+def _get_hwc_valve_switches(coord: SaunierGeniaCoordinator) -> int | None:
+    """Read DHW 3-way valve switches (0x0bc1), with legacy RunStatsHwcStarts fallback."""
+    for circuit, msg in (
+        (CIRCUIT_HMUX0, "RunStatsHwcValveSwitches"),
+        (CIRCUIT_VWZIO, "RunStatsHwcValveSwitches"),
+        (CIRCUIT_HMUX0, "RunStatsHwcStarts"),
+        (CIRCUIT_VWZIO, "RunStatsHwcStarts"),
+    ):
+        val = coord.get_int(circuit, msg, "value")
+        if val is not None:
+            return val
+    return None
+
+
+def _get_condensate_tray_heater_hours(coord: SaunierGeniaCoordinator) -> int | None:
+    """Read condensate tray heater hours (0x0be3), with legacy RunStatsDeiceHours fallback."""
+    for circuit, msg in (
+        (CIRCUIT_HMUX0, "RunStatsCondensateTrayHeaterHours"),
+        (CIRCUIT_HMU, "RunStatsCondensateTrayHeaterHours"),
+        (CIRCUIT_HMUX0, "RunStatsDeiceHours"),
+        (CIRCUIT_HMU, "RunStatsDeiceHours"),
+    ):
+        val = coord.get_int(circuit, msg, "value")
+        if val is not None:
+            return val
+    return None
+
+
+def _get_condensate_tray_heater_switches(coord: SaunierGeniaCoordinator) -> int | None:
+    """Read condensate tray heater switches (0x0be4), with legacy RunStatsDeiceStarts fallback."""
+    for circuit, msg in (
+        (CIRCUIT_HMUX0, "RunStatsCondensateTrayHeaterSwitches"),
+        (CIRCUIT_HMU, "RunStatsCondensateTrayHeaterSwitches"),
+        (CIRCUIT_HMUX0, "RunStatsDeiceStarts"),
+        (CIRCUIT_HMU, "RunStatsDeiceStarts"),
+    ):
+        val = coord.get_int(circuit, msg, "value")
+        if val is not None:
+            return val
+    return None
+
+
 def _get_vr70_error(coord: SaunierGeniaCoordinator) -> str | None:
     """Format vr_70 Currenterror (error..error_4), returning 'OK' when all slots are '-' or 0."""
     return _format_currenterror_msg(coord.get_message(CIRCUIT_VR70, "Currenterror"))
@@ -1171,14 +1213,15 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(
-        key="stats_hwc_starts",
-        translation_key="stats_hwc_starts",
+        key="stats_hwc_valve_switches",
+        translation_key="stats_hwc_valve_switches",
         device_key=DEVICE_OUTDOOR_UNIT,
         circuit=CIRCUIT_HMUX0,
-        message="RunStatsHwcStarts",
+        message="RunStatsHwcValveSwitches",
         field="value",
+        value_fn=_get_hwc_valve_switches,
         fallback_circuit=CIRCUIT_VWZIO,
-        fallback_message="RunStatsHwcStarts",
+        fallback_message="RunStatsHwcValveSwitches",
         fallback_field="value",
         state_class=SensorStateClass.TOTAL_INCREASING,
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -1295,14 +1338,15 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         entity_registry_enabled_default=False,
     ),
     SaunierGeniaSensorEntityDescription(
-        key="stats_deice_hours",
-        translation_key="stats_deice_hours",
+        key="stats_condensate_tray_heater_hours",
+        translation_key="stats_condensate_tray_heater_hours",
         device_key=DEVICE_OUTDOOR_UNIT,
         circuit=CIRCUIT_HMUX0,
-        message="RunStatsDeiceHours",
+        message="RunStatsCondensateTrayHeaterHours",
         field="value",
+        value_fn=_get_condensate_tray_heater_hours,
         fallback_circuit=CIRCUIT_HMU,
-        fallback_message="RunStatsDeiceHours",
+        fallback_message="RunStatsCondensateTrayHeaterHours",
         fallback_field="value",
         native_unit_of_measurement=UnitOfTime.HOURS,
         device_class=SensorDeviceClass.DURATION,
@@ -1311,14 +1355,15 @@ SENSOR_DESCRIPTIONS: tuple[SaunierGeniaSensorEntityDescription, ...] = (
         is_integer=True,
     ),
     SaunierGeniaSensorEntityDescription(
-        key="stats_deice_starts",
-        translation_key="stats_deice_starts",
+        key="stats_condensate_tray_heater_switches",
+        translation_key="stats_condensate_tray_heater_switches",
         device_key=DEVICE_OUTDOOR_UNIT,
         circuit=CIRCUIT_HMUX0,
-        message="RunStatsDeiceStarts",
+        message="RunStatsCondensateTrayHeaterSwitches",
         field="value",
+        value_fn=_get_condensate_tray_heater_switches,
         fallback_circuit=CIRCUIT_HMU,
-        fallback_message="RunStatsDeiceStarts",
+        fallback_message="RunStatsCondensateTrayHeaterSwitches",
         fallback_field="value",
         state_class=SensorStateClass.TOTAL_INCREASING,
         entity_category=EntityCategory.DIAGNOSTIC,

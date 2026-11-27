@@ -122,7 +122,17 @@ def _check_energy_integration(coord: SaunierGeniaCoordinator) -> bool | None:
     status = coord.get_str(CIRCUIT_HMUX0, "PowerStatus", "status")
     if status is None:
         return None
-    return status.lower() in ("active", "heating", "hwc", "cooling", "1", "2", "3")
+    return status.lower() in (
+        "active",
+        "heating",
+        "hwc",
+        "cooling",
+        "defrost",
+        "1",
+        "2",
+        "3",
+        "4",
+    )
 
 
 def _check_z1_heating_demand(coord: SaunierGeniaCoordinator) -> bool | None:

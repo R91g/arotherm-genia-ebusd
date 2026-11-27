@@ -681,8 +681,8 @@
       "stats_hwc_hours": {
         "name": "Horas de funcionamiento en ACS"
       },
-      "stats_hwc_starts": {
-        "name": "Arranques acumulados en ACS"
+      "stats_hwc_valve_switches": {
+        "name": "Conmutaciones válvula 3 vías ACS"
       },
       "stats_building_cpump_hours": {
         "name": "Horas de funcionamiento bomba primaria"
@@ -691,10 +691,10 @@
         "name": "Arranques acumulados bomba primaria"
       },
       "stats_4port_valve_hours": {
-        "name": "Horas de funcionamiento válvula 4 vías (Refrigeración)"
+        "name": "Horas de funcionamiento válvula 4 vías (Refrigeración / Desescarche)"
       },
       "stats_4port_valve_switches": {
-        "name": "Conmutaciones acumuladas válvula 4 vías"
+        "name": "Conmutaciones válvula 4 vías (Refrigeración / Desescarche)"
       },
       "stats_fan1_hours": {
         "name": "Horas de funcionamiento ventilador 1"
@@ -708,11 +708,11 @@
       "stats_fan2_starts": {
         "name": "Arranques acumulados ventilador 2"
       },
-      "stats_deice_hours": {
-        "name": "Horas acumuladas en desescarche"
+      "stats_condensate_tray_heater_hours": {
+        "name": "Horas resistencia bandeja de condensados"
       },
-      "stats_deice_starts": {
-        "name": "Ciclos acumulados de desescarche"
+      "stats_condensate_tray_heater_switches": {
+        "name": "Conmutaciones resistencia bandeja de condensados"
       },
       "system_operating_state": {
         "name": "Estado operativo del sistema",

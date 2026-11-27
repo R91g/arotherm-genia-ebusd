@@ -681,8 +681,8 @@
       "stats_hwc_hours": {
         "name": "DHW Mode Operating Hours"
       },
-      "stats_hwc_starts": {
-        "name": "DHW Mode Total Starts"
+      "stats_hwc_valve_switches": {
+        "name": "DHW 3-Way Valve Total Switches"
       },
       "stats_building_cpump_hours": {
         "name": "Primary Pump Operating Hours"
@@ -691,10 +691,10 @@
         "name": "Primary Pump Total Starts"
       },
       "stats_4port_valve_hours": {
-        "name": "4-Port Reversing Valve Operating Hours (Cooling)"
+        "name": "4-Port Reversing Valve Operating Hours (Cooling / Defrost)"
       },
       "stats_4port_valve_switches": {
-        "name": "4-Port Reversing Valve Total Switches"
+        "name": "4-Port Reversing Valve Total Switches (Cooling / Defrost)"
       },
       "stats_fan1_hours": {
         "name": "Fan 1 Operating Hours"
@@ -708,11 +708,11 @@
       "stats_fan2_starts": {
         "name": "Fan 2 Total Starts"
       },
-      "stats_deice_hours": {
-        "name": "Defrost Total Operating Hours"
+      "stats_condensate_tray_heater_hours": {
+        "name": "Condensate Tray Heater Operating Hours"
       },
-      "stats_deice_starts": {
-        "name": "Defrost Total Cycles"
+      "stats_condensate_tray_heater_switches": {
+        "name": "Condensate Tray Heater Total Switches"
       },
       "system_operating_state": {
         "name": "System Operating State",

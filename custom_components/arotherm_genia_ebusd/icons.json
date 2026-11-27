@@ -479,7 +479,7 @@
       "stats_building_cpump_starts": {
         "default": "mdi:counter"
       },
-      "stats_deice_hours": {
+      "stats_condensate_tray_heater_hours": {
         "default": "mdi:timer-sand"
       },
       "stats_fan1_hours": {
@@ -617,8 +617,8 @@
       "stats_hwc_hours": {
         "default": "mdi:timer-sand"
       },
-      "stats_hwc_starts": {
-        "default": "mdi:counter"
+      "stats_hwc_valve_switches": {
+        "default": "mdi:valve"
       },
       "stats_fan1_starts": {
         "default": "mdi:counter"
@@ -626,7 +626,7 @@
       "stats_fan2_starts": {
         "default": "mdi:counter"
       },
-      "stats_deice_starts": {
+      "stats_condensate_tray_heater_switches": {
         "default": "mdi:counter"
       },
       "stats_compressor_hc_hours": {

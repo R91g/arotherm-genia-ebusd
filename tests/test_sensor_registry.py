@@ -473,25 +473,57 @@ class TestSensorRegistry(unittest.TestCase):
         self.assertIn((CIRCUIT_BASS3, "Hc1PumpStatus"), ent._subscriptions)
         self.assertIn((CIRCUIT_BASS3, "CoolingReleaseStatus"), ent._subscriptions)
 
-    def test_stats_hwc_starts_has_vwzio_fallback(self) -> None:
-        """stats_hwc_starts falls back to 76.vwzio RunStatsHwcStarts when hmux0 has no value."""
+    def test_stats_hwc_valve_switches_has_vwzio_and_legacy_fallback(self) -> None:
+        """stats_hwc_valve_switches reads 0x0bc1 from hmux0/vwzio with legacy RunStatsHwcStarts fallback."""
         from unittest.mock import MagicMock
 
         from custom_components.arotherm_genia_ebusd.sensor import SaunierGeniaSensor
 
-        desc = next(d for d in SENSOR_DESCRIPTIONS if d.key == "stats_hwc_starts")
+        desc = next(
+            d for d in SENSOR_DESCRIPTIONS if d.key == "stats_hwc_valve_switches"
+        )
         self.assertEqual(desc.fallback_circuit, CIRCUIT_VWZIO)
-        self.assertEqual(desc.fallback_message, "RunStatsHwcStarts")
+        self.assertEqual(desc.fallback_message, "RunStatsHwcValveSwitches")
         self.assertEqual(desc.fallback_field, "value")
 
         mock_coord = MagicMock()
         mock_coord.entry.entry_id = "test_entry"
         mock_coord.get_int.side_effect = lambda c, m, _f: (
-            42 if (c == CIRCUIT_VWZIO and m == "RunStatsHwcStarts") else None
+            42 if (c == CIRCUIT_VWZIO and m == "RunStatsHwcValveSwitches") else None
         )
         sensor_ent = SaunierGeniaSensor(mock_coord, desc)
+        self.assertIn(
+            (CIRCUIT_VWZIO, "RunStatsHwcValveSwitches"), sensor_ent._subscriptions
+        )
         self.assertIn((CIRCUIT_VWZIO, "RunStatsHwcStarts"), sensor_ent._subscriptions)
         self.assertEqual(sensor_ent.native_value, 42)
+
+        # Legacy CSV fallback (RunStatsHwcStarts)
+        mock_coord.get_int.side_effect = lambda c, m, _f: (
+            167 if (c == CIRCUIT_VWZIO and m == "RunStatsHwcStarts") else None
+        )
+        self.assertEqual(sensor_ent.native_value, 167)
+
+    def test_energy_integration_active_includes_defrost_mode_4(self) -> None:
+        """PowerStatus mode 4 (defrost) keeps energy_integration_active True."""
+        from unittest.mock import MagicMock
+
+        from custom_components.arotherm_genia_ebusd.binary_sensor import (
+            _check_energy_integration,
+        )
+
+        mock_coord = MagicMock()
+        for val, expected in (
+            ("standby", False),
+            ("0", False),
+            ("heating", True),
+            ("hwc", True),
+            ("cooling", True),
+            ("defrost", True),
+            ("4", True),
+        ):
+            mock_coord.get_str.return_value = val
+            self.assertEqual(_check_energy_integration(mock_coord), expected)
 
     def test_stats_sensors_are_diagnostic_and_hc1_pump_is_primary(self) -> None:
         """Verify all stats_* counters use EntityCategory.DIAGNOSTIC while hc1_pump_status stays primary."""

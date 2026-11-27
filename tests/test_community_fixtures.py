@@ -224,17 +224,20 @@ class TestCommunityFixtures(unittest.TestCase):
         fan2_starts_desc = next(
             d for d in SENSOR_DESCRIPTIONS if d.key == "stats_fan2_starts"
         )
-        deice_starts_desc = next(
-            d for d in SENSOR_DESCRIPTIONS if d.key == "stats_deice_starts"
+        tray_heater_switches_desc = next(
+            d
+            for d in SENSOR_DESCRIPTIONS
+            if d.key == "stats_condensate_tray_heater_switches"
         )
 
         s_fan1_starts = SaunierGeniaSensor(coord, fan1_starts_desc)
         s_fan2_starts = SaunierGeniaSensor(coord, fan2_starts_desc)
-        s_deice_starts = SaunierGeniaSensor(coord, deice_starts_desc)
+        s_tray_switches = SaunierGeniaSensor(coord, tray_heater_switches_desc)
 
         self.assertEqual(s_fan1_starts.native_value, 1092)
         self.assertEqual(s_fan2_starts.native_value, 1092)
-        self.assertEqual(s_deice_starts.native_value, 29)
+        # Legacy RunStatsDeiceStarts (0x0be4) in older fixture falls back seamlessly
+        self.assertEqual(s_tray_switches.native_value, 29)
 
         # Verify energy registers and heating seasonal COP
         elec_hc = coord.get_float("hmux0", "PrEnergyElectricHc")

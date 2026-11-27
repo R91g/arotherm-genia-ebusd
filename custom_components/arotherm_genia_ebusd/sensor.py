@@ -18,6 +18,7 @@ from .const import (
     CIRCUIT_BASS3,
     CIRCUIT_HMU,
     CIRCUIT_HMUX0,
+    CIRCUIT_VWZIO,
     CONTROLLER_CIRCUITS,
     DAY_SHORT_KEYS,
     DEVICE_CLIMATE_CONTROLLER,
@@ -153,6 +154,27 @@ class SaunierGeniaSensor(SaunierGeniaEntity, SensorEntity):
                     (CIRCUIT_HMUX0, "RunDataCondensateTemp"),
                     (CIRCUIT_HMU, "RunDataCondensationTemp"),
                     (CIRCUIT_HMU, "RunDataCondensateTemp"),
+                ]
+            )
+        elif description.key == "stats_hwc_valve_switches":
+            subs.extend(
+                [
+                    (CIRCUIT_HMUX0, "RunStatsHwcStarts"),
+                    (CIRCUIT_VWZIO, "RunStatsHwcStarts"),
+                ]
+            )
+        elif description.key == "stats_condensate_tray_heater_hours":
+            subs.extend(
+                [
+                    (CIRCUIT_HMUX0, "RunStatsDeiceHours"),
+                    (CIRCUIT_HMU, "RunStatsDeiceHours"),
+                ]
+            )
+        elif description.key == "stats_condensate_tray_heater_switches":
+            subs.extend(
+                [
+                    (CIRCUIT_HMUX0, "RunStatsDeiceStarts"),
+                    (CIRCUIT_HMU, "RunStatsDeiceStarts"),
                 ]
             )
 
