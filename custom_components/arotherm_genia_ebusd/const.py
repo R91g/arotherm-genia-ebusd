@@ -920,6 +920,11 @@ HMU_FAULT_STATUS_CODES: frozenset[str] = frozenset(
 WATER_PRESSURE_LOW_BAR: float = 0.8
 WATER_PRESSURE_HIGH_BAR: float = 2.8
 
+# Debounce grace period (seconds) before flagging ebus_offline in system_health_alert.
+# Filters out transient ~16s eBUSd signal blips (e.g. Wi-Fi adapter hiccups or brief
+# eBUSd restarts) without delaying hardware faults or water-pressure alerts.
+EBUS_OFFLINE_ALERT_DEBOUNCE_SECONDS: int = 90
+
 SYSTEM_OPERATING_STATES: list[str] = [
     "standby",
     "heating",

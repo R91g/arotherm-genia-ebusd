@@ -141,6 +141,7 @@ triggers:
 
 variables:
   health_entity: !input health_alert_sensor
+  alert_delay_minutes: !input alert_delay_minutes
   pressure_entity: !input water_pressure_sensor
   low_pressure: !input low_pressure_threshold
   high_pressure: !input high_pressure_threshold
@@ -181,7 +182,20 @@ variables:
 
 conditions:
   - condition: template
-    value_template: "{{ not is_recovery or notify_recovery }}"
+    value_template: >-
+      {% if not is_recovery %}
+        true
+      {% elif not notify_recovery %}
+        false
+      {% else %}
+        {% set prev = trigger.from_state %}
+        {% set curr = trigger.to_state %}
+        {% if prev is not none and curr is not none and prev.last_changed is defined and curr.last_changed is defined %}
+          {{ (curr.last_changed - prev.last_changed).total_seconds() >= (alert_delay_minutes | float(0) * 60) }}
+        {% else %}
+          true
+        {% endif %}
+      {% endif %}
 
 actions:
   - if:

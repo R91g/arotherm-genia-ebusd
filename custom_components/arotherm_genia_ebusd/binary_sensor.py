@@ -317,7 +317,7 @@ def _evaluate_system_health(
             alerts.append("low_water_pressure")
         elif pressure > WATER_PRESSURE_HIGH_BAR:
             alerts.append("high_water_pressure")
-    if ebus_known and not ebus_ok:
+    if ebus_known and coord.is_ebus_offline_alert_active:
         alerts.append("ebus_offline")
 
     attrs: dict[str, Any] = {

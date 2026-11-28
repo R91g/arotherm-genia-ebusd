@@ -88,6 +88,7 @@ from .const import (
     DHW_BOOST_HYST_MARGIN,
     DHW_BOOST_MAX_TIMEOUT_SECONDS,
     DOMAIN,
+    EBUS_OFFLINE_ALERT_DEBOUNCE_SECONDS,
     EBUSD_TRAFFIC_TIMEOUT_SECONDS,
     ELECTRIC_POWER_UNAVAILABLE_TIMEOUT_SECONDS,
     ESSENTIAL_HYDRATION_MESSAGES,
@@ -491,6 +492,8 @@ class SaunierGeniaCoordinator:
         # Silence watchdog and last telemetry timestamp
         self._last_telemetry_time: float | None = None
         self._last_ebus_operational: bool = False
+        self._ebus_offline_since: float | None = None
+        self._ebus_offline_alert_unsub: CALLBACK_TYPE | None = None
         self._watchdog_unsub: CALLBACK_TYPE | None = None
         self._last_watchdog_elec_power: float | None = None
         self._last_watchdog_date: date = dt_util.now().date()
@@ -1102,10 +1105,79 @@ class SaunierGeniaCoordinator:
             name=f"{DOMAIN}_seed_check_{self.entry.entry_id}",
         )
 
+    @property
+    def is_ebus_offline_alert_active(self) -> bool:
+        """Return True when eBUS has been offline long enough to raise a health alert.
+
+        Filters transient eBUSd signal micro-drops (e.g. ~16s Wi-Fi adapter hiccups
+        or brief add-on restarts) via EBUS_OFFLINE_ALERT_DEBOUNCE_SECONDS while
+        alerting immediately if the 600s total-silence timeout has already elapsed.
+        """
+        if self.is_ebus_operational:
+            if self._ebus_offline_since is not None:
+                self._async_cancel_ebus_offline_debounce()
+            return False
+
+        # Total communication silence already waited EBUSD_TRAFFIC_TIMEOUT_SECONDS (600s)
+        if (
+            self._last_telemetry_time is not None
+            and (time.monotonic() - self._last_telemetry_time)
+            > EBUSD_TRAFFIC_TIMEOUT_SECONDS
+        ):
+            return True
+
+        if self._ebus_offline_since is None:
+            self._ebus_offline_since = time.monotonic()
+            return False
+
+        return (
+            time.monotonic() - self._ebus_offline_since
+        ) >= EBUS_OFFLINE_ALERT_DEBOUNCE_SECONDS
+
+    @callback
+    def _async_cancel_ebus_offline_debounce(self) -> None:
+        """Clear pending eBUS offline alert debounce timer and timestamp."""
+        self._ebus_offline_since = None
+        if self._ebus_offline_alert_unsub is not None:
+            self._ebus_offline_alert_unsub()
+            self._ebus_offline_alert_unsub = None
+
+    @callback
+    def _async_on_ebus_offline_alert_timeout(self, _now: datetime) -> None:
+        """Re-evaluate system_health_alert once eBUS offline debounce expires."""
+        self._ebus_offline_alert_unsub = None
+        if self._unloaded:
+            return
+        self._async_notify_message_listeners(CALC_CIRCUIT, "SystemHealthAlert")
+
+    @callback
+    def _async_update_ebus_offline_debounce(self) -> None:
+        """Arm or clear the ebus_offline health-alert debounce timer."""
+        if self.is_ebus_operational:
+            self._async_cancel_ebus_offline_debounce()
+            return
+
+        if self._ebus_offline_since is None:
+            self._ebus_offline_since = time.monotonic()
+
+        if self._ebus_offline_alert_unsub is None and not self._unloaded:
+            remaining = max(
+                0.5,
+                float(EBUS_OFFLINE_ALERT_DEBOUNCE_SECONDS)
+                - (time.monotonic() - self._ebus_offline_since)
+                + 0.5,
+            )
+            self._ebus_offline_alert_unsub = async_call_later(
+                self.hass,
+                remaining,
+                self._async_on_ebus_offline_alert_timeout,
+            )
+
     @callback
     def _async_sync_ebus_operational_listeners(self) -> None:
         """Notify availability-gated entities whenever is_ebus_operational transitions."""
         curr_op = self.is_ebus_operational
+        self._async_update_ebus_offline_debounce()
         if curr_op != self._last_ebus_operational:
             self._last_ebus_operational = curr_op
             self._async_notify_message_listeners(CIRCUIT_GLOBAL, "running")
@@ -1121,6 +1193,8 @@ class SaunierGeniaCoordinator:
                 self._async_notify_message_listeners(CIRCUIT_GLOBAL, "running")
                 self._async_notify_message_listeners(CIRCUIT_GLOBAL, "signal")
         self._async_sync_ebus_operational_listeners()
+        if self._ebus_offline_since is not None and self.is_ebus_offline_alert_active:
+            self._async_notify_message_listeners(CALC_CIRCUIT, "SystemHealthAlert")
 
         # Re-evaluate stale electric power / Live COP every 60s so expired power metrics update cleanly
         curr_elec = self.get_instantaneous_electric_power()
@@ -1330,6 +1404,8 @@ class SaunierGeniaCoordinator:
         if self._watchdog_unsub is not None:
             self._watchdog_unsub()
             self._watchdog_unsub = None
+
+        self._async_cancel_ebus_offline_debounce()
 
         for unsub in self._pending_get_unsubs.values():
             unsub()
@@ -1799,6 +1875,7 @@ class SaunierGeniaCoordinator:
         # Wake up availability-gated entities (e.g. subscriptions=[]) on offline -> online transitions
         if circuit_key == CIRCUIT_GLOBAL and msg_lower in ("running", "signal"):
             self._last_ebus_operational = self.is_ebus_operational
+            self._async_update_ebus_offline_debounce()
         else:
             self._async_sync_ebus_operational_listeners()
 

@@ -866,15 +866,60 @@ class TestSensorRegistry(unittest.TestCase):
             ["high_water_pressure"],
         )
 
-        # Restore pressure; test eBUS offline detection
+        # Restore pressure; test eBUS offline detection with debounce grace period
+        import time
+
+        from custom_components.arotherm_genia_ebusd.const import (
+            EBUS_OFFLINE_ALERT_DEBOUNCE_SECONDS,
+            EBUSD_TRAFFIC_TIMEOUT_SECONDS,
+        )
+
         coord._state[(CIRCUIT_HMUX0, "FlowPressure")] = {"value": 1.6}
         coord._state[(CIRCUIT_GLOBAL, "signal")] = {"value": "false"}
+        # Transient micro-drop (< debounce): no alert yet, but ebus_operational is False
+        self.assertFalse(health_ent.is_on)
+        self.assertEqual((health_ent.extra_state_attributes or {})["alerts"], [])
+        self.assertFalse((health_ent.extra_state_attributes or {})["ebus_operational"])
+        self.assertIsNotNone(coord._ebus_offline_since)
+
+        # Brief recovery within debounce clears timer without ever firing alert
+        coord._state[(CIRCUIT_GLOBAL, "signal")] = {"value": "true"}
+        self.assertFalse(health_ent.is_on)
+        self.assertIsNone(coord._ebus_offline_since)
+        self.assertTrue((health_ent.extra_state_attributes or {})["ebus_operational"])
+
+        # Real hardware fault still alerts immediately even during eBUS offline grace period
+        coord._state[(CIRCUIT_GLOBAL, "signal")] = {"value": "false"}
+        coord._state[(CIRCUIT_HMUX0, "Currenterror")] = {"error": "F.75"}
+        self.assertTrue(health_ent.is_on)
+        self.assertEqual(
+            (health_ent.extra_state_attributes or {})["alerts"],
+            ["outdoor_fault"],
+        )
+        coord._state[(CIRCUIT_HMUX0, "Currenterror")] = {"error": "-"}
+
+        # Persistent offline (>= debounce) raises ebus_offline alert
+        coord._ebus_offline_since = (
+            time.monotonic() - EBUS_OFFLINE_ALERT_DEBOUNCE_SECONDS - 1.0
+        )
         self.assertTrue(health_ent.is_on)
         self.assertEqual(
             (health_ent.extra_state_attributes or {})["alerts"],
             ["ebus_offline"],
         )
         self.assertFalse((health_ent.extra_state_attributes or {})["ebus_operational"])
+
+        # Total-silence timeout (> EBUSD_TRAFFIC_TIMEOUT_SECONDS) alerts immediately without extra debounce
+        coord._state[(CIRCUIT_GLOBAL, "signal")] = {"value": "true"}
+        self.assertFalse(health_ent.is_on)
+        coord._last_telemetry_time = (
+            time.monotonic() - EBUSD_TRAFFIC_TIMEOUT_SECONDS - 5.0
+        )
+        self.assertTrue(health_ent.is_on)
+        self.assertEqual(
+            (health_ent.extra_state_attributes or {})["alerts"],
+            ["ebus_offline"],
+        )
 
     def test_official_automation_blueprints_integrity(self) -> None:
         """Verify official Home Assistant blueprints declare valid metadata and matching !input refs."""
@@ -884,6 +929,7 @@ class TestSensorRegistry(unittest.TestCase):
         repo_root = Path(__file__).resolve().parent.parent
         bp_dir = repo_root / "blueprints" / "automation"
         expected_files = {
+            "ebusd_csv_auto_update.yaml",
             "system_health_alerts.yaml",
             "pv_surplus_dhw_boost.yaml",
         }
