@@ -13,7 +13,8 @@ blueprint:
       name: Integration Update Entity (HACS)
       description: >
         Select the Home Assistant update entity for aroTHERM & GeniaAir (eBUS),
-        e.g. update.arotherm_genia_ebusd_update.
+        e.g. update.arotherm_geniaair_ebus_update.
+      default: update.arotherm_geniaair_ebus_update
       selector:
         entity:
           filter:

@@ -184,7 +184,7 @@ Como las actualizaciones de HACS nunca sobrescriben archivos fuera de `custom_co
      alias: "eBUSd: Actualizar CSV automáticamente tras actualizar la integración"
      trigger:
        - trigger: state
-         entity_id: update.arotherm_genia_ebusd_update
+         entity_id: update.arotherm_geniaair_ebus_update
          from: "on"
          to: "off"
      action:
