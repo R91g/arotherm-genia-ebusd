@@ -44,9 +44,18 @@ blueprint:
     notify_on_no_change:
       name: Notify Even When No CSV Files Changed
       description: >
-        When enabled, sends a confirmation even if all CSV files were already up to date.
-        Errors are always reported regardless of this setting.
+        When enabled, sends a confirmation after HACS updates even if all CSV files
+        were already up to date. Errors are always reported regardless of this setting.
       default: true
+      selector:
+        boolean:
+    check_on_ha_start:
+      name: Also Check on Home Assistant Start
+      description: >
+        Optional (disabled by default). Re-checks CSVs 15 seconds after Home Assistant
+        starts, which catches updates if you clicked Restart immediately after HACS
+        finished updating. Startup checks stay silent when CSVs are already up to date.
+      default: false
       selector:
         boolean:
     custom_actions:
@@ -81,17 +90,30 @@ triggers:
       - "unknown"
       - "unavailable"
       - "none"
+  - id: ha_started
+    trigger: homeassistant
+    event: start
 
 variables:
   update_entity_id: !input update_entity
   pass_tag: !input pass_installed_version_tag
   send_persistent: !input send_persistent_notification
   notify_unchanged: !input notify_on_no_change
+  run_on_start: !input check_on_ha_start
+  is_startup_check: "{{ trigger.id == 'ha_started' }}"
   installed_version: "{{ state_attr(update_entity_id, 'installed_version') | default('', true) | string }}"
 
+conditions:
+  - condition: template
+    value_template: "{{ (not is_startup_check) or run_on_start }}"
+
 actions:
-  - delay:
-      seconds: 2
+  - if:
+      - condition: template
+        value_template: "{{ is_startup_check }}"
+    then:
+      - delay:
+          seconds: 15
   - action: !input shell_command_action
     data: "{{ {'tag': installed_version} if (pass_tag and installed_version != '') else {} }}"
     response_variable: csv_result
@@ -101,7 +123,8 @@ actions:
       update_stdout: "{{ csv_result.stdout | default('') | trim }}"
       update_stderr: "{{ csv_result.stderr | default('') | trim }}"
       update_has_changes: "{{ not ('0 installed, 0 updated,' in update_stdout) }}"
-      should_notify: "{{ (not update_success) or notify_unchanged or update_has_changes }}"
+      should_notify: >-
+        {{ (not update_success) or update_has_changes or ((not is_startup_check) and notify_unchanged) }}
       update_title: >-
         {% if not update_success %}
           eBUSd CSV Update Failed
@@ -117,6 +140,13 @@ actions:
           Exit code {{ update_returncode }}.
           {{ update_stderr if update_stderr != '' else (update_stdout if update_stdout != '' else 'Unknown error running shell_command.') }}
         {% endif %}
+      persistent_message: |-
+        ```text
+        {{ update_message }}
+        ```{% if update_success and not update_has_changes %}
+
+        _Tip: You can disable **Notify Even When No CSV Files Changed** in this automation if you only want notifications when CSVs are updated or fail._
+        {% endif %}
   - if:
       - condition: template
         value_template: "{{ should_notify }}"
@@ -129,5 +159,5 @@ actions:
             data:
               notification_id: arotherm_genia_ebusd_csv_update
               title: "{{ update_title }}"
-              message: "{{ update_message }}"
+              message: "{{ persistent_message }}"
       - sequence: !input custom_actions
