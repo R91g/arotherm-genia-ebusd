@@ -15,7 +15,7 @@
 
 **aroTHERM & GeniaAir (eBUS)** (`arotherm_genia_ebusd`) is a Home Assistant custom integration for **Vaillant** and **Saunier Duval** R290 air-to-water heat pumps managed by `sensoCOMFORT` (`VRC 720`) or `MiPro Sense` (`SRC 720`) system controllers. It communicates with the heating system locally through [ebusd](https://github.com/john30/ebusd) over MQTT; no cloud account is required.
 
-ebusd's default register definitions predate these R290 heat pump boards and do not cover most of their messages, so this project ships its own CSV definitions for the outdoor unit (`08.hmux0` / `08.hmu`), climate controller (`15.bass3` / `15.basv3` / `15.ctlv2` / `15.ctlv3`), hydraulic module (`76.vwzio`) and wireless receiver (`04.netx3`). On top of that decoded telemetry it adds typed entities grouped by physical device and local control: setpoints, operating modes, weekly schedules, quick veto, holiday mode and bus diagnostics.
+ebusd's default register definitions predate these R290 heat pump boards and do not cover most of their messages, so this project ships its own CSV definitions for the outdoor unit (`08.hmux0` / `08.hmu`), climate controller (`15.bass3` / `15.basv3` / `15.ctlv2` / `15.ctlv3`), hydraulic module (`76.vwzio`), optional mixer/solar expansion module (`52.vr_70`) and wireless receiver (`04.netx3`). On top of that decoded telemetry it adds typed entities grouped by physical device and local control: setpoints, operating modes, weekly schedules, quick veto, holiday mode and bus diagnostics.
 
 ## Features
 
@@ -26,12 +26,13 @@ ebusd's default register definitions predate these R290 heat pump boards and do 
 - Weekly schedule calendars, summary sensors and writing for heating, cooling, DHW, circulation and silent mode (up to 3 slots per day at 1-minute resolution), plus `read_time_program` / `write_time_program` actions for visual schedule editing with **[citoki/ebusd-time-program](https://github.com/citoki/ebusd-time-program)** (`source: arotherm_genia_ebusd`).
 - Native heating quick veto, persistent timed cooling quick veto, 30-minute intensive ventilation boost, and full date/time holiday scheduling with unified remaining-duration sensors across restarts.
 - Wh-resolution energy counters per mode, computed thermal power and COP/EER, ready for the Energy Dashboard.
-- Optional ebusd TCP diagnostics (`info` and CSV `find` verification), missing-CSV detection, anonymized dumps and symbolic register read/write actions.
+- Aggregated **System Health Alert** (`system_health_alert`) monitoring board faults (`Currenterror` / `HMUStatusCode`), water pressure bounds, and sustained eBUS loss (`90 s` debounce), paired with one-click automation blueprints.
+- Optional ebusd TCP diagnostics (`info` and CSV `find` verification), automatic outdated/missing-CSV Repairs, anonymized dumps and symbolic register read/write actions.
 - UI in English, Spanish and German.
 
 ## Supported Hardware
 
-The integration covers the Vaillant `aroTHERM plus` / Saunier Duval `GeniaAir Max` R290 families (current `/7.1` and previous `/6` generations), the `76.vwzio` hydraulic modules and towers (`VWZ MEH/MH`, `uniTOWER`, `HPIM 7`, `GeniaSet`), the `VRC 720` / `SRC 720` system controllers (including `720/2` and `720/3` variants) and the optional wireless room thermostat and cloud gateway.
+The integration covers the Vaillant `aroTHERM plus` / `pro` & Saunier Duval `GeniaAir Max` R290 families (current `/7.1`, `/8.1` and previous `/6` generations), the `76.vwzio` hydraulic modules and towers (`VWZ MEH/MH`, `uniTOWER`, `HPIM 7`, `GeniaSet`), the `VRC 720` / `SRC 720` system controllers (including `720/2` and `720/3` variants), the optional `52.vr_70` mixer/solar expansion module (`VR 70` / `RED-3`), and the optional wireless room thermostat and cloud gateway.
 
 The full model tables and the per-board validation status (which boards are verified on the developer's own hardware and which rely on register maps and community reports) are in **[docs/hardware.md](docs/hardware.md)**.
 

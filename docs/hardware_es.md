@@ -6,7 +6,7 @@ Las bombas aerotérmicas de Vaillant y Saunier Duval comparten las mismas placas
 
 ## Estado de Validación
 
-La instalación de referencia del desarrollador es un regulador `15.bass3` con unidad exterior `08.hmux0`; esas definiciones CSV se ejercitan a diario sobre ese hardware real. El resto de placas (`15.basv3`, `15.ctlv2`, `15.ctlv3`, `08.hmu`, `08.hmu.HW5103`) se soportan a partir de sus mapas de registros y de los informes de testers de la comunidad, y sus definiciones siguen registro a registro a las de referencia. Si usas alguna de estas variantes y algo no decodifica bien, abre un issue con una captura anonimizada de [`dump_mqtt_values`](services_es.md#8-arotherm_genia_ebusddump_mqtt_values).
+La instalación de referencia del desarrollador es un regulador `15.bass3` con unidad exterior `08.hmux0`; esas definiciones CSV se ejercitan a diario sobre ese hardware real. El resto de placas (`15.basv3`, `15.ctlv2`, `15.ctlv3`, `08.hmu`, `08.hmu.HW5103`, `52.vr_70`) se soportan a partir de sus mapas de registros y de los informes de testers de la comunidad, y sus definiciones siguen registro a registro a las de referencia. Si usas alguna de estas variantes y algo no decodifica bien, abre un issue con una captura anonimizada de [`dump_mqtt_values`](services_es.md#8-arotherm_genia_ebusddump_mqtt_values).
 
 ## Unidades Exteriores - Bombas de Calor (`08.hmux0` / `08.hmu`)
 
@@ -28,6 +28,7 @@ La instalación de referencia del desarrollador es un regulador `15.bass3` con u
 | Rol del Componente | Modelos Vaillant | Modelos Saunier Duval | Dirección eBUS |
 | :--- | :--- | :--- | :---: |
 | **Regulador Climático (Obligatorio)** | `sensoCOMFORT VRC 720` (`720/2`, `720/3`) | `MiPro Sense SRC 720` (`720/2`, `720/3`) | `15` (`BASS3` / `BASV3` / `CTLV2` / `CTLV3`) |
+| **Módulo Mezclador / Expansión Solar (Opcional)** | `VR 70` *(autodetectado vía eBUSd TCP o activable en Configuración/Reconfigurar)* | `RED-3` *(autodetectado vía eBUSd TCP o activable en Configuración/Reconfigurar)* | `52` (`VR_70`) |
 | **Termostato Ambiente Inalámbrico / Receptor RF (Opcional)** | `sensoCOMFORT RF VRC 720f` (`NETX3` / `NETX2`) | `MiPro Sense RF SRC 720f` (`NETX3` / `NETX2`) | `04` / `f6` |
 | **Pasarela Cloud Oficial (Opcional)** | `myVAILLANT connect VR 940f` / `sensoNET VR 921` | `MiGo Link SR 940f` | Maestro `f1` |
 

@@ -15,7 +15,7 @@
 
 **aroTHERM & GeniaAir (eBUS)** (`arotherm_genia_ebusd`) es una integración personalizada de Home Assistant para bombas de calor aire-agua R290 de **Vaillant** y **Saunier Duval** gobernadas por reguladores `sensoCOMFORT` (`VRC 720`) o `MiPro Sense` (`SRC 720`). Se comunica con la instalación localmente a través de [ebusd](https://github.com/john30/ebusd) por MQTT, sin necesidad de cuenta ni pasarela cloud.
 
-Las definiciones de registros que `ebusd` incluye por defecto son anteriores a estas placas R290 y no cubren la mayoría de sus mensajes, por lo que este proyecto aporta sus propios CSV para la unidad exterior (`08.hmux0` / `08.hmu`), el regulador climático (`15.bass3` / `15.basv3` / `15.ctlv2` / `15.ctlv3`), el módulo hidráulico (`76.vwzio`) y el receptor inalámbrico (`04.netx3`). Sobre esa telemetría decodificada añade entidades tipadas agrupadas por dispositivo físico y control local: consignas, modos de funcionamiento, programaciones horarias, quick veto, modo vacaciones y diagnóstico del bus.
+Las definiciones de registros que `ebusd` incluye por defecto son anteriores a estas placas R290 y no cubren la mayoría de sus mensajes, por lo que este proyecto aporta sus propios CSV para la unidad exterior (`08.hmux0` / `08.hmu`), el regulador climático (`15.bass3` / `15.basv3` / `15.ctlv2` / `15.ctlv3`), el módulo hidráulico (`76.vwzio`), el módulo mezclador/expansión solar opcional (`52.vr_70`) y el receptor inalámbrico (`04.netx3`). Sobre esa telemetría decodificada añade entidades tipadas agrupadas por dispositivo físico y control local: consignas, modos de funcionamiento, programaciones horarias, quick veto, modo vacaciones y diagnóstico del bus.
 
 ## Características
 
@@ -26,12 +26,13 @@ Las definiciones de registros que `ebusd` incluye por defecto son anteriores a e
 - Calendarios de programación semanal, sensores resumen y escritura de horarios de calefacción, refrigeración, ACS, circulación y modo silencioso (hasta 3 franjas diarias y resolución de 1 minuto), además de las acciones `read_time_program` / `write_time_program` para editarlos visualmente con **[citoki/ebusd-time-program](https://github.com/citoki/ebusd-time-program)** (`source: arotherm_genia_ebusd`).
 - Quick veto nativo en calefacción, quick veto temporal persistente en refrigeración, refuerzo de ventilación intensiva (30 minutos) y programación de vacaciones con fecha y hora y sensores unificados de tiempo restante entre reinicios.
 - Contadores de energía por modo con resolución de Wh, potencia térmica y COP/EER calculados, listos para el Panel de Energía.
-- Diagnóstico TCP opcional de `ebusd` (`info` y verificación CSV `find`), detección de CSV ausentes, volcados anonimizados y acciones de lectura/escritura simbólica de registros.
+- **Alerta de salud del sistema** agregada (`system_health_alert`) que vigila fallos de placa (`Currenterror` / `HMUStatusCode`), límites de presión de agua y pérdida sostenida del bus eBUS (debounce de `90 s`), acompañada de blueprints oficiales en un clic.
+- Diagnóstico TCP opcional de `ebusd` (`info` y verificación CSV `find`), avisos Repair automáticos de CSV ausentes o desactualizados, volcados anonimizados y acciones de lectura/escritura simbólica de registros.
 - Interfaz en inglés, español y alemán.
 
 ## Hardware Compatible
 
-La integración cubre las familias R290 Vaillant `aroTHERM plus` / Saunier Duval `GeniaAir Max` (generaciones actuales `/7.1` y anteriores `/6`), los módulos hidráulicos y torres `76.vwzio` (`VWZ MEH/MH`, `uniTOWER`, `HPIM 7`, `GeniaSet`), los reguladores `VRC 720` / `SRC 720` (incluidas las variantes `720/2` y `720/3`) y el termostato inalámbrico y la pasarela cloud opcionales.
+La integración cubre las familias R290 Vaillant `aroTHERM plus` / `pro` y Saunier Duval `GeniaAir Max` (generaciones actuales `/7.1`, `/8.1` y anteriores `/6`), los módulos hidráulicos y torres `76.vwzio` (`VWZ MEH/MH`, `uniTOWER`, `HPIM 7`, `GeniaSet`), los reguladores `VRC 720` / `SRC 720` (incluidas las variantes `720/2` y `720/3`), el módulo mezclador/expansión solar opcional `52.vr_70` (`VR 70` / `RED-3`), y el termostato inalámbrico y la pasarela cloud opcionales.
 
 Las tablas completas de modelos y el estado de validación de cada placa (cuáles están verificadas en el hardware del propio desarrollador y cuáles dependen de mapas de registros e informes de la comunidad) están en **[docs/hardware_es.md](docs/hardware_es.md)**.
 
@@ -51,6 +52,7 @@ Importa automatizaciones listas para usar en Home Assistant con un clic:
 | :--- | :--- | :--- |
 | [Alertas de Salud y Averías](blueprints/automation/system_health_alerts.yaml) | Notifica ante fallos activos (`Currenterror` / `HMUStatusCode`), presión de agua baja/alta, pérdida de eBUS o mantenimiento pendiente | [![Importar Blueprint en Home Assistant](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FR91g%2Farotherm-genia-ebusd%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsystem_health_alerts.yaml) |
 | [Boost de ACS con Excedentes Solares](blueprints/automation/pv_surplus_dhw_boost.yaml) | Lanza `force_dhw_boost` automáticamente cuando hay excedente fotovoltaico sostenido | [![Importar Blueprint en Home Assistant](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FR91g%2Farotherm-genia-ebusd%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fpv_surplus_dhw_boost.yaml) |
+| [Actualizador Automático de CSV de eBUSd](blueprints/automation/ebusd_csv_auto_update.yaml) | Ejecuta `shell_command.update_ebusd_csvs` tras cada actualización de HACS y notifica el resultado del script (requiere `shell_command` de [Instalación Opción C](docs/installation_es.md#opción-c-opcional-actualización-automática-de-csv-tras-cada-actualización-de-hacs-shell_command)) | [![Importar Blueprint en Home Assistant](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FR91g%2Farotherm-genia-ebusd%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Febusd_csv_auto_update.yaml) |
 
 ## Documentación
 

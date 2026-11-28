@@ -4,9 +4,10 @@
 
 This directory contains **reverse-engineered and collision-free** eBUS message definitions (`.csv`) purpose-built for modern **Vaillant** and **Saunier Duval** R290 air-to-water heat pump installations (replacing upstream default `ebusd` CSVs, which target legacy boilers/controllers and are incompatible with these platforms):
 
-- **Outdoor Heat Pumps (`08.hmux0` / `08.hmu` / `08.hmu.HW5103`):** Vaillant `aroTHERM plus ES` (`VWL 55–155/7.1 A`), `aroTHERM plus` (`VWL 35–125/6 A`) & Saunier Duval `GeniaAir Max ES` (`5–15`), `GeniaAir Iso ES`, `GeniaAir Max` (`4–15`).
+- **Outdoor Heat Pumps (`08.hmux0` / `08.hmu` / `08.hmu.HW5103`):** Vaillant `aroTHERM plus ES` (`VWL 55–155/7.1 A`), `aroTHERM pro` (`VWL 55–155/7.1 A`), `aroTHERM plus` (`VWL 35–125/8.1 A` & `/6 A`) & Saunier Duval `GeniaAir Max ES` (`5–15`), `GeniaAir Iso ES`, `GeniaAir Max` (`4–15`).
 - **System Climate Controllers (`15.bass3` / `15.basv3` / `15.ctlv2` / `15.ctlv3`):** Vaillant `sensoCOMFORT` (`VRC 720/2`, `VRC 720/3`) & Saunier Duval `MiPro Sense` (`SRC 720/2`, `SRC 720/3`).
 - **Indoor Hydraulic Modules & Towers (`76.vwzio`):** Vaillant `VWZ MEH 97/7`, `VWZ MH 97/7`, `VWZ AI 7/230V`, `uniTOWER VIH QW 190/7` & Saunier Duval `HPIM 7 230V`, `HE 9-7 W`, `GeniaSet FEW/FIW 200-7`.
+- **Mixer / Solar Expansion Modules (Optional, `52.vr_70`):** Vaillant `VR 70` & Saunier Duval `RED-3` (temperature probes S1–S6, mixer circuits MC1/MC2 valves, flow targets, pumps, and active error).
 - **Wireless Room Thermostats (`04.netx3` / `f6.netx3`):** Vaillant `sensoCOMFORT RF` (`VRC 720f`) & Saunier Duval `MiPro Sense RF` (`SRC 720f`).
 - **Official Cloud Gateways (Optional, eBUS `f1`):** Vaillant `myVAILLANT connect` (`VR 940f`) / `sensoNET` (`VR 921`) & Saunier Duval `MiGo Link` (`SR 940f`).
 
@@ -24,6 +25,7 @@ This directory contains **reverse-engineered and collision-free** eBUS message d
 | **`vaillant/15.basv3.csv`** | `15` (`BASV3`) | `sensoCOMFORT` (reporting `BASV3`) | Twin definition of `15.bass3.csv` for Vaillant `sensoCOMFORT` controllers that identify as `ID=BASV3`. |
 | **`vaillant/15.ctlv2.csv`** | `15` (`CTLV2`) | `sensoCOMFORT` (reporting `CTLV2`) | Full modern definition for `sensoCOMFORT` controllers that scan as `ID=CTLV2` (e.g. `VRC 720/2` with `HW=1104`). |
 | **`vaillant/15.ctlv3.csv`** | `15` (`CTLV3`) | `sensoCOMFORT` (reporting `CTLV3`) | Full modern definition for newer `sensoCOMFORT` controllers that scan as `ID=CTLV3` (e.g. `VRC 720/3`). |
+| **`vaillant/52.vr_70.csv`** | `52` (`VR_70`) | `VR 70` / `RED-3` mixer module *(optional)* | Up to 6 NTC temperature probes (`S1`–`S6`), mixed circuit 1 & 2 (`MC1`/`MC2`) target flow temperatures, mixer valve positions, circulation pumps, and active error register. |
 | **`vaillant/76.vwzio.csv`** | `76` (`VWZIO`) | Hydraulic module / tower | 3-way diverter valve (heating/DHW), secondary circuit status, backup heater diagnostics, and active error registers. |
 | **`vaillant/04.netx3.csv`** | `04` | Wireless RF receiver | Reference room dial temperature and zone target setpoint. |
 | **`vaillant/f6.netx3.csv`** | `f6` | Wireless RF receiver (alt) | Passive reception of wireless thermostat RF broadcast frames. |
@@ -44,7 +46,7 @@ curl -fsSL https://raw.githubusercontent.com/R91g/arotherm-genia-ebusd/main/scri
 curl -fsSL https://raw.githubusercontent.com/R91g/arotherm-genia-ebusd/main/scripts/install_ebusd_csvs.sh | sudo sh -s -- -d /etc/ebusd/en
 ```
 
-Pass `--main` to fetch unreleased fixes from `main`, `--version v1.3.2` for a specific tag, `--dry-run` to preview changes, or `--help` for all options.
+Pass `--main` to fetch unreleased fixes from `main`, `--version v1.4.0` for a specific tag, `--reload` to reload `ebusd` live over TCP, `--dry-run` to preview changes, or `--help` for all options.
 
 ### 1. Home Assistant eBUSd Add-on (`b4d7ad18_ebusd`)
 
@@ -78,4 +80,4 @@ Pass `--main` to fetch unreleased fixes from `main`, `--version v1.3.2` for a sp
 For full licensing details and legal notices, see [`LICENSE.md`](LICENSE.md).
 
 - **GPL-3.0 Licensed Files:** Baseline templates and message definitions derived or adapted from [john30/ebusd-configuration](https://github.com/john30/ebusd-configuration) (including `broadcast.csv`) are licensed under the **GNU General Public License v3.0 (GPL-3.0)**, Copyright (c) John30 and eBUSd contributors.
-- **Dual-Licensed Files (MIT & GPL-3.0):** Original reverse-engineered message definitions developed specifically for this project (`08.hmux0.csv`, `08.hmu.csv`, `08.hmu.HW5103.csv`, `15.bass3.csv`, `15.basv3.csv`, `15.ctlv2.csv`, `15.ctlv3.csv`, `76.vwzio.csv`, `04.netx3.csv`, `f6.netx3.csv`) are dual-licensed under both the **MIT License** and **GPL-3.0** to allow seamless upstream contributions to the eBUSd project.
+- **Dual-Licensed Files (MIT & GPL-3.0):** Original reverse-engineered message definitions developed specifically for this project (`08.hmux0.csv`, `08.hmu.csv`, `08.hmu.HW5103.csv`, `15.bass3.csv`, `15.basv3.csv`, `15.ctlv2.csv`, `15.ctlv3.csv`, `52.vr_70.csv`, `76.vwzio.csv`, `04.netx3.csv`, `f6.netx3.csv`) are dual-licensed under both the **MIT License** and **GPL-3.0** to allow seamless upstream contributions to the eBUSd project.

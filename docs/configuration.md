@@ -6,7 +6,7 @@
 
 ## Reconfiguring Hardware, Brand, or eBUSd TCP
 
-To change the heat pump model, switch brand labels, toggle the wireless thermostat / cloud gateway, or update the optional eBUSd TCP endpoint after setup:
+To change the heat pump model, switch brand labels, toggle the wireless thermostat / cloud gateway / optional `VR 70` mixer module, or update the optional eBUSd TCP endpoint after setup:
 
 - Go to **Settings → Devices & Services → aroTHERM & GeniaAir (eBUS)**, open the **three-dot menu (`⋮`)** on the config entry and select **Reconfigure**.
 - The wizard walks through manufacturer, hardware models, and the optional eBUSd TCP step (auto-detecting local/add-on `ebusd` when unconfigured, while keeping custom hosts intact). You can also edit eBUSd TCP settings at any time under **Configure** below.
@@ -38,6 +38,7 @@ Click **Configure** on the integration card to adjust runtime behavior without r
 - **Weekly schedules:** the **5 weekly schedule summary sensors** and read-only **schedule calendar entities** (`heating`, `dhw`, `cooling`, `circulation` and `silent`) show the active programs; changes can be written from automations via [`set_weekly_timer`](services.md#1-arotherm_genia_ebusdset_weekly_timer) / [`write_time_program`](services.md#16-arotherm_genia_ebusdwrite_time_program), or edited visually on a dashboard using the **[eBUSd Time Program Card](https://github.com/citoki/ebusd-time-program)** with `source: arotherm_genia_ebusd` (see [Visual Weekly Schedule Editor Card](services.md#visual-weekly-schedule-editor-card)).
 - **Silent mode:** **Compressor Silent Operation Level** (`*_compressor_silent_operation_level`, `30–60 %`) sets the compressor noise reduction limit, and the `silent` schedule in `set_weekly_timer` controls when it applies.
 - **Unified Remaining-Duration Sensors:** `quick_veto_remaining_time` (`min`), `ventilation_remaining_time` (`min`), `holiday_duration_remaining` (`d`), and `cooling_duration_remaining` (`d`) are all standard numeric `DURATION` sensors (`0` when inactive, `Unknown` with `is_open_ended: true` in attributes when an end date is open-ended), with detailed `remaining_hours`, `remaining_minutes`, `remaining_formatted`, and start/end date & time attributes where supported.
+- **System Health Alert (`system_health_alert`):** aggregated diagnostic `problem` binary sensor combining board errors (`Currenterror` across outdoor, controller, hydraulic and optional VR 70 boards), fault-level `HMUStatusCode` states (`S.252+`), water pressure out-of-range (`< 0.8` or `> 2.8 bar`), and sustained eBUS loss (`90 s` debounce to ignore transient Wi-Fi adapter blips). Works directly with the official [System Health & Fault Alerts Blueprint](../blueprints/automation/system_health_alerts.yaml).
 
 ## Quick Veto Tuning Entities
 

@@ -6,7 +6,7 @@
 
 ## Reconfigurar Hardware, Marca o eBUSd TCP
 
-Para cambiar el modelo de bomba de calor, cambiar las etiquetas de marca, activar/desactivar el termostato inalámbrico o la pasarela cloud, o ajustar la conexión opcional eBUSd TCP tras la instalación:
+Para cambiar el modelo de bomba de calor, cambiar las etiquetas de marca, activar/desactivar el termostato inalámbrico, la pasarela cloud o el módulo mezclador opcional `VR 70`, o ajustar la conexión opcional eBUSd TCP tras la instalación:
 
 - Ve a **Ajustes → Dispositivos y Servicios → aroTHERM & GeniaAir (eBUS)**, abre el **menú de tres puntos (`⋮`)** de la entrada y selecciona **Reconfigurar**.
 - El asistente recorre el fabricante, los modelos de hardware y el paso opcional de eBUSd TCP (autodetectando el add-on o demonio local si no estaba configurado y respetando hosts personalizados). También puedes cambiar eBUSd TCP en cualquier momento desde **Configurar**.
@@ -38,6 +38,7 @@ Pulsa **Configurar** en la tarjeta de la integración para ajustar el comportami
 - **Programaciones horarias:** los **5 sensores resumen de programación semanal** y las **entidades de calendario de solo lectura** (`heating`, `dhw`, `cooling`, `circulation` y `silent`) muestran los programas vigentes; los cambios pueden escribirse desde automatizaciones con [`set_weekly_timer`](services_es.md#1-arotherm_genia_ebusdset_weekly_timer) / [`write_time_program`](services_es.md#16-arotherm_genia_ebusdwrite_time_program), o editarse visualmente desde un panel usando la tarjeta **[eBUSd Time Program Card](https://github.com/citoki/ebusd-time-program)** con `source: arotherm_genia_ebusd` (ver [Tarjeta visual para editar la programación semanal](services_es.md#tarjeta-visual-para-editar-la-programación-semanal)).
 - **Modo silencioso:** **Nivel de modo silencioso del compresor** (`compressor_silent_operation_level`, `30–60 %`) fija el límite de reducción sonora del compresor, y la programación `silent` de `set_weekly_timer` decide cuándo se aplica.
 - **Sensores unificados de tiempo restante:** `quick_veto_remaining_time` (`min`), `ventilation_remaining_time` (`min`), `holiday_duration_remaining` (`d`) y `cooling_duration_remaining` (`d`) son sensores numéricos estándar (`DURATION`, devuelven `0` cuando están inactivos o `Desconocido` con `is_open_ended: true` en atributos si no hay fecha fin), e incluyen atributos detallados como `remaining_hours`, `remaining_minutes`, `remaining_formatted` y las horas/fechas de inicio y fin cuando aplica.
+- **Alerta de salud del sistema (`system_health_alert`):** sensor binario de diagnóstico (`problem`) que agrupa averías de placas (`Currenterror` en unidad exterior, regulador, módulo hidráulico y VR 70 opcional), códigos de fallo en `HMUStatusCode` (`S.252+`), presión de agua fuera de rango (`< 0,8` o `> 2,8 bar`) y pérdida sostenida del bus eBUS (con debounce de `90 s` para filtrar microcortes Wi-Fi del adaptador). Se integra directamente con el [Blueprint oficial de Alertas de Salud y Averías](../blueprints/automation/system_health_alerts.yaml).
 
 ## Entidades de Ajuste del Quick Veto
 

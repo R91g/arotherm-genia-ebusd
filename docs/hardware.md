@@ -6,7 +6,7 @@ Vaillant and Saunier Duval aerothermal heat pumps share the same eBUS electronic
 
 ## Validation Status
 
-The developer's reference installation is a `15.bass3` controller with an `08.hmux0` outdoor unit; those CSV definitions are exercised daily on that live hardware. The remaining boards (`15.basv3`, `15.ctlv2`, `15.ctlv3`, `08.hmu`, `08.hmu.HW5103`) are supported from their register maps and from community tester reports, and their definitions track the reference ones register by register. If you run any of these variants and something does not decode correctly, please open an issue with an anonymized [`dump_mqtt_values`](services.md#8-arotherm_genia_ebusddump_mqtt_values) capture.
+The developer's reference installation is a `15.bass3` controller with an `08.hmux0` outdoor unit; those CSV definitions are exercised daily on that live hardware. The remaining boards (`15.basv3`, `15.ctlv2`, `15.ctlv3`, `08.hmu`, `08.hmu.HW5103`, `52.vr_70`) are supported from their register maps and from community tester reports, and their definitions track the reference ones register by register. If you run any of these variants and something does not decode correctly, please open an issue with an anonymized [`dump_mqtt_values`](services.md#8-arotherm_genia_ebusddump_mqtt_values) capture.
 
 ## Outdoor Units - Heat Pumps (`08.hmux0` / `08.hmu`)
 
@@ -28,6 +28,7 @@ The developer's reference installation is a `15.bass3` controller with an `08.hm
 | Component Role | Vaillant Models | Saunier Duval Models | eBUS Address |
 | :--- | :--- | :--- | :---: |
 | **System Climate Controller (Required)** | `sensoCOMFORT VRC 720` (`720/2`, `720/3`) | `MiPro Sense SRC 720` (`720/2`, `720/3`) | `15` (`BASS3` / `BASV3` / `CTLV2` / `CTLV3`) |
+| **Mixer / Solar Expansion Module (Optional)** | `VR 70` *(auto-detected via eBUSd TCP or toggle in Setup/Reconfigure)* | `RED-3` *(auto-detected via eBUSd TCP or toggle in Setup/Reconfigure)* | `52` (`VR_70`) |
 | **Wireless Room Thermostat / RF Receiver (Optional)** | `sensoCOMFORT RF VRC 720f` (`NETX3` / `NETX2`) | `MiPro Sense RF SRC 720f` (`NETX3` / `NETX2`) | `04` / `f6` |
 | **Official Cloud Gateway (Optional)** | `myVAILLANT connect VR 940f` / `sensoNET VR 921` | `MiGo Link SR 940f` | Master `f1` |
 
