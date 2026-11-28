@@ -286,12 +286,28 @@ log ""
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT INT TERM
 
+# Optional newer board CSVs that may not exist on older release tags (e.g. v1.3.2)
+is_optional_csv() {
+    case "$1" in
+        vaillant/52.vr_70.csv) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 log "Downloading and validating CSV files..."
 mkdir -p "${TMP_DIR}/vaillant"
+DOWNLOADED_FILES=""
+SKIPPED=0
 for rel in $CSV_FILES; do
     url="${RAW_BASE}/${GIT_REF}/ebusd-configuration/${rel}"
     staged="${TMP_DIR}/${rel}"
-    if ! http_download "$url" "$staged"; then
+    if ! http_download "$url" "$staged" 2>/dev/null; then
+        rm -f "$staged"
+        if is_optional_csv "$rel"; then
+            SKIPPED=$((SKIPPED + 1))
+            log "  [skipped]   ${rel} (not present in ${GIT_REF})"
+            continue
+        fi
         err "Failed to download ${url}"
         err "Aborted without modifying any files in ${TARGET_DIR}."
         exit 1
@@ -301,6 +317,7 @@ for rel in $CSV_FILES; do
         err "Aborted without modifying any files in ${TARGET_DIR}."
         exit 1
     fi
+    DOWNLOADED_FILES="${DOWNLOADED_FILES} ${rel}"
 done
 log "All CSV files downloaded and verified."
 log ""
@@ -315,7 +332,7 @@ if [ "$DRY_RUN" -eq 0 ]; then
     mkdir -p "${TARGET_DIR}/vaillant"
 fi
 
-for rel in $CSV_FILES; do
+for rel in $DOWNLOADED_FILES; do
     staged="${TMP_DIR}/${rel}"
     dest="${TARGET_DIR}/${rel}"
 
