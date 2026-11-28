@@ -3675,6 +3675,9 @@ class TestCoordinatorLogic(unittest.TestCase):
             # find Hc1CoolingEnabled -> missing
             b"ERR: element not found\n",
             b"\n",
+            # find PrEnergySumTotal -> missing (v1.4.0)
+            b"ERR: element not found\n",
+            b"\n",
             # find -f CirculationTimer_Monday -> legacy IGN:2 without ffff
             b"w,bass3,CirculationTimer_Monday,Timer,,15,b555,a600030000,ign_end,m,IGN:2,,,\n",
             b"\n",
@@ -3688,6 +3691,12 @@ class TestCoordinatorLogic(unittest.TestCase):
             b"ERR: element not found\n",
             b"\n",
             # find SubcoolingTemp -> missing
+            b"ERR: element not found\n",
+            b"\n",
+            # find RunStatsCondensateTrayHeaterHours -> missing (v1.4.0)
+            b"ERR: element not found\n",
+            b"\n",
+            # find RunStatsHwcValveSwitches -> missing (v1.4.0)
             b"ERR: element not found\n",
             b"\n",
             # find -F type,circuit,name Status02 -> passive u
@@ -3711,11 +3720,14 @@ class TestCoordinatorLogic(unittest.TestCase):
         mock_writer.write.assert_any_call(b"find VentilationBoost\n")
         mock_writer.write.assert_any_call(b"find Z1QuickVetoEndTime\n")
         mock_writer.write.assert_any_call(b"find Hc1CoolingEnabled\n")
+        mock_writer.write.assert_any_call(b"find PrEnergySumTotal\n")
         mock_writer.write.assert_any_call(b"find -f CirculationTimer_Monday\n")
         mock_writer.write.assert_any_call(b"find CompressorSilentOperationLevel\n")
         mock_writer.write.assert_any_call(b"find RunDataElectricPowerConsumption\n")
         mock_writer.write.assert_any_call(b"find RunStatsAuxHeaterSwitches\n")
         mock_writer.write.assert_any_call(b"find SubcoolingTemp\n")
+        mock_writer.write.assert_any_call(b"find RunStatsCondensateTrayHeaterHours\n")
+        mock_writer.write.assert_any_call(b"find RunStatsHwcValveSwitches\n")
         mock_writer.write.assert_any_call(b"quit\n")
 
         # 2. After user updates CSVs -> TCP find returns valid messages -> repairs auto-cleared
@@ -3735,6 +3747,8 @@ class TestCoordinatorLogic(unittest.TestCase):
             b"\n",
             b"bass3 Hc1CoolingEnabled = on\n",
             b"\n",
+            b"bass3 PrEnergySumTotal = 1234\n",
+            b"\n",
             b"w,bass3,CirculationTimer_Monday,Timer,,15,b555,a600030000,ign_end,m,HEX:2,=ffff,,\n",
             b"\n",
             b"hmux0 CompressorSilentOperationLevel = 0\n",
@@ -3744,6 +3758,10 @@ class TestCoordinatorLogic(unittest.TestCase):
             b"hmux0 RunStatsAuxHeaterSwitches = 8\n",
             b"\n",
             b"hmux0 SubcoolingTemp = 3.5\n",
+            b"\n",
+            b"hmux0 RunStatsCondensateTrayHeaterHours = 12\n",
+            b"\n",
+            b"hmux0 RunStatsHwcValveSwitches = 189\n",
             b"\n",
             b"u,hmux0,Status02\n",
             b"\n",
@@ -3779,6 +3797,8 @@ class TestCoordinatorLogic(unittest.TestCase):
             b"\n",
             b"bass3 Hc1CoolingEnabled = on\n",
             b"\n",
+            b"bass3 PrEnergySumTotal = 1234\n",
+            b"\n",
             b"w,bass3,CirculationTimer_Monday,Timer,,15,b555,a600030000,ign_end,m,IGN:2,,,\n",
             b"\n",
             b"hmux0 CompressorSilentOperationLevel = 0\n",
@@ -3788,6 +3808,10 @@ class TestCoordinatorLogic(unittest.TestCase):
             b"hmux0 RunStatsAuxHeaterSwitches = 8\n",
             b"\n",
             b"hmux0 SubcoolingTemp = 3.5\n",
+            b"\n",
+            b"hmux0 RunStatsCondensateTrayHeaterHours = 12\n",
+            b"\n",
+            b"hmux0 RunStatsHwcValveSwitches = 189\n",
             b"\n",
             b"u,hmux0,Status02\n",
             b"\n",

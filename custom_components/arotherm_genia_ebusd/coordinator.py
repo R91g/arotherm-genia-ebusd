@@ -482,6 +482,7 @@ class SaunierGeniaCoordinator:
         self._missing_outdoor_silent_circuits: set[str] = set()
         self._active_poll_legacy_outdoor_circuits: set[str] = set()
         self._missing_hmux0_registers: set[str] = set()
+        self._missing_hmu_registers: set[str] = set()
         self._missing_vwzio_registers: set[str] = set()
         self._legacy_hmu_field_circuits: set[str] = set()
         self._legacy_vwzio_active_poll: bool = False
@@ -2075,16 +2076,26 @@ class SaunierGeniaCoordinator:
                 self.get_message(CIRCUIT_HMUX0, "CompressorSilentOperationLevel")
             )
         )
-        has_missing_v132 = bool(
-            self._missing_hmux0_registers
-        ) or self._is_missing_element_err(
-            self.get_message(CIRCUIT_HMUX0, "RunStatsAuxHeaterSwitches")
+        has_missing_hmux0_regs = (
+            bool(self._missing_hmux0_registers)
+            or self._is_missing_element_err(
+                self.get_message(CIRCUIT_HMUX0, "RunStatsAuxHeaterSwitches")
+            )
+            or self._is_missing_element_err(
+                self.get_message(CIRCUIT_HMUX0, "RunStatsCondensateTrayHeaterHours")
+            )
+            or self._is_missing_element_err(
+                self.get_message(CIRCUIT_HMUX0, "RunStatsHwcValveSwitches")
+            )
         )
         has_active_diag_legacy = (
             CIRCUIT_HMUX0 in self._active_poll_legacy_outdoor_circuits
         )
         return (
-            has_legacy_sc or is_silent_err or has_missing_v132 or has_active_diag_legacy
+            has_legacy_sc
+            or is_silent_err
+            or has_missing_hmux0_regs
+            or has_active_diag_legacy
         )
 
     def _has_hmu_csv_incompatibility(self, circuit_key: str) -> bool:
@@ -2101,6 +2112,11 @@ class SaunierGeniaCoordinator:
                 self.get_message(circuit_key, "CompressorSilentOperationLevel")
             )
         )
+        has_missing_hmu_regs = bool(
+            self._missing_hmu_registers
+        ) or self._is_missing_element_err(
+            self.get_message(circuit_key, "RunStatsCondensateTrayHeaterHours")
+        )
         has_active_diag_legacy = (
             circuit_key in self._active_poll_legacy_outdoor_circuits
         )
@@ -2108,6 +2124,7 @@ class SaunierGeniaCoordinator:
         return (
             has_legacy_status
             or is_silent_err
+            or has_missing_hmu_regs
             or has_active_diag_legacy
             or has_legacy_fields
         )
@@ -2119,6 +2136,9 @@ class SaunierGeniaCoordinator:
             or bool(self._missing_vwzio_registers)
             or self._is_missing_element_err(
                 self.get_message(CIRCUIT_VWZIO, "RunStatsAuxHeaterSwitches")
+            )
+            or self._is_missing_element_err(
+                self.get_message(CIRCUIT_VWZIO, "RunStatsHwcValveSwitches")
             )
         )
 
@@ -2187,12 +2207,16 @@ class SaunierGeniaCoordinator:
                             ISSUE_OUTDATED_HMUX0_CSV, active=False
                         )
 
-            elif msg_lower == "runstatsauxheaterswitches":
+            elif msg_lower in (
+                "runstatsauxheaterswitches",
+                "runstatscondensatetrayheaterhours",
+                "runstatshwcvalveswitches",
+            ):
                 if is_missing_err:
-                    self._missing_hmux0_registers.add("runstatsauxheaterswitches")
+                    self._missing_hmux0_registers.add(msg_lower)
                     self._async_set_repair_issue(ISSUE_OUTDATED_HMUX0_CSV, active=True)
                 elif not is_any_err:
-                    self._missing_hmux0_registers.discard("runstatsauxheaterswitches")
+                    self._missing_hmux0_registers.discard(msg_lower)
                     if not self._has_hmux0_csv_incompatibility():
                         self._async_set_repair_issue(
                             ISSUE_OUTDATED_HMUX0_CSV, active=False
@@ -2228,7 +2252,18 @@ class SaunierGeniaCoordinator:
                             ISSUE_OUTDATED_HMU_CSV, active=False
                         )
 
-        # 2b. Detect legacy vs modern controller CSVs (v1.3.2+: Z1QuickVetoEndTime/Z1TimeSlotActive/Hc1CoolingEnabled/etc.)
+            elif msg_lower == "runstatscondensatetrayheaterhours":
+                if is_missing_err:
+                    self._missing_hmu_registers.add(msg_lower)
+                    self._async_set_repair_issue(ISSUE_OUTDATED_HMU_CSV, active=True)
+                elif not is_any_err:
+                    self._missing_hmu_registers.discard(msg_lower)
+                    if not self._has_hmu_csv_incompatibility(circuit_key):
+                        self._async_set_repair_issue(
+                            ISSUE_OUTDATED_HMU_CSV, active=False
+                        )
+
+        # 2b. Detect legacy vs modern controller CSVs (v1.4.0+: PrEnergySumTotal/Hc1CoolingEnabled/etc.)
         if circuit_key in CONTROLLER_CIRCUITS:
             probe_registers = (
                 "hwclegionelladay",
@@ -2238,6 +2273,7 @@ class SaunierGeniaCoordinator:
                 "z1quickvetoendtime",
                 "z1timeslotactive",
                 "hc1coolingenabled",
+                "prenergysumtotal",
             )
             if not is_any_err and msg_lower in ("z1holidaytemp", "z1daytemp"):
                 self._async_set_repair_issue(ISSUE_OUTDATED_CONTROLLER_CSV, active=True)
@@ -2267,13 +2303,16 @@ class SaunierGeniaCoordinator:
                             ISSUE_OUTDATED_CONTROLLER_CSV, active=False
                         )
 
-        # 2c. Detect pre-v1.3.2 76.vwzio.csv via RunStatsAuxHeaterSwitches over MQTT
-        if circuit_key == CIRCUIT_VWZIO and msg_lower == "runstatsauxheaterswitches":
+        # 2c. Detect pre-v1.4.0 76.vwzio.csv via RunStatsAuxHeaterSwitches / RunStatsHwcValveSwitches over MQTT
+        if circuit_key == CIRCUIT_VWZIO and msg_lower in (
+            "runstatsauxheaterswitches",
+            "runstatshwcvalveswitches",
+        ):
             if is_missing_err:
-                self._missing_vwzio_registers.add("runstatsauxheaterswitches")
+                self._missing_vwzio_registers.add(msg_lower)
                 self._async_set_repair_issue(ISSUE_OUTDATED_VWZIO_CSV, active=True)
             elif not is_any_err:
-                self._missing_vwzio_registers.discard("runstatsauxheaterswitches")
+                self._missing_vwzio_registers.discard(msg_lower)
                 if not self._has_vwzio_csv_incompatibility():
                     self._async_set_repair_issue(ISSUE_OUTDATED_VWZIO_CSV, active=False)
 
@@ -3601,6 +3640,7 @@ class SaunierGeniaCoordinator:
                 ("VentilationBoost", "ventilationboost"),
                 ("Z1QuickVetoEndTime", "z1quickvetoendtime"),
                 ("Hc1CoolingEnabled", "hc1coolingenabled"),
+                ("PrEnergySumTotal", "prenergysumtotal"),
             )
             ctrl_results = [
                 (key, await _tcp_find(name)) for name, key in ctrl_probe_names
@@ -3666,19 +3706,38 @@ class SaunierGeniaCoordinator:
                 for c_out in active_out_circuits:
                     self._missing_outdoor_silent_circuits.discard(c_out)
 
-            # Verify v1.3.2+ registers on 08.hmux0.csv
-            has_hmux0_v132_err = False
+            # Verify v1.3.2+ / v1.4.0+ registers on 08.hmux0.csv and 08.hmu*.csv
+            has_hmux0_reg_err = False
+            has_hmu_reg_err = False
             if is_hmux0_csv:
                 for name, key in (
                     ("RunStatsAuxHeaterSwitches", "runstatsauxheaterswitches"),
                     ("SubcoolingTemp", "subcoolingtemp"),
+                    (
+                        "RunStatsCondensateTrayHeaterHours",
+                        "runstatscondensatetrayheaterhours",
+                    ),
+                    ("RunStatsHwcValveSwitches", "runstatshwcvalveswitches"),
                 ):
-                    v132_resp = await _tcp_find(name)
-                    if self._is_missing_element_err(v132_resp):
+                    probe_resp = await _tcp_find(name)
+                    if self._is_missing_element_err(probe_resp):
                         self._missing_hmux0_registers.add(key)
-                        has_hmux0_v132_err = True
-                    elif v132_resp is not None and not v132_resp.startswith("ERR:"):
+                        has_hmux0_reg_err = True
+                    elif probe_resp is not None and not probe_resp.startswith("ERR:"):
                         self._missing_hmux0_registers.discard(key)
+            else:
+                for name, key in (
+                    (
+                        "RunStatsCondensateTrayHeaterHours",
+                        "runstatscondensatetrayheaterhours",
+                    ),
+                ):
+                    probe_resp = await _tcp_find(name)
+                    if self._is_missing_element_err(probe_resp):
+                        self._missing_hmu_registers.add(key)
+                        has_hmu_reg_err = True
+                    elif probe_resp is not None and not probe_resp.startswith("ERR:"):
+                        self._missing_hmu_registers.discard(key)
 
             # Verify passive-only (u) v1.3.1+ definitions on diagnostic/status frames
             outdoor_diag_msg = "Status02" if is_hmux0_csv else "RunDataDiag000b"
@@ -3715,7 +3774,8 @@ class SaunierGeniaCoordinator:
             if (
                 any(self._is_missing_element_err(r) for r in out_probes)
                 or has_active_diag_poll
-                or has_hmux0_v132_err
+                or has_hmux0_reg_err
+                or has_hmu_reg_err
                 or has_legacy_hmu_fields
             ):
                 self._async_set_repair_issue(outdoor_issue, active=True)
@@ -3740,16 +3800,20 @@ class SaunierGeniaCoordinator:
                 self._legacy_vwzio_active_poll = any(
                     row[0].startswith("r") for row in vwzio_rows
                 )
-            immersion_resp = await _tcp_find("ImmersionHeaterPower")
-            if self._is_missing_element_err(immersion_resp):
-                self._missing_vwzio_registers.add("immersionheaterpower")
-            elif immersion_resp is not None and not immersion_resp.startswith("ERR:"):
-                self._missing_vwzio_registers.discard("immersionheaterpower")
+            vwzio_probe_ok = False
+            for name, key in (
+                ("ImmersionHeaterPower", "immersionheaterpower"),
+                ("RunStatsHwcValveSwitches", "runstatshwcvalveswitches"),
+            ):
+                vwz_resp = await _tcp_find(name)
+                if self._is_missing_element_err(vwz_resp):
+                    self._missing_vwzio_registers.add(key)
+                elif vwz_resp is not None and not vwz_resp.startswith("ERR:"):
+                    self._missing_vwzio_registers.discard(key)
+                    vwzio_probe_ok = True
             if self._has_vwzio_csv_incompatibility():
                 self._async_set_repair_issue(ISSUE_OUTDATED_VWZIO_CSV, active=True)
-            elif vwzio_rows or (
-                immersion_resp is not None and not immersion_resp.startswith("ERR:")
-            ):
+            elif vwzio_rows or vwzio_probe_ok:
                 self._async_set_repair_issue(ISSUE_OUTDATED_VWZIO_CSV, active=False)
 
     async def _async_fetch_ebusd_tcp_info(self) -> None:

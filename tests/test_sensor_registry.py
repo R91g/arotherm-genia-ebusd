@@ -284,6 +284,15 @@ class TestSensorRegistry(unittest.TestCase):
         self.assertEqual(
             overlap, set(), f"Active unique_id overlaps deprecated list: {overlap}"
         )
+        for v140_deprecated in (
+            "hmux0_runstatsimmersionheaterhours_value",
+            "hmux0_runstatsimmersionheaterstarts_value",
+            "hmux0_runstatshwcstarts_value",
+            "hmux0_runstatsdeicehours_value",
+            "hmux0_runstatsdeicestarts_value",
+            "number_bass3_dewpointoffset_value",
+        ):
+            self.assertIn(v140_deprecated, DEPRECATED_UNIQUE_ID_SUFFIXES)
 
     def test_hmux0_only_sensor_unique_id_suffixes_match_descriptions(self) -> None:
         """Verify HMUX0_ONLY_SENSOR_UNIQUE_ID_SUFFIXES matches exactly the 3 hmux0_only descriptions."""

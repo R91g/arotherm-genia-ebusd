@@ -820,11 +820,17 @@ class TestEbusdTcpScanMetadata(unittest.TestCase):
             b"\n",
             b"hmux0 SubcoolingTemp = 3.0\n",
             b"\n",
+            b"hmux0 RunStatsCondensateTrayHeaterHours = 12\n",
+            b"\n",
+            b"hmux0 RunStatsHwcValveSwitches = 189\n",
+            b"\n",
             b"r,hmux0,Status02\n",
             b"u,hmux0,Status02\n",
             b"\n",
-            # SecondaryCircuitStatus still has active `r` (pre-v1.3.1) and ImmersionHeaterPower missing
+            # SecondaryCircuitStatus still has active `r` (pre-v1.3.1), ImmersionHeaterPower & RunStatsHwcValveSwitches missing
             b"r,vwzio,SecondaryCircuitStatus\n",
+            b"\n",
+            b"ERR: element not found\n",
             b"\n",
             b"ERR: element not found\n",
             b"\n",
@@ -847,7 +853,7 @@ class TestEbusdTcpScanMetadata(unittest.TestCase):
         self.assertIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
         self.assertIn(ISSUE_OUTDATED_VWZIO_CSV, coord._active_repair_issues)
 
-        # Updating CSVs to v1.3.2 definitions clears both repairs cleanly
+        # Updating CSVs to v1.4.0 definitions clears both repairs cleanly
         tcp_updated = [
             b"version: ebusd 26.1\n",
             b'address 08: slave #11, scanned "MF=Vaillant;ID=HMUX0;SW=0407;HW=0504", loaded "vaillant/08.hmux0.csv"\n',
@@ -861,11 +867,17 @@ class TestEbusdTcpScanMetadata(unittest.TestCase):
             b"\n",
             b"hmux0 SubcoolingTemp = 3.0\n",
             b"\n",
+            b"hmux0 RunStatsCondensateTrayHeaterHours = 12\n",
+            b"\n",
+            b"hmux0 RunStatsHwcValveSwitches = 189\n",
+            b"\n",
             b"u,hmux0,Status02\n",
             b"\n",
             b"u,vwzio,SecondaryCircuitStatus\n",
             b"\n",
             b"vwzio ImmersionHeaterPower = 0.0\n",
+            b"\n",
+            b"vwzio RunStatsHwcValveSwitches = 189\n",
             b"\n",
         ]
         r2 = AsyncMock()
@@ -886,7 +898,7 @@ class TestEbusdTcpScanMetadata(unittest.TestCase):
         self.assertNotIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
         self.assertNotIn(ISSUE_OUTDATED_VWZIO_CSV, coord._active_repair_issues)
 
-        # Verify HMU00 Status01 missing 8=venting (v1.3.1 CSV) triggers ISSUE_OUTDATED_HMU_CSV and clears on v1.3.2
+        # Verify HMU00 Status01 missing 8=venting / missing v1.4.0 RunStatsCondensateTrayHeaterHours triggers ISSUE_OUTDATED_HMU_CSV and clears on v1.4.0
         coord_hmu = self._make_coord()
         tcp_hmu_v131 = [
             b"version: ebusd 26.1\n",
@@ -895,6 +907,8 @@ class TestEbusdTcpScanMetadata(unittest.TestCase):
             b"hmu CompressorSilentOperationLevel = 0\n",
             b"\n",
             b"hmu RunDataElectricPowerConsumption = 300\n",
+            b"\n",
+            b"ERR: element not found\n",
             b"\n",
             b"u,hmu,RunDataDiag000b\n",
             b"\n",
@@ -918,7 +932,7 @@ class TestEbusdTcpScanMetadata(unittest.TestCase):
 
         self.assertIn(ISSUE_OUTDATED_HMU_CSV, coord_hmu._active_repair_issues)
 
-        tcp_hmu_v132 = [
+        tcp_hmu_v140 = [
             b"version: ebusd 26.1\n",
             b'address 08: slave #3, scanned "MF=Vaillant;ID=HMU00;SW=0902;HW=5103", loaded "vaillant/08.hmu.HW5103.csv"\n',
             b"\n",
@@ -926,13 +940,15 @@ class TestEbusdTcpScanMetadata(unittest.TestCase):
             b"\n",
             b"hmu RunDataElectricPowerConsumption = 300\n",
             b"\n",
+            b"hmu RunStatsCondensateTrayHeaterHours = 5\n",
+            b"\n",
             b"u,hmu,RunDataDiag000b\n",
             b"\n",
             b"r,hmu,Status01,temps,,08,b511,01,pumpstate,s,UCH,0=off;1=on;2=overrun;4=hwc;8=venting,,\n",
             b"\n",
         ]
         r4 = AsyncMock()
-        r4.readline = AsyncMock(side_effect=tcp_hmu_v132)
+        r4.readline = AsyncMock(side_effect=tcp_hmu_v140)
         w4 = MagicMock()
         w4.drain = AsyncMock()
         w4.wait_closed = AsyncMock()
@@ -949,7 +965,7 @@ class TestEbusdTcpScanMetadata(unittest.TestCase):
         self.assertNotIn(ISSUE_OUTDATED_HMU_CSV, coord_hmu._active_repair_issues)
 
     def test_mqtt_detects_v132_missing_registers_without_tcp(self) -> None:
-        """MQTT ERR responses on v1.3.2 registers trigger and clear HMUX0, VWZIO, and controller repairs."""
+        """MQTT ERR responses on v1.3.2/v1.4.0 registers trigger and clear HMUX0, HMU, VWZIO, and controller repairs."""
         from custom_components.arotherm_genia_ebusd.const import (
             ISSUE_OUTDATED_CONTROLLER_CSV,
         )
@@ -982,6 +998,29 @@ class TestEbusdTcpScanMetadata(unittest.TestCase):
         _pub("ebusd/bass3/Z1QuickVetoEndTime", '{"value": {"value": "00:00:00"}}')
 
         self.assertNotIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
+        self.assertNotIn(ISSUE_OUTDATED_VWZIO_CSV, coord._active_repair_issues)
+        self.assertNotIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+
+        # 3. Missing v1.4.0 registers over MQTT activate and clear all 4 CSV family repairs
+        _pub("ebusd/hmux0/RunStatsCondensateTrayHeaterHours", "ERR: element not found")
+        _pub("ebusd/hmu/RunStatsCondensateTrayHeaterHours", "ERR: element not found")
+        _pub("ebusd/vwzio/RunStatsHwcValveSwitches", "ERR: element not found")
+        _pub("ebusd/bass3/PrEnergySumTotal", "ERR: element not found")
+
+        self.assertIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
+        self.assertIn(ISSUE_OUTDATED_HMU_CSV, coord._active_repair_issues)
+        self.assertIn(ISSUE_OUTDATED_VWZIO_CSV, coord._active_repair_issues)
+        self.assertIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
+
+        _pub(
+            "ebusd/hmux0/RunStatsCondensateTrayHeaterHours", '{"value": {"value": 12}}'
+        )
+        _pub("ebusd/hmu/RunStatsCondensateTrayHeaterHours", '{"value": {"value": 5}}')
+        _pub("ebusd/vwzio/RunStatsHwcValveSwitches", '{"value": {"value": 189}}')
+        _pub("ebusd/bass3/PrEnergySumTotal", '{"value": {"value": 1234}}')
+
+        self.assertNotIn(ISSUE_OUTDATED_HMUX0_CSV, coord._active_repair_issues)
+        self.assertNotIn(ISSUE_OUTDATED_HMU_CSV, coord._active_repair_issues)
         self.assertNotIn(ISSUE_OUTDATED_VWZIO_CSV, coord._active_repair_issues)
         self.assertNotIn(ISSUE_OUTDATED_CONTROLLER_CSV, coord._active_repair_issues)
 
