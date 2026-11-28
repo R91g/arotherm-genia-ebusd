@@ -175,7 +175,11 @@ Because HACS updates never overwrite files outside `custom_components/`, you can
          curl -fsSL https://raw.githubusercontent.com/R91g/arotherm-genia-ebusd/main/scripts/install_ebusd_csvs.sh
          | sh -s -- -d /share/ebusd-configuration/en --reload
      ```
-  4. Optionally add a Home Assistant automation triggered when the HACS update entity finishes updating to run `shell_command.update_ebusd_csvs` and post the script's output (which files changed, exit status, and reload result) as a notification (`persistent_notification.create`, or replace with `notify.mobile_app_<your_phone>`):
+  4. Import the official **[Automatic eBUSd CSV Updater Blueprint](../blueprints/automation/ebusd_csv_auto_update.yaml)** in one click (no automation YAML needed — supports persistent notifications, custom mobile/Telegram notify actions, and optional `{{ tag }}` beta version tracking):
+
+     [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FR91g%2Farotherm-genia-ebusd%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Febusd_csv_auto_update.yaml)
+
+     *(Or if you prefer manual YAML instead of the blueprint:)*
      ```yaml
      alias: "eBUSd: Auto-update CSVs after integration update"
      trigger:

@@ -1,0 +1,132 @@
+blueprint:
+  name: aroTHERM & GeniaAir — Automatic eBUSd CSV Updater
+  description: >
+    Automatically runs your eBUSd CSV update shell_command whenever the
+    arotherm_genia_ebusd HACS integration finishes updating, and sends a
+    notification with the exact script output (files updated, live reload
+    status, or error details). Requires declaring shell_command.update_ebusd_csvs
+    once in configuration.yaml (see docs/installation.md Option C).
+  domain: automation
+  source_url: https://github.com/R91g/arotherm-genia-ebusd/blob/main/blueprints/automation/ebusd_csv_auto_update.yaml
+  input:
+    update_entity:
+      name: Integration Update Entity (HACS)
+      description: >
+        Select the Home Assistant update entity for aroTHERM & GeniaAir (eBUS),
+        e.g. update.arotherm_genia_ebusd_update.
+      selector:
+        entity:
+          filter:
+            - domain: update
+    shell_command_action:
+      name: Shell Command Action
+      description: >
+        The shell_command action declared in configuration.yaml that runs
+        install_ebusd_csvs.sh (default: shell_command.update_ebusd_csvs).
+      default: shell_command.update_ebusd_csvs
+      selector:
+        text:
+    pass_installed_version_tag:
+      name: "Pass Installed Version as tag (Beta Pre-Releases)"
+      description: >
+        Enable if your shell_command includes '-v {{ tag }}' so beta pre-releases
+        pull CSVs matching the exact installed HACS version instead of latest stable.
+      default: false
+      selector:
+        boolean:
+    send_persistent_notification:
+      name: Create Persistent Notification in Home Assistant
+      description: Shows the update summary (or error output) in the Home Assistant sidebar.
+      default: true
+      selector:
+        boolean:
+    notify_on_no_change:
+      name: Notify Even When No CSV Files Changed
+      description: >
+        When enabled, sends a confirmation even if all CSV files were already up to date.
+        Errors are always reported regardless of this setting.
+      default: true
+      selector:
+        boolean:
+    custom_actions:
+      name: Additional Notification Actions (Optional)
+      description: >
+        Add any notify actions (Mobile App, Telegram, Pushover, email, etc.).
+        Templates {{ update_title }}, {{ update_message }}, {{ update_success }},
+        {{ update_returncode }}, {{ update_has_changes }}, {{ update_stdout }}, and
+        {{ update_stderr }} are available in your action fields.
+      default: []
+      selector:
+        action:
+
+mode: single
+max_exceeded: silent
+
+triggers:
+  - id: update_completed
+    trigger: state
+    entity_id: !input update_entity
+    from: "on"
+    to: "off"
+  - id: version_changed
+    trigger: state
+    entity_id: !input update_entity
+    attribute: installed_version
+    not_from:
+      - "unknown"
+      - "unavailable"
+      - "none"
+    not_to:
+      - "unknown"
+      - "unavailable"
+      - "none"
+
+variables:
+  update_entity_id: !input update_entity
+  pass_tag: !input pass_installed_version_tag
+  send_persistent: !input send_persistent_notification
+  notify_unchanged: !input notify_on_no_change
+  installed_version: "{{ state_attr(update_entity_id, 'installed_version') | default('', true) | string }}"
+
+actions:
+  - delay:
+      seconds: 2
+  - action: !input shell_command_action
+    data: "{{ {'tag': installed_version} if (pass_tag and installed_version != '') else {} }}"
+    response_variable: csv_result
+  - variables:
+      update_returncode: "{{ csv_result.returncode | default(-1) | int }}"
+      update_success: "{{ update_returncode == 0 }}"
+      update_stdout: "{{ csv_result.stdout | default('') | trim }}"
+      update_stderr: "{{ csv_result.stderr | default('') | trim }}"
+      update_has_changes: "{{ not ('0 installed, 0 updated,' in update_stdout) }}"
+      should_notify: "{{ (not update_success) or notify_unchanged or update_has_changes }}"
+      update_title: >-
+        {% if not update_success %}
+          eBUSd CSV Update Failed
+        {% elif not update_has_changes %}
+          eBUSd CSVs Already Up to Date
+        {% else %}
+          eBUSd CSVs Updated
+        {% endif %}
+      update_message: >-
+        {% if update_success %}
+          {{ update_stdout if update_stdout != '' else 'CSV update completed successfully.' }}
+        {% else %}
+          Exit code {{ update_returncode }}.
+          {{ update_stderr if update_stderr != '' else (update_stdout if update_stdout != '' else 'Unknown error running shell_command.') }}
+        {% endif %}
+  - if:
+      - condition: template
+        value_template: "{{ should_notify }}"
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ send_persistent }}"
+        then:
+          - action: persistent_notification.create
+            data:
+              notification_id: arotherm_genia_ebusd_csv_update
+              title: "{{ update_title }}"
+              message: "{{ update_message }}"
+      - sequence: !input custom_actions
